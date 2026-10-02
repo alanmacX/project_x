@@ -64,7 +64,7 @@ export default class FridgeFormAbility extends FormExtensionAbility {
 
   onUpdateForm(formId: string): void {
     this.actionQueue = this.actionQueue.catch(() => {}).then(async () => {
-      await this.refreshDueWeather(); await this.pushForm(formId);
+      await this.pushForm(formId); await this.refreshDueWeather();
     }).catch((e: Error) => hilog.error(0x0000, 'FridgeForm', 'update %{public}s', e.message));
   }
 

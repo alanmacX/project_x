@@ -60,7 +60,7 @@ export function smoothAlpha(mask: Int32Array, width: number, height: number): In
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
     if (mask[y * width + x] >= 128) { left = Math.min(left, x); top = Math.min(top, y); right = Math.max(right, x); bottom = Math.max(bottom, y); }
   }
-  const sigma = Math.min(width, height) < 8 ? .55 : Math.max(1.2, Math.min(2.2, Math.max(right - left + 1, bottom - top + 1) / 240));
+  const sigma = Math.min(width, height) < 8 ? .55 : Math.max(1.4, Math.min(2.6, Math.max(right - left + 1, bottom - top + 1) / 240));
   const radius = Math.ceil(sigma * 3), weights: number[] = []; let sum = 0;
   for (let i = -radius; i <= radius; i++) { const value = Math.exp(-i * i / (2 * sigma * sigma)); weights.push(value); sum += value; }
   const horizontal = new Float32Array(mask.length), result = new Int32Array(mask.length);
@@ -210,7 +210,7 @@ export function traceMask(mask: Int32Array, width: number, height: number): Shap
         const a = loop[(j + loop.length - 1) % loop.length], b = loop[(j + 1) % loop.length];
         return Math.abs((p.x - a.x) * (b.y - p.y) - (p.y - a.y) * (b.x - p.x)) > 0.000001;
       });
-      if (simplified.length >= 3) loops.push(compactLoop(simplified, .4 / Math.max(width, height)));
+      if (simplified.length >= 3) loops.push(compactLoop(simplified, .8 / Math.max(width, height)));
     }
   }
   if (loops.length === 0) throw new Error('未检测到可用主体');

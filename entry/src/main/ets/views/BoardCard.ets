@@ -32,6 +32,8 @@ export struct BoardCard {
   onSelect: (id: string) => void = () => {};
   onDelete: (id: string) => void = () => {};
   onEdit: (id: string) => void = () => {};
+  getMoveBounds: (card: FridgeCard) => DragBounds = (card: FridgeCard) => dragBounds(card);
+  onMove: (x: number, y: number) => void = () => {};
   onInteraction: (active: boolean) => void = () => {};
   onCommit: (card: FridgeCard) => void = () => {};
   @State @Watch('syncHandles') moving: boolean = false;
@@ -144,13 +146,14 @@ export struct BoardCard {
     });
   }
   private startMove(): void {
-    this.animateLift(true); this.originX = this.card.x; this.originY = this.card.y; this.dx = 0; this.dy = 0; this.lastDX = 0; this.moveBounds = dragBounds(this.card); this.moving = true; this.onInteraction(true);
+    this.animateLift(true); this.originX = this.card.x; this.originY = this.card.y; this.dx = 0; this.dy = 0; this.lastDX = 0; this.moveBounds = this.getMoveBounds(this.card); this.moving = true; this.onInteraction(true);
   }
   private move(e: GestureEvent): void {
     const offset = this.screenOffset(e);
     const x = Math.max(this.moveBounds.minX, Math.min(this.moveBounds.maxX, this.originX + offset.x / this.scaleFactor));
     const y = Math.max(this.moveBounds.minY, Math.min(this.moveBounds.maxY, this.originY + offset.y / this.yScaleFactor));
     this.dx = (x - this.originX) * this.scaleFactor; this.dy = (y - this.originY) * this.yScaleFactor;
+    this.onMove(this.dx, this.dy);
     this.tilt = this.tilt * .65 + Math.max(-3, Math.min(3, (offset.x - this.lastDX) * .12)) * .35; this.lastDX = offset.x;
   }
   private cancelMove(): void { this.animateLift(false); this.dx = 0; this.dy = 0; this.moving = false; this.tilt = 0; this.onInteraction(false); }

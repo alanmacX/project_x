@@ -1,3 +1,4 @@
+import { combineCards, ungroupCards, groupMembers, groupDragBounds, cleanGroups } from '../model/CardGroups';
 import { PhotoCrop } from '../views/PhotoCrop';
 import { CanvasBackdrop } from '../views/CanvasBackdrop';
 import { CanvasBackground, FridgeState, normalizeBackground } from '../model/CardSchema';
@@ -38,6 +39,11 @@ const SHAPES: string[] = ['rect', 'round', 'pill', 'blob'];
 @Component
 struct Index {
   private photoCropDialog: CustomDialogController | null = null;
+  @State groupSelecting: boolean = false;
+  @State groupSelection: string[] = [];
+  @State groupDX: number = 0;
+  @State groupDY: number = 0;
+  private movingGroupIds: string[] = [];
   private store: FridgeStore = new FridgeStore();
   private context: Context | null = null;
   private frameRate: ExpectedFrameRateRange = motionFrameRate();
@@ -192,7 +198,7 @@ struct Index {
   private arrivalY(id: string): number { return this.arrival * (this.arrivalOffsets[id]?.y ?? 0); }
   private async repairStoredSubjects(): Promise<void> {
     if (this.context === null || this.repairingSubjects) return;
-    const pending = this.store.state.cards.filter((card: FridgeCard) => card.cutout.startsWith('file://') && card.subjectVersion < 3);
+    const pending = this.store.state.cards.filter((card: FridgeCard) => card.cutout.startsWith('file://') && card.subjectVersion < 4);
     if (pending.length === 0) return;
     this.repairingSubjects = true;
     try {
@@ -202,11 +208,11 @@ struct Index {
         const src = card.cutout;
         try {
           const result = await repairSubject(src, this.context.filesDir);
-          if (!this.alive || this.store.findCard(card.id) !== card || card.cutout !== src || card.subjectVersion >= 3) {
+          if (!this.alive || this.store.findCard(card.id) !== card || card.cutout !== src || card.subjectVersion >= 4) {
             try { await fileIo.unlink(result.src.slice(7)); } catch (_) {} continue;
           }
           if (card.shape === 'subject') { cropCardToSubject(card, result.crop); card.h = card.w / result.aspect; }
-          card.subjectAspect = result.aspect; card.cutout = result.src; card.outline = result.outline; card.subjectVersion = 3; card.subjectInk = result.ink;
+          card.subjectAspect = result.aspect; card.cutout = result.src; card.outline = result.outline; card.subjectVersion = 4; card.subjectInk = result.ink;
           if (!ensureCapabilitySize(card)) this.error = '部分主体内部空间不足，请移除能力或更换形状';
           this.clamp(card); this.render(); this.persist();
         } catch (_) { if (this.alive) this.error = '部分旧主体照片未能更新，请重新选择本地照片'; }
@@ -419,7 +425,7 @@ struct Index {
     }
     this.render();
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer);
-    this.scheduleBackground(); this.saveTimer = setTimeout(() => this.persist(true), 450);
+    this.scheduleBackground(); this.saveTimer = setTimeout(() => this.persist(true), 120);
   }
   private restoreHistory(redo: boolean): void {
     if (this.layerDrag.length > 0 || this.gestureGroup.length > 0 || this.heroActive || this.busy) return;
@@ -431,7 +437,7 @@ struct Index {
     if (this.layerId !== 'capability' && !restored.elements.some((el: CanvasElement) => el.id === this.layerId)) this.layerId = '';
     if (this.layerId === 'capability' && restored.capability === null) this.layerId = '';
     this.gestureGroup = ''; this.syncFields(); this.render();
-    this.undoAvailable = this.history.canUndo(); this.redoAvailable = this.history.canRedo(); this.persist(false);
+    this.undoAvailable = this.history.canUndo(); this.redoAvailable = this.history.canRedo(); this.persist(true);
   }
   private duplicateElement(): void {
     const card = this.current(), element = this.currentElement(); if (card === null || element === null) return;
@@ -447,11 +453,11 @@ struct Index {
     const a = card.elements.indexOf(element), b = card.elements.indexOf(peers[next]);
     card.elements[a] = peers[next]; card.elements[b] = element; this.change();
   }
-  private persist(syncWidgets: boolean = !this.editing): void {
+  private persist(syncWidgets: boolean = true): void {
     if (!this.ready || this.activeBoardId.length > 0) return;
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer); this.saveTimer = -1;
     this.store.state.canvasAspect = this.canvasAspect; this.store.state.canvasDimension = this.canvasDimension;
-    this.store.save(syncWidgets).catch(() => { this.error = '保存失败，点此重试'; });
+    this.store.save(syncWidgets).catch((e: Error) => { this.error = e.message === '桌面组件同步未完成' ? '桌面同步暂未完成，点此重试' : '保存失败，点此重试'; });
   }
   private clamp(card: FridgeCard): void {
     clampCardGeometry(card);
@@ -499,7 +505,7 @@ struct Index {
   }
   private duplicate(): void {
     const card = this.current(); if (card === null) return;
-    const copy = JSON.parse(JSON.stringify(card)) as FridgeCard; copy.id = this.store.newId(); copy.x += 16; copy.y += 16;
+    const copy = JSON.parse(JSON.stringify(card)) as FridgeCard; copy.id = this.store.newId(); copy.groupId = ''; copy.x += 16; copy.y += 16;
     copy.elements.forEach((e: CanvasElement) => { e.id = this.store.newId(); });
     this.clamp(copy); this.store.addCard(copy); this.select(copy.id); this.change();
   }
@@ -507,23 +513,28 @@ struct Index {
     this.getUIContext().showAlertDialog({ title: '删除卡片？', message: '卡片中的内容也会删除。',
       primaryButton: { value: '取消', action: () => {} },
       secondaryButton: { value: '删除', fontColor: '#C43A35', action: () => {
-        this.store.removeCard(id); this.selectedId = ''; this.editing = false; this.change();
+        this.store.removeCard(id); cleanGroups(this.store.state.cards); this.selectedId = ''; this.editing = false; this.change();
       } }
     });
   }
   private boardInteraction(id: string, active: boolean): void {
+    if (active) { const card = this.store.findCard(id); this.movingGroupIds = card === null ? [] : groupMembers(this.store.state.cards, card).filter((c: FridgeCard) => c.id !== id).map((c: FridgeCard) => c.id); }
+    else { this.groupDX = 0; this.groupDY = 0; this.movingGroupIds = []; }
     this.activeBoardId = active ? id : '';
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer); this.saveTimer = -1;
-    if (!active) { this.scheduleBackground(); this.saveTimer = setTimeout(() => this.persist(true), 450); }
+    if (!active) { this.scheduleBackground(); this.persist(true); }
   }
   private commitGeometry(updated: FridgeCard): void {
     const card = this.store.findCard(updated.id); if (card === null) return;
+    const dx = updated.x - card.x, dy = updated.y - card.y;
+    if (updated.w === card.w && updated.h === card.h) { for (const peer of groupMembers(this.store.state.cards, card)) if (peer.id !== card.id) { peer.x += dx; peer.y += dy; } }
+    this.groupDX = 0; this.groupDY = 0;
     card.x = updated.x; card.y = updated.y; card.w = updated.w; card.h = updated.h;
-    this.clamp(card); this.store.bringToFront(card);
+    this.clamp(card); groupMembers(this.store.state.cards, card).sort((a: FridgeCard, b: FridgeCard) => a.z - b.z).forEach((member: FridgeCard) => this.store.bringToFront(member));
     // Geometry handoff only updates the visible board; hydrate inspector on entry.
     if (this.editing || this.viewing) this.render(); else this.renderBoard();
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer);
-    this.scheduleBackground(); this.saveTimer = setTimeout(() => this.persist(true), 450);
+    this.scheduleBackground(); this.persist(true);
   }
   private async pickImage(subject: boolean = false, group: string = ''): Promise<void> {
     if (this.context === null || this.busy) return;
@@ -538,7 +549,7 @@ struct Index {
       if (subject) {
         const shapeResult = await extractSubject(result.photoUris[0], this.context.filesDir);
         if (this.store.findCard(id) !== card) { await fileIo.unlink(shapeResult.src.slice(7)); return; }
-        card.cutout = shapeResult.src; card.outline = shapeResult.outline; card.shape = 'subject'; card.subjectBorder = true; card.subjectVersion = 3; card.subjectInk = shapeResult.ink; card.subjectAspect = shapeResult.aspect;
+        card.cutout = shapeResult.src; card.outline = shapeResult.outline; card.shape = 'subject'; card.subjectBorder = true; card.subjectVersion = 4; card.subjectInk = shapeResult.ink; card.subjectAspect = shapeResult.aspect;
         card.h = card.w / shapeResult.aspect;
         const fit = Math.min(1, 320 / card.w, 420 / card.h); card.w *= fit; card.h *= fit;
         card.capBox = safeContentBox(card); this.change(group);
@@ -652,16 +663,18 @@ struct Index {
             Stack({ alignContent: Alignment.TopStart }) {
             BoardCard({ card: this.sceneCard(id), localCoordinates: true, cacheSurface: this.heroActive || this.arriving, scatterAngle: 0, editingSurface: this.editing,
               displayAngle: id === this.selectedId ? this.surfaceAngle() : this.cardMap[id].rot + this.scatter * (this.cardMap[id].z % 2 === 0 ? 9 : -9),
-              selected: this.selectedId === id && !this.editing, scaleFactor: this.boardScale, yScaleFactor: this.boardHeight / BOARD_H,
+              selected: this.selectedId === id && !this.editing && !this.groupSelecting, scaleFactor: this.boardScale, yScaleFactor: this.boardHeight / BOARD_H,
               hideContent: this.editing && id === this.selectedId && this.settingsTab === 0,
               movingLayerId: id === this.selectedId ? this.layerDrag : '',
               moveX: id === this.selectedId && this.editing ? this.layerDX * this.boardScale / this.editorScale() : 0, moveY: id === this.selectedId && this.editing ? this.layerDY * this.boardScale / this.editorScale() : 0, tick: this.tick,
-              onSelect: (id: string) => this.select(id), onDelete: (id: string) => this.deleteCard(id),
+              getMoveBounds: (card: FridgeCard) => groupDragBounds(this.store.state.cards, card),
+              onMove: (x: number, y: number) => { if (this.movingGroupIds.length > 0) { this.groupDX = x; this.groupDY = y; } },
+              onSelect: (id: string) => this.selectLayerCard(id), onDelete: (id: string) => this.deleteCard(id),
               onEdit: (id: string) => this.openEditor(id), onInteraction: (active: boolean) => this.boardInteraction(id, active), onCommit: (updated: FridgeCard) => this.commitGeometry(updated) })
           }.width(this.sceneCard(id).w * this.boardScale + 48).height(this.sceneCard(id).h * this.boardScale + 48)
             .scale({ x: this.sceneScale(id), y: this.sceneScale(id), centerX: 24, centerY: 24 })
             .position({ x: this.sceneX(id) - 24 - this.creationClipX(id), y: this.sceneY(id) - 24 - this.creationClipY(id) })
-            .translate({ x: this.arrivalX(id), y: this.arrivalY(id) })
+            .translate({ x: this.arrivalX(id) + (this.movingGroupIds.includes(id) ? this.groupDX : 0), y: this.arrivalY(id) + (this.movingGroupIds.includes(id) ? this.groupDY : 0) })
             .hitTestBehavior(this.editing || this.arriving ? HitTestMode.None : HitTestMode.Transparent)
           }.width(this.creationClip(id) ? this.transitionClipW : this.screenWidth)
             .height(this.creationClip(id) ? this.transitionClipH : this.screenHeight)
@@ -694,11 +707,23 @@ struct Index {
       this.homeBackground()
     }.width('100%').height('100%').opacity(this.boardOpacity).accessibilityLevel(this.editing || this.viewing ? 'no-hide-descendants' : 'auto').hitTestBehavior(this.editing || this.viewing ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Default)
   }
+  private selectLayerCard(id: string): void {
+    if (!this.groupSelecting) { this.select(id); return; }
+    this.groupSelection = this.groupSelection.includes(id) ? this.groupSelection.filter((value: string) => value !== id) : this.groupSelection.concat([id]);
+  }
+  private confirmGroup(): void {
+    if (this.groupSelection.length < 2) return;
+    combineCards(this.store.state.cards, this.groupSelection, this.store.newId()); this.groupSelecting = false; this.groupSelection = []; this.renderBoard(); this.persist(true);
+  }
+  private releaseGroup(): void {
+    const card = this.store.findCard(this.selectedId); if (card === null) return; ungroupCards(this.store.state.cards, card.groupId); this.renderBoard(); this.persist(true);
+  }
   @Builder
   homeLayers() {
       Column({ space: 12 }) {
         Row() {
           Text('图层').fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText()); Blank()
+          Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule }).margin({ right: 8 }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
           Button('+', { type: ButtonType.Circle }).width(44).height(AppDesign.controlHeight).fontSize(24).backgroundColor('#262626').fontColor(Color.White).accessibilityText('添加卡片').onClick(() => this.addCard())
         }.width('100%')
         Scroll() {
@@ -711,15 +736,17 @@ struct Index {
                 }.width(52).height(52).hitTestBehavior(HitTestMode.None)
                 Column({ space: 4 }) {
                   Text(layerLabel(this.cardMap[id])).fontSize(14).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).fontColor(this.appText()).width('100%')
-                  Text((index === 0 ? '最上层 · ' : '') + (this.cardMap[id].capability !== null ? typeLabel(this.cardMap[id].capability?.k ?? '') : '自定义')).fontSize(11).fontColor(this.appMuted()).width('100%')
+                  Text((this.cardMap[id].groupId.length > 0 ? '组合 · ' : '') + (index === 0 ? '最上层 · ' : '') + (this.cardMap[id].capability !== null ? typeLabel(this.cardMap[id].capability?.k ?? '') : '自定义')).fontSize(11).fontColor(this.appMuted()).width('100%')
                 }.layoutWeight(1).hitTestBehavior(HitTestMode.None)
-                Button('编辑', { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).fontSize(13).backgroundColor(Color.Transparent).fontColor(this.appText()).onClick(() => this.openEditor(id))
-              }.width('100%').padding(8).borderRadius(12).backgroundColor(this.appSurface()).border({ width: this.selectedId === id ? 1.5 : 0, color: this.appMuted() })
-                .accessibilityText('选择卡片 ' + layerLabel(this.cardMap[id])).onClick(() => this.select(id))
+                Button('编辑', { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).fontSize(13).backgroundColor(Color.Transparent).fontColor(this.appText()).enabled(!this.groupSelecting).onClick(() => this.openEditor(id))
+              }.width('100%').padding(8).borderRadius(12).backgroundColor(this.appSurface()).border({ width: (this.groupSelecting ? this.groupSelection.includes(id) : this.selectedId === id) ? 1.5 : 0, color: this.appMuted() })
+                .accessibilityText('选择卡片 ' + layerLabel(this.cardMap[id])).onClick(() => this.selectLayerCard(id))
             }, (id: string) => id)
           }.width('100%')
         }.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Off)
-        if (this.selectedId.length > 0) {
+        if (this.groupSelecting) { Button('组合选中卡片（' + this.groupSelection.length + '）', { type: ButtonType.Capsule }).height(44).width('100%').enabled(this.groupSelection.length > 1).onClick(() => this.confirmGroup()) }
+        if (!this.groupSelecting && (this.store.findCard(this.selectedId)?.groupId ?? '').length > 0) { Button('取消组合', { type: ButtonType.Capsule }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.releaseGroup()) }
+        if (!this.groupSelecting && this.selectedId.length > 0) {
           Row({ space: 12 }) {
             Button('上移一层', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.moveCardLayer(this.selectedId, true))
             Button('下移一层', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.moveCardLayer(this.selectedId, false))

@@ -1,3 +1,5 @@
+import { cleanGroups } from './CardGroups';
+import { LatestWidgetQueue } from './LatestWidgetQueue';
 import { primeRenderContours } from './RenderContours';
 import { storageSnapshot } from './StorageSnapshot';
 import preferences from '@ohos.data.preferences';
@@ -15,11 +17,11 @@ export class FridgeStore {
   private sequence: number = 0;
   private saveVersion: number = 0;
   private lastSaved: string = '';
-  private lastPushed: string = '';
+  private widgetQueue: LatestWidgetQueue = new LatestWidgetQueue(async (json: string) => { if (this.context !== null) await pushWidgets(this.context, json); });
   state: FridgeState = defaultState();
   canvasSpecs: Record<string, number> = {};
   async init(context: Context): Promise<void> {
-    this.context = context; this.lastSaved = ''; this.lastPushed = '';
+    this.context = context; this.lastSaved = '';
     await this.saveQueue.catch(() => {});
     await preferences.removePreferencesFromCache(context, 'fridge_store');
     this.prefs = await preferences.getPreferences(context, 'fridge_store');
@@ -29,7 +31,7 @@ export class FridgeStore {
     try {
       const parsed = JSON.parse(json) as FridgeState;
       if (!Array.isArray(parsed.cards)) throw new Error('Invalid cards');
-      this.state = normalizeState(parsed);
+      this.state = normalizeState(parsed); cleanGroups(this.state.cards);
       this.state.cards.forEach((card: FridgeCard) => clampCardGeometry(card));
       await primeRenderContours(this.state.cards, storageSnapshot(this.state)); // Cache derived geometry off the UI thread before interaction.
     } catch (e) { throw new Error('本地卡片数据无法读取，已保留原始记录'); }
@@ -52,12 +54,10 @@ export class FridgeStore {
       if (snapshot !== this.lastSaved) {
         await this.prefs.put('fridge_state_json', snapshot); await this.prefs.flush();
       }
-      if (syncWidgets && version === this.saveVersion && snapshot !== this.lastPushed && this.context !== null) {
-        await pushWidgets(this.context, snapshot); this.lastPushed = snapshot;
-      }
       this.lastSaved = snapshot;
     });
-    this.saveQueue = pending; return pending;
+    this.saveQueue = pending;
+    return pending.then(() => syncWidgets && version === this.saveVersion ? this.widgetQueue.submit(snapshot) : Promise.resolve());
   }
   nextZ(): number { return ++this.state.maxZ; }
   bringToFront(card: FridgeCard): void { card.z = this.nextZ(); }

@@ -55,6 +55,7 @@ export class CanvasElement extends ElementBox {
 }
 export interface ShapePoint { x: number; y: number; }
 export class FridgeCard {
+  groupId: string = '';
   id: string = '';
   x: number = 24;
   y: number = 32;
@@ -172,7 +173,7 @@ export function normalizeState(raw: FridgeState): FridgeState {
   state.maxZ = bounded(raw.maxZ, 0, Number.MAX_SAFE_INTEGER, 10);
   for (const source of (Array.isArray(raw.cards) ? raw.cards : [])) {
     if (source === null || typeof source.id !== 'string') continue;
-    const card = new FridgeCard(); card.id = source.id;
+    const card = new FridgeCard(); card.id = source.id; card.groupId = typeof source.groupId === 'string' ? source.groupId.slice(0, 96) : '';
     card.w = bounded(source.w, source.shape === 'subject' ? 16 : 80, 320, 180); card.h = bounded(source.h, source.shape === 'subject' ? 16 : 80, 420, 180);
     card.x = bounded(source.x, -card.w + Math.min(32, card.w * .2), BOARD_W - Math.min(32, card.w * .2), 24); card.y = bounded(source.y, -card.h + Math.min(32, card.h * .2), BOARD_H - Math.min(32, card.h * .2), 32);
     card.rot = bounded(source.rot, -180, 180, 0); card.z = bounded(source.z, 0, Number.MAX_SAFE_INTEGER, 1);

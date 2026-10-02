@@ -125,6 +125,16 @@ function load(name) {
   const {sceneRect,scenePercent} = load('SceneLayout');
   const {cardContainsPoint} = load('CardHitTest');
   const {storageSnapshot}=load('StorageSnapshot');
+  const {LatestWidgetQueue}=load('LatestWidgetQueue');
+  const sent=[];let release;const queue=new LatestWidgetQueue(async json=>{sent.push(json);if(json==='A')await new Promise(r=>release=r);});
+  const firstDelivery=queue.submit('A');queue.submit('B');queue.submit('C');release();await firstDelivery;assert.deepEqual(sent,['A','C'],'pending scenes coalesce to the newest without delivering stale intermediate scenes');
+  await queue.submit('C');assert.equal(sent.length,2,'successful revisions are acknowledged');
+  let attempts=0;const retryQueue=new LatestWidgetQueue(async()=>{if(++attempts===1)throw Error('IPC');});await assert.rejects(retryQueue.submit('same'));await retryQueue.submit('same');assert.equal(attempts,2,'a failed revision is never acknowledged');
+  const {combineCards,ungroupCards,groupMembers,cleanGroups,groupDragBounds}=load('CardGroups');
+  const members=[new FridgeCard(),new FridgeCard(),new FridgeCard()];members.forEach((c,i)=>{c.id='group'+i;c.x=.15+i*.1;c.y=.25;});
+  combineCards(members,['group0','group1'],'first');combineCards(members,['group1','group2'],'merged');assert.equal(groupMembers(members,members[0]).length,3,'combining a member merges the entire existing group');
+  const before=members.map(c=>[c.x,c.y,c.rot,c.w,c.h]);const limits=groupDragBounds(members,members[0]);assert.ok(limits.minX<=members[0].x&&limits.maxX>=members[0].x);ungroupCards(members,'merged');assert.deepEqual(members.map(c=>[c.x,c.y,c.rot,c.w,c.h]),before,'ungrouping never changes layout');members[0].groupId='orphan';cleanGroups(members);assert.equal(members[0].groupId,'');
+  const {contourPath}=load('ContourPath');const square=[{x:0,y:0},{x:1,y:0},{x:1,y:1},{x:0,y:1}];const curve=contourPath([square,square.slice().reverse()],100,100,1);assert.equal((curve.match(/Z/g)||[]).length,2,'independent closed loops retain holes');assert.ok(curve.startsWith('M0,0 L100,0 L100,100 L0,100 L0,0 Z'),'deliberate large corners remain pinned without redundant curve commands');
   const {compactContours}=load('ContourGeometry');
   const denseLoop=Array.from({length:4000},(_,i)=>{const a=i*Math.PI*2/4000;return {x:.5+.4*Math.cos(a),y:.5+.4*Math.sin(a)};});
   const hole=Array.from({length:400},(_,i)=>{const a=-i*Math.PI*2/400;return {x:.5+.05*Math.cos(a),y:.5+.05*Math.sin(a)};});
@@ -286,7 +296,7 @@ function load(name) {
   await updateWidget('123',JSON.stringify({schemaVersion:2,cards:[photo]}),'4*4');
   assert.equal(JSON.parse(updates.at(-1).data.faceCards)[0].elements[0].src,'');
   disk.set('fridge_form_dims_json', JSON.stringify({removed:'4*4',working:'2*4'})); failForm=true; await pushWidgets({},snapshot);
-  assert.equal(updates.at(-1).id,'working');
+  assert.ok(updates.some(u=>u.id==='working')); assert.equal(updates.at(-1).id,'removed','failed instance retries without blocking healthy instance');
   assert.throws(() => traceMask(new Int32Array(2),2,2),/尺寸/);
   assert.throws(() => traceMask(new Int32Array(4),2,2),/未检测/);
   assert.equal(traceMask(new Int32Array([255,255,255,255]),2,2)[0].length,4,'a square preserves four real corners without adding artificial smoothing vertices');
@@ -376,7 +386,7 @@ function load(name) {
   function referenceAlpha(mask,w,h) {
     let l=w,t=h,r=0,b=0;
     for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(mask[y*w+x]>=128){l=Math.min(l,x);t=Math.min(t,y);r=Math.max(r,x);b=Math.max(b,y);}
-    const sigma=Math.min(w,h)<8?.55:Math.max(1.2,Math.min(2.2,Math.max(r-l+1,b-t+1)/240));
+    const sigma=Math.min(w,h)<8?.55:Math.max(1.4,Math.min(2.6,Math.max(r-l+1,b-t+1)/240));
     const radius=Math.ceil(sigma*3),weights=[];let sum=0;
     for(let i=-radius;i<=radius;i++){const v=Math.exp(-i*i/(2*sigma*sigma));weights.push(v);sum+=v;}
     const tmp=new Float32Array(w*h),out=new Int32Array(w*h);

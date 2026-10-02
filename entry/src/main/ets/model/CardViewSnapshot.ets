@@ -4,7 +4,7 @@ import { FridgeCard, CapBlock, ElementBox, CanvasElement } from './CardSchema';
 /** Contours are immutable after extraction. Keep them shared while editable values are snapshots. */
 export function cardViewSnapshot(source: FridgeCard): FridgeCard {
   const copy = new FridgeCard();
-  copy.id = source.id;
+  copy.id = source.id; copy.groupId = source.groupId;
   copy.x = source.x;
   copy.y = source.y;
   copy.w = source.w;

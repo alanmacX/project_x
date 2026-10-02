@@ -11,13 +11,18 @@ export async function updateWidget(formId: string, json: string, dim: string): P
 }
 
 export async function pushWidgets(context: Context, json: string): Promise<void> {
+  await preferences.removePreferencesFromCache(context, 'fridge_store');
   const prefs = await preferences.getPreferences(context, 'fridge_store');
   const dims = JSON.parse(await prefs.get('fridge_form_dims_json', '{}') as string) as Record<string, string>;
-  for (const id of Object.keys(dims)) {
-    try {
-      await updateWidget(id, json, dims[id]);
-    } catch (e) {
-      hilog.warn(0x0000, 'WidgetSync', 'update %{public}s: %{public}s', id, (e as Error).message);
+  const failures: string[] = [];
+  await Promise.all(Object.keys(dims).map(async (id: string) => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try { await updateWidget(id, json, dims[id]); return; }
+      catch (e) {
+        if (attempt === 2) { failures.push(id); hilog.warn(0x0000, 'WidgetSync', 'update %{public}s: %{public}s', id, (e as Error).message); }
+        else await new Promise<void>((resolve) => { setTimeout(resolve, attempt === 0 ? 120 : 400); });
+      }
     }
-  }
+  }));
+  if (failures.length > 0) throw new Error('桌面组件同步未完成');
 }
