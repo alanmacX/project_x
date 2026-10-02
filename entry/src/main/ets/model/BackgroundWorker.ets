@@ -1,3 +1,4 @@
+import { photoFrame } from './PhotoCropGeometry';
 import { image } from '@kit.ImageKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { BackgroundAnchor, CanvasBackground, FridgeState, FridgeCard, materialColors, BOARD_W, BOARD_H } from './CardSchema';
@@ -32,7 +33,7 @@ export async function createSmartBackground(json:string,filesDir:string):Promise
   // Keep the twelve most visible influences; bitmap generation stays off the UI thread.
   bg.anchors=anchors.sort((a:BackgroundAnchor,b:BackgroundAnchor)=>b.weight-a.weight).slice(0,12);
   if(bg.mode==='smart')return JSON.stringify(bg);
-  const width=640,height=Math.max(256,Math.min(1024,Math.round(width/state.canvasAspect))),path=filesDir+'/canvas_blend_'+hash(bg.signature)+'.png';
+  const width=320,height=Math.max(160,Math.min(512,Math.round(width/state.canvasAspect))),path=filesDir+'/canvas_blend_'+hash(bg.signature)+'.png';
   try{if(await fileIo.access(path)){bg.src='file://'+path;return JSON.stringify(bg);}}catch(_){}
   const rgba=blendPixels(bg.anchors,bg.color,width,height);let pixel:image.PixelMap|null=null,packer:image.ImagePacker|null=null,file:fileIo.File|null=null;
   try{
@@ -52,4 +53,22 @@ export async function importBackgroundPhoto(uri:string,filesDir:string):Promise<
     packer=image.createImagePacker();output=await fileIo.open(path,fileIo.OpenMode.CREATE|fileIo.OpenMode.READ_WRITE);await packer.packToFile(pixel,output.fd,{format:'image/jpeg',quality:92});return 'file://'+path;
   } catch(e) {try{await fileIo.unlink(path);}catch(_){}throw e as Error;}
   finally {if(input!==null)fileIo.closeSync(input.fd);if(output!==null)fileIo.closeSync(output.fd);if(pixel!==null)await pixel.release();if(source!==null)await source.release();if(packer!==null)await packer.release();}
+}
+
+/** Commit the same cover transform shown inside the widget-shaped crop frame. */
+@Concurrent
+export async function cropBackgroundPhoto(src: string, filesDir: string, aspect: number, zoom: number, x: number, y: number): Promise<string> {
+  let file: fileIo.File | null = null, output: fileIo.File | null = null, source: image.ImageSource | null = null, pixel: image.PixelMap | null = null, packer: image.ImagePacker | null = null;
+  const path = filesDir + '/canvas_crop_' + Date.now() + '.jpg';
+  try {
+    file = await fileIo.open(src.slice(7), fileIo.OpenMode.READ_ONLY); source = image.createImageSource(file.fd);
+    pixel = await source.createPixelMap({ editable: true }); const info = await pixel.getImageInfo();
+    const f = photoFrame(info.size.width, info.size.height, 280, 280 / aspect, zoom, x, y), scale = f.width / info.size.width;
+    const left = Math.max(0, Math.round(-f.left / scale)), top = Math.max(0, Math.round(-f.top / scale));
+    const width = Math.min(info.size.width - left, Math.max(1, Math.round(280 / scale))), height = Math.min(info.size.height - top, Math.max(1, Math.round(280 / aspect / scale)));
+    await pixel.crop({ x: left, y: top, size: { width: width, height: height } });
+    packer = image.createImagePacker(); output = await fileIo.open(path, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE);
+    await packer.packToFile(pixel, output.fd, { format: 'image/jpeg', quality: 94 }); return 'file://' + path;
+  } catch (e) { try { await fileIo.unlink(path); } catch (_) {} throw e as Error; }
+  finally { if (file !== null) fileIo.closeSync(file.fd); if (output !== null) fileIo.closeSync(output.fd); if (pixel !== null) await pixel.release(); if (source !== null) await source.release(); if (packer !== null) await packer.release(); }
 }

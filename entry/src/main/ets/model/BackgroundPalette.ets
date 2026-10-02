@@ -9,12 +9,13 @@ export function colorLab(hex: string): LabColor {
   const x=f((r*.4124564+g*.3575761+b*.1804375)/.95047),y=f(r*.2126729+g*.7151522+b*.072175),z=f((r*.0193339+g*.119192+b*.9503041)/1.08883);
   return {l:116*y-16,a:500*(x-y),b:200*(y-z)};
 }
-export function labColor(lab: LabColor): string {
+function labRGB(lab: LabColor): number[] {
   const y=(lab.l+16)/116,x=y+lab.a/500,z=y-lab.b/200;
   const f=(v:number):number => v**3>.008856 ? v**3 : (v-16/116)/7.787;
   const X=f(x)*.95047,Y=f(y),Z=f(z)*1.08883;
-  return '#'+[encoded(X*3.2404542-Y*1.5371385-Z*.4985314),encoded(-X*.969266+Y*1.8760108+Z*.041556),encoded(X*.0556434-Y*.2040259+Z*1.0572252)].map((v:number)=>v.toString(16).padStart(2,'0')).join('').toUpperCase();
+  return [encoded(X*3.2404542-Y*1.5371385-Z*.4985314),encoded(-X*.969266+Y*1.8760108+Z*.041556),encoded(X*.0556434-Y*.2040259+Z*1.0572252)];
 }
+export function labColor(lab: LabColor): string { return '#'+labRGB(lab).map((v:number)=>v.toString(16).padStart(2,'0')).join('').toUpperCase(); }
 function distance(a: LabColor,b: LabColor): number { return (a.l-b.l)**2+(a.a-b.a)**2+(a.b-b.b)**2; }
 /** Alpha-weighted perceptual clusters: transparent padding and white margins do not vote. */
 export function representativeColor(rgba: Uint8Array, premultiplied: boolean = false): string {
@@ -69,18 +70,26 @@ export function smartTone(colors: WeightedColor[]): string {
 }
 /** Smooth Lab mixture tied to card centres; cached as one bitmap for App and FormKit. */
 export function blendPixels(anchors: BackgroundAnchor[], base: string, width: number, height: number): Uint8Array {
-  const bytes=new Uint8Array(width*height*4),labs=anchors.map((a:BackgroundAnchor)=>colorLab(backgroundTone(a.color))),neutral=colorLab(base);
+  const bytes=new Uint8Array(width*height*4);
+  const labs=anchors.map((anchor:BackgroundAnchor)=>{ const tone=colorLab(anchor.color),chroma=Math.hypot(tone.a,tone.b),scale=chroma>0?Math.min(30,chroma*.6)/chroma:0;
+    return {l:Math.max(40,Math.min(64,30+tone.l*.4)),a:tone.a*scale,b:tone.b*scale} as LabColor;
+  });
+  const neutral=colorLab(base);neutral.l=50;neutral.a*=.55;neutral.b*=.55;
+  // Broad overlapping colour clouds with subtle luminance variation, never small radial spots.
+  const horizontal=anchors.map((p:BackgroundAnchor)=>{const row:number[]=[];for(let x=0;x<width;x++){const dx=x/Math.max(1,width-1)-p.x;row.push(Math.exp(-dx*dx/.28));}return row;});
+  const vertical=anchors.map((p:BackgroundAnchor)=>{const column:number[]=[];for(let y=0;y<height;y++){const dy=y/Math.max(1,height-1)-p.y;column.push(Math.exp(-dy*dy/.2));}return column;});
   for(let y=0;y<height;y++)for(let x=0;x<width;x++){
-    const nx=x/Math.max(1,width-1),ny=y/Math.max(1,height-1);let sum=.4,l=neutral.l*.4,a=neutral.a*.4,b=neutral.b*.4;
+    const nx=x/Math.max(1,width-1),ny=y/Math.max(1,height-1);let sum=.22,l=neutral.l*.22,a=neutral.a*.22,b=neutral.b*.22;
     for(let k=0;k<anchors.length;k++){
-      const p=anchors[k],d=(nx-p.x)**2+(ny-p.y)**2,w=Math.exp(-d/ .16)*Math.sqrt(p.weight);
+      const p=anchors[k],w=horizontal[k][x]*vertical[k][y]*Math.sqrt(p.weight);
       sum+=w;l+=labs[k].l*w;a+=labs[k].a*w;b+=labs[k].b*w;
     }
-    const color=labColor({l:l/sum,a:a/sum,b:b/sum}),i=(y*width+x)*4;
+    const atmosphere=4.8*Math.sin(nx*3.1+ny*1.7)-3.2*ny;
+    const color=labRGB({l:l/sum+atmosphere,a:a/sum,b:b/sum}),i=(y*width+x)*4;
     const noise=(((x*73+y*151)%17)/16-.5)*.65;
-    bytes[i]=Math.max(0,Math.min(255,Math.round(parseInt(color.slice(1,3),16)+noise)));
-    bytes[i+1]=Math.max(0,Math.min(255,Math.round(parseInt(color.slice(3,5),16)+noise)));
-    bytes[i+2]=Math.max(0,Math.min(255,Math.round(parseInt(color.slice(5,7),16)+noise)));bytes[i+3]=255;
+    bytes[i]=Math.max(0,Math.min(255,Math.round(color[0]+noise)));
+    bytes[i+1]=Math.max(0,Math.min(255,Math.round(color[1]+noise)));
+    bytes[i+2]=Math.max(0,Math.min(255,Math.round(color[2]+noise)));bytes[i+3]=255;
   }
   return bytes;
 }

@@ -490,6 +490,12 @@ function load(name) {
   assert.equal(httpCalls,2,'concurrent requests for one city share one geocode and one forecast');
   assert.equal(results[0].temp,'24°');assert.equal(results[1].desc,'阴');
   await realWeather.fetchWeather('Hangzhou');assert.equal(httpCalls,3,'later refresh reuses coordinates and still requests fresh forecast');
+  const {photoFrame}=load('PhotoCropGeometry');
+  for(const [sw,sh] of [[4000,3000],[3000,4000],[4000,700]]) for(const aspect of [.73,1,1.5,2]) for(const zoom of [1,2,5]) for(const [x,y] of [[0,0],[10000,-10000],[-10000,10000]]) {
+    const fw=280,fh=280/aspect,f=photoFrame(sw,sh,fw,fh,zoom,x,y),scale=f.width/sw;
+    assert.ok(f.left<=1e-9&&f.top<=1e-9&&f.left+f.width>=fw-1e-9&&f.top+f.height>=fh-1e-9,'crop always covers widget frame');
+    assert.ok(-f.left/scale>=-1e-9&&(-f.left+fw)/scale<=sw+1e-7&&(-f.top+fh)/scale<=sh+1e-7,'native crop stays inside source pixels');
+  }
   const palette=load('BackgroundPalette');
   for(const hex of ['#FF0000','#00FF00','#0000FF','#D8BE92','#262824']){
     const roundtrip=palette.labColor(palette.colorLab(hex));
