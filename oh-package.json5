@@ -1,0 +1,13 @@
+{
+  "modelVersion": "5.0.0",
+  "name": "fridgememo",
+  "version": "1.0.0",
+  "description": "冰箱贴桌面 · 可自由拼贴的原子卡片 widget",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {},
+  "devDependencies": {
+    "@ohos/hypium": "1.0.19"
+  }
+}

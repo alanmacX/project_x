@@ -1,0 +1,12 @@
+{
+  "modelVersion": "5.0.0",
+  // 若后续报 modelVersion 与 hvigor 版本不匹配：
+  // 新建空工程，用它自动生成的 hvigor/hvigor-config.json5 覆盖本文件即可。
+  "dependencies": {
+    "@ohos/hvigor-ohos-plugin": "6.26.8"
+  },
+  "execution": {},
+  "logging": {},
+  "debugging": {},
+  "nodeOptions": {}
+}

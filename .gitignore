@@ -1,0 +1,29 @@
+# DevEco / hvigor 产物
+build/
+oh_modules/
+.local/
+.cxx/
+/.idea/
+**/build
+**/oh_modules
+**/.cxx
+**/.test
+/AppScope/build
+/entry/build
+oh-package-lock.json5
+
+# 签名材料（含密码，严禁提交）
+**/*.p12
+**/*.cer
+**/*.p7b
+build-profile.json5.bak
+
+# Local IDE state and non-app working notes
+.hvigor/
+.DS_Store
+.idea/
+/docs/
+/build-profile.json5
+local.properties
+*.trace
+*.log

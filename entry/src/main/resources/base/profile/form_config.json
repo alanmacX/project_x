@@ -1,0 +1,22 @@
+{
+  "forms": [
+    {
+      "name": "FridgeForm",
+      "displayName": "$string:form_display",
+      "description": "$string:form_desc",
+      "src": "./ets/widget/pages/FridgeWidgetCard.ets",
+      "uiSyntax": "arkts",
+      "window": {
+        "designWidth": 720
+      },
+      "isDefault": true,
+      "supportDimensions": [
+        "4*4"
+      ],
+      "defaultDimension": "4*4",
+      "updateEnabled": true,
+      "updateDuration": 1,
+      "formConfigAbility": "ability://EntryAbility"
+    }
+  ]
+}
