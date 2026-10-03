@@ -1,3 +1,4 @@
+import { CalendarRulesDialog } from './CalendarRulesDialog';
 import { ValuePicker } from './ValuePicker';
 import { CapBlock, ParcelItem, CourseItem, AgendaItem } from '../model/CardSchema';
 import { ValueField, pickupCandidates, pendingParcels, eventWhen } from '../model/CapabilityData';
@@ -80,6 +81,12 @@ export struct CapabilitySettings {
       if(!this.alive||this.cardId!==id)return;const next=this.copy(),courses=(next.courses??[]).filter((c)=>c.id!==value.id);courses.push(value);next.courses=courses;this.change(next);
     }}),customStyle:true,alignment:DialogAlignment.Center,autoCancel:true});this.dialog.open();
   }
+  private calendarRules():void {
+    const id=this.cardId;
+    this.dialog=new CustomDialogController({builder:CalendarRulesDialog({cap:this.copy(),appDark:this.appDark,onSave:(cap:CapBlock)=>{
+      if(this.alive&&this.cardId===id&&this.cap.k==='timetable')this.change(cap);
+    }}),customStyle:true,autoCancel:true});this.dialog.open();
+  }
   private semesterDate():void {
     this.getUIContext().showDatePickerDialog({selected:new Date((this.cap.semester??'')+'T00:00:00'),onAccept:(v:DatePickerResult)=>{
       const next=this.copy();next.semester=v.year+'-'+('0'+((v.month??0)+1)).slice(-2)+'-'+('0'+v.day).slice(-2);this.change(next);
@@ -104,7 +111,7 @@ export struct CapabilitySettings {
       if(!replace&&list.length&&next.semester!==semester)throw new Error('开学日期不同，请选择替换或先建立另一张课程卡');
       for(const c of courses)if(!list.some((v)=>v.name===c.name&&v.room===c.room&&v.day===c.day&&v.start===c.start&&v.end===c.end&&v.firstWeek===c.firstWeek&&v.lastWeek===c.lastWeek&&v.parity===c.parity))list.push(c);
       if(list.length>128)throw new Error('合并后超过 128 条，请分成两张课程卡');
-      next.semester=semester;next.courses=list;this.change(next);
+      next.semester=semester;next.courses=list;if(replace)next.courseChanges=[];this.change(next);
     }}),customStyle:true,alignment:DialogAlignment.Center,autoCancel:true});this.dialog.open();
   }
   @Builder
@@ -145,6 +152,7 @@ export struct CapabilitySettings {
         this.action('导入课程表',()=>this.importTimetable())
         Text('学期与课程').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
         this.action('学期第一周周一  '+(this.cap.semester??''),()=>this.semesterDate())
+        this.action('假期与调课',()=>this.calendarRules())
         this.action('添加课程',()=>this.editCourse())
         ForEach(this.cap.courses??[],(c:CourseItem)=>{
           Row({space:8}) {Button(c.name+' · 周'+['一','二','三','四','五','六','日'][c.day-1]+' '+c.start,{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontSize(12).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.editCourse(c));Button('删除',{type:ButtonType.Capsule}).height(44).fontSize(12).fontColor('#C43A35').backgroundColor(this.control()).onClick(()=>{const next=this.copy();next.courses=(next.courses??[]).filter((v)=>v.id!==c.id);this.change(next);})}.width('100%')

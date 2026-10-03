@@ -1,4 +1,5 @@
-import { agendaItems, courseInstances, pendingParcels, eventWhen } from '../model/CapabilityData';
+import { holidayName, holidayMarker } from '../model/HolidayCalendar';
+import { agendaItems, courseInstances, teachingDayLabel, pendingParcels, eventWhen } from '../model/CapabilityData';
 import { AgendaItem, ParcelItem } from '../model/CardSchema';
 import { CapBlock, typeLabel, contrastingInk } from '../model/CardSchema';
 import { capabilityMinimum, compactCapability } from '../model/CapabilityMetrics';
@@ -49,7 +50,7 @@ export struct CapabilityView {
         TextClock().format('HH:mm').fontSize(((this.compact() ? 26 : 42) * this.unit()) + 'vp').fontWeight(FontWeight.Medium).fontColor(this.ink)
       } else if (this.cap.k === 'date') {
         TextClock().format('dd').fontSize(((this.compact() ? 28 : 54) * this.unit()) + 'vp').fontWeight(FontWeight.Medium).fontColor(this.ink)
-        TextClock().format(this.compact() ? 'MM月 E' : 'yyyy年MM月 E').fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).opacity(0.65)
+        Text(holidayName(this.now()) || (this.now().getFullYear()+'年'+(this.now().getMonth()+1)+'月 · '+['周日','周一','周二','周三','周四','周五','周六'][this.now().getDay()]+(holidayMarker(this.now())==='班'?' · 班':''))).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).opacity(0.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
       } else if (this.cap.k === 'calendar' && this.compact() && (this.cap.calendarOffset ?? 0) === 0) {
         Text((this.now().getMonth() + 1) + '月 · 本周').fontSize((12 * this.unit()) + 'vp').fontColor(this.ink)
         Row() {
@@ -59,6 +60,7 @@ export struct CapabilityView {
               Text('' + day).fontSize((12 * this.unit()) + 'vp').fontColor(day === this.now().getDate() && (this.cap.calendarOffset ?? 0) === 0 ? contrastingInk(this.ink) : this.ink)
                 .width('100%').height(20 * this.unit()).textAlign(TextAlign.Center)
                 .backgroundColor(day === this.now().getDate() && (this.cap.calendarOffset ?? 0) === 0 ? this.ink : Color.Transparent).borderRadius(4)
+            Text(holidayMarker(new Date(this.now().getFullYear(),this.now().getMonth(),this.now().getDate()-this.now().getDay()+index))).fontSize((7*this.unit())+'vp').fontColor(this.ink).height(8*this.unit()).opacity(.65)
             }.layoutWeight(1)
           }, (day: number, index: number) => index + ':' + day)
         }.width('100%')
@@ -76,10 +78,13 @@ export struct CapabilityView {
         Grid() {
           ForEach(calendarCells(this.calendarDate()), (day: number, index: number) => {
             GridItem() {
+              Stack({alignContent:Alignment.TopEnd}) {
               Text(day > 0 ? '' + day : '').fontSize((12 * this.unit()) + 'vp')
                 .fontColor(day === this.now().getDate() && (this.cap.calendarOffset ?? 0) === 0 ? contrastingInk(this.ink) : this.ink)
                 .width('100%').height(20 * this.unit()).textAlign(TextAlign.Center)
                 .backgroundColor(day === this.now().getDate() && (this.cap.calendarOffset ?? 0) === 0 ? this.ink : Color.Transparent).borderRadius(4)
+              Text(day>0?holidayMarker(new Date(this.calendarDate().getFullYear(),this.calendarDate().getMonth(),day)):'').fontSize((6*this.unit())+'vp').fontColor(this.ink).opacity(.65)
+              }.width('100%')
             }
           }, (day: number, index: number) => this.now().getFullYear() + ':' + this.now().getMonth() + ':' + this.now().getDate() + ':' + index + ':' + day)
         }.columnsTemplate('1fr 1fr 1fr 1fr 1fr 1fr 1fr').rowsGap(2 * this.unit()).width('100%')
@@ -102,7 +107,7 @@ export struct CapabilityView {
         Text((this.cap.value||'待配置')+(this.cap.value?this.cap.unit??'':'')).fontSize((24*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(this.compact()?2:3).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').textAlign(TextAlign.Center)
         if(this.cap.refreshState==='failed') {Text('上次结果 · 更新失败').fontSize((10*this.unit())+'vp').fontColor(this.ink).opacity(.6)}
       } else if(this.cap.k==='agenda'||this.cap.k==='timetable') {
-        Text(this.cap.k==='agenda'?'接下来':'下一课').fontSize((11*this.unit())+'vp').fontColor(this.ink).opacity(.65)
+        Text(this.cap.k==='agenda'?'接下来':teachingDayLabel(this.cap,this.now().getTime())||'下一课').maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontSize((11*this.unit())+'vp').fontColor(this.ink).opacity(.65)
         if((this.cap.k==='agenda'?agendaItems(this.cap,this.now().getTime()):courseInstances(this.cap,this.now().getTime())).length===0) {
           Text(this.cap.k==='agenda'?(this.cap.agendaSource?'暂无待办日程':'导入日程'):((this.cap.courses??[]).length?'近期没有课程':'添加课程')).fontSize((18*this.unit())+'vp').fontColor(this.ink)
         } else {

@@ -1,3 +1,4 @@
+import { validDay, HolidayDate } from './HolidayCalendar';
 /** Pure, versioned schema shared by the app and FormKit renderer. */
 export const BOARD_W: number = 344;
 export const BOARD_H: number = 470;
@@ -37,6 +38,10 @@ export interface CapBlock {
   interval?: number; // minutes; 30 minimum for unattended refresh
   semester?: string;
   courses?: CourseItem[];
+  skipHolidays?: boolean;
+  holidayDates?: HolidayDate[];
+  teachingDays?: TeachingDay[];
+  courseChanges?: CourseChange[];
   // Read only during migration of the old multi-cap schema.
   text?: string;
   fs?: number;
@@ -46,6 +51,8 @@ export interface CapBlock {
   label?: string;
   artist?: string;
 }
+export interface TeachingDay { date: string; sourceDate: string; } // empty source = stop; same date = teach even on a holiday
+export interface CourseChange { id: string; courseId: string; date: string; targetDate: string; start: string; end: string; room: string; } // empty target = cancellation
 export interface AgendaItem { id: string; title: string; start: number; end: number; location: string; allDay: boolean; }
 export interface ParcelItem { id: string; code: string; place: string; picked: boolean; }
 export interface CourseItem { id: string; name: string; room: string; day: number; start: string; end: string; firstWeek: number; lastWeek: number; parity: number; }
@@ -253,5 +260,11 @@ export function normalizeCapability(raw: CapBlock): CapBlock {
   cap.events = (Array.isArray(raw.events) ? raw.events : []).filter((e:AgendaItem)=> e && typeof e.title==='string' && Number.isFinite(e.start) && Number.isFinite(e.end) && e.end>=e.start).slice(0,256).map((e:AgendaItem):AgendaItem=>({id:String(e.id).slice(0,96),title:e.title.slice(0,160),start:e.start,end:e.end,location:typeof e.location==='string'?e.location.slice(0,160):'',allDay:e.allDay===true}));
   cap.parcels = (Array.isArray(raw.parcels) ? raw.parcels : []).filter((e:ParcelItem)=> e && typeof e.code==='string' && e.code.length>0).slice(0,64).map((e:ParcelItem):ParcelItem=>({id:String(e.id).slice(0,96),code:e.code.slice(0,24),place:typeof e.place==='string'?e.place.slice(0,80):'',picked:e.picked===true}));
   cap.courses = (Array.isArray(raw.courses) ? raw.courses : []).filter((c:CourseItem)=> c && typeof c.name==='string' && c.name.trim().length>0 && /^([01]\d|2[0-3]):[0-5]\d$/.test(c.start) && /^([01]\d|2[0-3]):[0-5]\d$/.test(c.end) && c.end>c.start).slice(0,128).map((c:CourseItem):CourseItem=>({id:String(c.id).slice(0,96),name:c.name.slice(0,80),room:typeof c.room==='string'?c.room.slice(0,80):'',day:Math.round(bounded(c.day,1,7,1)),start:c.start,end:c.end,firstWeek:Math.round(bounded(c.firstWeek,1,60,1)),lastWeek:Math.round(bounded(c.lastWeek,c.firstWeek||1,60,16)),parity:[0,1,2].includes(c.parity)?c.parity:0}));
+  if(raw.k==='timetable') {
+    cap.skipHolidays=raw.skipHolidays!==false;
+    cap.holidayDates=(Array.isArray(raw.holidayDates)?raw.holidayDates:[]).filter((d:HolidayDate)=>d&&validDay(d.date)).slice(0,512).map((d:HolidayDate):HolidayDate=>({date:d.date,name:typeof d.name==='string'?d.name.slice(0,60):'校历假期'}));
+    cap.teachingDays=(Array.isArray(raw.teachingDays)?raw.teachingDays:[]).filter((d:TeachingDay)=>d&&validDay(d.date)&&(d.sourceDate===''||validDay(d.sourceDate))).slice(-512);
+    cap.courseChanges=(Array.isArray(raw.courseChanges)?raw.courseChanges:[]).filter((d:CourseChange)=>d&&typeof d.id==='string'&&cap.courses!.some((c:CourseItem)=>c.id===d.courseId)&&validDay(d.date)&&(d.targetDate===''||(validDay(d.targetDate)&&/^([01]\d|2[0-3]):[0-5]\d$/.test(d.start)&&/^([01]\d|2[0-3]):[0-5]\d$/.test(d.end)&&d.end>d.start))).slice(-256).map((d:CourseChange):CourseChange=>({id:d.id.slice(0,96),courseId:d.courseId,date:d.date,targetDate:d.targetDate,start:d.start??'',end:d.end??'',room:typeof d.room==='string'?d.room.slice(0,80):''}));
+  }
   return cap;
 }

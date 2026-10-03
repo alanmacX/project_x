@@ -1,3 +1,4 @@
+import { dateKey, holidayName } from './HolidayCalendar';
 import { CapBlock, CourseItem, AgendaItem, ParcelItem } from './CardSchema';
 export interface ValueField { path: string; value: string; }
 /** Only scalar values, bounded depth/count and own properties. Never execute remote code. */
@@ -45,16 +46,44 @@ export function semesterWeek(semester: string, now: number): number {
   return Math.floor((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())-Date.UTC(start.getFullYear(),start.getMonth(),start.getDate()))/604800000)+1;
 }
 export function courseInstances(cap: CapBlock, now: number): AgendaItem[] {
-  const out:AgendaItem[]=[],today=new Date(now); today.setHours(0,0,0,0);
+  const out:AgendaItem[]=[],today=new Date(now);today.setHours(0,0,0,0);
+  const days=cap.teachingDays??[],changes=cap.courseChanges??[];
   for(let offset=0;offset<14;offset++) {
-    const d=new Date(today.getTime());d.setDate(d.getDate()+offset);const week=semesterWeek(cap.semester??'',d.getTime()),day=d.getDay()||7;
-    for(const c of (cap.courses??[])) {
-      if(c.day!==day || week<c.firstWeek || week>c.lastWeek || (c.parity===1&&week%2===0) || (c.parity===2&&week%2!==0)) continue;
-      const start=new Date(d.getTime()),end=new Date(d.getTime());start.setHours(Number(c.start.slice(0,2)),Number(c.start.slice(3)));end.setHours(Number(c.end.slice(0,2)),Number(c.end.slice(3)));
-      if(end.getTime()>now) out.push({id:c.id+'_'+offset,title:c.name,start:start.getTime(),end:end.getTime(),location:c.room,allDay:false});
+    const actual=new Date(today.getTime());actual.setDate(actual.getDate()+offset);const key=dateKey(actual);
+    const override=days.slice().reverse().find((d)=>d.date===key);
+    const movedAway=days.some((d)=>d.sourceDate===key&&d.date!==key);
+    const holiday=holidayName(actual).length>0||(cap.holidayDates??[]).some((d)=>d.date===key);
+    const sourceKey=override?override.sourceDate:(movedAway||cap.skipHolidays!==false&&holiday?'':key);
+    if(sourceKey) {
+      const source=new Date(sourceKey+'T12:00:00'),week=semesterWeek(cap.semester??'',source.getTime()),day=source.getDay()||7;
+      for(const c of cap.courses??[]) {
+        if(c.day!==day||week<c.firstWeek||week>c.lastWeek||(c.parity===1&&week%2===0)||(c.parity===2&&week%2!==0))continue;
+        if(changes.some((change)=>change.courseId===c.id&&change.date===sourceKey))continue;
+        appendCourse(out,c,key,c.start,c.end,c.room,now,'regular');
+      }
+    }
+    // Explicit school/user changes win over holiday filtering, but a full-day stop wins over them.
+    if(override?.sourceDate==='')continue;
+    for(const change of changes) {
+      if(change.targetDate!==key)continue;
+      const c=(cap.courses??[]).find((item)=>item.id===change.courseId);if(!c)continue;
+      const source=new Date(change.date+'T12:00:00'),week=semesterWeek(cap.semester??'',source.getTime());
+      if((source.getDay()||7)!==c.day||week<c.firstWeek||week>c.lastWeek||(c.parity===1&&week%2===0)||(c.parity===2&&week%2!==0))continue;
+      appendCourse(out,c,key,change.start,change.end,change.room,now,change.id);
     }
   }
   return out.sort((a,b)=>a.start-b.start).slice(0,3);
+}
+function appendCourse(out:AgendaItem[],course:CourseItem,date:string,startText:string,endText:string,room:string,now:number,suffix:string):void {
+  const start=new Date(date+'T'+startText+':00'),end=new Date(date+'T'+endText+':00');
+  if(end.getTime()>now)out.push({id:course.id+'_'+date+'_'+suffix,title:course.name,start:start.getTime(),end:end.getTime(),location:room,allDay:false});
+}
+export function teachingDayLabel(cap:CapBlock,now:number):string {
+  const date=new Date(now),key=dateKey(date),rule=(cap.teachingDays??[]).slice().reverse().find((d)=>d.date===key);
+  if(rule)return rule.sourceDate===''?'校历停课':rule.sourceDate===key?'按校历上课':'补 '+rule.sourceDate.slice(5)+' 的课程';
+  if((cap.courseChanges??[]).some((c)=>c.targetDate===key))return '单次调课';
+  const name=(cap.holidayDates??[]).find((d)=>d.date===key)?.name||holidayName(date);
+  return cap.skipHolidays!==false&&name?name+' · 假期':(cap.teachingDays??[]).some((d)=>d.sourceDate===key&&d.date!==key)?'今日课程已调走':'';
 }
 /** Contextual pickup labels only: do not mistake login verification or an order number for a pickup code. */
 export function pickupCandidates(text: string): ParcelItem[] {
@@ -72,7 +101,9 @@ export function pickupCandidates(text: string): ParcelItem[] {
 export function pendingParcels(cap: CapBlock): ParcelItem[] { return (cap.parcels??[]).filter((p)=>!p.picked); }
 export function nextDataBoundary(cap: CapBlock, now:number):number {
   const events=cap.k==='agenda'?agendaItems(cap,now):cap.k==='timetable'?courseInstances(cap,now):[];
+  const midnight=new Date(now);midnight.setHours(24,0,0,0);
   const boundaries=events.reduce((all:number[],e:AgendaItem):number[]=>all.concat([e.start,e.end]),[]).filter((t)=>t>now);
+  if(cap.k==='timetable'||cap.k==='agenda')boundaries.push(midnight.getTime());
   if(cap.k==='fetch')boundaries.push(Math.max(now+5*60000,(cap.attemptedAt??0)+Math.max(30,cap.interval??60)*60000));
   return boundaries.length?Math.min(...boundaries):now+30*60000;
 }
