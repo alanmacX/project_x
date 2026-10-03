@@ -147,7 +147,7 @@ export struct CapabilitySettings {
         ForEach(this.cap.courses??[],(c:CourseItem)=>{
           Row({space:8}) {Button(c.name+' · 周'+['一','二','三','四','五','六','日'][c.day-1]+' '+c.start,{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontSize(12).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.editCourse(c));Button('删除',{type:ButtonType.Capsule}).height(44).fontSize(12).fontColor('#C43A35').backgroundColor(this.control()).onClick(()=>{const next=this.copy();next.courses=(next.courses??[]).filter((v)=>v.id!==c.id);this.change(next);})}.width('100%')
         },(c:CourseItem)=>c.id)
-        this.action('导入 WakeUp 课程表',()=>this.importTimetable())
+        this.action('导入课程表',()=>this.importTimetable())
         Text('按周次、单双周和时间自动显示下一课及后续安排。桌面展示单个能力，不挤入完整微缩课表。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       }
       if(this.message || this.cap.refreshState==='failed') {Text(this.message||this.cap.desc||'更新失败，保留上次结果').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}

@@ -1,0 +1,6 @@
+qingyu_warehouse / shiguang_warehouse
+https://github.com/Mutx163/qingyu_warehouse
+Snapshot: 42474728fd1d6537c6ece020aa16d117c18d2d2d
+MIT; copyright (c) 2025 星河欲转. See LICENSE.txt.
+The adapter code is bundled unchanged. FridgeMemo provides its own ArkWeb host and preview validation.
+Missing placeholder assets, test/share tools, and server-expression evaluators excluded: DLMU_01, HAUST

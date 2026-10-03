@@ -1,3 +1,4 @@
+import { SchoolImportDialog } from './SchoolImportDialog';
 import { AppDesign } from '../model/AppDesign';
 import { CourseItem } from '../model/CardSchema';
 import { WakeImport, WakeSlot, WakeCourse, resolveWakeUp, mondayDate } from '../model/WakeUpImport';
@@ -11,6 +12,7 @@ export struct WakeUpImportDialog {
   existingCount:number=0;
   onImport:(semester:string,courses:CourseItem[],replace:boolean)=>void=()=>{};
   @State text:string='';
+  @State other:boolean=false;
   @State parsed:WakeImport=new WakeImport();
   @State slots:WakeSlot[]=[];
   @State semester:string='';
@@ -20,7 +22,9 @@ export struct WakeUpImportDialog {
   @State busy:boolean=false;
   @State error:string='';
   private alive:boolean=true;
-  aboutToDisappear():void {this.alive=false;}
+  private schoolDialog:CustomDialogController|undefined=undefined;
+  private school():void {this.schoolDialog=new CustomDialogController({builder:SchoolImportDialog({appDark:this.appDark,onRead:(json:string)=>this.accept(json)}),customStyle:true,autoCancel:false,alignment:DialogAlignment.Center});this.schoolDialog.open();}
+  aboutToDisappear():void {this.alive=false;this.schoolDialog?.close();}
   private accept(json:string):void {
     if(!this.alive)return;this.parsed=JSON.parse(json) as WakeImport;this.slots=this.parsed.slots;this.semester=this.parsed.semester;this.stage=true;this.periods=this.slots.some((s)=>!s.start||!s.end);this.error='';
   }
@@ -62,11 +66,15 @@ export struct WakeUpImportDialog {
     Column({space:14}) {
       Text(this.stage?'确认课程表':'导入课程表').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
       if(!this.stage) {
-        Text('在 WakeUp 中导出课表备份文件，再选择文件；也可以粘贴包含课程数据的导出文本。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
+        this.action('从学校教务导入',()=>this.school())
+        Text('在 App 内选学校、登录教务并读取个人课表；也可导入已有的课表备份。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
+        this.action(this.other?'收起其他方式':'导入已有课表备份',()=>this.other=!this.other)
+        if(this.other) {
         this.action('选择 WakeUp 文件',()=>this.file())
         TextArea({text:this.text,placeholder:'长按粘贴导出文本'}).height(160).maxLength(262144).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(16).onChange((v:string)=>this.text=v)
         this.action(this.busy?'读取中':'预览粘贴的课表',()=>this.parseText())
-        Text('在线分享口令请先在 WakeUp 中导出为课表文件。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+        Text('支持 WakeUp 备份作为可选迁移方式，无需安装其他课程表 App。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+        }
       } else {
         Text(this.parsed.name+' · '+this.parsed.courses.length+' 条上课安排').fontSize(13).fontColor(AppDesign.muted(this.appDark)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
         this.action('第一周周一  '+(this.semester||'选择开学日期'),()=>this.date())

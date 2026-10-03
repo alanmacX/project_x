@@ -1,3 +1,4 @@
+import { parseSchoolCourses } from './SchoolImport';
 import { i18n } from '@kit.LocalizationKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { importAgenda } from './ScheduleImport';
@@ -14,3 +15,6 @@ export async function importScheduleFile(uri:string,kind:string):Promise<string>
 }
 @Concurrent
 export function parseWakeUpText(text:string):string {return JSON.stringify(parseWakeUp(text));}
+
+@Concurrent
+export function parseSchoolText(text:string,name:string):string {return parseSchoolCourses(text,name);}
