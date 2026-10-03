@@ -18,6 +18,7 @@ struct FridgeWidgetCard {
   @LocalStorageProp('faceCards') @Watch('syncLegacyCards') faceCardsJson: string = '[]';
   @LocalStorageProp('doorCards') @Watch('syncLegacyCards') doorCardsJson: string = '[]';
   @LocalStorageProp('rev') rev: number = 0;
+  @LocalStorageProp('canvasId') canvasId: string = 'canvas_main';
   @LocalStorageProp('dim') dim: string = '4*4';
   @LocalStorageProp('canvasWidth') canvasWidth: number = 344;
   @LocalStorageProp('canvasHeight') canvasHeight: number = 344;
@@ -44,7 +45,7 @@ struct FridgeWidgetCard {
   }
   private open(id: string = ''): void {
     postCardAction(this, { action: 'router', abilityName: 'EntryAbility',
-      params: { viewCardId: id, canvasDimension: this.dim, canvasAspect: String(this.widthValue() / this.heightValue()) } });
+      params: { canvasId: this.canvasId, viewCardId: id, canvasDimension: this.dim, canvasAspect: String(this.widthValue() / this.heightValue()) } });
   }
   private action(id: string, operation: string): void {
     postCardAction(this, { action: 'message', params: { cardId: id, operation: operation } });

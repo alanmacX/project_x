@@ -28,6 +28,8 @@ export default class EntryAbility extends UIAbility {
   onConfigurationUpdate(config: Configuration): void { this.updateAppearance(config.colorMode ?? this.context.config.colorMode); }
 
   private routeCard(want: Want): void {
+    const canvasId = want.parameters?.['canvasId'];
+    AppStorage.setOrCreate('routeCanvasId', typeof canvasId === 'string' ? canvasId : '');
     const dim = want.parameters?.['canvasDimension'];
     AppStorage.setOrCreate('widgetDimension', typeof dim === 'string' && ['2*4', '4*4', '6*4'].includes(dim) ? dim : '');
     const aspect = Number(want.parameters?.['canvasAspect'] ?? 0);

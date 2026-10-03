@@ -16,12 +16,18 @@ const prefs = {
     disk.set(key, value); writes.push([key, value]);
   },
   flush: async () => {},
+  delete: async key => disk.delete(key),
 };
 const kits = {
+  '@kit.BasicServicesKit':{batteryInfo:{batterySOC:60,chargingStatus:0,BatteryChargeState:{ENABLE:1}}},
+  '@kit.CalendarKit':{calendarManager:{}},
+  '@kit.AbilityKit':{abilityAccessCtrl:{GrantStatus:{PERMISSION_GRANTED:0},createAtManager:()=>({checkAccessToken:async()=>-1})}},
+  '@kit.NetworkKit':{http:{}},
   '@ohos.data.preferences': { default: { getPreferences: async () => prefs, removePreferencesFromCache: async () => {} } },
   '@kit.FormKit': {
+    formInfo: {VisibilityType:{FORM_VISIBLE:1}},
     formBindingData: { createFormBindingData: data => data },
-    formProvider: { updateForm: async (id, data) => {
+    formProvider: { setFormNextRefreshTime: async()=>{}, updateForm: async (id, data) => {
       if (failForm) { failForm = false; throw Error('removed form'); }
       updates.push({id, data});
     } },
@@ -235,7 +241,7 @@ function load(name) {
   kits['@kit.FormKit'].formProvider.getFormRect=previousRect;
   assert.equal(contrastingInk('#FFFFFF'),'#262824'); assert.equal(contrastingInk('#262824'),'#FFFFFF');
   assert.equal(defaultState().cards.length, 0);
-  assert.equal(CAPABILITIES.length, 8);
+  assert.deepEqual(CAPABILITIES,['clock','date','calendar','countdown','anniversary','weather','dayprogress','yearprogress','battery','agenda','parcel','fetch','timetable']);
   assert.ok(!CAPABILITIES.includes('np'));
   const legacy = {id:'legacy',w:999,h:-1,x:800,y:-20,z:42,caps:[
     {k:'text',text:'自己的文字 ☕',fs:22}, {k:'clock'}, {k:'countdown',title:'生日',date:'2027-01-01'},
@@ -278,6 +284,7 @@ function load(name) {
   assert.equal(reloaded.state.cards[0].elements[0].text, 'retry');
   store.removeCard(custom.id); await store.save(); const empty = new FridgeStore(); await empty.init({});
   assert.equal(empty.state.cards.length, 0);
+  disk.delete('fridge_canvases_json');disk.delete('fridge_canvas_canvas_main');
   disk.set('fridge_state_json','{broken'); await assert.rejects(new FridgeStore().init({}), /本地卡片数据无法读取/);
   assert.equal(disk.get('fridge_state_json'),'{broken');
   const photo = new FridgeCard(); photo.id='photo'; photo.paper='#234567'; photo.shape='subject'; photo.cutout='file:///private/subject.png';

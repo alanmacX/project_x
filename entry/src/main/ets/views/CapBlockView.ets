@@ -1,3 +1,5 @@
+import { agendaItems, courseInstances, pendingParcels, eventWhen } from '../model/CapabilityData';
+import { AgendaItem, ParcelItem } from '../model/CardSchema';
 import { CapBlock, typeLabel, contrastingInk } from '../model/CardSchema';
 import { capabilityMinimum, compactCapability } from '../model/CapabilityMetrics';
 export { typeLabel } from '../model/CardSchema';
@@ -92,6 +94,38 @@ export struct CapabilityView {
       } else if (this.cap.k === 'weather') {
         Text(this.cap.temp ?? '--°').fontSize(((this.compact() ? 26 : 42) * this.unit()) + 'vp').fontWeight(FontWeight.Medium).fontColor(this.ink)
         Text(this.cap.refreshState === 'refreshing' ? '更新中' : (this.cap.refreshState === 'failed' ? '更新失败，点按重试' : (this.compact() ? (this.cap.city || '设置城市') : ((this.cap.city || '设置城市') + ' · ' + (this.cap.desc || '未更新'))))).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).width('100%').textAlign(TextAlign.Center).maxLines(this.compact() ? 1 : 2).textOverflow({ overflow: TextOverflow.Ellipsis })
+      } else if(this.cap.k==='battery') {
+        Text(this.cap.percent!==undefined&&this.cap.percent>=0?this.cap.percent+'%':'—').fontSize(((this.compact()?26:42)*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink)
+        Text(this.cap.refreshState==='failed'?'上次电量':this.cap.chargeState==='full'?'已充满':this.cap.charging?'正在充电':'本机电量').fontSize((12*this.unit())+'vp').fontColor(this.ink).opacity(.65)
+        Stack({alignContent:Alignment.Start}) {
+          Row().height(4*this.unit()).width('100%').backgroundColor(this.ink).opacity(.12)
+          Row().height(4*this.unit()).width(Math.max(0,this.cap.percent??0)+'%').backgroundColor(this.ink)
+        }.width('100%').height(4*this.unit()).borderRadius(2).clip(true)
+      } else if(this.cap.k==='fetch') {
+        Text(this.cap.title||'URL 内容').fontSize((12*this.unit())+'vp').fontColor(this.ink).opacity(.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
+        Text((this.cap.value||'待配置')+(this.cap.value?this.cap.unit??'':'')).fontSize((24*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(this.compact()?2:3).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').textAlign(TextAlign.Center)
+        if(this.cap.refreshState==='failed') {Text('上次结果 · 更新失败').fontSize((10*this.unit())+'vp').fontColor(this.ink).opacity(.6)}
+      } else if(this.cap.k==='agenda'||this.cap.k==='timetable') {
+        Text(this.cap.k==='agenda'?'接下来':'下一课').fontSize((11*this.unit())+'vp').fontColor(this.ink).opacity(.65)
+        if((this.cap.k==='agenda'?agendaItems(this.cap,this.now().getTime()):courseInstances(this.cap,this.now().getTime())).length===0) {
+          Text(this.cap.k==='agenda'?(this.cap.agendaSource?'暂无待办日程':'导入日程'):((this.cap.courses??[]).length?'近期没有课程':'添加课程')).fontSize((18*this.unit())+'vp').fontColor(this.ink)
+        } else {
+          ForEach((this.cap.k==='agenda'?agendaItems(this.cap,this.now().getTime()):courseInstances(this.cap,this.now().getTime())).slice(0,this.compact()?1:3),(e:AgendaItem)=>{
+            Column({space:2*this.unit()}) {
+              Text(e.title).fontSize(((this.compact()?16:14)*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
+              Text(eventWhen(e,this.now().getTime())+(e.location?' · '+e.location:'')).fontSize((10*this.unit())+'vp').fontColor(this.ink).opacity(.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
+            }.width('100%').alignItems(HorizontalAlign.Start)
+          },(e:AgendaItem)=>e.id)
+        }
+      } else if(this.cap.k==='parcel') {
+        Text('待取 '+pendingParcels(this.cap).length+' 件').fontSize((11*this.unit())+'vp').fontColor(this.ink).opacity(.65)
+        if(!pendingParcels(this.cap).length) {Text('没有待取包裹').fontSize((16*this.unit())+'vp').fontColor(this.ink)}
+        ForEach(pendingParcels(this.cap).slice(0,this.compact()?1:3),(p:ParcelItem)=>{
+          Column({space:2*this.unit()}) {
+            Text(p.code).fontSize(((this.compact()?20:18)*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
+            Text(p.place||'取件地点').fontSize((10*this.unit())+'vp').fontColor(this.ink).opacity(.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
+          }.width('100%')
+        },(p:ParcelItem)=>p.id)
       } else {
         Text(typeLabel(this.cap.k)).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).opacity(0.65)
         Text(Math.floor(progressOf(this.cap.k, this.now()) * 100) + '%').fontSize(((this.compact() ? 24 : 38) * this.unit()) + 'vp').fontColor(this.ink)

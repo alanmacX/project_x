@@ -11,7 +11,7 @@ export class CapType {
   static readonly DAY_PROGRESS: string = 'dayprogress';
   static readonly YEAR_PROGRESS: string = 'yearprogress';
 }
-export const CAPABILITIES: string[] = ['clock', 'date', 'calendar', 'countdown', 'anniversary', 'weather', 'dayprogress', 'yearprogress'];
+export const CAPABILITIES: string[] = ['clock', 'date', 'calendar', 'countdown', 'anniversary', 'weather', 'dayprogress', 'yearprogress', 'battery', 'agenda', 'parcel', 'fetch', 'timetable'];
 export interface CapBlock {
   k: string;
   title?: string;
@@ -23,6 +23,20 @@ export interface CapBlock {
   refreshState?: string;
   temp?: string;
   desc?: string;
+  percent?: number;
+  charging?: boolean;
+  chargeState?: string;
+  events?: AgendaItem[];
+  agendaSource?: string; // system | imported
+  parcels?: ParcelItem[];
+  url?: string;
+  sourceConfigured?: boolean;
+  field?: string; // dotted JSON path; empty = plain text
+  value?: string;
+  unit?: string;
+  interval?: number; // minutes; 30 minimum for unattended refresh
+  semester?: string;
+  courses?: CourseItem[];
   // Read only during migration of the old multi-cap schema.
   text?: string;
   fs?: number;
@@ -32,6 +46,9 @@ export interface CapBlock {
   label?: string;
   artist?: string;
 }
+export interface AgendaItem { id: string; title: string; start: number; end: number; location: string; allDay: boolean; }
+export interface ParcelItem { id: string; code: string; place: string; picked: boolean; }
+export interface CourseItem { id: string; name: string; room: string; day: number; start: string; end: string; firstWeek: number; lastWeek: number; parity: number; }
 export class ElementBox {
   x: number = 0.1;
   y: number = 0.12;
@@ -100,6 +117,7 @@ export function normalizeBackground(raw: CanvasBackground | undefined): CanvasBa
 }
 export class FridgeState {
   schemaVersion: number = 2;
+  canvasId: string = 'canvas_main';
   background: CanvasBackground = new CanvasBackground();
   canvasAspect: number = 1;
   canvasDimension: string = '4*4';
@@ -110,7 +128,7 @@ export class FridgeState {
 }
 export function typeLabel(k: string): string {
   const index = CAPABILITIES.indexOf(k);
-  const names: string[] = ['时间', '日期', '台历', '倒计时', '纪念日', '天气', '今日进度', '年度进度'];
+  const names: string[] = ['时间', '日期', '台历', '倒计时', '纪念日', '天气', '今日进度', '年度进度', '本机电量', '日程', '取件码', 'URL 内容', '课程表'];
   return index >= 0 ? names[index] : '自定义';
 }
 export function materialColors(material: string, paper: string = '', ink: string = ''): string[] {
@@ -167,7 +185,7 @@ function legacyElement(cap: CapBlock, id: string, index: number, count: number):
   return el;
 }
 export function normalizeState(raw: FridgeState): FridgeState {
-  const state = new FridgeState(); state.background = normalizeBackground(raw.background); state.door = raw.door ?? new DoorState();
+  const state = new FridgeState(); state.canvasId = typeof raw.canvasId === 'string' && /^[a-zA-Z0-9_-]{1,96}$/.test(raw.canvasId) ? raw.canvasId : 'canvas_main'; state.background = normalizeBackground(raw.background); state.door = raw.door ?? new DoorState();
   state.canvasDimension = ['2*4', '4*4', '6*4'].includes(raw.canvasDimension) ? raw.canvasDimension : '4*4';
   state.canvasAspect = bounded(raw.canvasAspect, .3, 3, 1);
   state.maxZ = bounded(raw.maxZ, 0, Number.MAX_SAFE_INTEGER, 10);
@@ -192,13 +210,13 @@ export function normalizeState(raw: FridgeState): FridgeState {
       const cap = caps[i]; if (cap === null || typeof cap.k !== 'string') continue;
       if (CAPABILITIES.includes(cap.k)) {
         if (card.capability === null) {
-          card.capability = cap;
+          card.capability = normalizeCapability(cap);
           if (cap.k === 'calendar') cap.calendarOffset = Math.round(bounded(cap.calendarOffset ?? 0, -120, 120, 0));
           if (raw.schemaVersion !== 2) {
             card.capBox.y = i / caps.length; card.capBox.h = 1 / caps.length;
           }
         } else {
-          const extra = new FridgeCard(); extra.id = card.id + '_cap_' + i; extra.capability = cap;
+          const extra = new FridgeCard(); extra.id = card.id + '_cap_' + i; extra.capability = normalizeCapability(cap);
           extra.w = card.w; extra.h = card.h; extra.x = Math.min(BOARD_W - extra.w, card.x + 16 * i);
           extra.y = Math.min(BOARD_H - extra.h, card.y + 16 * i); extra.material = card.material;
           extra.paper = card.paper; extra.ink = card.ink; extra.rot = card.rot; extra.inDoor = card.inDoor;
@@ -224,4 +242,16 @@ export function contrastingInk(color: string): string {
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) return '#FFFFFF';
   const light = .2126 * parseInt(color.slice(1, 3), 16) + .7152 * parseInt(color.slice(3, 5), 16) + .0722 * parseInt(color.slice(5, 7), 16);
   return light >= 145 ? '#262824' : '#FFFFFF';
+}
+
+export function normalizeCapability(raw: CapBlock): CapBlock {
+  const cap = JSON.parse(JSON.stringify(raw)) as CapBlock;
+  cap.title = typeof raw.title === 'string' ? raw.title.slice(0,160) : '';
+  cap.interval = Math.round(bounded(raw.interval ?? 60,30,1440,60));
+  if (raw.k === 'battery') cap.percent = bounded(raw.percent ?? -1,-1,100,-1);
+  if (raw.k === 'fetch') { cap.url = typeof raw.url === 'string' ? raw.url.slice(0,2048) : ''; cap.field = typeof raw.field === 'string' ? raw.field.slice(0,256) : ''; cap.value = typeof raw.value === 'string' ? raw.value.slice(0,256) : ''; cap.unit = typeof raw.unit === 'string' ? raw.unit.slice(0,24) : ''; }
+  cap.events = (Array.isArray(raw.events) ? raw.events : []).filter((e:AgendaItem)=> e && typeof e.title==='string' && Number.isFinite(e.start) && Number.isFinite(e.end) && e.end>=e.start).slice(0,256).map((e:AgendaItem):AgendaItem=>({id:String(e.id).slice(0,96),title:e.title.slice(0,160),start:e.start,end:e.end,location:typeof e.location==='string'?e.location.slice(0,160):'',allDay:e.allDay===true}));
+  cap.parcels = (Array.isArray(raw.parcels) ? raw.parcels : []).filter((e:ParcelItem)=> e && typeof e.code==='string' && e.code.length>0).slice(0,64).map((e:ParcelItem):ParcelItem=>({id:String(e.id).slice(0,96),code:e.code.slice(0,24),place:typeof e.place==='string'?e.place.slice(0,80):'',picked:e.picked===true}));
+  cap.courses = (Array.isArray(raw.courses) ? raw.courses : []).filter((c:CourseItem)=> c && typeof c.name==='string' && c.name.trim().length>0 && /^([01]\d|2[0-3]):[0-5]\d$/.test(c.start) && /^([01]\d|2[0-3]):[0-5]\d$/.test(c.end) && c.end>c.start).slice(0,128).map((c:CourseItem):CourseItem=>({id:String(c.id).slice(0,96),name:c.name.slice(0,80),room:typeof c.room==='string'?c.room.slice(0,80):'',day:Math.round(bounded(c.day,1,7,1)),start:c.start,end:c.end,firstWeek:Math.round(bounded(c.firstWeek,1,60,1)),lastWeek:Math.round(bounded(c.lastWeek,c.firstWeek||1,60,16)),parity:[0,1,2].includes(c.parity)?c.parity:0}));
+  return cap;
 }

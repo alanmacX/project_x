@@ -1,3 +1,4 @@
+import { BusinessError } from '@kit.BasicServicesKit';
 import { formBindingData, formProvider } from '@kit.FormKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { prepareWidgetPayload } from './WidgetPayload';
@@ -10,11 +11,14 @@ export async function deliverWidget(formId: string, json: string, dim: string): 
   const payload = await prepareWidgetPayload(json);
   try {
     const data: Record<string, Object> = {
-      'fridge': 'board', 'reveal': payload.reveal, 'open': payload.open,
+      'canvasId': (JSON.parse(json) as Record<string,Object>)['canvasId'] ?? 'canvas_main', 'fridge': 'board', 'reveal': payload.reveal, 'open': payload.open,
       'background': payload.background, 'cards': payload.cards, 'faceCards': payload.faceCards, 'doorCards': payload.doorCards,
       'canvasWidth': canvasWidth, 'canvasHeight': canvasHeight, 'rev': Date.now(), 'dim': dim, 'formId': formId, 'formImages': payload.images
     };
     await formProvider.updateForm(formId, formBindingData.createFormBindingData(data));
+  } catch(e) {
+    if((e as BusinessError).code===16501001)throw new Error('FORM_REMOVED');
+    throw e as Error;
   } finally {
     for (const fd of payload.descriptors) { try { fileIo.closeSync(fd); } catch (_) {} }
   }

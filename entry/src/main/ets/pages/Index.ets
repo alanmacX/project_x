@@ -1,3 +1,10 @@
+import { BatteryObserver } from '../model/BatteryObserver';
+import { needsDataRefresh, capabilityRequestKey } from '../model/CapabilityData';
+import { readCapability } from '../model/CapabilityService';
+import { CapabilitySettings } from '../views/CapabilitySettings';
+import { primeRenderContours } from '../model/RenderContours';
+import { storageSnapshot } from '../model/StorageSnapshot';
+import { CanvasEntry } from '../model/CanvasLibrary';
 import { BoardMotion } from '../model/BoardMotion';
 import { combineCards, ungroupCards, groupMembers, groupDragBounds, cleanGroups } from '../model/CardGroups';
 import { PhotoCrop } from '../views/PhotoCrop';
@@ -42,7 +49,16 @@ const SHAPES: string[] = ['rect', 'round', 'pill', 'blob'];
 @Entry
 @Component
 struct Index {
+  private batteryObserver:BatteryObserver=new BatteryObserver();
+  private refreshingCapabilities:boolean=false;
+  private widgetRouteTimer:number=-1;
   private photoCropDialog: CustomDialogController | null = null;
+  @State canvasPickerOpen: boolean = false;
+  @State canvasChanging: boolean = false;
+  @State canvasEntries: CanvasEntry[] = [];
+  @State canvasName: string = '我的画布';
+  @State renameValue: string = '';
+  @StorageLink('routeCanvasId') @Watch('canvasRouteChanged') routeCanvasId: string = '';
   @State groupSelecting: boolean = false;
   @State groupSelection: string[] = [];
   @State boardMotion: BoardMotion = new BoardMotion();
@@ -151,7 +167,7 @@ struct Index {
   private backgroundGeneration: number = 0;
   private backgroundTimer: number = -1;
   @StorageLink('appBackgrounded') @Watch('appWentBackground') appBackgrounded: boolean = false;
-  private appWentBackground(): void { if (this.appBackgrounded && this.ready) { if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); } }
+  private appWentBackground(): void { if(!this.appBackgrounded && this.ready) {this.refreshCapabilities();this.refreshDueWeather();} if (this.appBackgrounded && this.ready) { if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); } }
 
   @State repairingSubjects: boolean = false;
   @State weatherBusy: boolean = false;
@@ -161,11 +177,14 @@ struct Index {
     this.alive = true; this.appearanceChanged();
     this.context = this.getUIContext().getHostContext() ?? null;
     this.initialize();
-    this.clockTimer = setInterval(() => { this.tick = Date.now(); this.refreshDueWeather(); }, 60000);
+    this.clockTimer = setInterval(() => { this.tick = Date.now(); this.refreshDueWeather(); this.refreshCapabilities(); }, 60000);
+    this.batteryObserver.start(()=>this.refreshCapabilities());
   }
   private initialize(): void {
     if (this.context === null) return;
     this.store.init(this.context).then(async () => {
+      if (this.routeCanvasId) await this.store.openCanvas(this.routeCanvasId);
+      this.refreshCanvasList();
       // Resolve FormKit geometry before revealing the scene; a late aspect update jumps after arrival.
       await this.store.refreshCanvasSpecs().catch(() => {});
       if (!this.alive) return;
@@ -178,9 +197,73 @@ struct Index {
       const routedLaunch = this.routedId.length > 0 || this.viewRouteId.length > 0;
       this.canvasBackground = this.store.state.background; this.layoutBoard(); this.ready = true; this.render(); this.scheduleBackground(); this.routeChanged(); this.viewRouteChanged();
       if (!routedLaunch) this.startArrival();
-      this.maintenanceTimer = setTimeout(() => { if (this.alive) { this.editorMounted = true; this.persist(); this.repairStoredSubjects(); this.refreshDueWeather(); } }, 750);
+      this.maintenanceTimer = setTimeout(() => { if (this.alive) { this.editorMounted = true; this.persist(); this.repairStoredSubjects(); this.refreshDueWeather(); this.refreshCapabilities(); } }, 750);
 
     }).catch((e: Error) => { this.error = e.message; });
+  }
+  private refreshCanvasList(): void {
+    this.canvasEntries = this.store.catalog.canvases.map((c: CanvasEntry): CanvasEntry => ({id:c.id,name:c.name}));
+    this.canvasName = this.store.activeName; this.renameValue = this.canvasName;
+  }
+  private canvasRouteChanged(): void { if(this.ready && this.routeCanvasId) this.scheduleWidgetRoute(); }
+  private async chooseCanvas(id: string): Promise<void> {
+    if (this.heroActive || this.activeBoardId || this.sharing || this.busy || this.canvasChanging) return;
+    if (this.editing) { this.getUIContext().getPromptAction().showToast({message:'请先完成当前卡片编辑'}); return; }
+    this.canvasChanging=true;
+    try {await this.loadCanvas(id);}catch(e){this.templateError('画布切换未完成',e as Error);}finally{this.canvasChanging=false;}
+  }
+  private async loadCanvas(id:string):Promise<void> {
+    try {
+      this.backgroundGeneration++; if(this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); this.backgroundBusy = false;
+      await this.store.save(false); if (!await this.store.openCanvas(id)) return;
+      this.selectedId = ''; this.activeBoardId = ''; this.groupSelection = []; this.groupSelecting = false;
+      this.canvasBackground = this.store.state.background; this.refreshCanvasList();
+      await primeRenderContours(this.store.state.cards,storageSnapshot(this.store.state));
+      this.render(); this.persist(true); this.scheduleBackground(); this.canvasPickerOpen = false;
+      this.refreshCapabilities(); this.refreshDueWeather();
+    } catch (e) { this.templateError('画布切换未完成',e as Error); }
+  }
+  private async newCanvas(duplicate: boolean): Promise<void> {
+    if(this.canvasChanging)return;this.canvasChanging=true;
+    try {
+      await this.store.save(false);this.backgroundGeneration++;
+      const source = duplicate ? this.store.state : undefined;
+      const id = this.store.createCanvas(duplicate ? this.canvasName+' 副本' : '画布 '+(this.canvasEntries.length+1),source);
+      await this.loadCanvas(id);
+    } catch(e) {this.templateError('画布未创建',e as Error);}finally{this.canvasChanging=false;}
+  }
+  private deleteCanvas(): void {
+    if(this.canvasEntries.length <= 1 || this.canvasChanging) return;
+    const id = this.store.state.canvasId;
+    this.getUIContext().showAlertDialog({title:'删除这张画布？',message:'卡片和背景会一起删除。绑定它的桌面组件将显示剩余画布。',primaryButton:{value:'取消',action:()=>{}},secondaryButton:{value:'删除',fontColor:'#C43A35',action:()=>{
+      if(this.canvasChanging)return;this.canvasChanging=true;
+      this.store.deleteCanvas(id).then(()=>this.loadCanvas(this.store.catalog.activeId)).catch((e:Error)=>this.templateError('未能删除',e)).finally(()=>{this.canvasChanging=false;});
+    }}});
+  }
+  @Builder
+  canvasPicker() {
+    Column({space:16}) {
+      Text('我的画布').fontSize(20).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
+      Scroll() {
+        Column({space:8}) {
+          ForEach(this.canvasEntries,(c:CanvasEntry)=>{
+            Button({type:ButtonType.ROUNDED_RECTANGLE}) {
+              Row({space:12}) { Text(c.name).fontColor(this.appText()).fontSize(16).layoutWeight(1).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}); Text(c.id===this.store.state.canvasId?'当前':'切换').fontSize(12).fontColor(this.appMuted()) }.width('100%')
+            }.width('100%').height(56).padding(16).borderRadius(16).backgroundColor(this.appSurface()).onClick(()=>this.chooseCanvas(c.id))
+          },(c:CanvasEntry)=>c.id)
+        }.width('100%')
+      }.width('100%').layoutWeight(1).scrollBar(BarState.Off).align(Alignment.Top)
+      Row({space:12}) {
+        TextInput({text:this.renameValue,placeholder:'画布名称'}).height(44).layoutWeight(1).fontColor(this.appText()).backgroundColor(this.appControl()).borderRadius(14).onChange((v:string)=>this.renameValue=v)
+        Button('重命名',{type:ButtonType.Capsule}).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>{this.store.renameCanvas(this.renameValue);this.refreshCanvasList();this.persist(false);})
+      }.width('100%')
+      Row({space:12}) {
+        Button('新画布',{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>this.newCanvas(false))
+        Button('复制画布',{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>this.newCanvas(true))
+        Button('删除',{type:ButtonType.Capsule}).height(44).fontColor('#C43A35').backgroundColor(this.appControl()).enabled(this.canvasEntries.length>1).onClick(()=>this.deleteCanvas())
+      }.width('100%')
+      Text('桌面组件各自绑定添加时的画布，切换不会替换它们。').fontSize(12).fontColor(this.appMuted()).width('100%')
+    }.width('100%').height('100%').padding(20).backgroundColor(this.appSurface()).enabled(!this.canvasChanging)
   }
   private arrivalOffsets: Record<string, ShapePoint> = {};
   private startArrival(): void {
@@ -219,7 +302,7 @@ struct Index {
       }
     } finally { this.repairingSubjects = false; }
   }
-  aboutToDisappear(): void { if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
+  aboutToDisappear(): void { this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
     if (this.heroActive) return true;
     if (this.viewing) { this.viewing = false; this.selectedId = ''; return true; }
@@ -345,20 +428,32 @@ struct Index {
   }
   private routeChanged(): void {
     if (!this.ready || this.routedId.length === 0) return;
+    if(this.routeCanvasId&&this.routeCanvasId!==this.store.state.canvasId){this.scheduleWidgetRoute();return;}
     if (this.store.findCard(this.routedId) !== null) { this.openEditor(this.routedId); }
     AppStorage.setOrCreate('editCardId', '');
   }
-  private viewRouteChanged(): void {
-    if (!this.ready || this.viewRouteId.length === 0 || this.context === null) return;
-    const id = this.viewRouteId; AppStorage.setOrCreate('viewCardId', '');
-    this.store.init(this.context).then(async () => {
-      // Resolve FormKit geometry before revealing the scene; a late aspect update jumps after arrival.
-      await this.store.refreshCanvasSpecs().catch(() => {});
-      if (!this.alive) return;
-      if (!this.alive || this.store.findCard(id) === null) return;
-      this.editing = false; this.heroActive = false; this.boardOpacity = 1;
-      this.render(); this.select(id); this.viewing = true;
-    }).catch(() => { this.error = '卡片读取失败，请重试'; });
+  private viewRouteChanged(): void { if(this.ready&&this.viewRouteId) this.scheduleWidgetRoute(); }
+  private scheduleWidgetRoute():void {
+    if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer);
+    this.widgetRouteTimer=setTimeout(()=>{this.widgetRouteTimer=-1;this.reloadWidgetRoute();},0);
+  }
+  private async reloadWidgetRoute():Promise<void> {
+    if(!this.context || !this.alive)return;
+    const canvas=this.routeCanvasId,id=this.viewRouteId;
+    try {
+      this.backgroundGeneration++;
+      await this.store.init(this.context);if(canvas)await this.store.openCanvas(canvas);
+      await primeRenderContours(this.store.state.cards,storageSnapshot(this.store.state));
+      if(!this.alive)return;
+      this.refreshCanvasList();this.canvasBackground=this.store.state.background;
+      this.editing=false;this.heroActive=false;this.viewing=false;this.selectedId='';this.activeBoardId='';this.boardOpacity=1;this.render();this.layoutBoard();
+      AppStorage.setOrCreate('viewCardId','');
+      if(this.routeCanvasId===canvas)AppStorage.setOrCreate('routeCanvasId','');
+      if(id&&this.store.findCard(id)){this.select(id);this.viewing=true;}
+      this.routeChanged();this.scheduleBackground();this.refreshCapabilities();
+      // Persist only the selection metadata. Replaying stale UI state could undo a widget-side action.
+      this.store.save(false).catch(()=>{});
+    }catch(_){this.error='画布读取失败，请重试';}
   }
   private calendarAction(operation: string): void {
     const card = this.current(); if (card !== null && applyCalendarAction(card, operation)) { this.render(); this.persist(); }
@@ -476,10 +571,11 @@ struct Index {
         const date = new Date(); cap.date = date.getFullYear() + '-' + ('0' + (date.getMonth() + 1)).slice(-2) + '-' + ('0' + date.getDate()).slice(-2);
         cap.title = '';
       }
+      if(k==='timetable'){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));cap.semester=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);cap.courses=[];}
       if (k === 'weather') { cap.city = ''; cap.temp = '--°'; cap.desc = '未更新'; }
       card.capability = cap; card.capBox = safeContentBox(card); this.layerId = 'capability';
     }
-    this.syncFields(); this.change(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 });
+    this.syncFields(); this.change(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.refreshCapabilities();
   }
   private addElement(kind: string): void {
     const card = this.current(); if (card === null) return;
@@ -583,7 +679,25 @@ struct Index {
   }
   private autoWeatherBusy: boolean = false;
   onPageHide(): void { if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); }
-  onPageShow(): void { if (this.ready) this.refreshDueWeather(); }
+  onPageShow(): void { if (this.ready) {this.refreshDueWeather();this.refreshCapabilities();} }
+  private updateExtraCapability(id:string,next:CapBlock):void {
+    const card=this.store.findCard(id);if(!card||card.capability?.k!==next.k)return;
+    card.capability=next;this.syncFields();this.change();
+  }
+  private async refreshCapabilities():Promise<void> {
+    if(!this.ready||!this.alive||this.appBackgrounded||this.activeBoardId||this.refreshingCapabilities||!this.context)return;
+    this.refreshingCapabilities=true;const canvasId=this.store.state.canvasId;
+    try {
+      for(const card of this.store.state.cards.slice()) {
+        const cap=card.capability;if(!needsDataRefresh(cap)||!cap)continue;
+        const key=capabilityRequestKey(cap),next=await readCapability(cap,this.context);
+        if(!this.alive||this.store.state.canvasId!==canvasId||this.store.findCard(card.id)!==card||card.capability!==cap||capabilityRequestKey(cap)!==key)continue;
+        if(cap.k==='battery'&&cap.percent===next.percent&&cap.charging===next.charging&&cap.chargeState===next.chargeState&&cap.refreshState===next.refreshState)continue;
+        if(JSON.stringify(next)===JSON.stringify(cap))continue;card.capability=next;
+        this.render();this.persist(true);
+      }
+    }finally{this.refreshingCapabilities=false;}
+  }
   private async refreshDueWeather(): Promise<void> {
     if (!this.ready || !this.alive || this.autoWeatherBusy || this.weatherBusy) return;
     this.autoWeatherBusy = true;
@@ -722,6 +836,7 @@ struct Index {
       Column({ space: 12 }) {
         Row() {
           Text('图层').fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText()); Blank()
+          Button(this.canvasName+' ⌄',{type:ButtonType.Capsule}).height(44).width(Math.min(130,Math.max(64,this.panelWidth-220))).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).margin({right:8}).onClick(()=>{this.refreshCanvasList();this.canvasPickerOpen=true;}).bindSheet(this.canvasPickerOpen,this.canvasPicker,{height:SheetSize.LARGE,showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>{this.canvasPickerOpen=false;}})
           Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule }).margin({ right: 8 }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
           Button('+', { type: ButtonType.Circle }).width(44).height(AppDesign.controlHeight).fontSize(24).backgroundColor('#262626').fontColor(Color.White).accessibilityText('添加卡片').onClick(() => this.addCard())
         }.width('100%')
@@ -746,18 +861,17 @@ struct Index {
         }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
         if (this.homeActionHeight() > 0) {
         Column({ space: 12 }) {
-        if (this.groupSelecting) { Button('组合选中卡片（' + this.groupSelection.length + '）', { type: ButtonType.Capsule }).height(44).width('100%').enabled(this.groupSelection.length > 1).onClick(() => this.confirmGroup()) }
-        if (!this.groupSelecting && (this.store.findCard(this.selectedId)?.groupId ?? '').length > 0) { Button('取消组合', { type: ButtonType.Capsule }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.releaseGroup()) }
+        if (this.groupSelecting) { Button('组合选中卡片（' + this.groupSelection.length + '）', { type: ButtonType.Capsule }).height(44).width('100%').enabled(this.groupSelection.length > 1).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.confirmGroup()) }
+        if (!this.groupSelecting && (this.store.findCard(this.selectedId)?.groupId ?? '').length > 0) { Button('取消组合', { type: ButtonType.Capsule }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.releaseGroup()) }
         if (!this.groupSelecting && this.selectedId.length > 0) {
           Row({ space: 12 }) {
-            Button('上移一层', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.moveCardLayer(this.selectedId, true))
-            Button('下移一层', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.moveCardLayer(this.selectedId, false))
+            Button('上移一层', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.moveCardLayer(this.selectedId, true))
+            Button('下移一层', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.moveCardLayer(this.selectedId, false))
             Blank()
-            Button('删除', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(Color.Transparent).fontColor('#C43A35').onClick(() => this.deleteCard(this.selectedId))
+            Button('删除', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(this.appControl()).fontColor('#C43A35').shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.deleteCard(this.selectedId))
           }.width('100%')
         }
-        }.width('100%').padding(8).borderRadius(22).backgroundColor(this.appDark ? '#E625231F' : '#E6F6F2E9').backgroundBlurStyle(BlurStyle.Regular)
-          .shadow({radius:12,color:'#16000000',offsetY:3})
+        }.width('100%').padding(8)
         }
         }.width('100%').layoutWeight(1)
       }.width(this.panelWidth).height(this.panelHeight - 84).padding(12).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).border({ width: 1, color: AppDesign.border(this.appDark) })
@@ -774,7 +888,7 @@ struct Index {
   private scheduleBackground(): void {
     if (!['smart','blend'].includes(this.canvasBackground.mode) || !this.ready) return;
     if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer);
-    this.backgroundTimer = setTimeout(() => { this.backgroundTimer = -1; this.refreshBackground(); }, 450);
+    this.backgroundTimer = setTimeout(() => { this.backgroundTimer = -1; this.refreshBackground(); }, 1200);
   }
   private async refreshBackground(force: boolean = false): Promise<void> {
     if (this.context === null || !['smart','blend'].includes(this.canvasBackground.mode)) return;
@@ -889,7 +1003,7 @@ struct Index {
             }.width('100%')
           }
           if (this.canvasBackground.mode === 'smart' || this.canvasBackground.mode === 'blend') {
-            Text(this.backgroundBusy ? '正在从本地卡片提取颜色' : this.canvasBackground.mode === 'smart' ? '根据全部可见卡片取色，降低饱和度以衬托作品。' : '根据卡片颜色与位置柔和融合，移动结束后自动更新。').fontSize(13).fontColor(this.appMuted()).width('100%')
+            Text(this.backgroundBusy ? '正在从本地卡片提取颜色' : this.canvasBackground.mode === 'smart' ? '根据全部可见卡片取色，降低饱和度以衬托作品。' : '移动时保持当前配色；换图或改色后更新，也可手动重新取色。').fontSize(13).fontColor(this.appMuted()).width('100%')
             Button('重新取色', { type: ButtonType.Capsule }).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).border({ width: .5, color: AppDesign.border(this.appDark) }).enabled(!this.backgroundBusy).onClick(() => this.refreshBackground(true))
           }
           if (this.canvasBackground.mode === 'photo') {
@@ -951,18 +1065,20 @@ struct Index {
   }
   private async reviewTemplate(uri:string):Promise<void>{
     try{const summary=JSON.parse(await taskpool.execute(new taskpool.Task(inspectTemplate,uri)) as string) as TemplateSummary;
-      this.getUIContext().showAlertDialog({title:summary.kind==='card'?'导入卡片':'导入画布',message:summary.count+' 张卡片，'+summary.images+' 个图片资源。将追加到当前画布，保留现有卡片。'+(summary.kind==='canvas'?' 背景可在导入后选择应用。':''),primaryButton:{value:'取消',action:()=>{}},secondaryButton:{value:'添加到画布',action:()=>{this.importTemplate(uri,summary.kind);}}});
+      this.getUIContext().showAlertDialog({title:summary.kind==='card'?'导入卡片':'导入画布',message:summary.count+' 张卡片，'+summary.images+' 个图片资源。'+(summary.kind==='canvas'?'保存为独立画布，保留现有作品。':'添加到当前画布。'),primaryButton:{value:'取消',action:()=>{}},secondaryButton:{value:summary.kind==='canvas'?'保存新画布':'添加到画布',action:()=>{this.importTemplate(uri,summary.kind);}}});
     }catch(e){this.templateError('无法导入',e as Error);}
   }
   private async importTemplate(uri:string,kind:string):Promise<void>{
     if(this.context===null)return;
     try{this.busy=true;const state=normalizeState(JSON.parse(await taskpool.execute(new taskpool.Task(materializeTemplateUri,uri,this.context.filesDir)) as string) as FridgeState);
       const cards=importedCards(state,()=>this.store.newId());
-      if(kind==='canvas')fitImportedCanvas(cards,state.canvasAspect,this.canvasAspect);
+      if(kind==='canvas') {
+        await this.store.save(false); this.backgroundGeneration++; fitImportedCanvas(cards,state.canvasAspect,this.canvasAspect); state.cards=cards; state.canvasAspect=this.canvasAspect;
+        const id=this.store.createCanvas('导入的画布',state); this.busy=false; await this.chooseCanvas(id); return;
+      }
       if(kind==='card'&&cards.length===1){cards[0].x=Math.max(0,(BOARD_W-cards[0].w)/2);cards[0].y=Math.max(0,(BOARD_H-cards[0].h)/2);}
       for(const c of cards.slice().sort((a:FridgeCard,b:FridgeCard)=>a.z-b.z)){this.clamp(c);this.store.addCard(c);}this.render();this.persist(true);this.scheduleBackground();
       if(cards.length>0)this.select(cards[0].id);
-      if(kind==='canvas'){this.getUIContext().showAlertDialog({title:'应用作品背景？',message:'卡片已添加。也可以使用作品自带的画布背景。',primaryButton:{value:'保留当前背景',action:()=>{}},secondaryButton:{value:'应用背景',action:()=>this.applyBackground(state.background)}});}
     }catch(e){this.templateError('导入未完成',e as Error);}finally{this.busy=false;}
   }
   private async shareArtwork(single: boolean): Promise<void> {
@@ -1464,6 +1580,9 @@ struct Index {
           .onSubmit(() => this.refreshWeather())
         Button(this.weatherBusy ? '更新中' : '更新天气', { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).backgroundColor(Color.Transparent).fontColor(this.appText()).border({ width: .5, color: this.appMuted() }).enabled(!this.weatherBusy).onClick(() => this.refreshWeather())
         Text(this.preview.capability?.refreshState === 'failed' ? '暂时无法获取天气，稍后自动重试' : '天气自动更新；打开 App 时会补刷过期数据').fontSize(12).fontColor(this.appMuted()).width('100%')
+      }
+      if(this.preview.capability!==null && ['battery','agenda','parcel','fetch','timetable'].includes(this.preview.capability!.k)) {
+        CapabilitySettings({cap:this.preview.capability!,cardId:this.preview.id,appDark:this.appDark,onUpdate:(id:string,next:CapBlock)=>this.updateExtraCapability(id,next)})
       }
     }.width('100%')
   }
