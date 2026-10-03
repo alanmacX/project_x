@@ -10,5 +10,9 @@ export class AppDesign {
   static text(dark: boolean): string { return dark ? '#F4F4F4' : '#262824'; }
   static control(dark: boolean): string { return AppDesign.background(dark); }
   static muted(dark: boolean): string { return dark ? '#A8ADB5' : '#666B73'; }
-  static border(dark: boolean): string { return dark ? '#41454C' : '#DDE1E5'; }
+  static border(dark: boolean): string { return dark ? '#49443C' : '#E4DED2'; }
+  static selected(dark: boolean): string { return dark ? '#EEE8DC' : '#30332E'; }
+  static onSelected(dark: boolean): string { return dark ? '#25231F' : '#FFFFFF'; }
+  static choice(dark: boolean, active: boolean): string { return active ? AppDesign.selected(dark) : AppDesign.control(dark); }
+  static choiceText(dark: boolean, active: boolean): string { return active ? AppDesign.onSelected(dark) : AppDesign.text(dark); }
 }

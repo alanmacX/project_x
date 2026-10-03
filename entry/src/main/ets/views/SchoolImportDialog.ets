@@ -106,7 +106,7 @@ export struct SchoolImportDialog {
       }.width('100%')
       if(!this.page) {
         if(!this.selected) {
-          TextInput({text:this.query,placeholder:'搜索学校全名或简称'}).height(44).borderRadius(12).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onChange((v:string)=>this.search(v))
+          TextInput({text:this.query,placeholder:'搜索学校全名或简称'}).height(44).borderRadius(12).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).onChange((v:string)=>this.search(v))
           Text('学校专用适配与通用教务都可选择；未收录的学校可用通用教务并输入网址。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
           if(this.adapters.length>1){
             ForEach(this.adapters,(a:SchoolAdapter)=>{this.action(a.name,()=>this.select(a))},(a:SchoolAdapter)=>a.id)
@@ -126,12 +126,12 @@ export struct SchoolImportDialog {
           }
         }else{
           Text(this.display(this.selected.description)).fontSize(14).fontColor(AppDesign.muted(this.appDark)).width('100%')
-          TextInput({text:this.url,placeholder:'学校教务网址 https://…'}).height(48).borderRadius(12).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onChange((v:string)=>this.url=v)
+          TextInput({text:this.url,placeholder:'学校教务网址 https://…'}).height(48).borderRadius(12).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).onChange((v:string)=>this.url=v)
           this.action('打开教务',()=>this.open())
           Blank()
         }
       }else{
-        Row({space:8}) {this.action('返回',()=>this.back(),!this.busy);TextInput({text:this.url,placeholder:'教务网址'}).height(44).borderRadius(12).layoutWeight(1).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).enabled(!this.busy).onChange((v:string)=>this.url=v);this.action('打开',()=>this.open(),!this.busy)}.width('100%')
+        Row({space:8}) {this.action('返回',()=>this.back(),!this.busy);TextInput({text:this.url,placeholder:'教务网址'}).height(44).borderRadius(12).layoutWeight(1).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).enabled(!this.busy).onChange((v:string)=>this.url=v);this.action('打开',()=>this.open(),!this.busy)}.width('100%')
         if(this.frames.length){this.action(this.showFrames?'收起子页面':'打开课表子页面',()=>this.showFrames=!this.showFrames,!this.busy)}
         if(this.showFrames){Scroll(){Column({space:8}){ForEach(this.frames,(url:string)=>{this.action(url,()=>this.frame(url))},(url:string)=>url)}.width('100%')}.height(120).width('100%')}
         Text(this.display(this.message)).fontSize(12).maxLines(2).fontColor(AppDesign.muted(this.appDark)).width('100%')
@@ -149,14 +149,14 @@ export struct SchoolImportDialog {
             Column({space:12}) {
               Text(this.display(this.request.title)).fontSize(18).fontColor(AppDesign.text(this.appDark)).width('100%')
               Scroll(){Text(this.display(this.request.content)).fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')}.constraintSize({maxHeight:140}).width('100%').scrollBar(BarState.Off)
-              if(this.request.kind==='prompt'){TextInput({text:this.input}).onChange((v:string)=>this.input=v).borderRadius(12).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark))}
+              if(this.request.kind==='prompt'){TextInput({text:this.input}).onChange((v:string)=>this.input=v).borderRadius(12).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark))}
               if(this.request.kind==='select'){
                 Scroll(){Column({space:8}){ForEach(this.request.items,(v:string,i:number)=>{this.action(v,()=>this.reply(i))},(v:string,i:number)=>String(i))}.width('100%')}.constraintSize({maxHeight:200}).width('100%')
               }else{Row({space:10}){this.action('取消',()=>this.stop());this.action(this.request.kind==='prompt'?'确定':(this.request.value||'继续'),()=>this.reply(this.request?.kind==='prompt'?this.input:true))}}
             }.padding(20).width('90%').constraintSize({maxWidth:480}).borderRadius(20).backgroundColor(AppDesign.surface(this.appDark))
           }
         }.width('100%').layoutWeight(1).borderRadius(16).clip(true)
-        Row({space:10}){if(this.busy){this.action('取消读取',()=>this.stop());}Button(this.busy?'正在读取':'读取当前课表',{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontSize(15).enabled(!this.busy&&this.ready).onClick(()=>this.run())}.width('100%')
+        Row({space:10}){if(this.busy){this.action('取消读取',()=>this.stop());}Button(this.busy?'正在读取':'读取当前课表',{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontSize(15).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).enabled(!this.busy&&this.ready).onClick(()=>this.run())}.width('100%')
       }
       if(this.error){Text(this.error).fontSize(12).fontColor('#B34735').width('100%').maxLines(3)}
       Text('登录仅在学校网页内进行；读取后的课程在本机预览，确认才保存。').fontSize(11).fontColor(AppDesign.muted(this.appDark)).width('100%')

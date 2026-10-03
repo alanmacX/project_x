@@ -43,8 +43,8 @@ export struct PhotoCrop {
       Row({ space: 8 }) {
         Button('重置', { type: ButtonType.Capsule }).height(44).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.background(this.appDark)).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => { this.zoom = 1; this.x = 0; this.y = 0; })
         Button('取消', { type: ButtonType.Capsule }).height(44).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.background(this.appDark)).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.controller?.close())
-        Button('使用照片', { type: ButtonType.Capsule }).height(44).enabled(this.ready).onClick(() => { this.onApply(this.zoom, this.x, this.y); this.controller?.close(); })
+        Button('使用照片', { type: ButtonType.Capsule }).height(44).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).enabled(this.ready).onClick(() => { this.onApply(this.zoom, this.x, this.y); this.controller?.close(); })
       }
-    }.padding(24).width(340).backgroundColor(AppDesign.background(this.appDark)).borderRadius(28)
+    }.padding(20).width('94%').constraintSize({ maxWidth: 440 }).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(28)
   }
 }

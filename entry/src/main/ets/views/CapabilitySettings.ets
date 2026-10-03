@@ -118,18 +118,18 @@ export struct CapabilitySettings {
         this.action(this.busy?'更新中':'更新电量',()=>this.refresh())
       }
       if(this.cap.k==='fetch') {
-        TextInput({text:this.cap.title??'',placeholder:'名称，例如空气质量 / 剩余配额'}).height(44).fontColor(this.text()).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>{const next=this.copy();next.title=v;this.change(next);})
-        TextInput({text:this.cap.url??'',placeholder:'https://… JSON 或纯文本接口'}).height(44).fontColor(this.text()).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>{const next=this.copy();next.url=v.trim();next.value='';next.attemptedAt=0;next.field='';next.sourceConfigured=false;this.change(next);})
+        TextInput({text:this.cap.title??'',placeholder:'名称，例如空气质量 / 剩余配额'}).height(44).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>{const next=this.copy();next.title=v;this.change(next);})
+        TextInput({text:this.cap.url??'',placeholder:'https://… JSON 或纯文本接口'}).height(44).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>{const next=this.copy();next.url=v.trim();next.value='';next.attemptedAt=0;next.field='';next.sourceConfigured=false;this.change(next);})
         this.action(this.busy?'读取中':this.cap.value?'重新选择内容':'读取并选择内容',()=>this.chooseURLField())
         if(this.cap.value) {Text('内容：'+(this.cap.field||'正文')).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%'); this.action('立即刷新',()=>this.refresh())}
-        TextInput({text:this.cap.unit??'',placeholder:'单位（可留空）'}).height(44).fontColor(this.text()).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>{const next=this.copy();next.unit=v;this.change(next);})
-        Row({space:8}) {ForEach([30,60,180],(v:number)=>{Button(v+' 分钟',{type:ButtonType.Capsule}).height(44).fontSize(12).layoutWeight(1).fontColor(this.text()).backgroundColor(this.control()).border({width:(this.cap.interval??60)===v?1.5:0,color:AppDesign.border(this.appDark)}).onClick(()=>{const next=this.copy();next.interval=v;this.change(next);})},(v:number)=>String(v))}.width('100%')
+        TextInput({text:this.cap.unit??'',placeholder:'单位（可留空）'}).height(44).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>{const next=this.copy();next.unit=v;this.change(next);})
+        Row({space:8}) {ForEach([30,60,180],(v:number)=>{Button(v+' 分钟',{type:ButtonType.Capsule}).height(44).fontSize(12).layoutWeight(1).fontColor(AppDesign.choiceText(this.appDark,(this.cap.interval??60)===v)).backgroundColor(AppDesign.choice(this.appDark,(this.cap.interval??60)===v)).onClick(()=>{const next=this.copy();next.interval=v;this.change(next);})},(v:number)=>String(v))}.width('100%')
         Text('只读取所选内容，失败时保留上次结果。桌面更新受系统调度限制。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       }
       if(this.cap.k==='parcel') {
         this.action(this.busy?'识别中':'从截图识别取件码',()=>this.pickScreenshot())
-        TextInput({text:this.code,placeholder:'确认取件码'}).height(44).maxLength(24).fontColor(this.text()).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>this.code=v)
-        TextInput({text:this.place,placeholder:'驿站 / 取件地点'}).height(44).maxLength(80).fontColor(this.text()).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>this.place=v)
+        TextInput({text:this.code,placeholder:'确认取件码'}).height(44).maxLength(24).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>this.code=v)
+        TextInput({text:this.place,placeholder:'驿站 / 取件地点'}).height(44).maxLength(80).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>this.place=v)
         this.action('加入待取',()=>this.addParcel())
         ForEach(pendingParcels(this.cap),(p:ParcelItem)=>{
           Row({space:12}) {Column({space:4}) {Text(p.code).fontSize(16).fontColor(this.text());Text(p.place).fontSize(12).fontColor(AppDesign.muted(this.appDark)).maxLines(1)}.layoutWeight(1).alignItems(HorizontalAlign.Start);Button('已取',{type:ButtonType.Capsule}).height(44).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>{const next=this.copy();for(const item of next.parcels??[])if(item.id===p.id)item.picked=true;this.change(next);})}.width('100%')
@@ -142,12 +142,13 @@ export struct CapabilitySettings {
         Text(this.cap.agendaSource==='system'?'系统日历：需要受限权限资格和用户授权':this.cap.agendaSource==='imported'?'本地日历副本；原文件修改后需要重新导入':'显示接下来三项安排，缩小时保留下一项').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       }
       if(this.cap.k==='timetable') {
+        this.action('导入课程表',()=>this.importTimetable())
+        Text('学期与课程').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
         this.action('学期第一周周一  '+(this.cap.semester??''),()=>this.semesterDate())
         this.action('添加课程',()=>this.editCourse())
         ForEach(this.cap.courses??[],(c:CourseItem)=>{
           Row({space:8}) {Button(c.name+' · 周'+['一','二','三','四','五','六','日'][c.day-1]+' '+c.start,{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontSize(12).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.editCourse(c));Button('删除',{type:ButtonType.Capsule}).height(44).fontSize(12).fontColor('#C43A35').backgroundColor(this.control()).onClick(()=>{const next=this.copy();next.courses=(next.courses??[]).filter((v)=>v.id!==c.id);this.change(next);})}.width('100%')
         },(c:CourseItem)=>c.id)
-        this.action('导入课程表',()=>this.importTimetable())
         Text('按周次、单双周和时间自动显示下一课及后续安排。桌面展示单个能力，不挤入完整微缩课表。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       }
       if(this.message || this.cap.refreshState==='failed') {Text(this.message||this.cap.desc||'更新失败，保留上次结果').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}

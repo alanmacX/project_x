@@ -58,27 +58,27 @@ export struct WakeUpImportDialog {
     try {const courses=resolveWakeUp(this.parsed,this.semester,this.slots);this.onImport(mondayDate(this.semester),courses,this.replace);this.controller.close();}catch(e){this.error=(e as Error).message;}
   }
   @Builder
-  action(label:string,run:()=>void) {
-    Button(label,{type:ButtonType.Capsule}).height(44).fontSize(14).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).enabled(!this.busy).onClick(run)
+  action(label:string,run:()=>void,emphasis:boolean=false) {
+    Button(label,{type:ButtonType.Capsule}).height(44).fontSize(14).fontColor(AppDesign.choiceText(this.appDark,emphasis)).backgroundColor(AppDesign.choice(this.appDark,emphasis)).enabled(!this.busy).onClick(run)
   }
   build() {
     Scroll() {
     Column({space:14}) {
       Text(this.stage?'确认课程表':'导入课程表').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
       if(!this.stage) {
-        this.action('从学校教务导入',()=>this.school())
+        this.action('从学校教务导入',()=>this.school(),true)
         Text('在 App 内选学校、登录教务并读取个人课表；也可导入已有的课表备份。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
         this.action(this.other?'收起其他方式':'导入已有课表备份',()=>this.other=!this.other)
         if(this.other) {
         this.action('选择 WakeUp 文件',()=>this.file())
-        TextArea({text:this.text,placeholder:'长按粘贴导出文本'}).height(160).maxLength(262144).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(16).onChange((v:string)=>this.text=v)
+        TextArea({text:this.text,placeholder:'长按粘贴导出文本'}).height(160).maxLength(262144).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(16).onChange((v:string)=>this.text=v)
         this.action(this.busy?'读取中':'预览粘贴的课表',()=>this.parseText())
         Text('支持 WakeUp 备份作为可选迁移方式，无需安装其他课程表 App。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
         }
       } else {
         Text(this.parsed.name+' · '+this.parsed.courses.length+' 条上课安排').fontSize(13).fontColor(AppDesign.muted(this.appDark)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
         this.action('第一周周一  '+(this.semester||'选择开学日期'),()=>this.date())
-        Row({space:10}) {this.action('课程',()=>this.periods=false);this.action('作息'+(this.slots.some((s)=>!s.start||!s.end)?' · 待补全':''),()=>this.periods=true)}.width('100%')
+        Row({space:10}) {this.action('课程',()=>this.periods=false,!this.periods);this.action('作息'+(this.slots.some((s)=>!s.start||!s.end)?' · 待补全':''),()=>this.periods=true,this.periods)}.width('100%')
         Scroll() {
           Column({space:10}) {
             if(this.periods) {
@@ -100,7 +100,7 @@ export struct WakeUpImportDialog {
         if(this.existingCount>0) {Row({space:12}) {Text(this.replace?'替换现有 '+this.existingCount+' 条课程':'追加到现有课程').fontSize(13).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:this.replace}).onChange((v:boolean)=>this.replace=v)}.width('100%')}
       }
       if(this.error){Text(this.error).fontSize(12).fontColor('#B34735').width('100%').maxLines(3).textOverflow({overflow:TextOverflow.Ellipsis})}
-      Row({space:10}) {this.action('取消',():void=>{this.controller.close();});if(this.stage){this.action('重新选择',()=>{this.stage=false;this.error='';});Button('确认导入',{type:ButtonType.Capsule}).height(44).fontSize(14).layoutWeight(1).onClick(()=>this.confirm());}}
+      Row({space:10}) {this.action('取消',():void=>{this.controller.close();});if(this.stage){this.action('重新选择',()=>{this.stage=false;this.error='';});Button('确认导入',{type:ButtonType.Capsule}).height(44).fontSize(14).layoutWeight(1).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).onClick(()=>this.confirm());}}
     }.padding(20).width('100%')
     }.width('92%').constraintSize({maxWidth:560,maxHeight:'90%'}).scrollBar(BarState.Off).borderRadius(24).backgroundColor(AppDesign.surface(this.appDark))
   }
