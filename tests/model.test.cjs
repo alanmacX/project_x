@@ -515,6 +515,7 @@ function load(name) {
   const samples=new Uint8Array(500*4);
   for(let i=0;i<500;i++)samples.set(i<300?[255,0,0,0]:i<450?[255,255,255,255]:[40,160,75,255],i*4);
   const rep=palette.colorLab(palette.representativeColor(samples));assert.ok(rep.a<-20,'transparent padding and white margins do not overwhelm green subject');
+  const spectrum=new Uint8Array(90*4);for(let i=0;i<90;i++)spectrum.set(i<30?[220,55,45,255]:i<60?[45,170,65,255]:[45,85,215,255],i*4);assert.equal(new Set(palette.representativePalette(spectrum)).size,3,'multi-colour mode preserves three distinct image clusters rather than one muddy mean');
   const anchors=[{x:0,y:.5,color:'#E56953',weight:1},{x:1,y:.5,color:'#538CE5',weight:1}];
   const pixels=palette.blendPixels(anchors,'#EFECE5',128,64);
   const hexAt=(x,y)=>'#'+Array.from(pixels.slice((y*128+x)*4,(y*128+x)*4+3)).map(v=>v.toString(16).padStart(2,'0')).join('');

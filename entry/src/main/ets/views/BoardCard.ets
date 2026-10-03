@@ -1,3 +1,4 @@
+import { BoardMotion } from '../model/BoardMotion';
 import { dragBounds, DragBounds } from '../model/DragGeometry';
 import { cardOutline } from '../model/RenderContours';
 import { motionFrameRate } from '../model/MotionPolicy';
@@ -9,6 +10,12 @@ import { cardContainsPoint } from '../model/CardHitTest';
 /** A stable card node owns its gestures; committing geometry never recreates its canvas. */
 @Component
 export struct BoardCard {
+  @ObjectLink motion: BoardMotion;
+  @Prop controlViewportWidth: number = 10000;
+  @Prop controlViewportHeight: number = 10000;
+  @State rotating: boolean = false;
+  @State liveAngle: number = 0;
+  private initialAngle: number = 0;
   @Prop card: FridgeCard = new FridgeCard();
   @Prop @Watch('syncHandles') selected: boolean = false;
   @Prop heroHidden: boolean = false;
@@ -99,7 +106,7 @@ export struct BoardCard {
   @State atMinimum: boolean = false;
   private copyCard(): FridgeCard {
     const copy = new FridgeCard();
-    copy.id = this.card.id;
+    copy.id = this.card.id; copy.groupId = this.card.groupId;
     copy.x = this.card.x;
     copy.y = this.card.y;
     copy.w = this.card.w;
@@ -132,10 +139,10 @@ export struct BoardCard {
     const key = this.card.shape + ':' + this.card.w + ':' + this.card.h + ':' + this.card.subjectBorder;
     const contour = cardOutline(this.card);
     if (this.handleKey !== key || this.handleOutline !== contour) {
-      this.handles = [cardHandlePoint(this.card, false, false), cardHandlePoint(this.card, true, false), cardHandlePoint(this.card, true, true)];
+      this.handles = [cardHandlePoint(this.card, false, false), cardHandlePoint(this.card, true, false), cardHandlePoint(this.card, true, true), cardHandlePoint(this.card, false, true)];
       this.handleKey = key; this.handleOutline = contour;
     }
-    return this.handles[bottom ? 2 : (right ? 1 : 0)];
+    return this.handles[bottom ? (right ? 2 : 3) : (right ? 1 : 0)];
   }
   private w(): number { return (this.resizing ? this.liveW : this.card.w) * this.scaleFactor; }
   private h(): number { return (this.resizing ? this.liveH : this.card.h) * this.scaleFactor; }
@@ -144,6 +151,13 @@ export struct BoardCard {
     this.getUIContext().animateTo({ duration: 160, curve: Curve.Friction, expectedFrameRateRange: this.frameRate }, () => {
       this.liftScale = active ? 1.025 : 1; if (!active) this.tilt = 0;
     });
+  }
+  private controlPosition(right: boolean, bottom: boolean): ShapePoint {
+    const p=this.handle(right,bottom),a=(this.rotating?this.liveAngle:this.card.rot)*Math.PI/180,w=this.w(),h=this.h();
+    const originX=this.card.x*this.scaleFactor,originY=(this.resizing?this.liveY:this.card.y)*this.yScaleFactor;
+    const px=originX+p.x*w*Math.cos(a)-(p.y*h-h)*Math.sin(a),py=originY+h+p.x*w*Math.sin(a)+(p.y*h-h)*Math.cos(a);
+    const x=Math.max(22,Math.min(this.controlViewportWidth-22,px))-originX,y=Math.max(22,Math.min(this.controlViewportHeight-22,py))-originY-h;
+    return {x:2+x*Math.cos(a)+y*Math.sin(a),y:2+h-x*Math.sin(a)+y*Math.cos(a)};
   }
   private startMove(): void {
     this.animateLift(true); this.originX = this.card.x; this.originY = this.card.y; this.dx = 0; this.dy = 0; this.lastDX = 0; this.moveBounds = this.getMoveBounds(this.card); this.moving = true; this.onInteraction(true);
@@ -197,12 +211,12 @@ export struct BoardCard {
       Stack() {
         // Shadow fringe stays in the texture; rotation and translation stay outside it.
         Stack({ alignContent: Alignment.TopStart }) {
-          CardFace({ card: this.faceCard(), scaleFactor: this.scaleFactor, tick: this.tick, lifted: this.moving, hideContent: this.hideContent, movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
+          CardFace({ card: this.faceCard(), scaleFactor: this.scaleFactor, tick: this.tick, lifted: this.moving || this.motion.ids.includes(this.card.id), hideContent: this.hideContent, movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
             .width(this.w()).height(this.h()).position({ x: 24, y: 24 }).hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS)
         }.width(this.w() + 48).height(this.h() + 48).position({ x: -24, y: -24 })
           .renderGroup(this.cacheSurface || this.moving || (!this.editingSurface && this.card.elements.every(el => !el.animated))).hitTestBehavior(HitTestMode.None)
-      }.scale({ x: this.liftScale, y: this.liftScale })
-        .rotate({ angle: this.tilt })
+      }.scale({ x: this.motion.ids.includes(this.card.id) ? 1 : this.liftScale, y: this.motion.ids.includes(this.card.id) ? 1 : this.liftScale })
+        .rotate({ angle: this.motion.ids.includes(this.card.id) ? 0 : this.tilt })
         .width(this.w()).height(this.h()).position({ x: 24, y: 24 })
         .onTouchIntercept((e: TouchEvent): HitTestMode => {
           // Ownership is decided on DOWN; do not scan every contour on every MOVE.
@@ -219,12 +233,12 @@ export struct BoardCard {
       Button('×', { type: ButtonType.Circle }).width(44).height(44).fontSize(24).fontColor('#D3423C').backgroundColor(Color.White)
         .shadow({ radius: 8, color: '#20000000', offsetY: 2 })
         .opacity(this.controlsOpacity).scale({ x: this.controlsScale, y: this.controlsScale })
-        .position({ x: 2 + this.handle(false, false).x * this.w(), y: 2 + this.handle(false, false).y * this.h() }).hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
+        .position(this.controlPosition(false, false)).hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('删除卡片').onClick(() => this.onDelete(this.card.id))
       Button('↗', { type: ButtonType.Circle }).width(44).height(44).fontSize(22).fontColor('#303030').backgroundColor(Color.White)
         .shadow({ radius: 8, color: '#20000000', offsetY: 2 })
         .opacity(this.controlsOpacity).scale({ x: this.resizeControlScale, y: this.resizeControlScale })
-        .position({ x: 2 + this.handle(true, false).x * this.w(), y: 2 + this.handle(true, false).y * this.h() }).hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
+        .position(this.controlPosition(true, false)).hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('调整卡片大小').onClick(() => this.getUIContext().getPromptAction().showToast({ message: '向外拖动放大，向内拖动缩小' }))
         .gesture(PanGesture({ distance: 2 }).onActionStart((e: GestureEvent) => { this.beginFinger(e); this.startResize(); this.resize(e); }).onActionUpdate((e: GestureEvent) => this.resize(e))
           .onActionEnd((e: GestureEvent) => { this.resize(e); this.finishResize(); }).onActionCancel(() => this.cancelResize()))
@@ -232,14 +246,24 @@ export struct BoardCard {
         Text('最小可读尺寸').fontSize(12).fontColor('#FFFFFF').padding(8).backgroundColor('#303030').borderRadius(8)
           .position({ x: 24, y: this.h() + 26 }).hitTestBehavior(HitTestMode.None)
       }
+      Button('↻', { type: ButtonType.Circle }).width(44).height(44).fontSize(22).fontColor('#303030').backgroundColor(Color.White)
+        .shadow({ radius: 8, color: '#20000000', offsetY: 2 }).opacity(this.controlsOpacity).scale({ x: this.controlsScale, y: this.controlsScale })
+        .position(this.controlPosition(false, true))
+        .hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
+        .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('旋转整张卡片')
+        .onClick(() => { const next = this.copyCard(); next.rot = 0; this.onCommit(next); })
+        .gesture(PanGesture({ distance: 2 }).onActionStart((e: GestureEvent) => { this.beginFinger(e); this.initialAngle = this.card.rot; this.liveAngle = this.card.rot; this.rotating = true; this.onInteraction(true); })
+          .onActionUpdate((e: GestureEvent) => { const offset = this.screenOffset(e); this.liveAngle = this.initialAngle + offset.x * .65 - offset.y * .35; })
+          .onActionEnd(() => { const next = this.copyCard(); next.rot = ((this.liveAngle + 180) % 360 + 360) % 360 - 180; this.onCommit(next); this.rotating = false; this.onInteraction(false); })
+          .onActionCancel(() => { this.rotating = false; this.onInteraction(false); }))
       Button('编辑', { type: ButtonType.Circle }).width(44).height(44).fontSize(11).fontColor('#303030').backgroundColor(Color.White)
         .shadow({ radius: 8, color: '#20000000', offsetY: 2 })
         .opacity(this.controlsOpacity).scale({ x: this.controlsScale, y: this.controlsScale })
-        .position({ x: 2 + this.handle(true, true).x * this.w(), y: 2 + this.handle(true, true).y * this.h() }).hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
+        .position(this.controlPosition(true, true)).hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('编辑卡片内容').onClick(() => this.onEdit(this.card.id))
     }.width(this.w() + 48).height(this.h() + 48).opacity(this.heroHidden ? 0 : 1).hitTestBehavior(this.heroHidden ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Transparent)
-      .translate({ x: this.scatterX + this.dx, y: this.scatterY + this.dy })
-      .rotate({ angle: this.editingSurface ? this.displayAngle : this.card.rot + this.scatterAngle, centerX: 24, centerY: this.h() + 24 })
+      .translate({ x: this.scatterX + (this.motion.ids.includes(this.card.id) ? this.motion.x : this.dx), y: this.scatterY + (this.motion.ids.includes(this.card.id) ? this.motion.y : this.dy) })
+      .rotate({ angle: this.editingSurface ? this.displayAngle : (this.rotating ? this.liveAngle : this.card.rot) + this.scatterAngle, centerX: 24, centerY: this.h() + 24 })
       .position({ x: (this.localCoordinates ? 0 : this.boardLeft + this.card.x * this.scaleFactor - 24),
         y: (this.localCoordinates ? (this.resizing ? this.liveY - this.card.y : 0) * this.yScaleFactor : this.boardTop + (this.resizing ? this.liveY : this.card.y) * this.yScaleFactor - 24) })
       .zIndex(this.moving ? 100002 : (this.resizing ? 100001 : this.card.z))

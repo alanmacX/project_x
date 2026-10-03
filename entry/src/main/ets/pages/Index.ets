@@ -1,3 +1,4 @@
+import { BoardMotion } from '../model/BoardMotion';
 import { combineCards, ungroupCards, groupMembers, groupDragBounds, cleanGroups } from '../model/CardGroups';
 import { PhotoCrop } from '../views/PhotoCrop';
 import { CanvasBackdrop } from '../views/CanvasBackdrop';
@@ -24,7 +25,7 @@ import { extractSubject, repairSubject } from '../model/SubjectShape';
 import { fetchWeather } from '../model/WeatherService';
 import { weatherNeedsRefresh } from '../model/WeatherRefresh';
 import { BoardCard } from '../views/BoardCard';
-import { capabilityBox, capabilityPlacement, safeContentBox, clampCardGeometry, ensureCapabilitySize, minimumCardSize, subjectSurfaceFactor } from '../model/CanvasLayout';
+import { capabilityBox, capabilityPlacement, safeContentBox, clampCardGeometry, ensureCapabilitySize, minimumCardSize, subjectSurfaceFactor, cardHandlePoint } from '../model/CanvasLayout';
 import { fileIo } from '@kit.CoreFileKit';
 import { cropCardToSubject } from '../model/SubjectGeometry';
 import { applyCalendarAction } from '../model/CapabilityActions';
@@ -41,8 +42,7 @@ struct Index {
   private photoCropDialog: CustomDialogController | null = null;
   @State groupSelecting: boolean = false;
   @State groupSelection: string[] = [];
-  @State groupDX: number = 0;
-  @State groupDY: number = 0;
+  @State boardMotion: BoardMotion = new BoardMotion();
   private movingGroupIds: string[] = [];
   private store: FridgeStore = new FridgeStore();
   private context: Context | null = null;
@@ -86,6 +86,9 @@ struct Index {
   @State showLayerOptions: boolean = false;
   private resizeStart: ElementBox = new ElementBox();
   private rotateStart: number = 0;
+  private outerResizeW: number = 0;
+  private outerResizeH: number = 0;
+  private outerResizeY: number = 0;
   private rotationStartAngle: number = 0;
   @State private cardRotating: boolean = false;
   private rotationViewport: EditorViewport = new EditorViewport();
@@ -316,7 +319,7 @@ struct Index {
     });
   }
   private appBackground(): string { return AppDesign.background(this.appDark); }
-  private appSurface(): string { return this.appBackground(); }
+  private appSurface(): string { return AppDesign.surface(this.appDark); }
   private appPanel(): string { return this.appBackground(); }
   private appControl(): string { return this.appBackground(); }
   private appText(): string { return AppDesign.text(this.appDark); }
@@ -518,8 +521,8 @@ struct Index {
     });
   }
   private boardInteraction(id: string, active: boolean): void {
-    if (active) { const card = this.store.findCard(id); this.movingGroupIds = card === null ? [] : groupMembers(this.store.state.cards, card).filter((c: FridgeCard) => c.id !== id).map((c: FridgeCard) => c.id); }
-    else { this.groupDX = 0; this.groupDY = 0; this.movingGroupIds = []; }
+    if (active) { const card = this.store.findCard(id); this.movingGroupIds = card === null ? [] : groupMembers(this.store.state.cards, card).filter((c: FridgeCard) => c.id !== id).map((c: FridgeCard) => c.id); this.boardMotion.ids = this.movingGroupIds.length > 0 ? [id, ...this.movingGroupIds] : []; }
+    else { this.boardMotion.x = 0; this.boardMotion.y = 0; this.boardMotion.ids = []; this.movingGroupIds = []; }
     this.activeBoardId = active ? id : '';
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer); this.saveTimer = -1;
     if (!active) { this.scheduleBackground(); this.persist(true); }
@@ -528,8 +531,8 @@ struct Index {
     const card = this.store.findCard(updated.id); if (card === null) return;
     const dx = updated.x - card.x, dy = updated.y - card.y;
     if (updated.w === card.w && updated.h === card.h) { for (const peer of groupMembers(this.store.state.cards, card)) if (peer.id !== card.id) { peer.x += dx; peer.y += dy; } }
-    this.groupDX = 0; this.groupDY = 0;
-    card.x = updated.x; card.y = updated.y; card.w = updated.w; card.h = updated.h;
+    this.boardMotion.x = 0; this.boardMotion.y = 0;
+    card.x = updated.x; card.y = updated.y; card.w = updated.w; card.h = updated.h; card.rot = updated.rot;
     this.clamp(card); groupMembers(this.store.state.cards, card).sort((a: FridgeCard, b: FridgeCard) => a.z - b.z).forEach((member: FridgeCard) => this.store.bringToFront(member));
     // Geometry handoff only updates the visible board; hydrate inspector on entry.
     if (this.editing || this.viewing) this.render(); else this.renderBoard();
@@ -661,20 +664,20 @@ struct Index {
         ForEach(this.cardIds, (id: string) => {
           Stack({ alignContent: Alignment.TopStart }) {
             Stack({ alignContent: Alignment.TopStart }) {
-            BoardCard({ card: this.sceneCard(id), localCoordinates: true, cacheSurface: this.heroActive || this.arriving, scatterAngle: 0, editingSurface: this.editing,
+            BoardCard({ controlViewportWidth: BOARD_W * this.boardScale, controlViewportHeight: this.boardHeight, motion: this.boardMotion, card: this.sceneCard(id), localCoordinates: true, cacheSurface: this.heroActive || this.arriving, scatterAngle: 0, editingSurface: this.editing,
               displayAngle: id === this.selectedId ? this.surfaceAngle() : this.cardMap[id].rot + this.scatter * (this.cardMap[id].z % 2 === 0 ? 9 : -9),
               selected: this.selectedId === id && !this.editing && !this.groupSelecting, scaleFactor: this.boardScale, yScaleFactor: this.boardHeight / BOARD_H,
               hideContent: this.editing && id === this.selectedId && this.settingsTab === 0,
               movingLayerId: id === this.selectedId ? this.layerDrag : '',
               moveX: id === this.selectedId && this.editing ? this.layerDX * this.boardScale / this.editorScale() : 0, moveY: id === this.selectedId && this.editing ? this.layerDY * this.boardScale / this.editorScale() : 0, tick: this.tick,
               getMoveBounds: (card: FridgeCard) => groupDragBounds(this.store.state.cards, card),
-              onMove: (x: number, y: number) => { if (this.movingGroupIds.length > 0) { this.groupDX = x; this.groupDY = y; } },
+              onMove: (x: number, y: number) => { if (this.movingGroupIds.length > 0) { this.boardMotion.x = x; this.boardMotion.y = y; } },
               onSelect: (id: string) => this.selectLayerCard(id), onDelete: (id: string) => this.deleteCard(id),
               onEdit: (id: string) => this.openEditor(id), onInteraction: (active: boolean) => this.boardInteraction(id, active), onCommit: (updated: FridgeCard) => this.commitGeometry(updated) })
           }.width(this.sceneCard(id).w * this.boardScale + 48).height(this.sceneCard(id).h * this.boardScale + 48)
             .scale({ x: this.sceneScale(id), y: this.sceneScale(id), centerX: 24, centerY: 24 })
             .position({ x: this.sceneX(id) - 24 - this.creationClipX(id), y: this.sceneY(id) - 24 - this.creationClipY(id) })
-            .translate({ x: this.arrivalX(id) + (this.movingGroupIds.includes(id) ? this.groupDX : 0), y: this.arrivalY(id) + (this.movingGroupIds.includes(id) ? this.groupDY : 0) })
+            .translate({ x: this.arrivalX(id), y: this.arrivalY(id) })
             .hitTestBehavior(this.editing || this.arriving ? HitTestMode.None : HitTestMode.Transparent)
           }.width(this.creationClip(id) ? this.transitionClipW : this.screenWidth)
             .height(this.creationClip(id) ? this.transitionClipH : this.screenHeight)
@@ -754,7 +757,7 @@ struct Index {
             Button('删除', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(Color.Transparent).fontColor('#C43A35').onClick(() => this.deleteCard(this.selectedId))
           }.width('100%')
         }
-      }.width(this.panelWidth).height(this.panelHeight - 84).padding(12).backgroundColor(this.appPanel()).borderRadius(AppDesign.sectionRadius).border({ width: 1, color: AppDesign.border(this.appDark) })
+      }.width(this.panelWidth).height(this.panelHeight - 84).padding(12).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).border({ width: 1, color: AppDesign.border(this.appDark) })
         .position({ x: this.panelLeft, y: this.panelTop })
   }
   private backgroundLabel(): string {
@@ -846,7 +849,7 @@ struct Index {
         .bindSheet(this.backgroundOpen, this.backgroundEditor, { height: SheetSize.LARGE, showClose: true, backgroundColor: this.appBackground(), onDisappear: () => { this.backgroundOpen = false; } })
       Button(this.sharing ? '生成中' : '系统分享', { type: ButtonType.Capsule }).id('shareCanvas').height(44).fontSize(13).padding({ left: 12, right: 12 })
         .backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).enabled(!this.sharing && !this.backgroundBusy).onClick(() => this.shareArtwork(false))
-    }.width(this.panelWidth).height(72).padding(8).borderRadius(AppDesign.sectionRadius).border({ width: 1, color: AppDesign.border(this.appDark) }).backgroundColor(this.appPanel())
+    }.width(this.panelWidth).height(72).padding(8).borderRadius(AppDesign.sectionRadius).border({ width: 1, color: AppDesign.border(this.appDark) }).backgroundColor(this.appSurface())
       .position({ x: this.panelLeft, y: this.panelTop + this.panelHeight - 72 })
   }
   @Builder
@@ -986,9 +989,9 @@ struct Index {
           style: {
             blurStrategy: BlurStrategy.ADAPTIVE, thermoCtrl: true,
             scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-            scrollEffectStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } },
+            scrollEffectStyle: { contentStyle: { menuStyle: { textColor: this.appText(), iconColor: this.appText() }, backIconStyle: { textColor: this.appText(), iconColor: this.appText() } }, backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } },
             systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
-            originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } }
+            originalStyle: { contentStyle: { menuStyle: { textColor: this.appText(), iconColor: this.appText() }, backIconStyle: { textColor: this.appText(), iconColor: this.appText() } }, backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } }
           }
         })
         .bindToScrollable([this.detailScroller]).hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).width('100%').height('100%').backgroundColor(Color.Transparent)
@@ -1029,9 +1032,9 @@ struct Index {
           style: {
             blurStrategy: BlurStrategy.ADAPTIVE, thermoCtrl: true,
             scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-            scrollEffectStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } },
+            scrollEffectStyle: { contentStyle: { menuStyle: { textColor: this.appText(), iconColor: this.appText() }, backIconStyle: { textColor: this.appText(), iconColor: this.appText() } }, backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } },
             systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
-            originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } }
+            originalStyle: { contentStyle: { menuStyle: { textColor: this.appText(), iconColor: this.appText() }, backIconStyle: { textColor: this.appText(), iconColor: this.appText() } }, backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } }
           }
         })
         .bindToScrollable([this.scroller]).hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).width('100%').height('100%').backgroundColor(Color.Transparent)
@@ -1071,7 +1074,7 @@ struct Index {
   editorLayers() {
     Column({ space: 8 }) { this.layersPanel() }
       .width(this.editorLandscape() ? this.editorViewportWidth() - 32 : this.screenWidth - this.editorViewportWidth() - 24)
-      .height(this.editorLandscape() ? Math.min(148, this.editorBodyHeight() - this.previewPaneHeight() - 16) : this.previewPaneHeight() - 12).padding(12).borderRadius(AppDesign.sectionRadius)
+      .height(this.editorLandscape() ? Math.min(148, this.editorBodyHeight() - this.previewPaneHeight() - 16) : this.previewPaneHeight() - 12).padding(12).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
       .border({ width: 1, color: AppDesign.border(this.appDark) }).clip(true)
       .margin({ left: this.editorLandscape() ? 16 : 0, right: 16, bottom: 12 })
   }
@@ -1135,18 +1138,43 @@ struct Index {
               .onActionEnd((e: GestureEvent) => { this.rotateElement(e); this.flushPreview(); }).onActionCancel(() => this.cancelTransform()))
         }
       }
-      Button('↻ 整卡', { type: ButtonType.Capsule }).id('rotateWholeCard').height(44).width(104).fontSize(14)
-        .backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: 1, color: AppDesign.border(this.appDark) })
-        .position({ x: Math.max(8, this.editorViewportWidth() - 120), y: 8 }).accessibilityText('拖动旋转整张卡片，点击回正')
-        .onClick(() => { const card = this.current(); if (card !== null && !this.heroActive) { card.rot = 0; this.change(); } })
-        .gesture(PanGesture({ distance: 2 }).onActionStart(() => { const card = this.current(); if (card !== null && !this.heroActive) { this.rotateStart = card.rot; this.rotationViewport = this.previewViewport(); this.cardRotating = true; } })
-          .onActionUpdate((e: GestureEvent) => this.rotateOuterCard(e)).onActionEnd((e: GestureEvent) => { this.rotateOuterCard(e); this.finishCardRotation(false); }).onActionCancel(() => this.finishCardRotation(true)))
+      if (this.layerId.length === 0) { this.wholeCardControls() }
     }.width('100%').height(this.editorCanvasHeight())
 
   }
+  private wholeCardHandle(right: boolean, bottom: boolean): ShapePoint {
+    const v = this.previewViewport(), w = this.preview.w * this.editorScale(), h = this.preview.h * this.editorScale(), a = this.editingAngle() * Math.PI / 180;
+    const unrotated: ShapePoint[] = [{x:0,y:-h},{x:w,y:-h},{x:w,y:0},{x:0,y:0}];
+    const corners: ShapePoint[] = unrotated.map((p:ShapePoint):ShapePoint=>({x:v.left+p.x*Math.cos(a)-p.y*Math.sin(a),y:v.top+h+p.x*Math.sin(a)+p.y*Math.cos(a)}));
+    const xs=corners.map((p:ShapePoint)=>p.x),ys=corners.map((p:ShapePoint)=>p.y),left=Math.min(...xs),top=Math.min(...ys),rightEdge=Math.max(...xs),bottomEdge=Math.max(...ys);
+    const cx=(left+rightEdge)/2,cy=(top+bottomEdge)/2,rx=Math.max(28,(rightEdge-left)/2+12),ry=Math.max(28,(bottomEdge-top)/2+12);
+    return {x:Math.max(22,Math.min(this.editorViewportWidth()-22,cx+(right?rx:-rx))),y:Math.max(22,Math.min(this.editorCanvasHeight()-22,cy+(bottom?ry:-ry)))};
+  }
+  @Builder
+  wholeCardControls() {
+    Button('×', { type: ButtonType.Circle }).width(44).height(44).fontSize(24).fontColor('#D3423C').backgroundColor(this.appSurface())
+      .position({ x: this.wholeCardHandle(false, false).x - 22, y: this.wholeCardHandle(false, false).y - 22 }).accessibilityText('删除整张卡片').onClick(() => this.deleteCard(this.selectedId))
+    Button('↗', { type: ButtonType.Circle }).width(44).height(44).fontSize(22).fontColor(this.appText()).backgroundColor(this.appSurface())
+      .position({ x: this.wholeCardHandle(true, false).x - 22, y: this.wholeCardHandle(true, false).y - 22 }).accessibilityText('缩放整张卡片')
+      .gesture(PanGesture({ distance: 2 }).onActionStart(() => { const c = this.current(); if (c !== null) { this.outerResizeW = c.w; this.outerResizeH = c.h; this.outerResizeY = c.y; } })
+        .onActionUpdate((e: GestureEvent) => this.resizeOuterCard(e)).onActionEnd(() => this.flushPreview()).onActionCancel(() => { const c = this.current(); if (c !== null) { c.w = this.outerResizeW; c.h = this.outerResizeH; c.y = this.outerResizeY; } this.flushPreview(); }))
+    Button('编辑', { type: ButtonType.Circle }).width(44).height(44).fontSize(11).fontColor(this.appText()).backgroundColor(this.appSurface())
+      .position({ x: this.wholeCardHandle(true, true).x - 22, y: this.wholeCardHandle(true, true).y - 22 }).accessibilityText('编辑上层内容').onClick(() => { this.settingsTab = 1; this.chooseLayer('capability'); })
+    Button('↻', { type: ButtonType.Circle }).width(44).height(44).fontSize(22).fontColor(this.appText()).backgroundColor(this.appSurface())
+      .position({ x: this.wholeCardHandle(false, true).x - 22, y: this.wholeCardHandle(false, true).y - 22 }).accessibilityText('旋转整张卡片')
+      .onClick(() => { const c = this.current(); if (c !== null) { c.rot = 0; this.change(); } })
+      .gesture(PanGesture({ distance: 2 }).onActionStart((e: GestureEvent) => { this.beginFinger(e, 0); const c = this.current(); if (c !== null) { this.rotateStart = c.rot; this.rotationViewport = this.previewViewport(); this.cardRotating = true; } })
+        .onActionUpdate((e: GestureEvent) => this.rotateOuterCard(e)).onActionEnd((e: GestureEvent) => { this.rotateOuterCard(e); this.finishCardRotation(false); }).onActionCancel(() => this.finishCardRotation(true)))
+  }
+  private resizeOuterCard(e: GestureEvent): void {
+    const c = this.current(); if (c === null || this.outerResizeW <= 0) return;
+    const a = c.rot * Math.PI / 180, dx = (e.offsetX * Math.cos(a) + e.offsetY * Math.sin(a)) / this.editorScale(), dy = (-e.offsetX * Math.sin(a) + e.offsetY * Math.cos(a)) / this.editorScale();
+    const min = minimumCardSize(c), f = Math.max(min.w / this.outerResizeW, min.h / this.outerResizeH, Math.min(320 / this.outerResizeW, 420 / this.outerResizeH, 1 + (dx * this.outerResizeW - dy * this.outerResizeH) / (this.outerResizeW ** 2 + this.outerResizeH ** 2)));
+    c.w = this.outerResizeW * f; c.h = this.outerResizeH * f; c.y = this.outerResizeY + this.outerResizeH - c.h; this.continuousChange(SliderChangeMode.Moving);
+  }
   private rotateOuterCard(e: GestureEvent): void {
     const card = this.current(); if (card === null || !this.cardRotating) return;
-    const raw = this.rotateStart + e.offsetX * .65 - e.offsetY * .35;
+    const offset = this.fingerOffset(e); const raw = this.rotateStart + offset.x * .65 - offset.y * .35;
     const value = ((raw + 180) % 360 + 360) % 360 - 180;
     card.rot = Math.abs(value - Math.round(value / 15) * 15) < 2 ? Math.round(value / 15) * 15 : value;
     this.continuousChange(SliderChangeMode.Moving);
@@ -1289,7 +1317,7 @@ struct Index {
           } else if (this.layerElement(id)?.kind === 'shape') {
             Column().width(28).height(this.layerElement(id)?.primitive === 'line' ? 3 : 28).borderRadius(this.layerElement(id)?.primitive === 'circle' ? 14 : 4).backgroundColor(this.layerElement(id)?.color || this.appText())
           } else {
-            Text(id === 'capability' ? 'Aa' : (this.layerElement(id)?.text || 'Aa')).fontSize(15).fontColor(this.appText()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+            Text(id === 'capability' ? 'Aa' : 'A').fontSize(15).fontColor(this.appText()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
           }
         }.width(44).height(AppDesign.controlHeight).hitTestBehavior(HitTestMode.None)
         Text(label).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -1301,7 +1329,7 @@ struct Index {
   @Builder
   layerEntries() {
     ForEach(this.preview.elements.filter((el: CanvasElement) => el.behindCapability === (this.settingsTab === 0)).slice().reverse(), (el: CanvasElement) => {
-      this.layerEntry(el.id, el.kind === 'text' ? (el.text.trim().slice(0, 16) || '文字') : (el.kind === 'image' ? '图片' : '形状'))
+      this.layerEntry(el.id, el.kind === 'text' ? '文字' : (el.kind === 'image' ? '图片' : '形状'))
     }, (el: CanvasElement) => el.id)
     if (this.settingsTab === 1 && this.preview.capability !== null) { this.layerEntry('capability', typeLabel(this.preview.capability!.k)) }
     this.layerEntry('', this.settingsTab === 0 ? '背景底板' : '能力设置')

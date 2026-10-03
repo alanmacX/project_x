@@ -18,7 +18,7 @@ function labRGB(lab: LabColor): number[] {
 export function labColor(lab: LabColor): string { return '#'+labRGB(lab).map((v:number)=>v.toString(16).padStart(2,'0')).join('').toUpperCase(); }
 function distance(a: LabColor,b: LabColor): number { return (a.l-b.l)**2+(a.a-b.a)**2+(a.b-b.b)**2; }
 /** Alpha-weighted perceptual clusters: transparent padding and white margins do not vote. */
-export function representativeColor(rgba: Uint8Array, premultiplied: boolean = false): string {
+export function representativePalette(rgba: Uint8Array, premultiplied: boolean = false): string[] {
   const bins=new Map<number,WeightedColor>();
   for(let i=0;i<rgba.length;i+=4){
     const alpha=rgba[i+3]/255;if(alpha<.35)continue;
@@ -33,7 +33,7 @@ export function representativeColor(rgba: Uint8Array, premultiplied: boolean = f
     else bins.set(key,{color:'#'+[r,g,b].map((v:number)=>Math.round(v).toString(16).padStart(2,'0')).join(''),weight:weight});
   }
   const points=Array.from(bins.values()).sort((a:WeightedColor,b:WeightedColor)=>b.weight-a.weight).slice(0,96);
-  if(points.length===0)return '#C5C1B8';
+  if(points.length===0)return ['#C5C1B8'];
   const labs=points.map((p:WeightedColor)=>colorLab(p.color)),centres:LabColor[]=[labs[0]];
   for(let c=1;c<Math.min(3,labs.length);c++){
     let best=0,score=-1;
@@ -50,8 +50,10 @@ export function representativeColor(rgba: Uint8Array, premultiplied: boolean = f
     for(let c=0;c<centres.length;c++)if(weights[c]>0)centres[c]={l:sums[c].l/weights[c],a:sums[c].a/weights[c],b:sums[c].b/weights[c]};
   }
   let at=0,score=-1;for(let c=0;c<centres.length;c++){const v=weights[c]*(.7+Math.min(40,Math.hypot(centres[c].a,centres[c].b))/40);if(v>score){score=v;at=c;}}
-  return labColor(centres[at]);
+  const ordered = centres.map((c: LabColor, i: number): WeightedColor => ({ color: labColor(c), weight: weights[i] })).filter((p: WeightedColor) => p.weight > 0).sort((a: WeightedColor, b: WeightedColor) => b.weight - a.weight);
+  return [labColor(centres[at]), ...ordered.filter((p: WeightedColor) => p.color !== labColor(centres[at])).map((p: WeightedColor) => p.color)].slice(0, 3);
 }
+export function representativeColor(rgba: Uint8Array, premultiplied: boolean = false): string { return representativePalette(rgba, premultiplied)[0]; }
 /** Quiet colour wash, not a saturated average or a harsh complementary colour. */
 export function backgroundTone(color: string): string {
   const lab=colorLab(color),c=Math.hypot(lab.a,lab.b),scale=c>0?Math.min(14,c*.28)/c:0;
@@ -71,25 +73,45 @@ export function smartTone(colors: WeightedColor[]): string {
 /** Smooth Lab mixture tied to card centres; cached as one bitmap for App and FormKit. */
 export function blendPixels(anchors: BackgroundAnchor[], base: string, width: number, height: number): Uint8Array {
   const bytes=new Uint8Array(width*height*4);
-  const labs=anchors.map((anchor:BackgroundAnchor)=>{ const tone=colorLab(anchor.color),chroma=Math.hypot(tone.a,tone.b),scale=chroma>0?Math.min(30,chroma*.6)/chroma:0;
-    return {l:Math.max(40,Math.min(64,30+tone.l*.4)),a:tone.a*scale,b:tone.b*scale} as LabColor;
+  const labs=anchors.map((anchor:BackgroundAnchor)=>{ const tone=colorLab(anchor.color),chroma=Math.hypot(tone.a,tone.b),scale=chroma>0?Math.min(48,chroma*.82)/chroma:0;
+    return {l:Math.max(42,Math.min(76,22+tone.l*.62)),a:tone.a*scale,b:tone.b*scale} as LabColor;
   });
-  const neutral=colorLab(base);neutral.l=50;neutral.a*=.55;neutral.b*=.55;
+  const neutral=colorLab(base);neutral.l=62;neutral.a*=.7;neutral.b*=.7;
   // Broad overlapping colour clouds with subtle luminance variation, never small radial spots.
-  const horizontal=anchors.map((p:BackgroundAnchor)=>{const row:number[]=[];for(let x=0;x<width;x++){const dx=x/Math.max(1,width-1)-p.x;row.push(Math.exp(-dx*dx/.28));}return row;});
+  const horizontal=anchors.map((p:BackgroundAnchor)=>{const row:number[]=[];for(let x=0;x<width;x++){const dx=x/Math.max(1,width-1)-p.x;row.push(Math.exp(-dx*dx/.18));}return row;});
   const vertical=anchors.map((p:BackgroundAnchor)=>{const column:number[]=[];for(let y=0;y<height;y++){const dy=y/Math.max(1,height-1)-p.y;column.push(Math.exp(-dy*dy/.2));}return column;});
   for(let y=0;y<height;y++)for(let x=0;x<width;x++){
-    const nx=x/Math.max(1,width-1),ny=y/Math.max(1,height-1);let sum=.22,l=neutral.l*.22,a=neutral.a*.22,b=neutral.b*.22;
+    const nx=x/Math.max(1,width-1),ny=y/Math.max(1,height-1);let sum=.07,l=neutral.l*.07,a=neutral.a*.07,b=neutral.b*.07;
     for(let k=0;k<anchors.length;k++){
-      const p=anchors[k],w=horizontal[k][x]*vertical[k][y]*Math.sqrt(p.weight);
+      const p=anchors[k];
+      // Second, softly displaced highlight field creates folds rather than a flat average.
+      const hx=nx-(p.x+.12*Math.sin(k*2.4+ny*2.2)),hy=ny-(p.y+.11*Math.cos(k*1.7+nx*2.6));
+      const highlight=Math.exp(-hx*hx/.12-hy*hy/.16)*.32;
+      const field=horizontal[k][x]*vertical[k][y]+highlight;
+      const w=field*Math.sqrt(p.weight);
       sum+=w;l+=labs[k].l*w;a+=labs[k].a*w;b+=labs[k].b*w;
     }
-    const atmosphere=4.8*Math.sin(nx*3.1+ny*1.7)-3.2*ny;
+    const atmosphere=3.6*Math.sin(nx*3.1+ny*1.7)-2.2*ny;
     const color=labRGB({l:l/sum+atmosphere,a:a/sum,b:b/sum}),i=(y*width+x)*4;
     const noise=(((x*73+y*151)%17)/16-.5)*.65;
     bytes[i]=Math.max(0,Math.min(255,Math.round(color[0]+noise)));
     bytes[i+1]=Math.max(0,Math.min(255,Math.round(color[1]+noise)));
     bytes[i+2]=Math.max(0,Math.min(255,Math.round(color[2]+noise)));bytes[i+3]=255;
   }
-  return bytes;
+  // Separable blur on the generated colour field, not on card artwork. O(pixels), off UI thread.
+  const radius=Math.max(2,Math.round(width*.08)),span=radius*2+1;
+  let input=bytes;
+  for(let pass=0;pass<2;pass++){
+    const horizontalBytes=new Uint8Array(bytes.length),output=new Uint8Array(bytes.length);
+    for(let y=0;y<height;y++)for(let c=0;c<3;c++){
+      let sum=0;for(let k=-radius;k<=radius;k++)sum+=input[(y*width+Math.max(0,Math.min(width-1,k)))*4+c];
+      for(let x=0;x<width;x++){horizontalBytes[(y*width+x)*4+c]=Math.round(sum/span);sum+=input[(y*width+Math.min(width-1,x+radius+1))*4+c]-input[(y*width+Math.max(0,x-radius))*4+c];}
+    }
+    for(let x=0;x<width;x++)for(let c=0;c<3;c++){
+      let sum=0;for(let k=-radius;k<=radius;k++)sum+=horizontalBytes[(Math.max(0,Math.min(height-1,k))*width+x)*4+c];
+      for(let y=0;y<height;y++){output[(y*width+x)*4+c]=Math.round(sum/span);sum+=horizontalBytes[(Math.min(height-1,y+radius+1)*width+x)*4+c]-horizontalBytes[(Math.max(0,y-radius)*width+x)*4+c];}
+    }
+    for(let i=3;i<output.length;i+=4)output[i]=255;input=output;
+  }
+  return input;
 }

@@ -4,20 +4,20 @@ import { fileIo } from '@kit.CoreFileKit';
 import { BackgroundAnchor, CanvasBackground, FridgeState, FridgeCard, materialColors, BOARD_W, BOARD_H } from './CardSchema';
 import { representativeColor, smartTone, blendPixels, combineColors, WeightedColor } from './BackgroundPalette';
 
-import { imageColor, cardSource, backgroundSignature, hash } from './BackgroundInputs';
+import { imagePalette, imageColor, cardSource, backgroundSignature, hash } from './BackgroundInputs';
 export { backgroundSignature } from './BackgroundInputs';
 @Concurrent
 export async function createSmartBackground(json:string,filesDir:string):Promise<string> {
   const state=JSON.parse(json) as FridgeState,bg=new CanvasBackground();bg.mode=state.background.mode;
-  const colors:WeightedColor[]=[],anchors:BackgroundAnchor[]=[],cache=new Map<string,string>();
+  const colors:WeightedColor[]=[],anchors:BackgroundAnchor[]=[],cache=new Map<string,string[]>();
   for(const card of state.cards){
     const samples:WeightedColor[]=[],paper=materialColors(card.material,card.paper)[0];
     const cutout=card.shape==='subject'&&card.subjectPhoto?card.cutout:'';
-    if(cutout.startsWith('file://')){try{const color=cache.get(cutout)??await imageColor(cutout);cache.set(cutout,color);samples.push({color:color,weight:1});}catch(_){}}
+    if(cutout.startsWith('file://')){try{const palette=cache.get(cutout)??await imagePalette(cutout);cache.set(cutout,palette);palette.forEach((color: string, i: number) => samples.push({color:color,weight:1/(i+1)}));}catch(_){}}
     let filled=0;
     for(const el of card.elements.filter((el)=>el.kind==='image'||el.kind==='shape').sort((a,b)=>b.w*b.h-a.w*a.h).slice(0,4)){
       const weight=Math.max(0,Math.min(1,el.w*el.h*el.opacity));filled+=weight;
-      if(el.kind==='image'&&el.src.startsWith('file://')){try{const color=cache.get(el.src)??await imageColor(el.src);cache.set(el.src,color);samples.push({color:color,weight:weight});}catch(_){}}
+      if(el.kind==='image'&&el.src.startsWith('file://')){try{const palette=cache.get(el.src)??await imagePalette(el.src);cache.set(el.src,palette);palette.forEach((color: string, i: number) => samples.push({color:color,weight:weight/(i+1)}));}catch(_){}}
       if(el.kind==='shape'&&el.color.length>0)samples.push({color:el.color,weight:weight});
     }
     if(samples.length===0||paper.toUpperCase()!=='#FFFFFF'&&cutout.length===0)samples.push({color:paper,weight:Math.max(.1,1-filled)});
@@ -27,7 +27,9 @@ export async function createSmartBackground(json:string,filesDir:string):Promise
     const boundsW=Math.abs(w*Math.cos(a))+Math.abs(shapeH*Math.sin(a)),boundsH=Math.abs(w*state.canvasAspect*Math.sin(a))+Math.abs(h*Math.cos(a));
     const visible=Math.max(0,Math.min(1,x+boundsW/2)-Math.max(0,x-boundsW/2))*Math.max(0,Math.min(1,y+boundsH/2)-Math.max(0,y-boundsH/2));
     if(visible<=0)continue;const weight=Math.sqrt(visible);
-    colors.push({color:color,weight:weight});anchors.push({x:Math.max(0,Math.min(1,x)),y:Math.max(0,Math.min(1,y)),color:color,weight:weight});
+    colors.push({color:color,weight:weight});
+    const influences=samples.slice().sort((a:WeightedColor,b:WeightedColor)=>b.weight-a.weight).slice(0,3),total=influences.reduce((sum:number,p:WeightedColor)=>sum+p.weight,0);
+    influences.forEach((p:WeightedColor,i:number)=>anchors.push({x:Math.max(0,Math.min(1,x+(i===1?-.2:i===2?.2:0))),y:Math.max(0,Math.min(1,y+(i===1?.16:i===2?-.16:0))),color:p.color,weight:weight*p.weight/Math.max(total,.001)}));
   }
   bg.color=smartTone(colors);bg.signature=backgroundSignature(state);bg.palette=Array.from(new Set(colors.map((c:WeightedColor)=>c.color))).slice(0,6);
   // Keep the twelve most visible influences; bitmap generation stays off the UI thread.
