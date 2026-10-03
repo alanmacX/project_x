@@ -9,6 +9,7 @@ import { taskpool } from '@kit.ArkTS';
 import { picker } from '@kit.CoreFileKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { CourseEditor } from './CourseEditor';
+import { WakeUpImportDialog } from './WakeUpImportDialog';
 @Component
 export struct CapabilitySettings {
   @Prop @Watch('inputChanged') cap:CapBlock={k:'battery'};
@@ -85,16 +86,26 @@ export struct CapabilitySettings {
     }});
   }
   private async importSchedule():Promise<void> {
-    const context=this.getUIContext().getHostContext();if(!context||this.busy)return;const token=++this.generation,id=this.cardId,cap=this.copy();this.busy=true;
+    const context=this.getUIContext().getHostContext();if(!context||this.busy||this.cap.k!=='agenda')return;const token=++this.generation,id=this.cardId,cap=this.copy();this.busy=true;
     try{
-      const options=new picker.DocumentSelectOptions();options.maxSelectNumber=1;options.fileSuffixFilters=[cap.k==='agenda'?'日历|.ics':'课程表|.json'];
+      const options=new picker.DocumentSelectOptions();options.maxSelectNumber=1;options.fileSuffixFilters=['日历|.ics'];
       const files=await new picker.DocumentViewPicker(context).select(options);if(!files.length)return;
       const json=await taskpool.execute(new taskpool.Task(importScheduleFile,files[0],cap.k)) as string;
       if(!this.alive||token!==this.generation)return;
-      if(cap.k==='agenda'){cap.events=JSON.parse(json) as AgendaItem[];cap.agendaSource='imported';cap.updatedAt=Date.now();cap.refreshState='done';}
-      else cap.courses=JSON.parse(json) as CourseItem[];
+      cap.events=JSON.parse(json) as AgendaItem[];cap.agendaSource='imported';cap.updatedAt=Date.now();cap.refreshState='done';
       this.onUpdate(id,cap);this.message='已导入，请检查预览';
     }catch(e){if(this.alive)this.message=(e as Error).message;}finally{if(token===this.generation)this.busy=false;}
+  }
+  private importTimetable():void {
+    const id=this.cardId;
+    this.dialog=new CustomDialogController({builder:WakeUpImportDialog({appDark:this.appDark,existingCount:(this.cap.courses??[]).length,onImport:(semester:string,courses:CourseItem[],replace:boolean)=>{
+      if(!this.alive||this.cardId!==id||this.cap.k!=='timetable')return;
+      const next=this.copy(),list=replace?[]:(next.courses??[]).slice();
+      if(!replace&&list.length&&next.semester!==semester)throw new Error('开学日期不同，请选择替换或先建立另一张课程卡');
+      for(const c of courses)if(!list.some((v)=>v.name===c.name&&v.room===c.room&&v.day===c.day&&v.start===c.start&&v.end===c.end&&v.firstWeek===c.firstWeek&&v.lastWeek===c.lastWeek&&v.parity===c.parity))list.push(c);
+      if(list.length>128)throw new Error('合并后超过 128 条，请分成两张课程卡');
+      next.semester=semester;next.courses=list;this.change(next);
+    }}),customStyle:true,alignment:DialogAlignment.Center,autoCancel:true});this.dialog.open();
   }
   @Builder
   action(label:string,action:()=>void) {
@@ -136,7 +147,7 @@ export struct CapabilitySettings {
         ForEach(this.cap.courses??[],(c:CourseItem)=>{
           Row({space:8}) {Button(c.name+' · 周'+['一','二','三','四','五','六','日'][c.day-1]+' '+c.start,{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontSize(12).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.editCourse(c));Button('删除',{type:ButtonType.Capsule}).height(44).fontSize(12).fontColor('#C43A35').backgroundColor(this.control()).onClick(()=>{const next=this.copy();next.courses=(next.courses??[]).filter((v)=>v.id!==c.id);this.change(next);})}.width('100%')
         },(c:CourseItem)=>c.id)
-        this.action('导入课程 JSON',()=>this.importSchedule())
+        this.action('导入 WakeUp 课程表',()=>this.importTimetable())
         Text('按周次、单双周和时间自动显示下一课及后续安排。桌面展示单个能力，不挤入完整微缩课表。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       }
       if(this.message || this.cap.refreshState==='failed') {Text(this.message||this.cap.desc||'更新失败，保留上次结果').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
