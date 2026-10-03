@@ -2,9 +2,12 @@ import { BoardMotion } from '../model/BoardMotion';
 import { combineCards, ungroupCards, groupMembers, groupDragBounds, cleanGroups } from '../model/CardGroups';
 import { PhotoCrop } from '../views/PhotoCrop';
 import { CanvasBackdrop } from '../views/CanvasBackdrop';
-import { CanvasBackground, FridgeState, normalizeBackground } from '../model/CardSchema';
+import { CanvasBackground, FridgeState, normalizeState, normalizeBackground } from '../model/CardSchema';
 import { backgroundSignature, createSmartBackground, importBackgroundPhoto, cropBackgroundPhoto } from '../model/BackgroundWorker';
-import { sharePixelMap } from '../model/ImageShare';
+import { exportTemplate, inspectTemplate, materializeTemplateUri } from '../model/TemplateFiles';
+import { TemplateSummary, importedCards, fitImportedCanvas } from '../model/TemplatePackage';
+import { picker } from '@kit.CoreFileKit';
+import { sharePixelMap, shareTemplateFile } from '../model/ImageShare';
 import { taskpool } from '@kit.ArkTS';
 import { common } from '@kit.AbilityKit';
 import { AppDesign } from '../model/AppDesign';
@@ -86,12 +89,6 @@ struct Index {
   @State showLayerOptions: boolean = false;
   private resizeStart: ElementBox = new ElementBox();
   private rotateStart: number = 0;
-  private outerResizeW: number = 0;
-  private outerResizeH: number = 0;
-  private outerResizeY: number = 0;
-  private rotationStartAngle: number = 0;
-  @State private cardRotating: boolean = false;
-  private rotationViewport: EditorViewport = new EditorViewport();
   private rotationVector: ShapePoint = { x: 0, y: -40 };
   @State showEditorContent: boolean = false;
   private fingerStartX: number = 0;
@@ -264,7 +261,6 @@ struct Index {
   private previewPaneHeight(): number { return this.editorLandscape() ? Math.min(300, Math.max(64, this.editorBodyHeight() - 164), this.editorBodyHeight() * .58) : Math.min(280, this.editorBodyHeight() * .36); }
   private editingAngle(): number { return this.preview.rot; }
   private previewViewport(): EditorViewport {
-    if (this.cardRotating) return this.rotationViewport;
     return editorViewport(this.preview.w, this.preview.h, this.editingAngle(), this.editorViewportWidth(),
       this.screenHeight, this.safeTop, this.safeBottom, this.editorLandscape(), this.previewPaneHeight());
   }
@@ -522,7 +518,7 @@ struct Index {
   }
   private boardInteraction(id: string, active: boolean): void {
     if (active) { const card = this.store.findCard(id); this.movingGroupIds = card === null ? [] : groupMembers(this.store.state.cards, card).filter((c: FridgeCard) => c.id !== id).map((c: FridgeCard) => c.id); this.boardMotion.ids = this.movingGroupIds.length > 0 ? [id, ...this.movingGroupIds] : []; }
-    else { this.boardMotion.x = 0; this.boardMotion.y = 0; this.boardMotion.ids = []; this.movingGroupIds = []; }
+    else { this.boardMotion.offset = { x: 0, y: 0 }; this.boardMotion.ids = []; this.movingGroupIds = []; }
     this.activeBoardId = active ? id : '';
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer); this.saveTimer = -1;
     if (!active) { this.scheduleBackground(); this.persist(true); }
@@ -530,8 +526,8 @@ struct Index {
   private commitGeometry(updated: FridgeCard): void {
     const card = this.store.findCard(updated.id); if (card === null) return;
     const dx = updated.x - card.x, dy = updated.y - card.y;
-    if (updated.w === card.w && updated.h === card.h) { for (const peer of groupMembers(this.store.state.cards, card)) if (peer.id !== card.id) { peer.x += dx; peer.y += dy; } }
-    this.boardMotion.x = 0; this.boardMotion.y = 0;
+    if (updated.w === card.w && updated.h === card.h && updated.rot === card.rot) { for (const peer of groupMembers(this.store.state.cards, card)) if (peer.id !== card.id) { peer.x += dx; peer.y += dy; } }
+    this.boardMotion.offset = { x: 0, y: 0 };
     card.x = updated.x; card.y = updated.y; card.w = updated.w; card.h = updated.h; card.rot = updated.rot;
     this.clamp(card); groupMembers(this.store.state.cards, card).sort((a: FridgeCard, b: FridgeCard) => a.z - b.z).forEach((member: FridgeCard) => this.store.bringToFront(member));
     // Geometry handoff only updates the visible board; hydrate inspector on entry.
@@ -671,7 +667,7 @@ struct Index {
               movingLayerId: id === this.selectedId ? this.layerDrag : '',
               moveX: id === this.selectedId && this.editing ? this.layerDX * this.boardScale / this.editorScale() : 0, moveY: id === this.selectedId && this.editing ? this.layerDY * this.boardScale / this.editorScale() : 0, tick: this.tick,
               getMoveBounds: (card: FridgeCard) => groupDragBounds(this.store.state.cards, card),
-              onMove: (x: number, y: number) => { if (this.movingGroupIds.length > 0) { this.boardMotion.x = x; this.boardMotion.y = y; } },
+              onMove: (x: number, y: number) => { if (this.movingGroupIds.length > 0) { this.boardMotion.offset = { x: x, y: y }; } },
               onSelect: (id: string) => this.selectLayerCard(id), onDelete: (id: string) => this.deleteCard(id),
               onEdit: (id: string) => this.openEditor(id), onInteraction: (active: boolean) => this.boardInteraction(id, active), onCommit: (updated: FridgeCard) => this.commitGeometry(updated) })
           }.width(this.sceneCard(id).w * this.boardScale + 48).height(this.sceneCard(id).h * this.boardScale + 48)
@@ -698,7 +694,7 @@ struct Index {
   board() {
     Stack({ alignContent: Alignment.TopStart }) {
       Stack({ alignContent: Alignment.TopStart }) {
-        CanvasBackdrop({ sceneBackground: this.canvasBackground }).width('100%').height('100%')
+        CanvasBackdrop({ sceneBackground: this.canvasBackground, liveFluid: true }).width('100%').height('100%')
         Column().width('100%').height('100%').onClick(() => { this.selectedId = ''; })
         if (this.cards.length === 0) {
           Text('放一张自己的卡片').fontSize(16).fontColor('#989898').width('100%').height('100%').textAlign(TextAlign.Center).hitTestBehavior(HitTestMode.None)
@@ -729,6 +725,7 @@ struct Index {
           Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule }).margin({ right: 8 }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
           Button('+', { type: ButtonType.Circle }).width(44).height(AppDesign.controlHeight).fontSize(24).backgroundColor('#262626').fontColor(Color.White).accessibilityText('添加卡片').onClick(() => this.addCard())
         }.width('100%')
+        Stack({ alignContent: Alignment.Bottom }) {
         Scroll() {
           Column({ space: 8 }) {
             ForEach(this.orderedCards().map((item: FridgeCard) => item.id), (id: string, index: number) => {
@@ -745,8 +742,10 @@ struct Index {
               }.width('100%').padding(8).borderRadius(12).backgroundColor(this.appSurface()).border({ width: (this.groupSelecting ? this.groupSelection.includes(id) : this.selectedId === id) ? 1.5 : 0, color: this.appMuted() })
                 .accessibilityText('选择卡片 ' + layerLabel(this.cardMap[id])).onClick(() => this.selectLayerCard(id))
             }, (id: string) => id)
-          }.width('100%')
-        }.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Off)
+          }.width('100%').padding({ bottom: this.homeActionHeight() + 8 })
+        }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
+        if (this.homeActionHeight() > 0) {
+        Column({ space: 12 }) {
         if (this.groupSelecting) { Button('组合选中卡片（' + this.groupSelection.length + '）', { type: ButtonType.Capsule }).height(44).width('100%').enabled(this.groupSelection.length > 1).onClick(() => this.confirmGroup()) }
         if (!this.groupSelecting && (this.store.findCard(this.selectedId)?.groupId ?? '').length > 0) { Button('取消组合', { type: ButtonType.Capsule }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.releaseGroup()) }
         if (!this.groupSelecting && this.selectedId.length > 0) {
@@ -757,9 +756,14 @@ struct Index {
             Button('删除', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(Color.Transparent).fontColor('#C43A35').onClick(() => this.deleteCard(this.selectedId))
           }.width('100%')
         }
+        }.width('100%').padding(8).borderRadius(22).backgroundColor(this.appDark ? '#E625231F' : '#E6F6F2E9').backgroundBlurStyle(BlurStyle.Regular)
+          .shadow({radius:12,color:'#16000000',offsetY:3})
+        }
+        }.width('100%').layoutWeight(1)
       }.width(this.panelWidth).height(this.panelHeight - 84).padding(12).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).border({ width: 1, color: AppDesign.border(this.appDark) })
         .position({ x: this.panelLeft, y: this.panelTop })
   }
+  private homeActionHeight():number {return this.groupSelecting?60:this.selectedId.length===0?0:(this.store.findCard(this.selectedId)?.groupId??'').length>0?108:56;}
   private backgroundLabel(): string {
     return this.canvasBackground.mode === 'smart' ? '智能取色' : this.canvasBackground.mode === 'blend' ? '智能多色' : this.canvasBackground.mode === 'photo' ? '本地照片' : this.canvasBackground.mode === 'preset' ? '柔色预设' : '纯色';
   }
@@ -847,8 +851,8 @@ struct Index {
         }.width('100%')
       }.height(56).layoutWeight(1).backgroundColor(Color.Transparent).padding(8).onClick(() => { this.backgroundOpen = true; })
         .bindSheet(this.backgroundOpen, this.backgroundEditor, { height: SheetSize.LARGE, showClose: true, backgroundColor: this.appBackground(), onDisappear: () => { this.backgroundOpen = false; } })
-      Button(this.sharing ? '生成中' : '系统分享', { type: ButtonType.Capsule }).id('shareCanvas').height(44).fontSize(13).padding({ left: 12, right: 12 })
-        .backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).enabled(!this.sharing && !this.backgroundBusy).onClick(() => this.shareArtwork(false))
+      Button(this.sharing ? '生成中' : '作品', { type: ButtonType.Capsule }).id('shareCanvas').height(44).fontSize(13).padding({ left: 12, right: 12 })
+        .backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).enabled(!this.sharing && !this.backgroundBusy).onClick(() => this.shareMenu(false))
     }.width(this.panelWidth).height(72).padding(8).borderRadius(AppDesign.sectionRadius).border({ width: 1, color: AppDesign.border(this.appDark) }).backgroundColor(this.appSurface())
       .position({ x: this.panelLeft, y: this.panelTop + this.panelHeight - 72 })
   }
@@ -893,7 +897,7 @@ struct Index {
             Button('选择本地照片', { type: ButtonType.ROUNDED_RECTANGLE }).height(44).width('100%').fontColor(this.appText()).backgroundColor(this.appControl()).borderRadius(12).border({ width: .5, color: AppDesign.border(this.appDark) }).enabled(!this.backgroundBusy).onClick(() => this.pickBackgroundPhoto())
             Text('按桌面画布比例拖动、双指缩放后确认；原照片不修改。').fontSize(12).fontColor(this.appMuted()).width('100%')
           }
-        }.width('100%').padding(16).borderRadius(20).border({ width: 1, color: AppDesign.border(this.appDark) })
+        }.width('100%').padding(16).borderRadius(20).backgroundColor(this.appSurface()).border({ width: 1, color: AppDesign.border(this.appDark) })
         Column({ space: 16 }) {
           Text('柔色预设').fontSize(16).fontColor(this.appText()).width('100%')
           Flex({ wrap: FlexWrap.Wrap }) {
@@ -901,7 +905,7 @@ struct Index {
               Button(name, { type: ButtonType.Capsule }).height(44).fontColor(this.appText()).backgroundColor(Color.Transparent).margin({ right: 8 }).border({ width: .5, color: AppDesign.border(this.appDark) }).enabled(!this.backgroundBusy).onClick(() => this.setBackgroundPreset(index))
             }, (name: string) => name)
           }.width('100%')
-        }.width('100%').padding(16).borderRadius(20).border({ width: 1, color: AppDesign.border(this.appDark) })
+        }.width('100%').padding(16).borderRadius(20).backgroundColor(this.appSurface()).border({ width: 1, color: AppDesign.border(this.appDark) })
       }.width('100%').constraintSize({ maxWidth: 640 }).padding({ top: 24, left: 20, right: 20, bottom: this.safeBottom + 24 })
     }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
   }
@@ -925,6 +929,41 @@ struct Index {
           .rotate({ angle: card.rot, centerX: 0, centerY: '100%' }).zIndex(card.z)
       }, (card: FridgeCard) => card.id)
     }.width(this.shareWidth).height(this.shareHeight).backgroundColor(this.shareOpaque ? Color.White : Color.Transparent).clip(true)
+  }
+  private templateError(prefix:string,error:Error):void {
+    if(/cancel/i.test(error.message??''))return;
+    console.warn('Template operation failed: '+error.name+' '+error.message);
+    this.getUIContext().getPromptAction().showToast({message:prefix+'：'+(error.message??'请重试'),duration:3500});
+  }
+  private async shareMenu(single: boolean): Promise<void> {
+    if(this.sharing || this.context === null)return;
+    try { const result=await this.getUIContext().getPromptAction().showActionMenu({title:single?'卡片作品':'画布作品',buttons:[
+      {text:single?'分享可编辑卡片':'分享可编辑画布',color:this.appText()}, {text:'导出成品图片',color:this.appText()}, {text:'导入作品包',color:this.appText()}]});
+      if(result.index===1){await this.shareArtwork(single);return;}if(result.index===2){await this.pickTemplate();return;}
+      const id=single?this.selectedId:'';if(single&&this.store.findCard(id)===null)return;this.sharing=true;
+      const path=await taskpool.execute(new taskpool.Task(exportTemplate,JSON.stringify(this.store.state),id,this.context.filesDir,this.context.cacheDir)) as string;
+      await shareTemplateFile(this.context as common.UIAbilityContext,path,single?'shareCard':'shareCanvas');
+    }catch(e){this.templateError('分享未完成',e as Error);}finally{this.sharing=false;}
+  }
+  private async pickTemplate():Promise<void>{
+    if(this.context===null)return;const options=new picker.DocumentSelectOptions();options.maxSelectNumber=1;options.fileSuffixFilters=['桌面作品|.fridge'];
+    try{const uris=await new picker.DocumentViewPicker(this.context).select(options);if(uris.length>0)await this.reviewTemplate(uris[0]);}catch(e){this.templateError('导入未完成',e as Error);}
+  }
+  private async reviewTemplate(uri:string):Promise<void>{
+    try{const summary=JSON.parse(await taskpool.execute(new taskpool.Task(inspectTemplate,uri)) as string) as TemplateSummary;
+      this.getUIContext().showAlertDialog({title:summary.kind==='card'?'导入卡片':'导入画布',message:summary.count+' 张卡片，'+summary.images+' 个图片资源。将追加到当前画布，保留现有卡片。'+(summary.kind==='canvas'?' 背景可在导入后选择应用。':''),primaryButton:{value:'取消',action:()=>{}},secondaryButton:{value:'添加到画布',action:()=>{this.importTemplate(uri,summary.kind);}}});
+    }catch(e){this.templateError('无法导入',e as Error);}
+  }
+  private async importTemplate(uri:string,kind:string):Promise<void>{
+    if(this.context===null)return;
+    try{this.busy=true;const state=normalizeState(JSON.parse(await taskpool.execute(new taskpool.Task(materializeTemplateUri,uri,this.context.filesDir)) as string) as FridgeState);
+      const cards=importedCards(state,()=>this.store.newId());
+      if(kind==='canvas')fitImportedCanvas(cards,state.canvasAspect,this.canvasAspect);
+      if(kind==='card'&&cards.length===1){cards[0].x=Math.max(0,(BOARD_W-cards[0].w)/2);cards[0].y=Math.max(0,(BOARD_H-cards[0].h)/2);}
+      for(const c of cards.slice().sort((a:FridgeCard,b:FridgeCard)=>a.z-b.z)){this.clamp(c);this.store.addCard(c);}this.render();this.persist(true);this.scheduleBackground();
+      if(cards.length>0)this.select(cards[0].id);
+      if(kind==='canvas'){this.getUIContext().showAlertDialog({title:'应用作品背景？',message:'卡片已添加。也可以使用作品自带的画布背景。',primaryButton:{value:'保留当前背景',action:()=>{}},secondaryButton:{value:'应用背景',action:()=>this.applyBackground(state.background)}});}
+    }catch(e){this.templateError('导入未完成',e as Error);}finally{this.busy=false;}
   }
   private async shareArtwork(single: boolean): Promise<void> {
     if (this.context === null || this.sharing || this.heroActive || this.arriving) return;
@@ -1100,7 +1139,7 @@ struct Index {
             Column() { this.colorRow('内容默认颜色', 'ink', this.inkValue) }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).border({ width: 1, color: AppDesign.border(this.appDark) }).clip(true)
           }
           if (this.settingsTab === 1 && this.preview.capability !== null && capabilityBox(this.preview).w === 0) { Text('内容空间不足，请调整文字大小或位置').fontSize(12).fontColor('#846339').width('100%') }
-          Button(this.sharing ? '生成中' : '系统分享', { type: ButtonType.Capsule }).id('shareCard').height(44).width('100%').fontSize(14).fontColor(this.appText()).backgroundColor(Color.Transparent).border({ width: .5, color: AppDesign.border(this.appDark) }).enabled(!this.sharing && !this.heroActive).onClick(() => this.shareArtwork(true))
+          Button(this.sharing ? '生成中' : '作品', { type: ButtonType.Capsule }).id('shareCard').height(44).width('100%').fontSize(14).fontColor(this.appText()).backgroundColor(Color.Transparent).border({ width: .5, color: AppDesign.border(this.appDark) }).enabled(!this.sharing && !this.heroActive).onClick(() => this.shareMenu(true))
           Button('复制卡片', { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(14).width('100%').fontColor(this.appText()).backgroundColor(this.appControl()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.duplicate())
         }.width('100%').padding({ left: 16, right: 16, top: 4, bottom: this.safeBottom + 16 })
       }.width('100%').layoutWeight(1).scrollable(ScrollDirection.Vertical).align(Alignment.Top).scrollBar(BarState.Off).backgroundColor(this.appPanel()).renderGroup(this.heroActive)
@@ -1138,51 +1177,9 @@ struct Index {
               .onActionEnd((e: GestureEvent) => { this.rotateElement(e); this.flushPreview(); }).onActionCancel(() => this.cancelTransform()))
         }
       }
-      if (this.layerId.length === 0) { this.wholeCardControls() }
+
     }.width('100%').height(this.editorCanvasHeight())
 
-  }
-  private wholeCardHandle(right: boolean, bottom: boolean): ShapePoint {
-    const v = this.previewViewport(), w = this.preview.w * this.editorScale(), h = this.preview.h * this.editorScale(), a = this.editingAngle() * Math.PI / 180;
-    const unrotated: ShapePoint[] = [{x:0,y:-h},{x:w,y:-h},{x:w,y:0},{x:0,y:0}];
-    const corners: ShapePoint[] = unrotated.map((p:ShapePoint):ShapePoint=>({x:v.left+p.x*Math.cos(a)-p.y*Math.sin(a),y:v.top+h+p.x*Math.sin(a)+p.y*Math.cos(a)}));
-    const xs=corners.map((p:ShapePoint)=>p.x),ys=corners.map((p:ShapePoint)=>p.y),left=Math.min(...xs),top=Math.min(...ys),rightEdge=Math.max(...xs),bottomEdge=Math.max(...ys);
-    const cx=(left+rightEdge)/2,cy=(top+bottomEdge)/2,rx=Math.max(28,(rightEdge-left)/2+12),ry=Math.max(28,(bottomEdge-top)/2+12);
-    return {x:Math.max(22,Math.min(this.editorViewportWidth()-22,cx+(right?rx:-rx))),y:Math.max(22,Math.min(this.editorCanvasHeight()-22,cy+(bottom?ry:-ry)))};
-  }
-  @Builder
-  wholeCardControls() {
-    Button('×', { type: ButtonType.Circle }).width(44).height(44).fontSize(24).fontColor('#D3423C').backgroundColor(this.appSurface())
-      .position({ x: this.wholeCardHandle(false, false).x - 22, y: this.wholeCardHandle(false, false).y - 22 }).accessibilityText('删除整张卡片').onClick(() => this.deleteCard(this.selectedId))
-    Button('↗', { type: ButtonType.Circle }).width(44).height(44).fontSize(22).fontColor(this.appText()).backgroundColor(this.appSurface())
-      .position({ x: this.wholeCardHandle(true, false).x - 22, y: this.wholeCardHandle(true, false).y - 22 }).accessibilityText('缩放整张卡片')
-      .gesture(PanGesture({ distance: 2 }).onActionStart(() => { const c = this.current(); if (c !== null) { this.outerResizeW = c.w; this.outerResizeH = c.h; this.outerResizeY = c.y; } })
-        .onActionUpdate((e: GestureEvent) => this.resizeOuterCard(e)).onActionEnd(() => this.flushPreview()).onActionCancel(() => { const c = this.current(); if (c !== null) { c.w = this.outerResizeW; c.h = this.outerResizeH; c.y = this.outerResizeY; } this.flushPreview(); }))
-    Button('编辑', { type: ButtonType.Circle }).width(44).height(44).fontSize(11).fontColor(this.appText()).backgroundColor(this.appSurface())
-      .position({ x: this.wholeCardHandle(true, true).x - 22, y: this.wholeCardHandle(true, true).y - 22 }).accessibilityText('编辑上层内容').onClick(() => { this.settingsTab = 1; this.chooseLayer('capability'); })
-    Button('↻', { type: ButtonType.Circle }).width(44).height(44).fontSize(22).fontColor(this.appText()).backgroundColor(this.appSurface())
-      .position({ x: this.wholeCardHandle(false, true).x - 22, y: this.wholeCardHandle(false, true).y - 22 }).accessibilityText('旋转整张卡片')
-      .onClick(() => { const c = this.current(); if (c !== null) { c.rot = 0; this.change(); } })
-      .gesture(PanGesture({ distance: 2 }).onActionStart((e: GestureEvent) => { this.beginFinger(e, 0); const c = this.current(); if (c !== null) { this.rotateStart = c.rot; this.rotationViewport = this.previewViewport(); this.cardRotating = true; } })
-        .onActionUpdate((e: GestureEvent) => this.rotateOuterCard(e)).onActionEnd((e: GestureEvent) => { this.rotateOuterCard(e); this.finishCardRotation(false); }).onActionCancel(() => this.finishCardRotation(true)))
-  }
-  private resizeOuterCard(e: GestureEvent): void {
-    const c = this.current(); if (c === null || this.outerResizeW <= 0) return;
-    const a = c.rot * Math.PI / 180, dx = (e.offsetX * Math.cos(a) + e.offsetY * Math.sin(a)) / this.editorScale(), dy = (-e.offsetX * Math.sin(a) + e.offsetY * Math.cos(a)) / this.editorScale();
-    const min = minimumCardSize(c), f = Math.max(min.w / this.outerResizeW, min.h / this.outerResizeH, Math.min(320 / this.outerResizeW, 420 / this.outerResizeH, 1 + (dx * this.outerResizeW - dy * this.outerResizeH) / (this.outerResizeW ** 2 + this.outerResizeH ** 2)));
-    c.w = this.outerResizeW * f; c.h = this.outerResizeH * f; c.y = this.outerResizeY + this.outerResizeH - c.h; this.continuousChange(SliderChangeMode.Moving);
-  }
-  private rotateOuterCard(e: GestureEvent): void {
-    const card = this.current(); if (card === null || !this.cardRotating) return;
-    const offset = this.fingerOffset(e); const raw = this.rotateStart + offset.x * .65 - offset.y * .35;
-    const value = ((raw + 180) % 360 + 360) % 360 - 180;
-    card.rot = Math.abs(value - Math.round(value / 15) * 15) < 2 ? Math.round(value / 15) * 15 : value;
-    this.continuousChange(SliderChangeMode.Moving);
-  }
-  private finishCardRotation(cancelled: boolean): void {
-    if (!this.cardRotating) return;
-    const card = this.current(); if (cancelled && card !== null) card.rot = this.rotateStart;
-    this.cardRotating = false; this.flushPreview();
   }
   private elementTouchBox(element: CanvasElement): ElementBox {
     const f = subjectSurfaceFactor(this.preview), inset = (1 - f) / 2;

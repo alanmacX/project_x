@@ -16,6 +16,37 @@ export struct BoardCard {
   @State rotating: boolean = false;
   @State liveAngle: number = 0;
   private initialAngle: number = 0;
+  private rotateCentre: ShapePoint = { x: 0, y: 0 };
+  private previousFingerAngle: number = 0;
+  private accumulatedAngle: number = 0;
+  private dragX: number = 0;
+  private dragY: number = 0;
+  private rotationShift(): ShapePoint {
+    if (!this.rotating) return { x: 0, y: 0 };
+    const a=this.initialAngle*Math.PI/180,b=this.liveAngle*Math.PI/180;
+    return { x: this.w()*(Math.cos(a)-Math.cos(b))/2+this.h()*(Math.sin(a)-Math.sin(b))/2,
+      y: this.w()*(Math.sin(a)-Math.sin(b))/2-this.h()*(Math.cos(a)-Math.cos(b))/2 };
+  }
+  private startRotation(e: GestureEvent): void {
+    this.beginFinger(e); this.initialAngle=this.card.rot; this.liveAngle=this.card.rot;
+    const p=this.controlPosition(false,true),a=this.initialAngle*Math.PI/180;
+    const x=24+this.w()/2-(p.x+22),y=24+this.h()/2-(p.y+22);
+    this.rotateCentre={ x:this.fingerStartX+x*Math.cos(a)-y*Math.sin(a),y:this.fingerStartY+x*Math.sin(a)+y*Math.cos(a) };
+    this.previousFingerAngle=Math.atan2(this.fingerStartY-this.rotateCentre.y,this.fingerStartX-this.rotateCentre.x)*180/Math.PI;
+    this.accumulatedAngle=0; this.rotating=true; this.onInteraction(true); this.updateRotation(e);
+  }
+  private updateRotation(e: GestureEvent): void {
+    const p=this.screenOffset(e),x=this.fingerStartX+p.x-this.rotateCentre.x,y=this.fingerStartY+p.y-this.rotateCentre.y;
+    if(Math.hypot(x,y)<24)return;
+    const angle=Math.atan2(y,x)*180/Math.PI,delta=((angle-this.previousFingerAngle+540)%360)-180;
+    this.accumulatedAngle+=delta;this.previousFingerAngle=angle;
+    const value=this.initialAngle+this.accumulatedAngle,snap=Math.round(value/90)*90;
+    this.liveAngle=Math.abs(value-snap)<2?snap:value;
+  }
+  private finishRotation(): void {
+    const next=this.copyCard(),shift=this.rotationShift();next.x+=shift.x/this.scaleFactor;next.y+=shift.y/this.yScaleFactor;
+    next.rot=((this.liveAngle+180)%360+360)%360-180;this.onCommit(next);this.rotating=false;this.onInteraction(false);
+  }
   @Prop card: FridgeCard = new FridgeCard();
   @Prop @Watch('syncHandles') selected: boolean = false;
   @Prop heroHidden: boolean = false;
@@ -154,27 +185,33 @@ export struct BoardCard {
   }
   private controlPosition(right: boolean, bottom: boolean): ShapePoint {
     const p=this.handle(right,bottom),a=(this.rotating?this.liveAngle:this.card.rot)*Math.PI/180,w=this.w(),h=this.h();
-    const originX=this.card.x*this.scaleFactor,originY=(this.resizing?this.liveY:this.card.y)*this.yScaleFactor;
-    const px=originX+p.x*w*Math.cos(a)-(p.y*h-h)*Math.sin(a),py=originY+h+p.x*w*Math.sin(a)+(p.y*h-h)*Math.cos(a);
+    const originX=this.card.x*this.scaleFactor+this.rotationShift().x,originY=(this.resizing?this.liveY:this.card.y)*this.yScaleFactor+this.rotationShift().y;
+    // Thin cutouts still need four distinct 44vp touch targets.
+    const rowSpan=Math.abs(this.handle(true,bottom).x-this.handle(false,bottom).x)*w;
+    const columnSpan=Math.abs(this.handle(right,true).y-this.handle(right,false).y)*h;
+    const localX=p.x*w+(right?1:-1)*Math.max(0,60-rowSpan)/2;
+    const localY=p.y*h+(bottom?1:-1)*Math.max(0,60-columnSpan)/2;
+    const px=originX+localX*Math.cos(a)-(localY-h)*Math.sin(a),py=originY+h+localX*Math.sin(a)+(localY-h)*Math.cos(a);
     const x=Math.max(22,Math.min(this.controlViewportWidth-22,px))-originX,y=Math.max(22,Math.min(this.controlViewportHeight-22,py))-originY-h;
     return {x:2+x*Math.cos(a)+y*Math.sin(a),y:2+h-x*Math.sin(a)+y*Math.cos(a)};
   }
   private startMove(): void {
-    this.animateLift(true); this.originX = this.card.x; this.originY = this.card.y; this.dx = 0; this.dy = 0; this.lastDX = 0; this.moveBounds = this.getMoveBounds(this.card); this.moving = true; this.onInteraction(true);
+    this.animateLift(true); this.originX = this.card.x; this.originY = this.card.y; this.dx = 0; this.dy = 0; this.dragX = 0; this.dragY = 0; this.lastDX = 0; this.moveBounds = this.getMoveBounds(this.card); this.moving = true; this.onInteraction(true);
   }
   private move(e: GestureEvent): void {
     const offset = this.screenOffset(e);
     const x = Math.max(this.moveBounds.minX, Math.min(this.moveBounds.maxX, this.originX + offset.x / this.scaleFactor));
     const y = Math.max(this.moveBounds.minY, Math.min(this.moveBounds.maxY, this.originY + offset.y / this.yScaleFactor));
-    this.dx = (x - this.originX) * this.scaleFactor; this.dy = (y - this.originY) * this.yScaleFactor;
-    this.onMove(this.dx, this.dy);
+    this.dragX = (x - this.originX) * this.scaleFactor; this.dragY = (y - this.originY) * this.yScaleFactor;
+    if (this.motion.ids.includes(this.card.id)) { this.onMove(this.dragX, this.dragY); return; }
+    this.dx = this.dragX; this.dy = this.dragY;
     this.tilt = this.tilt * .65 + Math.max(-3, Math.min(3, (offset.x - this.lastDX) * .12)) * .35; this.lastDX = offset.x;
   }
   private cancelMove(): void { this.animateLift(false); this.dx = 0; this.dy = 0; this.moving = false; this.tilt = 0; this.onInteraction(false); }
   private finishMove(): void {
     if (!this.moving) return;
     this.animateLift(false); const next = this.copyCard();
-    next.x = this.originX + this.dx / this.scaleFactor; next.y = this.originY + this.dy / this.yScaleFactor;
+    next.x = this.originX + this.dragX / this.scaleFactor; next.y = this.originY + this.dragY / this.yScaleFactor;
     // Synchronous handoff: update the prop and clear the offset in the same frame.
     clampCardGeometry(next); this.onCommit(next); this.dx = 0; this.dy = 0; this.moving = false; this.tilt = 0; this.onInteraction(false);
   }
@@ -251,10 +288,10 @@ export struct BoardCard {
         .position(this.controlPosition(false, true))
         .hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('旋转整张卡片')
-        .onClick(() => { const next = this.copyCard(); next.rot = 0; this.onCommit(next); })
-        .gesture(PanGesture({ distance: 2 }).onActionStart((e: GestureEvent) => { this.beginFinger(e); this.initialAngle = this.card.rot; this.liveAngle = this.card.rot; this.rotating = true; this.onInteraction(true); })
-          .onActionUpdate((e: GestureEvent) => { const offset = this.screenOffset(e); this.liveAngle = this.initialAngle + offset.x * .65 - offset.y * .35; })
-          .onActionEnd(() => { const next = this.copyCard(); next.rot = ((this.liveAngle + 180) % 360 + 360) % 360 - 180; this.onCommit(next); this.rotating = false; this.onInteraction(false); })
+        .onClick(() => this.getUIContext().getPromptAction().showToast({ message: '沿卡片中心绕动旋转，靠近水平或竖直时自动吸附' }))
+        .gesture(PanGesture({ distance: 2 }).onActionStart((e: GestureEvent) => this.startRotation(e))
+          .onActionUpdate((e: GestureEvent) => this.updateRotation(e))
+          .onActionEnd((e: GestureEvent) => { this.updateRotation(e); this.finishRotation(); })
           .onActionCancel(() => { this.rotating = false; this.onInteraction(false); }))
       Button('编辑', { type: ButtonType.Circle }).width(44).height(44).fontSize(11).fontColor('#303030').backgroundColor(Color.White)
         .shadow({ radius: 8, color: '#20000000', offsetY: 2 })
@@ -262,7 +299,7 @@ export struct BoardCard {
         .position(this.controlPosition(true, true)).hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('编辑卡片内容').onClick(() => this.onEdit(this.card.id))
     }.width(this.w() + 48).height(this.h() + 48).opacity(this.heroHidden ? 0 : 1).hitTestBehavior(this.heroHidden ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Transparent)
-      .translate({ x: this.scatterX + (this.motion.ids.includes(this.card.id) ? this.motion.x : this.dx), y: this.scatterY + (this.motion.ids.includes(this.card.id) ? this.motion.y : this.dy) })
+      .translate({ x: this.scatterX + (this.motion.ids.includes(this.card.id) ? this.motion.offset.x : this.dx) + this.rotationShift().x, y: this.scatterY + (this.motion.ids.includes(this.card.id) ? this.motion.offset.y : this.dy) + this.rotationShift().y })
       .rotate({ angle: this.editingSurface ? this.displayAngle : (this.rotating ? this.liveAngle : this.card.rot) + this.scatterAngle, centerX: 24, centerY: this.h() + 24 })
       .position({ x: (this.localCoordinates ? 0 : this.boardLeft + this.card.x * this.scaleFactor - 24),
         y: (this.localCoordinates ? (this.resizing ? this.liveY - this.card.y : 0) * this.yScaleFactor : this.boardTop + (this.resizing ? this.liveY : this.card.y) * this.yScaleFactor - 24) })

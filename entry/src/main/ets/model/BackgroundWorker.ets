@@ -2,7 +2,7 @@ import { photoFrame } from './PhotoCropGeometry';
 import { image } from '@kit.ImageKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { BackgroundAnchor, CanvasBackground, FridgeState, FridgeCard, materialColors, BOARD_W, BOARD_H } from './CardSchema';
-import { representativeColor, smartTone, blendPixels, combineColors, WeightedColor } from './BackgroundPalette';
+import { representativeColor, smartTone, blendPixels, combineColors, WeightedColor, colorLab } from './BackgroundPalette';
 
 import { imagePalette, imageColor, cardSource, backgroundSignature, hash } from './BackgroundInputs';
 export { backgroundSignature } from './BackgroundInputs';
@@ -33,7 +33,16 @@ export async function createSmartBackground(json:string,filesDir:string):Promise
   }
   bg.color=smartTone(colors);bg.signature=backgroundSignature(state);bg.palette=Array.from(new Set(colors.map((c:WeightedColor)=>c.color))).slice(0,6);
   // Keep the twelve most visible influences; bitmap generation stays off the UI thread.
-  bg.anchors=anchors.sort((a:BackgroundAnchor,b:BackgroundAnchor)=>b.weight-a.weight).slice(0,12);
+  // Repeated yellow cards must not create twelve opaque copies of one colour.
+  // Merge nearby perceptual tones spatially; retain the actual strongest colour.
+  const fields:BackgroundAnchor[]=[];
+  for(const candidate of anchors.sort((a:BackgroundAnchor,b:BackgroundAnchor)=>b.weight-a.weight)){
+    const lab=colorLab(candidate.color);
+    const existing=fields.find((p:BackgroundAnchor)=>{const other=colorLab(p.color);return Math.hypot(lab.l-other.l,lab.a-other.a,lab.b-other.b)<20;});
+    if(existing!==undefined){const total=existing.weight+candidate.weight;existing.x=(existing.x*existing.weight+candidate.x*candidate.weight)/total;existing.y=(existing.y*existing.weight+candidate.y*candidate.weight)/total;existing.weight=total;}
+    else fields.push({x:candidate.x,y:candidate.y,color:candidate.color,weight:candidate.weight});
+  }
+  bg.anchors=fields.sort((a:BackgroundAnchor,b:BackgroundAnchor)=>b.weight-a.weight).slice(0,6);
   if(bg.mode==='smart')return JSON.stringify(bg);
   const width=320,height=Math.max(160,Math.min(512,Math.round(width/state.canvasAspect))),path=filesDir+'/canvas_blend_'+hash(bg.signature)+'.png';
   try{if(await fileIo.access(path)){bg.src='file://'+path;return JSON.stringify(bg);}}catch(_){}

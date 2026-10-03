@@ -70,38 +70,41 @@ export function smartTone(colors: WeightedColor[]): string {
   for(const p of colors){const lab=colorLab(p.color),c=Math.hypot(lab.a,lab.b),w=p.weight*(.25+Math.min(c,50)/50);a+=lab.a*w;b+=lab.b*w;total+=w;}
   return backgroundTone(labColor({l:65,a:a/Math.max(total,.001),b:b/Math.max(total,.001)}));
 }
-/** Smooth Lab mixture tied to card centres; cached as one bitmap for App and FormKit. */
+/** FluidGradient port: solid radial cores, source-over base, Overlay highlights, final blur.
+ * Cindori/FluidGradient (MIT); see THIRD_PARTY_NOTICES.md. A deterministic pose is
+ * rendered off-thread so FormKit, preview and exported artwork share identical pixels.
+ */
 export function blendPixels(anchors: BackgroundAnchor[], base: string, width: number, height: number): Uint8Array {
   const bytes=new Uint8Array(width*height*4);
-  const labs=anchors.map((anchor:BackgroundAnchor)=>{ const tone=colorLab(anchor.color),chroma=Math.hypot(tone.a,tone.b),scale=chroma>0?Math.min(48,chroma*.82)/chroma:0;
-    return {l:Math.max(42,Math.min(76,22+tone.l*.62)),a:tone.a*scale,b:tone.b*scale} as LabColor;
-  });
-  const neutral=colorLab(base);neutral.l=62;neutral.a*=.7;neutral.b*=.7;
-  // Broad overlapping colour clouds with subtle luminance variation, never small radial spots.
-  const horizontal=anchors.map((p:BackgroundAnchor)=>{const row:number[]=[];for(let x=0;x<width;x++){const dx=x/Math.max(1,width-1)-p.x;row.push(Math.exp(-dx*dx/.18));}return row;});
-  const vertical=anchors.map((p:BackgroundAnchor)=>{const column:number[]=[];for(let y=0;y<height;y++){const dy=y/Math.max(1,height-1)-p.y;column.push(Math.exp(-dy*dy/.2));}return column;});
+  const rgb=(hex:string):number[]=>[parseInt(hex.slice(1,3),16)/255,parseInt(hex.slice(3,5),16)/255,parseInt(hex.slice(5,7),16)/255];
+  const neutral=rgb(anchors.length>0?anchors[0].color:base);
+  const colors=anchors.map((p:BackgroundAnchor)=>rgb(p.color));
+  const core=(r:number):number=>r<=.9?1:r>=1?0:1-(r-.9)/.1;
+  const overlay=(b:number,h:number):number=>b<.5?2*b*h:1-2*(1-b)*(1-h);
+  // Spatial influences remain attached to card centres. Sizes match the source's
+  // .15–.75 range; a second independently displaced layer supplies luminous folds.
   for(let y=0;y<height;y++)for(let x=0;x<width;x++){
-    const nx=x/Math.max(1,width-1),ny=y/Math.max(1,height-1);let sum=.07,l=neutral.l*.07,a=neutral.a*.07,b=neutral.b*.07;
+    const nx=x/Math.max(1,width-1),ny=y/Math.max(1,height-1);
+    const out=neutral.slice(),high:number[]=[0,0,0];let alpha=0;
     for(let k=0;k<anchors.length;k++){
-      const p=anchors[k];
-      // Second, softly displaced highlight field creates folds rather than a flat average.
-      const hx=nx-(p.x+.12*Math.sin(k*2.4+ny*2.2)),hy=ny-(p.y+.11*Math.cos(k*1.7+nx*2.6));
-      const highlight=Math.exp(-hx*hx/.12-hy*hy/.16)*.32;
-      const field=horizontal[k][x]*vertical[k][y]+highlight;
-      const w=field*Math.sqrt(p.weight);
-      sum+=w;l+=labs[k].l*w;a+=labs[k].a*w;b+=labs[k].b*w;
+      const p=anchors[k],radius=.3+.45*((k*7+3)%11)/10;
+      const ry=radius*Math.max(width/height,1)*(.65+.9*((k*5+1)%7)/6);
+      const opacity=.55+.4*Math.min(1,Math.sqrt(p.weight));
+      const a=core(Math.hypot((nx-p.x)/radius,(ny-p.y)/ry))*opacity;
+      for(let c=0;c<3;c++)out[c]=colors[k][c]*a+out[c]*(1-a);
+      const hx=Math.max(0,Math.min(1,p.x+.28*Math.sin(k*2.4+1))),hy=Math.max(0,Math.min(1,p.y+.24*Math.cos(k*1.7+1)));
+      const ha=core(Math.hypot((nx-hx)/(radius*.85),(ny-hy)/(ry*.85)))*opacity;
+      for(let c=0;c<3;c++)high[c]=colors[k][c]*ha+high[c]*(1-ha);
+      alpha=ha+alpha*(1-ha);
     }
-    const atmosphere=3.6*Math.sin(nx*3.1+ny*1.7)-2.2*ny;
-    const color=labRGB({l:l/sum+atmosphere,a:a/sum,b:b/sum}),i=(y*width+x)*4;
-    const noise=(((x*73+y*151)%17)/16-.5)*.65;
-    bytes[i]=Math.max(0,Math.min(255,Math.round(color[0]+noise)));
-    bytes[i+1]=Math.max(0,Math.min(255,Math.round(color[1]+noise)));
-    bytes[i+2]=Math.max(0,Math.min(255,Math.round(color[2]+noise)));bytes[i+3]=255;
+    const i=(y*width+x)*4;
+    for(let c=0;c<3;c++)bytes[i+c]=Math.round(255*(alpha>0?out[c]*(1-alpha)+overlay(out[c],high[c]/alpha)*alpha:out[c]));
+    bytes[i+3]=255;
   }
   // Separable blur on the generated colour field, not on card artwork. O(pixels), off UI thread.
-  const radius=Math.max(2,Math.round(width*.08)),span=radius*2+1;
+  const radius=Math.max(2,Math.round(Math.pow(Math.min(width,height),.75))),span=radius*2+1;
   let input=bytes;
-  for(let pass=0;pass<2;pass++){
+  for(let pass=0;pass<3;pass++){
     const horizontalBytes=new Uint8Array(bytes.length),output=new Uint8Array(bytes.length);
     for(let y=0;y<height;y++)for(let c=0;c<3;c++){
       let sum=0;for(let k=-radius;k<=radius;k++)sum+=input[(y*width+Math.max(0,Math.min(width-1,k)))*4+c];

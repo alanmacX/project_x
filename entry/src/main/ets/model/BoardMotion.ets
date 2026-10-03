@@ -1,7 +1,7 @@
-/** One observed frame state consumed directly by every member; never relay through parent layout. */
+import { ShapePoint } from './CardSchema';
+/** All members consume one atomic translation. */
 @Observed
 export class BoardMotion {
-  ids: string[] = [];
-  x: number = 0;
-  y: number = 0;
+  @Track ids: string[] = [];
+  @Track offset: ShapePoint = { x: 0, y: 0 };
 }
