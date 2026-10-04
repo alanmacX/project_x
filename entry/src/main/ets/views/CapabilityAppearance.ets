@@ -1,6 +1,7 @@
 import { FridgeCard, materialColors } from '../model/CardSchema';
 import { readingWarning } from '../model/CapabilityPresentation';
 import { AppDesign } from '../model/AppDesign';
+import { SettingsSegmented } from './SettingsSegmented';
 /** All capabilities use this inspector. Data-specific controls never redefine appearance or gestures. */
 @Component
 export struct CapabilityAppearance {
@@ -20,12 +21,8 @@ export struct CapabilityAppearance {
         },(anchor:string)=>anchor)
       }.width('100%')
       Text('阅读衬底').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
-      Row({space:8}) {
-        ForEach(['auto','plain','surface'],(style:string,index:number)=>{
-          Button(['自动','融入底板','始终显示'][index],{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontSize(13)
-            .backgroundColor(AppDesign.choice(this.appDark,(this.card.capability?.readingStyle??'auto')===style)).fontColor(AppDesign.choiceText(this.appDark,(this.card.capability?.readingStyle??'auto')===style)).onClick(()=>this.onStyle(style))
-        },(style:string)=>style)
-      }.width('100%')
+      SettingsSegmented({labels:['自动','融入底板','始终显示'],selectedIndex:Math.max(0,['auto','plain','surface'].indexOf(this.card.capability?.readingStyle??'auto')),appDark:this.appDark,
+        onSelect:(index:number)=>this.onStyle(['auto','plain','surface'][index])})
       Button({type:ButtonType.ROUNDED_RECTANGLE}) {
         Row({space:12}) {
           Text('内容颜色').fontSize(14).fontColor(AppDesign.text(this.appDark)).layoutWeight(1)

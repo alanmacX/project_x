@@ -1,4 +1,6 @@
 import { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
+import { SettingsSegmented } from '../views/SettingsSegmented';
+import { settingsReveal, settingsDialogOpen, settingsDialogClose } from '../model/SettingsMotion';
 import { CapabilityAppearance } from '../views/CapabilityAppearance';
 import { CapabilityDetails } from '../views/CapabilityDetails';
 import { WeekTimetable } from '../views/WeekTimetable';
@@ -28,7 +30,6 @@ import { AppDesign } from '../model/AppDesign';
 import { arrivalOffset } from '../model/ArrivalGeometry';
 import { motionFrameRate } from '../model/MotionPolicy';
 import { HdsNavigation, HdsNavigationTitleMode, TextStyleMode, ScrollEffectType, BlurStrategy, hdsMaterial } from '@kit.UIDesignKit';
-import { SegmentButton, SegmentButtonOptions } from '@kit.ArkUI';
 import { EditorViewport, editorViewport, editorPreviewPaneHeight } from '../model/EditorViewport';
 import { SelectionHandles, selectionHandles } from '../model/SelectionHandles';
 import { CardEditHistory } from '../model/CardEditHistory';
@@ -106,9 +107,6 @@ struct Index {
   @State editing: boolean = false;
   @State settingsTab: number = 0;
   @State @Watch('editorTabChanged') editorTabs: number[] = [0];
-  @State editorTabOptions: SegmentButtonOptions = SegmentButtonOptions.capsule({
-    buttons: [{ text: '背景创作' }, { text: '上层内容' }], multiply: false
-  });
   @State scatter: number = 0;
   @State showBackgroundOptions: boolean = false;
   @State showLayerOptions: boolean = false;
@@ -145,7 +143,7 @@ struct Index {
   @State transitionClipW: number = 390;
   @State transitionClipH: number = 844;
   @State transitionClipRadius: number = 0;
-  @StorageLink('appDark') @Watch('appearanceChanged') appDark: boolean = false;
+  @StorageLink('appDark') appDark: boolean = false;
   @State heroRect: SceneRect = new SceneRect();
   @State heroBase: SceneRect = new SceneRect();
   @State heroScale: number = 1;
@@ -184,7 +182,7 @@ struct Index {
   @State tick: number = Date.now();
 
   aboutToAppear(): void {
-    this.alive = true; this.appearanceChanged();
+    this.alive = true;
     this.context = this.getUIContext().getHostContext() ?? null;
     this.initialize();
     this.clockTimer = setInterval(() => { this.tick = Date.now(); this.refreshDueWeather(); this.refreshCapabilities(); }, 60000);
@@ -400,13 +398,6 @@ struct Index {
     const rect = sceneRect(this.cardMap[id], BOARD_W * this.boardScale, this.boardHeight);
     rect.x += this.boardLeft + this.scatterOffset(id, true); rect.y += this.boardTop + this.scatterOffset(id, false);
     return rect;
-  }
-  private appearanceChanged(): void {
-    this.editorTabOptions = SegmentButtonOptions.capsule({
-      buttons: [{ text: '背景创作' }, { text: '上层内容' }], multiply: false,
-      fontColor: this.appText(), selectedFontColor: this.appText(),
-      backgroundColor: Color.Transparent, selectedBackgroundColor: Color.Transparent
-    });
   }
   private appBackground(): string { return AppDesign.background(this.appDark); }
   private appSurface(): string { return AppDesign.surface(this.appDark); }
@@ -925,7 +916,7 @@ struct Index {
   private chooseBackgroundColor(): void {
     this.colorDialog = new CustomDialogController({ builder: ColorSelector({ initialColor: this.canvasBackground.color, onPick: (color: string) => {
       const bg = new CanvasBackground(); bg.color = color || '#FFFFFF'; bg.photo = this.canvasBackground.photo; this.applyBackground(bg);
-    } }), customStyle: true, alignment: DialogAlignment.Center, autoCancel: true }); this.colorDialog.open();
+    } }), customStyle: true, openAnimation: settingsDialogOpen(), closeAnimation: settingsDialogClose(), alignment: DialogAlignment.Center, autoCancel: true }); this.colorDialog.open();
   }
   private async pickBackgroundPhoto(): Promise<void> {
     if (this.context === null || this.backgroundBusy) return;
@@ -941,7 +932,7 @@ struct Index {
   }
   private openBackgroundCrop(src: string): void {
     this.photoCropDialog = new CustomDialogController({ builder: PhotoCrop({ source: src, aspect: this.canvasAspect, appDark: this.appDark,
-      onApply: (zoom: number, x: number, y: number) => { this.commitBackgroundCrop(src, zoom, x, y); } }), customStyle: true, autoCancel: false });
+      onApply: (zoom: number, x: number, y: number) => { this.commitBackgroundCrop(src, zoom, x, y); } }), customStyle: true, openAnimation: settingsDialogOpen(), closeAnimation: settingsDialogClose(), autoCancel: false });
     this.photoCropDialog.open();
   }
   private async commitBackgroundCrop(src: string, zoom: number, x: number, y: number): Promise<void> {
@@ -997,13 +988,10 @@ struct Index {
           }, (card: FridgeCard) => card.id)
         }.width(240).height(240 / this.canvasAspect).borderRadius(20).clip(true)
         Column({ space: 16 }) {
-          Flex({ wrap: FlexWrap.Wrap }) {
-            ForEach(['solid','smart','blend','photo'], (mode: string, index: number) => {
-              Button(['纯色','智能取色','智能多色','照片'][index], { type: ButtonType.Capsule }).height(44).fontSize(14).margin({ right: 8, bottom: 8 })
-                .backgroundColor(AppDesign.choice(this.appDark, this.canvasBackground.mode === mode)).fontColor(AppDesign.choiceText(this.appDark, this.canvasBackground.mode === mode)).border({ width: .5, color: AppDesign.border(this.appDark) })
-                .enabled(!this.backgroundBusy).onClick(() => this.chooseBackgroundMode(mode))
-            }, (mode: string) => mode)
-          }.width('100%')
+          SettingsSegmented({labels:['纯色','智能取色','智能多色','照片'],selectedIndex:Math.max(0,['solid','smart','blend','photo'].indexOf(this.canvasBackground.mode)),appDark:this.appDark,
+            onSelect:(index:number)=>{if(!this.backgroundBusy)this.chooseBackgroundMode(['solid','smart','blend','photo'][index]);}}).enabled(!this.backgroundBusy)
+          ForEach([this.canvasBackground.mode],(_mode:string)=>{
+          Column({space:16}) {
           if (this.canvasBackground.mode === 'solid') {
             Button('自定义颜色', { type: ButtonType.ROUNDED_RECTANGLE }).height(44).width('100%').fontColor(this.appText()).backgroundColor(this.appControl()).borderRadius(12).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.chooseBackgroundColor())
             Flex({ wrap: FlexWrap.Wrap }) {
@@ -1023,6 +1011,8 @@ struct Index {
             Button('选择本地照片', { type: ButtonType.ROUNDED_RECTANGLE }).height(44).width('100%').fontColor(this.appText()).backgroundColor(this.appControl()).borderRadius(12).border({ width: .5, color: AppDesign.border(this.appDark) }).enabled(!this.backgroundBusy).onClick(() => this.pickBackgroundPhoto())
             Text('按桌面画布比例拖动、双指缩放后确认；原照片不修改。').fontSize(12).fontColor(this.appMuted()).width('100%')
           }
+          }.width('100%').transition(settingsReveal())
+          },(mode:string)=>mode)
         }.width('100%').padding(16).borderRadius(20).backgroundColor(this.appSurface()).border({ width: 1, color: AppDesign.border(this.appDark) })
         Column({ space: 16 }) {
           Text('柔色预设').fontSize(16).fontColor(this.appText()).width('100%')
@@ -1230,15 +1220,8 @@ struct Index {
   }
   @Builder
   editorControls() {
-    Row({ space: 4 }) {
-      ForEach(['背景创作', '上层内容'], (label: string, index: number) => {
-        Button(label, { type: ButtonType.Capsule }).height(AppDesign.controlHeight).layoutWeight(1).fontSize(14)
-          .fontWeight(this.settingsTab === index ? FontWeight.Medium : FontWeight.Normal)
-          .backgroundColor(AppDesign.choice(this.appDark, this.settingsTab === index))
-          .fontColor(AppDesign.choiceText(this.appDark, this.settingsTab === index))
-          .onClick(() => { this.editorTabs = [index]; })
-      }, (label: string) => label)
-    }.width(this.editorControlsWidth()).padding(4).borderRadius(28).backgroundColor(this.appSurface()).margin({ top: 4, bottom: 12 })
+    SettingsSegmented({labels:['背景创作','上层内容'],selectedIndex:this.settingsTab,appDark:this.appDark,onSelect:(index:number)=>{this.editorTabs=[index];}})
+      .width(this.editorControlsWidth()).margin({top:4,bottom:12})
   }
   @Builder
   editorLayers() {
@@ -1251,6 +1234,8 @@ struct Index {
   @Builder
   editorInspector() {
       Scroll(this.scroller) {
+        Column() {
+        ForEach([this.settingsTab+':'+this.layerId+':'+(this.preview.capability?.k??'none')],(_key:string)=>{
         Column({ space: 12 }) {
           if (this.layerId.length > 0 && this.layerId !== 'capability') {
             this.elementFields()
@@ -1263,7 +1248,7 @@ struct Index {
               Button(this.showBackgroundOptions ? '收起底板设置' : '底板形状与边缘', { type: ButtonType.ROUNDED_RECTANGLE }).layoutWeight(2).height(AppDesign.controlHeight).fontSize(14).fontColor(this.appText()).backgroundColor(this.appControl()).borderRadius(12).border({ width: .5, color: AppDesign.border(this.appDark) })
                 .onClick(() => { this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut, expectedFrameRateRange: this.frameRate }, () => { this.showBackgroundOptions = !this.showBackgroundOptions; }); })
             }.width('100%')
-            if (this.showBackgroundOptions) { this.appearancePanel() }
+            if (this.showBackgroundOptions) {Column(){this.appearancePanel()}.width('100%').transition(settingsReveal())}
             }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
           } else if (this.settingsTab === 1 && (this.layerId === 'capability' || this.layerId.length === 0)) {
             Column({space:16}) { this.capabilityPanel() }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
@@ -1282,7 +1267,9 @@ struct Index {
             Button(this.sharing ? '生成中' : '分享作品', { type: ButtonType.Capsule }).id('shareCard').height(44).layoutWeight(1).fontSize(14).fontColor(this.appText()).backgroundColor(this.appSurface()).enabled(!this.sharing && !this.heroActive).onClick(() => this.shareMenu(true))
             Button('复制卡片', { type: ButtonType.Capsule }).height(44).layoutWeight(1).fontSize(14).fontColor(this.appText()).backgroundColor(this.appSurface()).onClick(() => this.duplicate())
           }.width('100%').margin({ top: 4 })
-        }.width('100%').padding({ left: 16, right: 16, top: 4, bottom: this.safeBottom + 16 })
+        }.width('100%').padding({ left: 16, right: 16, top: 4, bottom: this.safeBottom + 16 }).transition(settingsReveal())
+        },(key:string)=>key)
+        }.width('100%')
       }.width('100%').layoutWeight(1).scrollable(ScrollDirection.Vertical).align(Alignment.Top).scrollBar(BarState.Off).backgroundColor(this.appPanel()).renderGroup(this.heroActive)
         .onAppear(() => this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }))
   }
@@ -1509,13 +1496,8 @@ struct Index {
             Button('+', { type: ButtonType.Circle }).width(AppDesign.controlHeight).height(AppDesign.controlHeight).fontColor(this.appText()).backgroundColor(this.appControl()).border({ width: .5, color: AppDesign.border(this.appDark) }).accessibilityText('增大字号')
               .onClick(() => { const el = this.currentElement(); if (el !== null) { el.fs = Math.min(64, el.fs + 2); this.change(); } })
         }.width('100%')
-          Flex({ wrap: FlexWrap.Wrap }) {
-            ForEach(['left', 'center', 'right'], (align: string, index: number) => {
-              Button(['左对齐', '居中', '右对齐'][index], { type: ButtonType.Capsule }).margin({ right: 8, bottom: 8 }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(13).backgroundColor(AppDesign.choice(this.appDark, this.elementPreview.align === align)).fontColor(AppDesign.choiceText(this.appDark, this.elementPreview.align === align)).border({ width: .5, color: AppDesign.border(this.appDark) }).borderRadius(12).clip(true)
-                .onClick(() => { const el = this.currentElement(); if (el !== null) { el.align = align; this.change(); } })
-            }, (v: string) => v)
-
-          }
+          SettingsSegmented({labels:['左对齐','居中','右对齐'],selectedIndex:Math.max(0,['left','center','right'].indexOf(this.elementPreview.align)),appDark:this.appDark,
+            onSelect:(index:number)=>{const el=this.currentElement();if(el!==null){el.align=['left','center','right'][index];this.change();}}})
           Row() { Text('加粗').fontSize(14).fontColor(this.appText()); Blank()
             Toggle({ type: ToggleType.Switch, isOn: this.elementPreview.bold }).margin({ left: 8 }).selectedColor('#303030').accessibilityText('加粗文字')
               .onChange((v: boolean) => { const el = this.currentElement(); if (el !== null) { el.bold = v; this.change(); } })
@@ -1524,12 +1506,8 @@ struct Index {
           Button(this.busy ? '正在读取' : '选择图片或 GIF', { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(14).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: 1, color: AppDesign.border(this.appDark) }).enabled(!this.busy).onClick(() => this.pickImage())
           if (this.elementPreview.animated) { Text('App 内循环播放；桌面组件展示时播放一次。').fontSize(12).fontColor(this.appMuted()).width('100%') }
         } else {
-          Row({ space: 8 }) {
-            ForEach(['rect', 'circle', 'line'], (shape: string, index: number) => {
-              Button(['矩形', '圆形', '线条'][index], { type: ButtonType.Capsule }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(13).backgroundColor(AppDesign.choice(this.appDark, this.elementPreview.primitive === shape)).fontColor(AppDesign.choiceText(this.appDark, this.elementPreview.primitive === shape)).border({ width: .5, color: AppDesign.border(this.appDark) }).borderRadius(12).clip(true)
-                .onClick(() => { const el = this.currentElement(); if (el !== null) { el.primitive = shape; this.change(); } })
-            }, (v: string) => v)
-          }
+          SettingsSegmented({labels:['矩形','圆形','线条'],selectedIndex:Math.max(0,['rect','circle','line'].indexOf(this.elementPreview.primitive)),appDark:this.appDark,
+            onSelect:(index:number)=>{const el=this.currentElement();if(el!==null){el.primitive=['rect','circle','line'][index];this.change();}}})
         }
         if (this.elementPreview.kind !== 'image') { this.colorRow('元素颜色', 'element', this.elementColor) }
       }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
@@ -1549,17 +1527,15 @@ struct Index {
           Button('垂直居中', { type: ButtonType.Capsule }).height(44).margin({ right: 8, bottom: 8 }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => { const box = this.currentBox(); if (box !== null) { box.y = (1 - box.h) / 2; this.change(); } })
           if (this.layerId !== 'capability') { Button('重置角度', { type: ButtonType.Capsule }).height(44).margin({ right: 8, bottom: 8 }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => { const box = this.currentBox(); if (box !== null) { box.rot = 0; this.change(); } }) }
         }
-        Row({ space: 8 }) {
+        Column({ space: 8 }) {
           Text('透明度').fontSize(13).fontColor(this.appText())
-          ForEach([1, .7, .4], (opacity: number, index: number) => {
-            Button(['实色', '柔和', '轻透'][index], { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).layoutWeight(1).borderRadius(AppDesign.controlRadius).fontSize(12)
-              .backgroundColor(AppDesign.choice(this.appDark, Math.abs(this.boxPreview.opacity - opacity) < .01)).fontColor(AppDesign.choiceText(this.appDark, Math.abs(this.boxPreview.opacity - opacity) < .01))
-              .onClick(() => { const box = this.currentBox(); if (box !== null) { box.opacity = opacity; this.change(); } })
-          }, (opacity: number) => String(opacity))
-        }.width('100%')
+          SettingsSegmented({labels:['实色','柔和','轻透'],selectedIndex:this.boxPreview.opacity>.85?0:this.boxPreview.opacity>.55?1:2,appDark:this.appDark,
+            onSelect:(index:number)=>{const box=this.currentBox();if(box!==null){box.opacity=[1,.7,.4][index];this.change();}}})
+        }.width('100%').alignItems(HorizontalAlign.Start)
         Button(this.showLayerOptions ? '收起图层操作' : '图层操作', { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).width('100%').fontSize(13).fontColor(this.appMuted()).backgroundColor(Color.Transparent)
           .onClick(() => { this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut, expectedFrameRateRange: this.frameRate }, () => { this.showLayerOptions = !this.showLayerOptions; }); })
         if (this.showLayerOptions) {
+        Column({space:12}) {
         if (this.layerId !== 'capability') {
           Row({ space: 8 }) {
             Button('复制元素', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.duplicateElement())
@@ -1579,6 +1555,7 @@ struct Index {
           }
           Button('移除此元素', { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(13).fontColor('#C43A35').backgroundColor(Color.Transparent).onClick(() => this.removeElement())
         }
+        }.width('100%').transition(settingsReveal())
         }
       }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
     }
@@ -1587,7 +1564,7 @@ struct Index {
     const id=this.preview.id;
     this.capabilityDialog=new CustomDialogController({builder:CapabilityPicker({selected:this.preview.capability?.k??'none',appDark:this.appDark,onChoose:(key:string)=>{
       if(this.editing && this.preview.id===id)this.setCapability(key);
-    }}),customStyle:true,autoCancel:true});this.capabilityDialog.open();
+    }}),customStyle:true,openAnimation:settingsDialogOpen(),closeAnimation:settingsDialogClose(),autoCancel:true});this.capabilityDialog.open();
   }
   @Builder
   capabilityPanel() {
@@ -1637,7 +1614,7 @@ struct Index {
       if (target === 'element' && element !== null && card.elements.includes(element)) element.color = color;
       if (target === 'paper') card.paper = color; if (target === 'ink') card.ink = color;
       this.syncFields(); this.change();
-    } }), customStyle: true, alignment: DialogAlignment.Center, autoCancel: true });
+    } }), customStyle: true, openAnimation: settingsDialogOpen(), closeAnimation: settingsDialogClose(), alignment: DialogAlignment.Center, autoCancel: true });
     this.colorDialog.open();
   }
   @Builder

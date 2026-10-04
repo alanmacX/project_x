@@ -1,5 +1,7 @@
 import { CAPABILITY_CATALOG, CAPABILITY_GROUPS, CapabilityDescriptor } from '../model/CapabilityCatalog';
 import { AppDesign } from '../model/AppDesign';
+import { SettingsSegmented } from './SettingsSegmented';
+import { settingsReveal } from '../model/SettingsMotion';
 @CustomDialog
 export struct CapabilityPicker {
   controller: CustomDialogController;
@@ -18,11 +20,7 @@ export struct CapabilityPicker {
         Button('关闭',{type:ButtonType.Capsule}).height(44).fontSize(14).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.controller.close())
       }.width('100%')
       TextInput({placeholder:'搜索能力',text:this.query}).height(44).fontSize(15).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(12).cancelButton({style:CancelButtonStyle.INPUT}).onChange((value:string)=>this.query=value)
-      Row({space:8}) {
-        ForEach(CAPABILITY_GROUPS,(group:string)=>{
-          Button(group,{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontSize(14).backgroundColor(AppDesign.choice(this.appDark,this.group===group)).fontColor(AppDesign.choiceText(this.appDark,this.group===group)).onClick(()=>{this.group=group;this.query='';})
-        },(group:string)=>group)
-      }.width('100%')
+      SettingsSegmented({labels:CAPABILITY_GROUPS,selectedIndex:CAPABILITY_GROUPS.indexOf(this.group),appDark:this.appDark,onSelect:(index:number)=>{this.group=CAPABILITY_GROUPS[index];this.query='';}})
       Scroll() {
         Column({space:8}) {
           ForEach(this.items(),(item:CapabilityDescriptor)=>{
@@ -35,7 +33,7 @@ export struct CapabilityPicker {
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
                 Text(this.selected===item.key?'已选':item.source.includes('联网')?'联网':'本地').fontSize(12).fontColor(AppDesign.muted(this.appDark))
               }.width('100%').padding(14)
-            }.width('100%').backgroundColor(AppDesign.control(this.appDark)).border({width:this.selected===item.key?1.5:0,color:AppDesign.text(this.appDark)}).borderRadius(14).onClick(()=>this.choose(item.key))
+            }.width('100%').backgroundColor(AppDesign.control(this.appDark)).border({width:this.selected===item.key?1.5:0,color:AppDesign.text(this.appDark)}).borderRadius(14).onClick(()=>this.choose(item.key)).transition(this.query.trim().length===0?settingsReveal():TransitionEffect.IDENTITY)
           },(item:CapabilityDescriptor)=>item.key)
           if(this.items().length===0) {Text('没有匹配的能力，试试其他关键词').fontSize(14).fontColor(AppDesign.muted(this.appDark)).padding(24).width('100%').textAlign(TextAlign.Center)}
         }.width('100%')
