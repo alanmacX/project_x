@@ -84,7 +84,7 @@ export struct CalendarRulesDialog {
           ForEach(this.draft.courseChanges??[],(change:CourseChange)=>{
             Row({space:8}) {Column({space:4}) {Text(this.draft.courses?.find((c)=>c.id===change.courseId)?.name??'课程').fontSize(14).fontColor(AppDesign.text(this.appDark)).width('100%');Text(change.date+' → '+(change.targetDate?change.targetDate+' '+change.start:'取消')).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}.layoutWeight(1);Button('移除',{type:ButtonType.Capsule}).height(44).fontSize(12).backgroundColor(AppDesign.control(this.appDark)).fontColor('#C43A35').onClick(()=>{this.draft.courseChanges=this.draft.courseChanges!.filter((c:CourseChange)=>c.id!==change.id);this.update();})}.width('100%')
           },(change:CourseChange)=>change.id)
-          Text('变动只在本机保存，不会修改学校教务。重新导入替换课程时会清除原课程的单次变动，保留校历。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+          Text('变动只在本机保存，不会修改学校教务。替换课表默认清除旧校历与单次变动；仅更新同一课表时，可在导入页选择保留校历。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
         }.width('100%')
       }.width('100%')}.width('100%').layoutWeight(1).scrollBar(BarState.Off)
       if(this.error){Text(this.error).fontSize(12).fontColor('#C43A35').width('100%').maxLines(3)}

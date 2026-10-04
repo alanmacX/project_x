@@ -12,7 +12,7 @@ export struct WakeUpImportDialog {
   controller:CustomDialogController;
   appDark:boolean=false;
   existingCount:number=0;
-  onImport:(semester:string,courses:CourseItem[],replace:boolean)=>void=()=>{};
+  onImport:(semester:string,courses:CourseItem[],replace:boolean,keepCalendar:boolean)=>void=()=>{};
   @State text:string='';
   @State other:boolean=false;
   @State parsed:WakeImport=new WakeImport();
@@ -23,6 +23,7 @@ export struct WakeUpImportDialog {
   @State stage:boolean=false;
   @State periods:boolean=false;
   @State replace:boolean=false;
+  @State keepCalendar:boolean=false;
   @State busy:boolean=false;
   @State error:string='';
   private alive:boolean=true;
@@ -60,7 +61,7 @@ export struct WakeUpImportDialog {
     }catch(_){this.previewReady=false;}
   }
   private confirm():void {
-    try {const courses=resolveWakeUp(this.parsed,this.semester,this.slots);this.onImport(mondayDate(this.semester),courses,this.replace);this.controller.close();}catch(e){this.error=(e as Error).message;}
+    try {const courses=resolveWakeUp(this.parsed,this.semester,this.slots);this.onImport(mondayDate(this.semester),courses,this.replace,this.keepCalendar);this.controller.close();}catch(e){this.error=(e as Error).message;}
   }
   @Builder
   action(label:string,run:()=>void,emphasis:boolean=false) {
@@ -98,6 +99,10 @@ export struct WakeUpImportDialog {
           }.width('100%')
         }.width('100%').height(this.periods?230:310).scrollBar(BarState.Off).align(Alignment.Top)
         if(this.existingCount>0) {Row({space:12}) {Text(this.replace?'替换现有 '+this.existingCount+' 条课程':'追加到现有课程').fontSize(13).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:this.replace}).onChange((v:boolean)=>this.replace=v)}.width('100%')}
+        if(this.existingCount>0 && this.replace) {
+          Row({space:12}) {Text('保留当前课表的校历').fontSize(13).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:this.keepCalendar}).onChange((v:boolean)=>this.keepCalendar=v)}.width('100%')
+          Text('换学校或学期时建议关闭；仅更新同一课表时，可保留原停课和整天调课安排。单次课程变动会清除。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+        }
       }
       if(this.error){Text(this.error).fontSize(12).fontColor('#B34735').width('100%').maxLines(3).textOverflow({overflow:TextOverflow.Ellipsis})}
       Row({space:10}) {this.action('取消',():void=>{this.controller.close();});if(this.stage){this.action('重新选择',()=>{this.stage=false;this.error='';});Button('确认导入',{type:ButtonType.Capsule}).height(44).fontSize(14).layoutWeight(1).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).onClick(()=>this.confirm());}}

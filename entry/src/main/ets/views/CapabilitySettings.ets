@@ -1,3 +1,4 @@
+import { applyTimetableImport } from '../model/TimetableImport';
 import { ParcelImportDialog } from './ParcelImportDialog';
 import { mergePickupParcels } from '../model/ParcelIntake';
 import { TimetableDialog } from './TimetableDialog';
@@ -121,13 +122,9 @@ export struct CapabilitySettings {
   }
   private importTimetable():void {
     const id=this.cardId;
-    this.dialog=new CustomDialogController({builder:WakeUpImportDialog({appDark:this.appDark,existingCount:(this.cap.courses??[]).length,onImport:(semester:string,courses:CourseItem[],replace:boolean)=>{
+    this.dialog=new CustomDialogController({builder:WakeUpImportDialog({appDark:this.appDark,existingCount:(this.cap.courses??[]).length,onImport:(semester:string,courses:CourseItem[],replace:boolean,keepCalendar:boolean)=>{
       if(!this.alive||this.cardId!==id||this.cap.k!=='timetable')return;
-      const next=this.copy(),list=replace?[]:(next.courses??[]).slice();
-      if(!replace&&list.length&&next.semester!==semester)throw new Error('开学日期不同，请选择替换或先建立另一张课程卡');
-      for(const c of courses)if(!list.some((v)=>v.name===c.name&&v.room===c.room&&v.day===c.day&&v.start===c.start&&v.end===c.end&&v.firstWeek===c.firstWeek&&v.lastWeek===c.lastWeek&&v.parity===c.parity))list.push(c);
-      if(list.length>128)throw new Error('合并后超过 128 条，请分成两张课程卡');
-      next.semester=semester;next.courses=list;if(replace)next.courseChanges=[];this.change(next);
+      this.change(applyTimetableImport(this.cap,semester,courses,replace,keepCalendar));
     }}),customStyle:true,alignment:DialogAlignment.Center,autoCancel:true});this.dialog.open();
   }
   private showTimetable():void {
