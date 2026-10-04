@@ -37,12 +37,12 @@ export struct WeekTimetable {
   build() {
     Column({space:12}) {
       Row({space:10}) {
-        Button('‹',{type:ButtonType.Circle}).width(44).height(44).fontSize(24).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).enabled(this.week>1).onClick(()=>this.move(-1))
+        Button({type:ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(20).fontColor([AppDesign.text(this.appDark)]).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(24).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).enabled(this.week>1).onClick(()=>this.move(-1))
         Column({space:2}) {
           Text('第 '+this.week+' 周').fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark))
           Text(this.items.length?this.items.length+' 项课程 · '+(this.editable?'点按编辑':'预览'):'本周无课').fontSize(11).fontColor(AppDesign.muted(this.appDark))
         }.layoutWeight(1)
-        Button('›',{type:ButtonType.Circle}).width(44).height(44).fontSize(24).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).enabled(this.week<60).onClick(()=>this.move(1))
+        Button({type:ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(20).fontColor([AppDesign.text(this.appDark)]).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(24).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).enabled(this.week<60).onClick(()=>this.move(1))
       }.width('100%')
       Scroll() {
         Column() {
@@ -66,13 +66,13 @@ export struct WeekTimetable {
                 },(h:number)=>String(h))
               }.width(658)
               ForEach(this.items,(i:WeekLesson)=>{
-                Button({type:ButtonType.ROUNDED_RECTANGLE}) {
+                Button({type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
                   Column({space:3}) {
                     Text(i.event.title).fontSize(12).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%').maxLines(Math.max(1,Math.min(3,Math.floor((this.cellHeight(i)-28)/15)))).textOverflow({overflow:TextOverflow.Ellipsis})
                     Text(i.event.location||'地点待定').fontSize(10).fontColor(AppDesign.muted(this.appDark)).width('100%').maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
                     if(this.cellHeight(i)>82) {Text(timeText(i.event.start)+'–'+timeText(i.event.end)).fontSize(9).fontColor(AppDesign.muted(this.appDark)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')}
                   }.width('100%').padding(7).alignItems(HorizontalAlign.Start)
-                }.width(86/i.lanes-2).height(this.cellHeight(i)).backgroundColor(AppDesign.surface(this.appDark)).border({width:.5,color:AppDesign.border(this.appDark)}).borderRadius(10).clip(true)
+                }.width(86/i.lanes-2).height(this.cellHeight(i)).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(10).clip(true)
                   .position({x:43+(i.day-1)*88+i.lane*86/i.lanes,y:(minuteOf(i.event.start)-this.firstHour*60)/60*this.hourHeight})
                   .onClick(()=>this.open(i))
               },(i:WeekLesson)=>i.event.id)

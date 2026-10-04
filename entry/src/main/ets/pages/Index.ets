@@ -1,5 +1,6 @@
 import { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
 import { SettingsSegmented } from '../views/SettingsSegmented';
+import { SettingsCounter } from '../views/SettingsCounter';
 import { settingsReveal, settingsDialogOpen, settingsDialogClose } from '../model/SettingsMotion';
 import { CapabilityAppearance } from '../views/CapabilityAppearance';
 import { CapabilityDetails } from '../views/CapabilityDetails';
@@ -255,20 +256,20 @@ struct Index {
       Scroll() {
         Column({space:8}) {
           ForEach(this.canvasEntries,(c:CanvasEntry)=>{
-            Button({type:ButtonType.ROUNDED_RECTANGLE}) {
+            Button({type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
               Row({space:12}) { Text(c.name).fontColor(this.appText()).fontSize(16).layoutWeight(1).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}); Text(c.id===this.store.state.canvasId?'当前':'切换').fontSize(12).fontColor(this.appMuted()) }.width('100%')
-            }.width('100%').height(56).padding(16).borderRadius(16).backgroundColor(this.appSurface()).onClick(()=>this.chooseCanvas(c.id))
+            }.width('100%').height(56).padding(16).backgroundColor(this.appSurface()).onClick(()=>this.chooseCanvas(c.id))
           },(c:CanvasEntry)=>c.id)
         }.width('100%')
       }.width('100%').layoutWeight(1).scrollBar(BarState.Off).align(Alignment.Top)
       Row({space:12}) {
         TextInput({text:this.renameValue,placeholder:'画布名称'}).height(44).layoutWeight(1).fontColor(this.appText()).backgroundColor(this.appControl()).borderRadius(14).onChange((v:string)=>this.renameValue=v)
-        Button('重命名',{type:ButtonType.Capsule}).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>{this.store.renameCanvas(this.renameValue);this.refreshCanvasList();this.persist(false);})
+        Button('重命名',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>{this.store.renameCanvas(this.renameValue);this.refreshCanvasList();this.persist(false);})
       }.width('100%')
       Row({space:12}) {
-        Button('新画布',{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>this.newCanvas(false))
-        Button('复制画布',{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>this.newCanvas(true))
-        Button('删除',{type:ButtonType.Capsule}).height(44).fontColor('#C43A35').backgroundColor(this.appControl()).enabled(this.canvasEntries.length>1).onClick(()=>this.deleteCanvas())
+        Button('新画布',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>this.newCanvas(false))
+        Button('复制画布',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>this.newCanvas(true))
+        Button('删除',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.ERROR}).height(44).fontColor('#C43A35').backgroundColor(this.appControl()).enabled(this.canvasEntries.length>1).onClick(()=>this.deleteCanvas())
       }.width('100%')
       Text('桌面组件各自绑定添加时的画布，切换不会替换它们。').fontSize(12).fontColor(this.appMuted()).width('100%')
     }.width('100%').height('100%').padding(20).backgroundColor(this.appSurface()).enabled(!this.canvasChanging)
@@ -736,7 +737,7 @@ struct Index {
       if (!this.ready) {
         Column({ space: 12 }) {
           if (this.error.length > 0) { Text(this.error).fontSize(14).fontColor(this.appMuted()) }
-          if (this.error.length > 0) { Button('重试', { type: ButtonType.ROUNDED_RECTANGLE }).onClick(() => this.initialize()) }
+          if (this.error.length > 0) { Button('重试', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).onClick(() => this.initialize()) }
         }.width('100%').height('100%').justifyContent(FlexAlign.Center)
       } else {
         this.board()
@@ -839,39 +840,43 @@ struct Index {
       Column({ space: 12 }) {
         Row() {
           Text('图层').fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText()); Blank()
-          Button(this.canvasName+' ⌄',{type:ButtonType.Capsule}).height(44).width(Math.min(130,Math.max(64,this.panelWidth-220))).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).margin({right:8}).onClick(()=>{this.refreshCanvasList();this.canvasPickerOpen=true;}).bindSheet(this.canvasPickerOpen,this.canvasPicker,{height:SheetSize.LARGE,showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>{this.canvasPickerOpen=false;}})
-          Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule }).margin({ right: 8 }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
-          Button('+', { type: ButtonType.Circle }).width(44).height(AppDesign.controlHeight).fontSize(24).backgroundColor('#262626').fontColor(Color.White).accessibilityText('添加卡片').onClick(() => this.addCard())
+          Button(this.canvasName+' ⌄',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).width(Math.min(130,Math.max(64,this.panelWidth-220))).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).margin({right:8}).onClick(()=>{this.refreshCanvasList();this.canvasPickerOpen=true;}).bindSheet(this.canvasPickerOpen,this.canvasPicker,{height:SheetSize.LARGE,showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>{this.canvasPickerOpen=false;}})
+          Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).margin({ right: 8 }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
+          Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([Color.White]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(24).backgroundColor('#262626').fontColor(Color.White).accessibilityText('添加卡片').onClick(() => this.addCard())
         }.width('100%')
         Stack({ alignContent: Alignment.Bottom }) {
         Scroll() {
           Column({ space: 8 }) {
             ForEach(this.orderedCards().map((item: FridgeCard) => item.id), (id: string, index: number) => {
               Row({ space: 12 }) {
-                Stack() {
-                  CardFace({ card: this.cardMap[id], scaleFactor: Math.min(44 / this.cardMap[id].w, 44 / this.cardMap[id].h), tick: this.tick })
-                    .width(this.cardMap[id].w * Math.min(44 / this.cardMap[id].w, 44 / this.cardMap[id].h)).height(this.cardMap[id].h * Math.min(44 / this.cardMap[id].w, 44 / this.cardMap[id].h))
-                }.width(52).height(52).hitTestBehavior(HitTestMode.None)
-                Column({ space: 4 }) {
-                  Text(layerLabel(this.cardMap[id])).fontSize(14).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).fontColor(this.appText()).width('100%')
-                  Text((this.cardMap[id].groupId.length > 0 ? '组合 · ' : '') + (index === 0 ? '最上层 · ' : '') + (this.cardMap[id].capability !== null ? typeLabel(this.cardMap[id].capability?.k ?? '') : '自定义')).fontSize(11).fontColor(this.appMuted()).width('100%')
-                }.layoutWeight(1).hitTestBehavior(HitTestMode.None)
-                Button('编辑', { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).fontSize(13).backgroundColor(Color.Transparent).fontColor(this.appText()).enabled(!this.groupSelecting).onClick(() => this.openEditor(id))
-              }.width('100%').padding(8).borderRadius(12).backgroundColor(this.appSurface()).border({ width: (this.groupSelecting ? this.groupSelection.includes(id) : this.selectedId === id) ? 1.5 : 0, color: this.appMuted() })
-                .accessibilityText('选择卡片 ' + layerLabel(this.cardMap[id])).onClick(() => this.selectLayerCard(id))
+                Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {
+                  Row({space:12}) {
+                    Stack() {
+                      CardFace({card:this.cardMap[id],scaleFactor:Math.min(44/this.cardMap[id].w,44/this.cardMap[id].h),tick:this.tick})
+                        .width(this.cardMap[id].w*Math.min(44/this.cardMap[id].w,44/this.cardMap[id].h)).height(this.cardMap[id].h*Math.min(44/this.cardMap[id].w,44/this.cardMap[id].h))
+                    }.width(52).height(52).hitTestBehavior(HitTestMode.None)
+                    Column({space:4}) {
+                      Text(layerLabel(this.cardMap[id])).fontSize(14).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontColor(this.appText()).width('100%')
+                      Text((this.cardMap[id].groupId.length>0?'组合 · ':'')+(index===0?'最上层 · ':'')+(this.cardMap[id].capability!==null?typeLabel(this.cardMap[id].capability?.k??''):'自定义')).fontSize(11).fontColor(this.appMuted()).width('100%')
+                    }.layoutWeight(1).hitTestBehavior(HitTestMode.None)
+                  }.width('100%')
+                }.layoutWeight(1).height(60).padding(0).backgroundColor(Color.Transparent)
+                  .accessibilityText('选择卡片 '+layerLabel(this.cardMap[id])).onClick(()=>this.selectLayerCard(id))
+                Button('编辑',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(AppDesign.controlHeight).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.groupSelecting).onClick(()=>this.openEditor(id))
+              }.width('100%').padding(8).borderRadius(12).backgroundColor(this.appSurface()).border({width:(this.groupSelecting?this.groupSelection.includes(id):this.selectedId===id)?1.5:0,color:this.appMuted()})
             }, (id: string) => id)
           }.width('100%').padding({ bottom: this.homeActionHeight() + 8 })
         }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
         if (this.homeActionHeight() > 0) {
         Column({ space: 12 }) {
-        if (this.groupSelecting) { Button('组合选中卡片（' + this.groupSelection.length + '）', { type: ButtonType.Capsule }).height(44).width('100%').enabled(this.groupSelection.length > 1).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.confirmGroup()) }
-        if (!this.groupSelecting && (this.store.findCard(this.selectedId)?.groupId ?? '').length > 0) { Button('取消组合', { type: ButtonType.Capsule }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.releaseGroup()) }
+        if (this.groupSelecting) { Button('组合选中卡片（' + this.groupSelection.length + '）', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.EMPHASIZED, role:ButtonRole.NORMAL }).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).height(44).width('100%').enabled(this.groupSelection.length > 1).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.confirmGroup()) }
+        if (!this.groupSelecting && (this.store.findCard(this.selectedId)?.groupId ?? '').length > 0) { Button('取消组合', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.releaseGroup()) }
         if (!this.groupSelecting && this.selectedId.length > 0) {
           Row({ space: 12 }) {
-            Button('上移一层', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.moveCardLayer(this.selectedId, true))
-            Button('下移一层', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.moveCardLayer(this.selectedId, false))
+            Button('上移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.moveCardLayer(this.selectedId, true))
+            Button('下移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.moveCardLayer(this.selectedId, false))
             Blank()
-            Button('删除', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(this.appControl()).fontColor('#C43A35').shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.deleteCard(this.selectedId))
+            Button('删除', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.ERROR }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor('#C43A35').shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.deleteCard(this.selectedId))
           }.width('100%')
         }
         }.width('100%').padding(8)
@@ -960,7 +965,7 @@ struct Index {
   @Builder
   homeBackground() {
     Row({ space: 8 }) {
-      Button({ type: ButtonType.ROUNDED_RECTANGLE }) {
+      Button({ type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {
         Row({ space: 12 }) {
           CanvasBackdrop({ sceneBackground: this.canvasBackground }).width(40).height(40).borderRadius(10).clip(true).border({ width: .5, color: AppDesign.border(this.appDark) })
           Column({ space: 3 }) { Text('画布背景').fontSize(14).fontColor(this.appText()); Text(this.backgroundBusy ? '正在取色' : this.backgroundLabel()).fontSize(11).fontColor(this.appMuted()) }.alignItems(HorizontalAlign.Start)
@@ -968,8 +973,8 @@ struct Index {
         }.width('100%')
       }.height(56).layoutWeight(1).backgroundColor(Color.Transparent).padding(8).onClick(() => { this.backgroundOpen = true; })
         .bindSheet(this.backgroundOpen, this.backgroundEditor, { height: SheetSize.LARGE, showClose: true, backgroundColor: this.appBackground(), onDisappear: () => { this.backgroundOpen = false; } })
-      Button(this.sharing ? '生成中' : '作品', { type: ButtonType.Capsule }).id('shareCanvas').height(44).fontSize(13).padding({ left: 12, right: 12 })
-        .backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).enabled(!this.sharing && !this.backgroundBusy).onClick(() => this.shareMenu(false))
+      Button(this.sharing ? '生成中' : '作品', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).id('shareCanvas').height(44).fontSize(13).padding({ left: 12, right: 12 })
+        .backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.sharing && !this.backgroundBusy).onClick(() => this.shareMenu(false))
     }.width(this.panelWidth).height(72).padding(8).borderRadius(AppDesign.sectionRadius).border({ width: 1, color: AppDesign.border(this.appDark) }).backgroundColor(this.appSurface())
       .position({ x: this.panelLeft, y: this.panelTop + this.panelHeight - 72 })
   }
@@ -988,15 +993,15 @@ struct Index {
           }, (card: FridgeCard) => card.id)
         }.width(240).height(240 / this.canvasAspect).borderRadius(20).clip(true)
         Column({ space: 16 }) {
-          SettingsSegmented({labels:['纯色','智能取色','智能多色','照片'],selectedIndex:Math.max(0,['solid','smart','blend','photo'].indexOf(this.canvasBackground.mode)),appDark:this.appDark,
+          SettingsSegmented({labels:['纯色','智能取色','智能多色','照片'],selectedIndex:this.canvasBackground.mode==='preset'?2:Math.max(0,['solid','smart','blend','photo'].indexOf(this.canvasBackground.mode)),appDark:this.appDark,
             onSelect:(index:number)=>{if(!this.backgroundBusy)this.chooseBackgroundMode(['solid','smart','blend','photo'][index]);}}).enabled(!this.backgroundBusy)
           ForEach([this.canvasBackground.mode],(_mode:string)=>{
           Column({space:16}) {
           if (this.canvasBackground.mode === 'solid') {
-            Button('自定义颜色', { type: ButtonType.ROUNDED_RECTANGLE }).height(44).width('100%').fontColor(this.appText()).backgroundColor(this.appControl()).borderRadius(12).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.chooseBackgroundColor())
+            Button('自定义颜色', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).width('100%').fontColor(this.appText()).backgroundColor(this.appControl()).onClick(() => this.chooseBackgroundColor())
             Flex({ wrap: FlexWrap.Wrap }) {
               ForEach(['#FFFFFF','#F1EEE6','#E9E5DF','#E2E8E2','#E3E9EF','#292B2B'], (color: string) => {
-                Button({ type: ButtonType.Circle }).width(44).height(44).backgroundColor(color).margin({ right: 8, bottom: 8 })
+                Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).width(44).height(44).backgroundColor(color).margin({ right: 8, bottom: 8 })
                   .border({ width: this.canvasBackground.color === color ? 2 : .5, color: this.appMuted() }).accessibilityText('背景色 '+color)
                   .onClick(() => { const bg = new CanvasBackground(); bg.color = color; bg.photo = this.canvasBackground.photo; this.applyBackground(bg); })
               }, (color: string) => color)
@@ -1004,11 +1009,11 @@ struct Index {
           }
           if (this.canvasBackground.mode === 'smart' || this.canvasBackground.mode === 'blend') {
             Text(this.backgroundBusy ? '正在从本地卡片提取颜色' : this.canvasBackground.mode === 'smart' ? '根据全部可见卡片取色，降低饱和度以衬托作品。' : '移动时保持当前配色；换图或改色后更新，也可手动重新取色。').fontSize(13).fontColor(this.appMuted()).width('100%')
-            Button('重新取色', { type: ButtonType.Capsule }).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).border({ width: .5, color: AppDesign.border(this.appDark) }).enabled(!this.backgroundBusy).onClick(() => this.refreshBackground(true))
+            Button('重新取色', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.backgroundBusy).onClick(() => this.refreshBackground(true))
           }
           if (this.canvasBackground.mode === 'photo') {
-            if (this.canvasBackground.photo.length > 0) { Button('调整照片', { type: ButtonType.Capsule }).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).border({ width: .5, color: AppDesign.border(this.appDark) }).enabled(!this.backgroundBusy).onClick(() => this.openBackgroundCrop(this.canvasBackground.photo)) }
-            Button('选择本地照片', { type: ButtonType.ROUNDED_RECTANGLE }).height(44).width('100%').fontColor(this.appText()).backgroundColor(this.appControl()).borderRadius(12).border({ width: .5, color: AppDesign.border(this.appDark) }).enabled(!this.backgroundBusy).onClick(() => this.pickBackgroundPhoto())
+            if (this.canvasBackground.photo.length > 0) { Button('调整照片', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.backgroundBusy).onClick(() => this.openBackgroundCrop(this.canvasBackground.photo)) }
+            Button('选择本地照片', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).width('100%').fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.backgroundBusy).onClick(() => this.pickBackgroundPhoto())
             Text('按桌面画布比例拖动、双指缩放后确认；原照片不修改。').fontSize(12).fontColor(this.appMuted()).width('100%')
           }
           }.width('100%').transition(settingsReveal())
@@ -1018,7 +1023,7 @@ struct Index {
           Text('柔色预设').fontSize(16).fontColor(this.appText()).width('100%')
           Flex({ wrap: FlexWrap.Wrap }) {
             ForEach(['雾沙','庭院','海盐'], (name: string, index: number) => {
-              Button(name, { type: ButtonType.Capsule }).height(44).fontColor(this.appText()).backgroundColor(Color.Transparent).margin({ right: 8 }).border({ width: .5, color: AppDesign.border(this.appDark) }).enabled(!this.backgroundBusy).onClick(() => this.setBackgroundPreset(index))
+              Button(name, { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).margin({ right: 8 }).enabled(!this.backgroundBusy).onClick(() => this.setBackgroundPreset(index))
             }, (name: string) => name)
           }.width('100%')
         }.width('100%').padding(16).borderRadius(20).backgroundColor(this.appSurface()).border({ width: 1, color: AppDesign.border(this.appDark) })
@@ -1128,15 +1133,15 @@ struct Index {
           }
           if (this.preview.capability?.k === 'calendar') {
             Row({ space: 12 }) {
-              Button('上月', { type: ButtonType.Capsule }).fontSize(14).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.calendarAction('previousMonth'))
-              Button('本月', { type: ButtonType.Capsule }).fontSize(14).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.calendarAction('currentMonth'))
-              Button('下月', { type: ButtonType.Capsule }).fontSize(14).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.calendarAction('nextMonth'))
+              Button('上月', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(14).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => this.calendarAction('previousMonth'))
+              Button('本月', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(14).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => this.calendarAction('currentMonth'))
+              Button('下月', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(14).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => this.calendarAction('nextMonth'))
             }
           }
           if (this.preview.capability?.k === 'weather') {
             Text(this.preview.capability!.updatedAt ? '更新于 ' + new Date(this.preview.capability!.updatedAt!).toLocaleString() : '尚无更新记录')
               .fontSize(12).fontColor(this.appMuted())
-            Button(this.weatherBusy ? '更新中' : '刷新天气', { type: ButtonType.ROUNDED_RECTANGLE }).backgroundColor(Color.Transparent).fontColor(this.appText()).border({ width: .5, color: this.appMuted() }).enabled(!this.weatherBusy).onClick(() => this.refreshWeather())
+            Button(this.weatherBusy ? '更新中' : '刷新天气', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.weatherBusy).onClick(() => this.refreshWeather())
           }
         }.width('100%').padding({ bottom: 24 })
       }.width('100%').height('100%').align(Alignment.Top).padding({ top: 76, left: 24, right: 24, bottom: this.safeBottom + 8 })
@@ -1244,8 +1249,8 @@ struct Index {
             Column({ space: 16 }) {
               Text('底板').fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
             Row({ space: 8 }) {
-              Button('底色', { type: ButtonType.ROUNDED_RECTANGLE }).layoutWeight(1).height(AppDesign.controlHeight).fontSize(14).fontColor(this.appText()).backgroundColor(this.appControl()).borderRadius(12).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.chooseColor('paper'))
-              Button(this.showBackgroundOptions ? '收起底板设置' : '底板形状与边缘', { type: ButtonType.ROUNDED_RECTANGLE }).layoutWeight(2).height(AppDesign.controlHeight).fontSize(14).fontColor(this.appText()).backgroundColor(this.appControl()).borderRadius(12).border({ width: .5, color: AppDesign.border(this.appDark) })
+              Button('底色', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).height(AppDesign.controlHeight).fontSize(14).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(() => this.chooseColor('paper'))
+              Button(this.showBackgroundOptions ? '收起底板设置' : '底板形状与边缘', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(2).height(AppDesign.controlHeight).fontSize(14).fontColor(this.appText()).backgroundColor(this.appControl())
                 .onClick(() => { this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut, expectedFrameRateRange: this.frameRate }, () => { this.showBackgroundOptions = !this.showBackgroundOptions; }); })
             }.width('100%')
             if (this.showBackgroundOptions) {Column(){this.appearancePanel()}.width('100%').transition(settingsReveal())}
@@ -1264,8 +1269,8 @@ struct Index {
 
           if (this.settingsTab === 1 && this.preview.capability !== null && capabilityBox(this.preview).w === 0) { Text('内容空间不足，请调整文字大小或位置').fontSize(12).fontColor('#846339').width('100%') }
           Row({ space: 12 }) {
-            Button(this.sharing ? '生成中' : '分享作品', { type: ButtonType.Capsule }).id('shareCard').height(44).layoutWeight(1).fontSize(14).fontColor(this.appText()).backgroundColor(this.appSurface()).enabled(!this.sharing && !this.heroActive).onClick(() => this.shareMenu(true))
-            Button('复制卡片', { type: ButtonType.Capsule }).height(44).layoutWeight(1).fontSize(14).fontColor(this.appText()).backgroundColor(this.appSurface()).onClick(() => this.duplicate())
+            Button(this.sharing ? '生成中' : '分享作品', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).id('shareCard').height(44).layoutWeight(1).fontSize(14).fontColor(this.appText()).backgroundColor(this.appSurface()).enabled(!this.sharing && !this.heroActive).onClick(() => this.shareMenu(true))
+            Button('复制卡片', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).layoutWeight(1).fontSize(14).fontColor(this.appText()).backgroundColor(this.appSurface()).onClick(() => this.duplicate())
           }.width('100%').margin({ top: 4 })
         }.width('100%').padding({ left: 16, right: 16, top: 4, bottom: this.safeBottom + 16 }).transition(settingsReveal())
         },(key:string)=>key)
@@ -1292,13 +1297,13 @@ struct Index {
         .position({ x: this.previewViewport().left, y: this.previewViewport().top })
       
       if (this.layerId.length > 0 && (this.layerId!=='capability'||this.preview.capability!==null) && this.layerDrag.length === 0) {
-        Button('↘', { type: ButtonType.Circle }).width(44).height(AppDesign.controlHeight).fontSize(18).backgroundColor(this.appSurface()).fontColor(this.appText()).shadow({ radius: 6, color: '#18000000', offsetY: 2 })
+        Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right')).fontSize(20).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(18).backgroundColor(this.appSurface()).fontColor(this.appText()).shadow({ radius: 6, color: '#18000000', offsetY: 2 })
           .border({ width: 1, color: '#B8B8B8' }).position({ x: this.editorHandle(true).x - 22, y: this.editorHandle(true).y - 22 })
           .accessibilityText('缩放选中元素')
           .gesture(PanGesture({ distance: 2 }).onActionStart((e: GestureEvent) => this.startTransform(this.layerId, e)).onActionUpdate((e: GestureEvent) => this.resizeElement(e))
             .onActionEnd((e: GestureEvent) => { this.resizeElement(e); this.flushPreview(); }).onActionCancel(() => this.cancelTransform()))
         if (this.layerId !== 'capability') {
-          Button('↻', { type: ButtonType.Circle }).width(44).height(AppDesign.controlHeight).fontSize(18).backgroundColor(this.appSurface()).fontColor(this.appText()).shadow({ radius: 6, color: '#18000000', offsetY: 2 })
+          Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(20).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(18).backgroundColor(this.appSurface()).fontColor(this.appText()).shadow({ radius: 6, color: '#18000000', offsetY: 2 })
             .border({ width: 1, color: '#B8B8B8' }).position({ x: this.editorHandle(false).x - 22, y: this.editorHandle(false).y - 22 })
             .accessibilityText('旋转选中元素')
             .gesture(PanGesture({ distance: 2 }).onActionStart((e: GestureEvent) => this.startTransform(this.layerId, e)).onActionUpdate((e: GestureEvent) => this.rotateElement(e))
@@ -1448,7 +1453,7 @@ struct Index {
   }
   @Builder
   layerEntry(id:string) {
-    Button({type:ButtonType.ROUNDED_RECTANGLE}) {
+    Button({type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
       if(this.editorLandscape() && !this.compactEditorLayers()) {
         Column({space:4}) {this.layerThumbnail(id);Text(this.layerTitle(id)).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})}.width('100%').padding(8)
       } else {
@@ -1459,7 +1464,7 @@ struct Index {
         }.width('100%').padding({left:8,right:12})
       }
     }.width(this.editorLandscape()?(this.compactEditorLayers()?132:96):'100%').height(this.editorLandscape()&&!this.compactEditorLayers()?76:52)
-      .backgroundColor(this.layerId===id?this.appControl():Color.Transparent).borderRadius(12)
+      .backgroundColor(this.layerId===id?this.appControl():Color.Transparent)
       .accessibilityText('选择图层 '+this.layerTitle(id)).onClick(()=>this.chooseLayer(id))
   }
   @Builder
@@ -1488,14 +1493,7 @@ struct Index {
         if (this.elementPreview.kind === 'text') {
           TextArea({ text: this.textValue, placeholder: '文字内容' }).height(96).fontSize(16).fontColor(this.appText()).placeholderColor(this.appMuted()).backgroundColor(this.appControl()).borderRadius(12).border({ width: .5, color: AppDesign.border(this.appDark) })
             .onChange((v: string) => { this.textValue = v; const el = this.currentElement(); if (el !== null) { el.text = v; this.change('typing_' + el.id); } })
-          Row({ space: 12 }) {
-            Text('字号').fontSize(14).fontColor(this.appText()); Blank()
-            Button('−', { type: ButtonType.Circle }).width(AppDesign.controlHeight).height(AppDesign.controlHeight).fontColor(this.appText()).backgroundColor(this.appControl()).border({ width: .5, color: AppDesign.border(this.appDark) }).accessibilityText('减小字号')
-              .onClick(() => { const el = this.currentElement(); if (el !== null) { el.fs = Math.max(10, el.fs - 2); this.change(); } })
-            Text(String(this.elementPreview.fs)).fontColor(this.appText()).fontSize(14).width(32).textAlign(TextAlign.Center)
-            Button('+', { type: ButtonType.Circle }).width(AppDesign.controlHeight).height(AppDesign.controlHeight).fontColor(this.appText()).backgroundColor(this.appControl()).border({ width: .5, color: AppDesign.border(this.appDark) }).accessibilityText('增大字号')
-              .onClick(() => { const el = this.currentElement(); if (el !== null) { el.fs = Math.min(64, el.fs + 2); this.change(); } })
-        }.width('100%')
+          SettingsCounter({value:this.elementPreview.fs,onChange:(value:number)=>{const el=this.currentElement();if(el!==null&&el.fs!==value){el.fs=value;this.change();}}})
           SettingsSegmented({labels:['左对齐','居中','右对齐'],selectedIndex:Math.max(0,['left','center','right'].indexOf(this.elementPreview.align)),appDark:this.appDark,
             onSelect:(index:number)=>{const el=this.currentElement();if(el!==null){el.align=['left','center','right'][index];this.change();}}})
           Row() { Text('加粗').fontSize(14).fontColor(this.appText()); Blank()
@@ -1503,7 +1501,7 @@ struct Index {
               .onChange((v: boolean) => { const el = this.currentElement(); if (el !== null) { el.bold = v; this.change(); } })
           }.width('100%').height(AppDesign.controlHeight)
         } else if (this.elementPreview.kind === 'image') {
-          Button(this.busy ? '正在读取' : '选择图片或 GIF', { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(14).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: 1, color: AppDesign.border(this.appDark) }).enabled(!this.busy).onClick(() => this.pickImage())
+          Button(this.busy ? '正在读取' : '选择图片或 GIF', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(14).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.busy).onClick(() => this.pickImage())
           if (this.elementPreview.animated) { Text('App 内循环播放；桌面组件展示时播放一次。').fontSize(12).fontColor(this.appMuted()).width('100%') }
         } else {
           SettingsSegmented({labels:['矩形','圆形','线条'],selectedIndex:Math.max(0,['rect','circle','line'].indexOf(this.elementPreview.primitive)),appDark:this.appDark,
@@ -1517,43 +1515,43 @@ struct Index {
         Text('位置与显示').fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
         if (this.layerId !== 'capability') {
           if (this.settingsTab === 0) {
-            Button('铺满底板', { type: ButtonType.ROUNDED_RECTANGLE }).width('100%').height(AppDesign.controlHeight).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) })
+            Button('铺满底板', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).width('100%').height(AppDesign.controlHeight).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText())
               .onClick(() => { const el = this.currentElement(); if (el !== null) { el.x = 0; el.y = 0; el.w = 1; el.h = 1; el.rot = 0; this.change(); } })
           }
         }
         Text('在预览中直接调整大小与位置').fontSize(12).fontColor(this.appMuted()).width('100%')
         Flex({ wrap: FlexWrap.Wrap }) {
-          Button('水平居中', { type: ButtonType.Capsule }).height(44).margin({ right: 8, bottom: 8 }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => { const box = this.currentBox(); if (box !== null) { box.x = (1 - box.w) / 2; this.change(); } })
-          Button('垂直居中', { type: ButtonType.Capsule }).height(44).margin({ right: 8, bottom: 8 }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => { const box = this.currentBox(); if (box !== null) { box.y = (1 - box.h) / 2; this.change(); } })
-          if (this.layerId !== 'capability') { Button('重置角度', { type: ButtonType.Capsule }).height(44).margin({ right: 8, bottom: 8 }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => { const box = this.currentBox(); if (box !== null) { box.rot = 0; this.change(); } }) }
+          Button('水平居中', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).margin({ right: 8, bottom: 8 }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => { const box = this.currentBox(); if (box !== null) { box.x = (1 - box.w) / 2; this.change(); } })
+          Button('垂直居中', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).margin({ right: 8, bottom: 8 }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => { const box = this.currentBox(); if (box !== null) { box.y = (1 - box.h) / 2; this.change(); } })
+          if (this.layerId !== 'capability') { Button('重置角度', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).margin({ right: 8, bottom: 8 }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => { const box = this.currentBox(); if (box !== null) { box.rot = 0; this.change(); } }) }
         }
         Column({ space: 8 }) {
           Text('透明度').fontSize(13).fontColor(this.appText())
           SettingsSegmented({labels:['实色','柔和','轻透'],selectedIndex:this.boxPreview.opacity>.85?0:this.boxPreview.opacity>.55?1:2,appDark:this.appDark,
             onSelect:(index:number)=>{const box=this.currentBox();if(box!==null){box.opacity=[1,.7,.4][index];this.change();}}})
         }.width('100%').alignItems(HorizontalAlign.Start)
-        Button(this.showLayerOptions ? '收起图层操作' : '图层操作', { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).width('100%').fontSize(13).fontColor(this.appMuted()).backgroundColor(Color.Transparent)
+        Button(this.showLayerOptions ? '收起图层操作' : '图层操作', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).width('100%').fontSize(13).fontColor(this.appText()).backgroundColor(this.appControl())
           .onClick(() => { this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut, expectedFrameRateRange: this.frameRate }, () => { this.showLayerOptions = !this.showLayerOptions; }); })
         if (this.showLayerOptions) {
         Column({space:12}) {
         if (this.layerId !== 'capability') {
           Row({ space: 8 }) {
-            Button('复制元素', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.duplicateElement())
-            Button('上移一层', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.moveElementOrder(true))
-            Button('下移一层', { type: ButtonType.Capsule }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.moveElementOrder(false))
+            Button('复制元素', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => this.duplicateElement())
+            Button('上移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => this.moveElementOrder(true))
+            Button('下移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => this.moveElementOrder(false))
         }.width('100%')
 
         }
         Flex({ wrap: FlexWrap.Wrap }) {
           if (this.layerId.length > 0 && this.layerId !== 'capability') {
-          Button(this.settingsTab === 0 ? '移到内容层' : '移到最上层', { type: ButtonType.ROUNDED_RECTANGLE }).margin({ right: 8, bottom: 8 }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(13).fontColor(this.appText()).backgroundColor(this.appControl())
+          Button(this.settingsTab === 0 ? '移到内容层' : '移到最上层', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).margin({ right: 8, bottom: 8 }).height(AppDesign.controlHeight).fontSize(13).fontColor(this.appText()).backgroundColor(this.appControl())
             .onClick(() => { const card = this.current(), el = this.currentElement(); if (card !== null && el !== null) { el.behindCapability = false; this.settingsTab = 1; this.editorTabs = [1]; card.elements = card.elements.filter((e: CanvasElement) => e.id !== el.id).concat([el]); this.change(); } })
-          Button(this.settingsTab === 1 ? '移到背景层' : '移到最下层', { type: ButtonType.ROUNDED_RECTANGLE }).margin({ right: 8, bottom: 8 }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(13).fontColor(this.appText()).backgroundColor(this.appControl())
+          Button(this.settingsTab === 1 ? '移到背景层' : '移到最下层', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).margin({ right: 8, bottom: 8 }).height(AppDesign.controlHeight).fontSize(13).fontColor(this.appText()).backgroundColor(this.appControl())
             .onClick(() => { const card = this.current(), el = this.currentElement(); if (card !== null && el !== null) {
               el.behindCapability = true; this.settingsTab = 0; this.editorTabs = [0]; card.elements = [el].concat(card.elements.filter((e: CanvasElement) => e.id !== el.id)); this.change();
             } })
           }
-          Button('移除此元素', { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(13).fontColor('#C43A35').backgroundColor(Color.Transparent).onClick(() => this.removeElement())
+          Button('移除此元素', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.ERROR }).height(AppDesign.controlHeight).fontSize(13).fontColor('#C43A35').backgroundColor(Color.Transparent).onClick(() => this.removeElement())
         }
         }.width('100%').transition(settingsReveal())
         }
@@ -1573,7 +1571,7 @@ struct Index {
         Text(capabilityDescriptor(this.preview.capability?.k??'none').name).fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
         Text(capabilityDescriptor(this.preview.capability?.k??'none').summary).fontSize(12).fontColor(this.appMuted()).width('100%')
       }.layoutWeight(1)
-      Button('选择能力',{type:ButtonType.Capsule}).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(()=>this.chooseCapability())
+      Button('选择能力',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(()=>this.chooseCapability())
     }.width('100%')
   }
   @Builder
@@ -1584,7 +1582,7 @@ struct Index {
       if (this.preview.capability?.k === 'countdown' || this.preview.capability?.k === 'anniversary') {
         TextInput({ text: this.titleValue, placeholder: '名称' }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(16).fontColor(this.appText()).placeholderColor(this.appMuted()).backgroundColor(this.appControl())
           .onChange((v: string) => { this.titleValue = v; const cap = this.current()?.capability; if (cap !== null && cap !== undefined) { cap.title = v; this.change(); } })
-        Button('日期  ' + (this.preview.capability?.date ?? ''), { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontColor(this.appText()).backgroundColor(this.appControl()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.pickDate())
+        Button('日期  ' + (this.preview.capability?.date ?? ''), { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(() => this.pickDate())
       }
       if (this.preview.capability?.k === 'worldclock') {
         TimeCapabilitySettings({cap:this.preview.capability!,appDark:this.appDark,onUpdate:(next:CapBlock)=>this.updateExtraCapability(this.preview.id,next)})
@@ -1593,7 +1591,7 @@ struct Index {
         TextInput({ text: this.cityValue, placeholder: '城市' }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(16).fontColor(this.appText()).placeholderColor(this.appMuted()).backgroundColor(this.appControl())
           .onChange((v: string) => { this.cityValue = v; const cap = this.current()?.capability; if (cap !== null && cap !== undefined) { if (cap.city !== v.trim()) { cap.city = v.trim(); cap.temp = '--°'; cap.desc = '未更新'; cap.updatedAt = 0; cap.attemptedAt = 0; cap.refreshState = ''; this.change(); } } })
           .onSubmit(() => this.refreshWeather())
-        Button(this.weatherBusy ? '更新中' : '更新天气', { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).backgroundColor(Color.Transparent).fontColor(this.appText()).border({ width: .5, color: this.appMuted() }).enabled(!this.weatherBusy).onClick(() => this.refreshWeather())
+        Button(this.weatherBusy ? '更新中' : '更新天气', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.weatherBusy).onClick(() => this.refreshWeather())
         Text(this.preview.capability?.refreshState === 'failed' ? '暂时无法获取天气，稍后自动重试' : '天气自动更新；打开 App 时会补刷过期数据').fontSize(12).fontColor(this.appMuted()).width('100%')
       }
       if(this.preview.capability!==null && ['battery','agenda','parcel','fetch','timetable'].includes(this.preview.capability!.k)) {
@@ -1619,51 +1617,45 @@ struct Index {
   }
   @Builder
   colorRow(label: string, target: string, value: string) {
+    Button({type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
     Row({ space: 12 }) {
       Text(label).fontSize(14).fontColor(this.appText()); Blank()
       Text(value.length === 0 ? '自动' : '自定义').fontSize(12).fontColor(this.appMuted())
       Column().width(28).height(28).borderRadius(8).backgroundColor(value || materialColors(this.preview.material, this.preview.paper, this.preview.ink)[target === 'paper' ? 0 : 1])
-        .border({ width: .5, color: '#BDBDBD' }).hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS)
-    }.width('100%').height(48).padding({ left: 12, right: 12 }).backgroundColor(this.appControl()).borderRadius(12)
+        .border({ width: .5, color: AppDesign.border(this.appDark) })
+    }.width('100%').padding({ left: 12, right: 12 })
+    }.width('100%').height(48).backgroundColor(this.appControl())
       .accessibilityText('选择' + label).onClick(() => this.chooseColor(target))
   }
   @Builder
   appearancePanel() {
     Column({ space: 12 }) {
       Text('底板配色').fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
-      Flex({ wrap: FlexWrap.Wrap }) {
-        ForEach(THEMES, (m: string, index: number) => {
-          Button(['白', '米色', '牛皮纸', '绿', '蓝', '粉', '黑'][index], { type: ButtonType.Capsule }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(13)
-            .backgroundColor(AppDesign.choice(this.appDark, this.preview.material === m)).fontColor(AppDesign.choiceText(this.appDark, this.preview.material === m))
-            .border({ width: .5, color: AppDesign.border(this.appDark) }).margin({ right: 8, bottom: 8 })
-            .onClick(() => { const card = this.current(); if (card !== null) { card.material = m; card.paper = ''; this.paperValue = ''; this.change(); } })
-        }, (m: string) => m)
-      }.width('100%')
+      Select(['白','米色','牛皮纸','绿','蓝','粉','黑'].map((value:string):SelectOption=>({value:value})))
+        .selected(Math.max(0,THEMES.indexOf(this.preview.material))).value(['白','米色','牛皮纸','绿','蓝','粉','黑'][Math.max(0,THEMES.indexOf(this.preview.material))])
+        .font({size:14}).fontColor(this.appText()).optionFontColor(this.appText()).optionBgColor(this.appSurface())
+        .selectedOptionFontColor(AppDesign.onSelected(this.appDark)).selectedOptionBgColor(AppDesign.selected(this.appDark))
+        .backgroundColor(this.appControl()).borderRadius(12).controlSize(ControlSize.NORMAL).width('100%').height(44)
+        .onSelect((index:number)=>{const card=this.current();if(card!==null&&THEMES[index]){card.material=THEMES[index];card.paper='';this.paperValue='';this.change();}})
       this.colorRow('底色', 'paper', this.paperValue)
       Text('形状').fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%').margin({ top: 8 })
-      Flex({ wrap: FlexWrap.Wrap }) {
-        ForEach(SHAPES, (s: string, index: number) => {
-          Button(['方形', '椭圆', '胶囊', '自由边角'][index], { type: ButtonType.Capsule }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(13).margin({ right: 8, bottom: 8 })
-            .backgroundColor(AppDesign.choice(this.appDark, this.preview.shape === s)).fontColor(AppDesign.choiceText(this.appDark, this.preview.shape === s)).border({ width: .5, color: AppDesign.border(this.appDark) })
-            .onClick(() => { const card = this.current(); if (card !== null) { card.shape = s; this.change(); } })
-        }, (s: string) => s)
-      }.width('100%')
-      Button(this.busy ? '正在处理照片' : '用照片主体作为形状', { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).width('100%').fontSize(14)
-        .fontColor(this.appText()).backgroundColor(this.appControl()).border({ width: .5, color: AppDesign.border(this.appDark) }).enabled(!this.busy).onClick(() => this.pickImage(true))
+      Select((this.preview.cutout.length>0?['方形','椭圆','胶囊','自由边角','照片主体']:['方形','椭圆','胶囊','自由边角']).map((value:string):SelectOption=>({value:value})))
+        .selected(this.preview.shape==='subject'?4:Math.max(0,SHAPES.indexOf(this.preview.shape)))
+        .value(this.preview.shape==='subject'?'照片主体':['方形','椭圆','胶囊','自由边角'][Math.max(0,SHAPES.indexOf(this.preview.shape))])
+        .font({size:14}).fontColor(this.appText()).optionFontColor(this.appText()).optionBgColor(this.appSurface())
+        .selectedOptionFontColor(AppDesign.onSelected(this.appDark)).selectedOptionBgColor(AppDesign.selected(this.appDark))
+        .backgroundColor(this.appControl()).borderRadius(12).controlSize(ControlSize.NORMAL).width('100%').height(44)
+        .onSelect((index:number)=>{const card=this.current();if(card!==null){if(index===4&&card.cutout.length>0){card.shape='subject';card.h=card.w/card.subjectAspect;}else if(SHAPES[index])card.shape=SHAPES[index];else return;this.change();}})
+      Button(this.busy ? '正在处理照片' : '用照片主体作为形状', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).width('100%').fontSize(14)
+        .fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.busy).onClick(() => this.pickImage(true))
       if (this.preview.cutout.length > 0 && this.preview.shape !== 'subject') {
-        Button('恢复主体形状', { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontColor(this.appText()).backgroundColor(this.appControl()).border({ width: .5, color: AppDesign.border(this.appDark) })
+        Button('恢复主体形状', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontColor(this.appText()).backgroundColor(this.appControl())
           .onClick(() => { const card = this.current(); if (card !== null) { card.shape = 'subject'; card.h = card.w / card.subjectAspect; this.change(); } })
       }
       if (this.preview.cutout.length > 0) {
         Text('主体外观').fontSize(14).fontColor(this.appText()).width('100%')
-        Row({ space: 8 }) {
-          Button('只用形状', { type: ButtonType.Capsule }).height(AppDesign.controlHeight).fontSize(13).borderRadius(AppDesign.controlRadius).layoutWeight(1)
-            .backgroundColor(AppDesign.choice(this.appDark, !this.preview.subjectPhoto)).fontColor(AppDesign.choiceText(this.appDark, !this.preview.subjectPhoto))
-            .onClick(() => { const card = this.current(); if (card !== null) { card.subjectPhoto = false; this.change(); } })
-          Button('主体照片作底图', { type: ButtonType.Capsule }).height(AppDesign.controlHeight).fontSize(13).borderRadius(AppDesign.controlRadius).layoutWeight(1)
-            .backgroundColor(AppDesign.choice(this.appDark, this.preview.subjectPhoto)).fontColor(AppDesign.choiceText(this.appDark, this.preview.subjectPhoto))
-            .onClick(() => { const card = this.current(); if (card !== null) { card.subjectPhoto = true; this.change(); } })
-        }.width('100%')
+        SettingsSegmented({labels:['只用形状','主体照片作底图'],selectedIndex:this.preview.subjectPhoto?1:0,appDark:this.appDark,
+          onSelect:(index:number)=>{const card=this.current();if(card!==null){card.subjectPhoto=index===1;this.change();}}})
       }
       if (this.preview.shape === 'subject') {
         Text('抠图固定使用白边，保留柔化的主体轮廓。').fontSize(12).fontColor(this.appMuted()).width('100%')

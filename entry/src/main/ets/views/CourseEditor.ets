@@ -1,5 +1,6 @@
 import { CourseItem } from '../model/CardSchema';
 import { AppDesign } from '../model/AppDesign';
+import { SettingsSegmented } from './SettingsSegmented';
 @CustomDialog
 export struct CourseEditor {
   controller: CustomDialogController;
@@ -27,22 +28,22 @@ export struct CourseEditor {
       TextInput({text:this.name,placeholder:'课程名称'}).height(44).borderRadius(14).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onChange((v:string)=>this.name=v)
       TextInput({text:this.room,placeholder:'教室 / 地点'}).height(44).borderRadius(14).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onChange((v:string)=>this.room=v)
       Text('上课日期').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
-      Flex({wrap:FlexWrap.Wrap}) {
-        ForEach(['一','二','三','四','五','六','日'],(v:string,i:number)=>{
-          Button(v,{type:ButtonType.Circle}).width(44).height(44).margin({right:4,bottom:4}).backgroundColor(this.day===i+1?AppDesign.text(this.appDark):AppDesign.control(this.appDark)).fontColor(this.day===i+1?AppDesign.background(this.appDark):AppDesign.text(this.appDark)).onClick(()=>this.day=i+1)
-        },(v:string)=>v)
-      }.width('100%')
+      Select(['周一','周二','周三','周四','周五','周六','周日'].map((value:string):SelectOption=>({value:value})))
+        .selected(this.day-1).value(['周一','周二','周三','周四','周五','周六','周日'][this.day-1]).width('100%').height(44)
+        .font({size:14}).fontColor(AppDesign.text(this.appDark)).optionFontColor(AppDesign.text(this.appDark)).optionBgColor(AppDesign.surface(this.appDark))
+        .selectedOptionFontColor(AppDesign.onSelected(this.appDark)).selectedOptionBgColor(AppDesign.selected(this.appDark))
+        .backgroundColor(AppDesign.control(this.appDark)).borderRadius(12).controlSize(ControlSize.NORMAL).onSelect((index:number)=>this.day=index+1)
       Row({space:12}) {
-        Button('开始 '+this.start,{type:ButtonType.Capsule}).height(44).layoutWeight(1).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.pickTime(true))
-        Button('结束 '+this.end,{type:ButtonType.Capsule}).height(44).layoutWeight(1).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.pickTime(false))
+        Button('开始 '+this.start,{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.pickTime(true))
+        Button('结束 '+this.end,{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.pickTime(false))
       }.width('100%')
       Row({space:8}) {Text('第').fontColor(AppDesign.text(this.appDark));TextInput({text:this.first}).type(InputType.Number).layoutWeight(1).height(44).borderRadius(14).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onChange((v:string)=>this.first=v);Text('至').fontColor(AppDesign.text(this.appDark));TextInput({text:this.last}).type(InputType.Number).layoutWeight(1).height(44).borderRadius(14).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onChange((v:string)=>this.last=v);Text('周').fontColor(AppDesign.text(this.appDark));}.width('100%')
-      Row({space:8}) {ForEach(['每周','单周','双周'],(v:string,i:number)=>{Button(v,{type:ButtonType.Capsule}).height(44).layoutWeight(1).backgroundColor(AppDesign.choice(this.appDark,this.parity===i)).fontColor(AppDesign.choiceText(this.appDark,this.parity===i)).onClick(()=>this.parity=i)},(v:string)=>v)}.width('100%')
+      SettingsSegmented({labels:['每周','单周','双周'],selectedIndex:this.parity,appDark:this.appDark,onSelect:(index:number)=>this.parity=index})
       }.width('100%')
       }.width('100%').layoutWeight(1).scrollBar(BarState.Off)
-      if(this.course.id) {Button('删除这门课程',{type:ButtonType.Capsule}).height(44).width('100%').fontColor('#B34735').backgroundColor(AppDesign.control(this.appDark)).onClick(()=>{this.onDelete();this.controller.close();})}
+      if(this.course.id) {Button('删除这门课程',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.ERROR}).height(44).width('100%').fontColor('#B34735').backgroundColor(AppDesign.control(this.appDark)).onClick(()=>{this.onDelete();this.controller.close();})}
       if(this.error) {Text(this.error).fontSize(12).fontColor('#C43A35')}
-      Row({space:12}) {Button('取消',{type:ButtonType.Capsule}).height(44).layoutWeight(1).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.controller.close());Button('保存',{type:ButtonType.Capsule}).height(44).layoutWeight(1).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).onClick(()=>this.save());}.width('100%')
+      Row({space:12}) {Button('取消',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.controller.close());Button('保存',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.EMPHASIZED, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).onClick(()=>this.save());}.width('100%')
     }.padding(20).width('90%').height('85%').constraintSize({maxWidth:480,maxHeight:560}).borderRadius(24).backgroundColor(AppDesign.surface(this.appDark))
   }
 }

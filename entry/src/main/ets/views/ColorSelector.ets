@@ -23,10 +23,10 @@ export struct ColorSelector {
     Column({ space: 16 }) {
       Row() {
         Text('选择颜色').fontColor(AppDesign.text(this.appDark)).fontSize(18).fontWeight(FontWeight.Medium); Blank()
-        Button('取消', { type: ButtonType.Capsule }).height(44).backgroundColor(Color.Transparent).fontColor(AppDesign.muted(this.appDark)).onClick(() => this.controller?.close())
+        Button('取消', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).backgroundColor(Color.Transparent).fontColor(AppDesign.muted(this.appDark)).onClick(() => this.controller?.close())
       }.width('100%')
       if (deviceInfo.sdkApiVersion >= 26 && canIUse('SystemCapability.UIDesign.HDSPattern.Standard')) {
-        HdsColorPicker({ initialColor: this.initialColor, onColorSelected: (color: string) => {
+        HdsColorPicker({ initialColor: this.initialColor, options: { circleRadius: 22 }, onColorSelected: (color: string) => {
           const value = color.replace('#', ''); if (/^[0-9a-fA-F]{6,8}$/.test(value)) this.chosen = '#' + value.slice(-6);
         } })
       } else {
@@ -38,8 +38,8 @@ export struct ColorSelector {
         }.width('100%')
       }
       Row({ space: 12 }) {
-        Button('恢复默认', { type: ButtonType.Capsule }).height(44).layoutWeight(1).borderRadius(12).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(() => { this.onPick(''); this.controller?.close(); })
-        Button('完成', { type: ButtonType.Capsule }).height(44).layoutWeight(1).borderRadius(12).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).onClick(() => { this.onPick(this.chosen); this.controller?.close(); })
+        Button('恢复默认', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).layoutWeight(1).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(() => { this.onPick(''); this.controller?.close(); })
+        Button('完成', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.EMPHASIZED, role:ButtonRole.NORMAL }).height(44).layoutWeight(1).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).onClick(() => { this.onPick(this.chosen); this.controller?.close(); })
       }.width('100%')
     }.padding(20).width('92%').constraintSize({ maxWidth: 520 }).borderRadius(24).backgroundColor(AppDesign.surface(this.appDark))
   }

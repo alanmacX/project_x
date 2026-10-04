@@ -1,6 +1,7 @@
 import { InstantShapeGenerator, ShapeInfo } from '@kit.Penkit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { AppDesign } from '../model/AppDesign';
+import { SettingsSegmented } from '../views/SettingsSegmented';
 import { beautifyContour, SketchCurve, SketchPoint, roughSketchSample, sketchDistance } from '../model/SketchContour';
 
 class SketchDraft {
@@ -163,9 +164,9 @@ struct SketchLab {
   }
   @Builder
   command(title:string,action:()=>void) {
-    Button(title,{type:ButtonType.Capsule}).height(44).fontSize(14).fontColor(AppDesign.text(this.dark))
+    Button(title,{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL,role:title==='清空'?ButtonRole.ERROR:ButtonRole.NORMAL}).height(44).fontSize(14).fontColor(AppDesign.text(this.dark))
       .backgroundColor(AppDesign.surface(this.dark)).enabled(title==='撤销'?this.canUndo:title==='重做'?this.canRedo:title==='清空'?this.hasDraft:true)
-      .opacity((title==='撤销'&&!this.canUndo)||(title==='重做'&&!this.canRedo)||(title==='清空'&&!this.hasDraft)?.4:1).onClick(action)
+      .onClick(action)
   }
   @Builder
   drawing() {
@@ -200,8 +201,7 @@ struct SketchLab {
         Blank();this.command('撤销',()=>this.undo());this.command('重做',()=>this.redo());this.command('清空',()=>this.clear())
       }.width('100%')
       Row({space:8}) {
-        Button('自由轮廓',{type:ButtonType.Capsule}).height(44).fontSize(14).backgroundColor(AppDesign.choice(this.dark,this.mode===0)).fontColor(AppDesign.choiceText(this.dark,this.mode===0)).onClick(()=>this.switchMode(0))
-        Button('一笔成形',{type:ButtonType.Capsule}).height(44).fontSize(14).backgroundColor(AppDesign.choice(this.dark,this.mode===1)).fontColor(AppDesign.choiceText(this.dark,this.mode===1)).onClick(()=>this.switchMode(1))
+        SettingsSegmented({labels:['自由轮廓','一笔成形'],selectedIndex:this.mode,appDark:this.dark,onSelect:(index:number)=>this.switchMode(index)}).layoutWeight(1)
         Blank();Text('仅手写笔').fontSize(13).fontColor(AppDesign.text(this.dark))
         Toggle({type:ToggleType.Switch,isOn:this.penOnly}).onChange((v)=>{this.cancelStroke();this.penOnly=v;})
       }.width('100%')

@@ -41,9 +41,9 @@ export struct PhotoCrop {
           PinchGesture({ fingers: 2 }).onActionStart(() => { this.startZoom = this.zoom; }).onActionUpdate((e: GestureEvent) => { this.zoom = Math.max(1, Math.min(5, this.startZoom * e.scale)); this.clamp(); })
         ))
       Row({ space: 8 }) {
-        Button('重置', { type: ButtonType.Capsule }).height(44).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.background(this.appDark)).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => { this.zoom = 1; this.x = 0; this.y = 0; })
-        Button('取消', { type: ButtonType.Capsule }).height(44).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.background(this.appDark)).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.controller?.close())
-        Button('使用照片', { type: ButtonType.Capsule }).height(44).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).enabled(this.ready).onClick(() => { this.onApply(this.zoom, this.x, this.y); this.controller?.close(); })
+        Button('重置', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.background(this.appDark)).onClick(() => { this.zoom = 1; this.x = 0; this.y = 0; })
+        Button('取消', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.background(this.appDark)).onClick(() => this.controller?.close())
+        Button('使用照片', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.EMPHASIZED, role:ButtonRole.NORMAL }).height(44).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).enabled(this.ready).onClick(() => { this.onApply(this.zoom, this.x, this.y); this.controller?.close(); })
       }
     }.padding(20).width('94%').constraintSize({ maxWidth: 440 }).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(28)
   }

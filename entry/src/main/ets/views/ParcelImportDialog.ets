@@ -32,7 +32,7 @@ export struct ParcelImportDialog {
     Column({space:16}) {
       Row() {
         Text('导入取件通知').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).layoutWeight(1)
-        Button('取消',{type:ButtonType.Capsule}).height(44).fontSize(14).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.controller.close())
+        Button('取消',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).fontSize(14).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.controller.close())
       }.width('100%')
       Scroll() {
         Column({space:12}) {
@@ -55,7 +55,7 @@ export struct ParcelImportDialog {
           if(this.message) {Text(this.message).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
         }.width('100%')
       }.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Off)
-      Button('加入待取 · '+this.chosen.length,{type:ButtonType.Capsule}).width('100%').height(48).fontSize(15).fontColor(AppDesign.onSelected(this.appDark)).backgroundColor(AppDesign.selected(this.appDark)).enabled(this.chosen.length>0).onClick(()=>this.confirm())
+      Button('加入待取 · '+this.chosen.length,{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.EMPHASIZED, role:ButtonRole.NORMAL}).width('100%').height(48).fontSize(15).fontColor(AppDesign.onSelected(this.appDark)).backgroundColor(AppDesign.selected(this.appDark)).enabled(this.chosen.length>0).onClick(()=>this.confirm())
     }.padding(20).width('92%').constraintSize({maxWidth:520}).height('80%').backgroundColor(AppDesign.surface(this.appDark)).borderRadius(24)
   }
 }

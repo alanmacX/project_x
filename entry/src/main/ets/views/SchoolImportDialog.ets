@@ -95,7 +95,7 @@ export struct SchoolImportDialog {
   }
   @Builder
   action(label:string,run:()=>void,enabled:boolean=true) {
-    Button(label,{type:ButtonType.Capsule}).height(44).fontSize(14).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).enabled(enabled).onClick(run)
+    Button(label,{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).fontSize(14).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).enabled(enabled).onClick(run)
   }
   build() {
     Column({space:12}) {
@@ -113,14 +113,14 @@ export struct SchoolImportDialog {
           }else{
             List({space:8}) {
               ForEach(this.visible,(s:ImportSchool)=>{ListItem(){
-                Button({type:ButtonType.Normal}){Row(){Text(s.name).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontSize(15).fontColor(AppDesign.text(this.appDark)).layoutWeight(1).textAlign(TextAlign.Start);Text(s.id).fontSize(12).fontColor(AppDesign.muted(this.appDark))}.padding(14).width('100%')}.width('100%').borderRadius(16).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.choose(s))
+                Button({type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}){Row(){Text(s.name).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontSize(15).fontColor(AppDesign.text(this.appDark)).layoutWeight(1).textAlign(TextAlign.Start);Text(s.id).fontSize(12).fontColor(AppDesign.muted(this.appDark))}.padding(14).width('100%')}.width('100%').backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.choose(s))
               }},(s:ImportSchool)=>s.id)
             }.width('100%').layoutWeight(1).scrollBar(BarState.Off)
             if(this.visible.length===this.limit){this.action('显示更多学校',()=>this.more())}
             if(!this.visible.length){Text('目录中没有匹配项，可选择通用教务并输入学校网址。').fontColor(AppDesign.muted(this.appDark)).fontSize(13)}
             Flex({wrap:FlexWrap.Wrap}) {
               ForEach(['qiangzhi_general','zhengfang_jiaowu','urp_jiaowu','qingguo_jiaowu','chaoxing_jiaowu'],(id:string,i:number)=>{
-                Button(['强智','正方','URP','青果','超星'][i],{type:ButtonType.Capsule}).height(44).fontSize(14).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).margin({right:8,bottom:8}).onClick(()=>this.choose(this.schools.find((s)=>s.id===id)))
+                Button(['强智','正方','URP','青果','超星'][i],{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).fontSize(14).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).margin({right:8,bottom:8}).onClick(()=>this.choose(this.schools.find((s)=>s.id===id)))
               },(id:string)=>id)
             }.width('100%')
           }
@@ -156,7 +156,7 @@ export struct SchoolImportDialog {
             }.padding(20).width('90%').constraintSize({maxWidth:480}).borderRadius(20).backgroundColor(AppDesign.surface(this.appDark))
           }
         }.width('100%').layoutWeight(1).borderRadius(16).clip(true)
-        Row({space:10}){if(this.busy){this.action('取消读取',()=>this.stop());}Button(this.busy?'正在读取':'读取当前课表',{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontSize(15).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).enabled(!this.busy&&this.ready).onClick(()=>this.run())}.width('100%')
+        Row({space:10}){if(this.busy){this.action('取消读取',()=>this.stop());}Button(this.busy?'正在读取':'读取当前课表',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.EMPHASIZED, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).fontSize(15).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).enabled(!this.busy&&this.ready).onClick(()=>this.run())}.width('100%')
       }
       if(this.error){Text(this.error).fontSize(12).fontColor('#B34735').width('100%').maxLines(3)}
       Text('登录仅在学校网页内进行；读取后的课程在本机预览，确认才保存。').fontSize(11).fontColor(AppDesign.muted(this.appDark)).width('100%')

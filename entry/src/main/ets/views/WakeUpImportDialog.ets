@@ -65,7 +65,7 @@ export struct WakeUpImportDialog {
   }
   @Builder
   action(label:string,run:()=>void,emphasis:boolean=false) {
-    Button(label,{type:ButtonType.Capsule}).height(44).fontSize(14).fontColor(AppDesign.choiceText(this.appDark,emphasis)).backgroundColor(AppDesign.choice(this.appDark,emphasis)).enabled(!this.busy).onClick(run)
+    Button(label,{type:ButtonType.Capsule,buttonStyle:emphasis?ButtonStyleMode.EMPHASIZED:ButtonStyleMode.NORMAL}).height(44).fontSize(14).fontColor(AppDesign.choiceText(this.appDark,emphasis)).backgroundColor(AppDesign.choice(this.appDark,emphasis)).enabled(!this.busy).onClick(run)
   }
   build() {
     Scroll() {
@@ -105,7 +105,7 @@ export struct WakeUpImportDialog {
         }
       }
       if(this.error){Text(this.error).fontSize(12).fontColor('#B34735').width('100%').maxLines(3).textOverflow({overflow:TextOverflow.Ellipsis})}
-      Row({space:10}) {this.action('取消',():void=>{this.controller.close();});if(this.stage){this.action('重新选择',()=>{this.stage=false;this.error='';});Button('确认导入',{type:ButtonType.Capsule}).height(44).fontSize(14).layoutWeight(1).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).onClick(()=>this.confirm());}}
+      Row({space:10}) {this.action('取消',():void=>{this.controller.close();});if(this.stage){this.action('重新选择',()=>{this.stage=false;this.error='';});Button('确认导入',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.EMPHASIZED, role:ButtonRole.NORMAL}).height(44).fontSize(14).layoutWeight(1).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).onClick(()=>this.confirm());}}
     }.padding(20).width('100%')
     }.width('92%').constraintSize({maxWidth:560,maxHeight:'90%'}).scrollBar(BarState.Off).borderRadius(24).backgroundColor(AppDesign.surface(this.appDark))
   }
