@@ -1,3 +1,5 @@
+import { SettingsSegmented } from './SettingsSegmented';
+import { SettingsAction } from './SettingsAction';
 import { WeekTimetable } from './WeekTimetable';
 import { CapBlock } from '../model/CardSchema';
 import { SchoolImportDialog } from './SchoolImportDialog';
@@ -55,6 +57,7 @@ export struct WakeUpImportDialog {
       this.slots=this.slots.map((s:WakeSlot):WakeSlot=>({node:s.node,start:s.node===node&&start?value:s.start,end:s.node===node&&!start?value:s.end}));this.refreshPreview();
     }});
   }
+  private slotTime(node:number,start:boolean):string {const slot=this.slots.find((value)=>value.node===node);return (start?slot?.start:slot?.end)||(start?'开始':'结束');}
   private refreshPreview():void {
     try {const courses=resolveWakeUp(this.parsed,this.semester,this.slots);courses.forEach((c:CourseItem,i:number)=>c.id='preview_'+i);
       this.previewCap={k:'timetable',semester:mondayDate(this.semester),courses:courses,skipHolidays:false};this.previewReady=true;
@@ -63,34 +66,30 @@ export struct WakeUpImportDialog {
   private confirm():void {
     try {const courses=resolveWakeUp(this.parsed,this.semester,this.slots);this.onImport(mondayDate(this.semester),courses,this.replace,this.keepCalendar);this.controller.close();}catch(e){this.error=(e as Error).message;}
   }
-  @Builder
-  action(label:string,run:()=>void,emphasis:boolean=false) {
-    Button(label,{type:ButtonType.Capsule,buttonStyle:emphasis?ButtonStyleMode.EMPHASIZED:ButtonStyleMode.NORMAL}).height(44).fontSize(14).fontColor(AppDesign.choiceText(this.appDark,emphasis)).backgroundColor(AppDesign.choice(this.appDark,emphasis)).enabled(!this.busy).onClick(run)
-  }
   build() {
     Scroll() {
     Column({space:14}) {
       Text(this.stage?'确认课程表':'导入课程表').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
       if(!this.stage) {
-        this.action('从学校教务导入',()=>this.school(),true)
+        SettingsAction({label:'从学校教务导入',onPress:()=>this.school(),appDark:this.appDark,isEnabled:!this.busy,emphasis:true})
         Text('在 App 内选学校、登录教务并读取个人课表；也可导入已有的课表备份。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
-        this.action(this.other?'收起其他方式':'导入已有课表备份',()=>this.other=!this.other)
+        SettingsAction({label:this.other?'收起其他方式':'导入已有课表备份',onPress:()=>this.other=!this.other,appDark:this.appDark,isEnabled:!this.busy})
         if(this.other) {
-        this.action('选择 WakeUp 文件',()=>this.file())
+        SettingsAction({label:'选择 WakeUp 文件',onPress:()=>this.file(),appDark:this.appDark,isEnabled:!this.busy})
         TextArea({text:this.text,placeholder:'长按粘贴导出文本'}).height(160).maxLength(262144).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(16).onChange((v:string)=>this.text=v)
-        this.action(this.busy?'读取中':'预览粘贴的课表',()=>this.parseText())
+        SettingsAction({label:this.busy?'读取中':'预览粘贴的课表',onPress:()=>this.parseText(),appDark:this.appDark,isEnabled:!this.busy})
         Text('支持 WakeUp 备份作为可选迁移方式，无需安装其他课程表 App。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
         }
       } else {
         Text(this.parsed.name+' · '+this.parsed.courses.length+' 条上课安排').fontSize(13).fontColor(AppDesign.muted(this.appDark)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
-        this.action('第一周周一  '+(this.semester||'选择开学日期'),()=>this.date())
-        Row({space:10}) {this.action('课程',()=>this.periods=false,!this.periods);this.action('作息'+(this.slots.some((s)=>!s.start||!s.end)?' · 待补全':''),()=>this.periods=true,this.periods)}.width('100%')
+        SettingsAction({label:'第一周周一  '+(this.semester||'选择开学日期'),onPress:()=>this.date(),appDark:this.appDark,isEnabled:!this.busy})
+        SettingsSegmented({labels:['课程',this.slots.some((s)=>!s.start||!s.end)?'作息 · 待补全':'作息'],selectedIndex:this.periods?1:0,appDark:this.appDark,onSelect:(index:number)=>this.periods=index===1})
         Scroll() {
           Column({space:10}) {
             if(this.periods) {
               if(!this.slots.length){Text('所有课程已包含实际时间，无需配置节次。').fontSize(13).fontColor(AppDesign.muted(this.appDark))}
               ForEach(this.slots,(s:WakeSlot)=>{
-                Row({space:8}) {Text('第 '+s.node+' 节').fontSize(14).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);this.action(s.start||'开始',()=>this.time(s.node,true));this.action(s.end||'结束',()=>this.time(s.node,false))}.width('100%').padding(10).borderRadius(14).backgroundColor(AppDesign.control(this.appDark))
+                Row({space:8}) {Text('第 '+s.node+' 节').fontSize(14).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);SettingsAction({label:this.slotTime(s.node,true),onPress:()=>this.time(s.node,true),appDark:this.appDark,isEnabled:!this.busy});SettingsAction({label:this.slotTime(s.node,false),onPress:()=>this.time(s.node,false),appDark:this.appDark,isEnabled:!this.busy})}.width('100%').padding(10).borderRadius(14).backgroundColor(AppDesign.control(this.appDark))
               },(s:WakeSlot)=>String(s.node))
             } else {
               if(this.previewReady) {WeekTimetable({cap:this.previewCap,appDark:this.appDark,initialWeek:1,heightLimit:230,editable:false})}
@@ -105,7 +104,7 @@ export struct WakeUpImportDialog {
         }
       }
       if(this.error){Text(this.error).fontSize(12).fontColor('#B34735').width('100%').maxLines(3).textOverflow({overflow:TextOverflow.Ellipsis})}
-      Row({space:10}) {this.action('取消',():void=>{this.controller.close();});if(this.stage){this.action('重新选择',()=>{this.stage=false;this.error='';});Button('确认导入',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.EMPHASIZED, role:ButtonRole.NORMAL}).height(44).fontSize(14).layoutWeight(1).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).onClick(()=>this.confirm());}}
+      Row({space:10}) {SettingsAction({label:'取消',onPress:():void=>{this.controller.close();},appDark:this.appDark,isEnabled:!this.busy});if(this.stage){SettingsAction({label:'重新选择',onPress:()=>{this.stage=false;this.error='';},appDark:this.appDark,isEnabled:!this.busy});Button('确认导入',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.EMPHASIZED, role:ButtonRole.NORMAL}).height(44).fontSize(14).layoutWeight(1).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).onClick(()=>this.confirm());}}
     }.padding(20).width('100%')
     }.width('92%').constraintSize({maxWidth:560,maxHeight:'90%'}).scrollBar(BarState.Off).borderRadius(24).backgroundColor(AppDesign.surface(this.appDark))
   }

@@ -1,3 +1,4 @@
+import { SettingsAction } from './SettingsAction';
 import { applyTimetableImport } from '../model/TimetableImport';
 import { ParcelImportDialog } from './ParcelImportDialog';
 import { mergePickupParcels } from '../model/ParcelIntake';
@@ -135,21 +136,17 @@ export struct CapabilitySettings {
       if(this.alive&&this.cardId===id)this.editCourse(c);
     }}),customStyle:true,openAnimation:settingsDialogOpen(),closeAnimation:settingsDialogClose(),autoCancel:true});this.dialog.open();
   }
-  @Builder
-  action(label:string,action:()=>void) {
-    Button(label,{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL,role:label==='清理已取记录'?ButtonRole.ERROR:ButtonRole.NORMAL}).height(44).width('100%').fontSize(14).fontColor(label==='清理已取记录'?'#C43A35':this.text()).backgroundColor(this.control()).enabled(!this.busy).onClick(action)
-  }
   build() {
     Column({space:12}) {
       if(this.cap.k==='battery') {
         Text('本机电量与充电状态，前台响应系统变化；桌面由系统周期刷新。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
-        this.action(this.busy?'更新中':'更新电量',()=>this.refresh())
+        SettingsAction({label:this.busy?'更新中':'更新电量',onPress:()=>this.refresh(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
       }
       if(this.cap.k==='fetch') {
         TextInput({text:this.cap.title??'',placeholder:'名称，例如空气质量 / 剩余配额'}).height(44).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>{const next=this.copy();next.title=v;this.change(next);})
         TextInput({text:this.cap.url??'',placeholder:'https://… JSON 或纯文本接口'}).height(44).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>{const next=this.copy();next.url=v.trim();next.value='';next.attemptedAt=0;next.field='';next.sourceConfigured=false;this.change(next);})
-        this.action(this.busy?'读取中':this.cap.value?'重新选择内容':'读取并选择内容',()=>this.chooseURLField())
-        if(this.cap.value) {Text('内容：'+(this.cap.field||'正文')).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%'); this.action('立即刷新',()=>this.refresh())}
+        SettingsAction({label:this.busy?'读取中':this.cap.value?'重新选择内容':'读取并选择内容',onPress:()=>this.chooseURLField(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
+        if(this.cap.value) {Text('内容：'+(this.cap.field||'正文')).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%'); SettingsAction({label:'立即刷新',onPress:()=>this.refresh(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})}
         TextInput({text:this.cap.unit??'',placeholder:'单位（可留空）'}).height(44).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>{const next=this.copy();next.unit=v;this.change(next);})
         Text('刷新间隔').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
         SettingsSegmented({labels:['30 分钟','60 分钟','180 分钟'],selectedIndex:Math.max(0,[30,60,180].indexOf(this.cap.interval??60)),appDark:this.appDark,
@@ -168,20 +165,20 @@ export struct CapabilitySettings {
           Column({space:12}) {
           TextInput({text:this.code,placeholder:'取件码'}).height(44).maxLength(24).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>this.code=v)
           TextInput({text:this.place,placeholder:'取件地点（留空使用常用驿站）'}).height(44).maxLength(80).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>this.place=v)
-          this.action('加入待取',()=>this.addParcel())
+          SettingsAction({label:'加入待取',onPress:()=>this.addParcel(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
           }.width('100%').transition(settingsReveal())
         }
         ForEach(pendingParcels(this.cap),(p:ParcelItem)=>{
           Row({space:12}) {Column({space:4}) {Text(p.code).fontSize(18).fontWeight(FontWeight.Medium).fontColor(this.text());Text(p.place||'未填写地点').fontSize(12).fontColor(AppDesign.muted(this.appDark)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})}.layoutWeight(1).alignItems(HorizontalAlign.Start);Button('已取',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).fontSize(13).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>{const next=this.copy();for(const item of next.parcels??[])if(item.id===p.id)item.picked=true;this.change(next);})}.width('100%')
         },(p:ParcelItem)=>p.id)
         if((this.cap.parcels??[]).some((p)=>p.picked)) {
-          this.action('清理已取记录',()=>{const next=this.copy();next.parcels=(next.parcels??[]).filter((p)=>!p.picked);this.change(next);})
+          SettingsAction({label:'清理已取记录',onPress:()=>{const next=this.copy();next.parcels=(next.parcels??[]).filter((p)=>!p.picked);this.change(next);},appDark:this.appDark,isEnabled:!this.busy,fillWidth:true,error:true})
         }
         Text('识别后校对再加入；原通知与截图不保存。常用驿站无需重复输入。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       }
       if(this.cap.k==='agenda') {
-        if(this.wholeCalendarAccess) {this.action('读取系统日历',()=>this.readSystemAgenda())}
-        this.action('导入日历文件 .ics',()=>this.importSchedule())
+        if(this.wholeCalendarAccess) {SettingsAction({label:'读取系统日历',onPress:()=>this.readSystemAgenda(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})}
+        SettingsAction({label:'导入日历文件 .ics',onPress:()=>this.importSchedule(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
         Text(this.cap.agendaSource==='system'?'系统日历' :this.cap.agendaSource==='imported'?'本地日历副本；原文件修改后需要重新导入':'显示接下来三项安排，缩小时保留下一项').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       }
       if(this.cap.k==='timetable') {
@@ -194,12 +191,12 @@ export struct CapabilitySettings {
           Text('学期课表').fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.text()).layoutWeight(1)
           Button('添加课程',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).fontSize(13).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.editCourse())
         }.width('100%')
-        this.action('查看周课表 · '+(this.cap.courses??[]).length+' 条安排',()=>this.showTimetable())
+        SettingsAction({label:'查看周课表 · '+(this.cap.courses??[]).length+' 条安排',onPress:()=>this.showTimetable(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
         Row({space:8}) {
           Button('导入课表',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).fontSize(14).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.importTimetable())
           Button('假期与调课',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).fontSize(14).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.calendarRules())
         }.width('100%')
-        this.action('第一周周一  '+(this.cap.semester??'选择开学日期'),()=>this.semesterDate())
+        SettingsAction({label:'第一周周一  '+(this.cap.semester??'选择开学日期'),onPress:()=>this.semesterDate(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
       }
       if(this.message || this.cap.refreshState==='failed') {Text(this.message||this.cap.desc||'更新失败，保留上次结果').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
     }.width('100%')

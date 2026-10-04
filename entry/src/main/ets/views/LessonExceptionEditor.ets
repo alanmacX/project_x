@@ -1,6 +1,7 @@
 import { CourseItem, CourseChange } from '../model/CardSchema';
 import { dateKey, validDay } from '../model/HolidayCalendar';
 import { semesterWeek } from '../model/CapabilityData';
+import { SettingsSelect } from './SettingsSelect';
 import { AppDesign } from '../model/AppDesign';
 @CustomDialog
 export struct LessonExceptionEditor {
@@ -35,17 +36,16 @@ export struct LessonExceptionEditor {
     if(!this.cancel&&this.end<=this.start){this.error='结束时间须晚于开始时间';return;}
     this.onSave({id:'change_'+Date.now(),courseId:course.id,date:this.date,targetDate:this.cancel?'':this.target,start:this.start,end:this.end,room:this.room});this.controller.close();
   }
-  @Builder
-  action(label:string,run:()=>void) {Button(label,{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).width('100%').fontSize(14).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(run)}
   build() {
     Column({space:16}) {
       Text('单次停课／调课').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
       Scroll() {Column({space:12}) {
-        Select(this.courses.map((c:CourseItem):SelectOption=>({value:c.name+' · 周'+['一','二','三','四','五','六','日'][c.day-1]+' '+c.start}))).selected(this.index).value(this.courses[this.index]?.name??'选择课程').width('100%').height(44).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(12).onSelect((index:number)=>this.choose(index))
-        this.action('原上课日期  '+this.date,()=>this.day(false))
+        SettingsSelect({labels:this.courses.map((c:CourseItem)=>c.name+' · 周'+['一','二','三','四','五','六','日'][c.day-1]+' '+c.start),selectedIndex:this.index,
+          valueLabel:this.courses[this.index]?.name??'',placeholder:'选择课程',appDark:this.appDark,onSelect:(index:number)=>this.choose(index)})
+        Button('原上课日期  '+this.date,{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).width('100%').height(44).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.day(false))
         Row() {Text('取消这一次课程').fontSize(14).fontColor(AppDesign.text(this.appDark));Blank();Toggle({type:ToggleType.Switch,isOn:this.cancel}).onChange((value:boolean)=>this.cancel=value)}.width('100%').height(44)
         if(!this.cancel) {
-          this.action('改到  '+this.target,()=>this.day(true))
+          Button('改到  '+this.target,{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).width('100%').height(44).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.day(true))
           Row({space:8}) {Button('开始 '+this.start,{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).layoutWeight(1).height(44).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.time(true));Button('结束 '+this.end,{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).layoutWeight(1).height(44).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.time(false))}.width('100%')
           TextInput({text:this.room,placeholder:'教室 / 地点'}).height(44).borderRadius(12).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).onChange((value:string)=>this.room=value)
         }

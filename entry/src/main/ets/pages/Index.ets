@@ -1,4 +1,5 @@
 import { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
+import { SettingsSelect } from '../views/SettingsSelect';
 import { SettingsSegmented } from '../views/SettingsSegmented';
 import { SettingsCounter } from '../views/SettingsCounter';
 import { settingsReveal, settingsDialogOpen, settingsDialogClose } from '../model/SettingsMotion';
@@ -66,6 +67,9 @@ struct Index {
   private widgetRouteTimer:number=-1;
   private photoCropDialog: CustomDialogController | null = null;
   @State canvasPickerOpen: boolean = false;
+  @State canvasCreating: boolean = false;
+  @State canvasDuplicate: boolean = false;
+  @State canvasDraftName: string = '';
   @State canvasChanging: boolean = false;
   @State canvasEntries: CanvasEntry[] = [];
   @State canvasName: string = '我的画布';
@@ -233,12 +237,12 @@ struct Index {
       this.refreshCapabilities(); this.refreshDueWeather();
     } catch (e) { this.templateError('画布切换未完成',e as Error); }
   }
-  private async newCanvas(duplicate: boolean): Promise<void> {
+  private async newCanvas(duplicate: boolean, name: string = ''): Promise<void> {
     if(this.canvasChanging)return;this.canvasChanging=true;
     try {
       await this.store.save(false);this.backgroundGeneration++;
       const source = duplicate ? this.store.state : undefined;
-      const id = this.store.createCanvas(duplicate ? this.canvasName+' 副本' : '画布 '+(this.canvasEntries.length+1),source);
+      const id = this.store.createCanvas(name.trim() || (duplicate ? this.canvasName+' 副本' : '画布 '+(this.canvasEntries.length+1)),source);
       await this.loadCanvas(id);
     } catch(e) {this.templateError('画布未创建',e as Error);}finally{this.canvasChanging=false;}
   }
@@ -250,30 +254,72 @@ struct Index {
       this.store.deleteCanvas(id).then(()=>this.loadCanvas(this.store.catalog.activeId)).catch((e:Error)=>this.templateError('未能删除',e)).finally(()=>{this.canvasChanging=false;});
     }}});
   }
+  private canvasTitle(id: string): string { return this.canvasEntries.find((entry: CanvasEntry)=>entry.id===id)?.name ?? ''; }
+  private canvasPopupWidth(): number { return Math.min(344, Math.max(240, this.screenWidth - 48)); }
+  private prepareCanvas(duplicate: boolean): void {
+    this.canvasDuplicate = duplicate; this.canvasDraftName = duplicate ? this.canvasName + ' 副本' : '画布 ' + (this.canvasEntries.length + 1); this.canvasCreating = true;
+  }
+  private renameCanvas(): void {
+    if (this.canvasChanging || !this.renameValue.trim()) return;
+    this.store.renameCanvas(this.renameValue.trim()); this.refreshCanvasList(); this.persist(false);
+  }
   @Builder
   canvasPicker() {
-    Column({space:16}) {
-      Text('我的画布').fontSize(20).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
-      Scroll() {
-        Column({space:8}) {
-          ForEach(this.canvasEntries,(c:CanvasEntry)=>{
-            Button({type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
-              Row({space:12}) { Text(c.name).fontColor(this.appText()).fontSize(16).layoutWeight(1).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}); Text(c.id===this.store.state.canvasId?'当前':'切换').fontSize(12).fontColor(this.appMuted()) }.width('100%')
-            }.width('100%').height(56).padding(16).backgroundColor(this.appSurface()).onClick(()=>this.chooseCanvas(c.id))
-          },(c:CanvasEntry)=>c.id)
+    Scroll() {
+    Column({space:12}) {
+      Row({space:8}) {
+        if (this.canvasCreating) {
+          Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
+            SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
+          }.width(44).height(44).accessibilityText('返回画布列表').onClick(()=>this.canvasCreating=false)
+        }
+        Text(this.canvasCreating?'新建画布':'我的画布').fontSize(18).fontWeight(FontWeight.Medium).fontColor(this.appText()).layoutWeight(1)
+        Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
+          SymbolGlyph($r('sys.symbol.xmark')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
+        }.width(44).height(44).accessibilityText('关闭画布菜单').onClick(()=>this.canvasPickerOpen=false)
+      }.width('100%')
+      if (this.canvasCreating) {
+        TextInput({text:this.canvasDraftName,placeholder:'画布名称'}).height(44).fontColor(this.appText()).placeholderColor(this.appMuted())
+          .backgroundColor(this.appControl()).borderRadius(12).maxLength(30).onChange((value:string)=>this.canvasDraftName=value)
+        Text(this.canvasDuplicate?'保留当前布局，创建一份独立副本':'从空白开始，添加你的卡片').fontSize(12).fontColor(this.appMuted()).width('100%')
+        Button(this.canvasChanging?'创建中':'创建画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.EMPHASIZED})
+          .height(44).width('100%').enabled(!this.canvasChanging && this.canvasDraftName.trim().length>0)
+          .onClick(()=>this.newCanvas(this.canvasDuplicate,this.canvasDraftName))
+      } else {
+        List({space:4}) {
+          ForEach(this.canvasEntries.map((entry:CanvasEntry)=>entry.id),(id:string)=>{
+            ListItem() {
+              Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {
+                Row({space:8}) {
+                  Text(this.canvasTitle(id)).fontColor(this.appText()).fontSize(14).layoutWeight(1).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
+                  if(id===this.store.state.canvasId) {SymbolGlyph($r('sys.symbol.checkmark')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}
+                }.width('100%')
+              }.width('100%').height(48).padding({left:12,right:12}).backgroundColor(id===this.store.state.canvasId?this.appControl():Color.Transparent)
+                .accessibilityText('切换到 '+this.canvasTitle(id)).onClick(()=>this.chooseCanvas(id))
+            }
+          },(id:string)=>id)
+        }.width('100%').height(Math.min(200,Math.max(48,this.canvasEntries.length*52))).scrollBar(BarState.Off)
+        Row({space:8}) {
+          Button('新画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).onClick(()=>this.prepareCanvas(false))
+          Button('复制画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).onClick(()=>this.prepareCanvas(true))
         }.width('100%')
-      }.width('100%').layoutWeight(1).scrollBar(BarState.Off).align(Alignment.Top)
-      Row({space:12}) {
-        TextInput({text:this.renameValue,placeholder:'画布名称'}).height(44).layoutWeight(1).fontColor(this.appText()).backgroundColor(this.appControl()).borderRadius(14).onChange((v:string)=>this.renameValue=v)
-        Button('重命名',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>{this.store.renameCanvas(this.renameValue);this.refreshCanvasList();this.persist(false);})
-      }.width('100%')
-      Row({space:12}) {
-        Button('新画布',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>this.newCanvas(false))
-        Button('复制画布',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>this.newCanvas(true))
-        Button('删除',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.ERROR}).height(44).fontColor('#C43A35').backgroundColor(this.appControl()).enabled(this.canvasEntries.length>1).onClick(()=>this.deleteCanvas())
-      }.width('100%')
-      Text('桌面组件各自绑定添加时的画布，切换不会替换它们。').fontSize(12).fontColor(this.appMuted()).width('100%')
-    }.width('100%').height('100%').padding(20).backgroundColor(this.appSurface()).enabled(!this.canvasChanging)
+        Row({space:8}) {
+          TextInput({text:this.renameValue,placeholder:'画布名称'}).height(44).layoutWeight(1).fontColor(this.appText()).placeholderColor(this.appMuted())
+            .backgroundColor(this.appControl()).borderRadius(12).maxLength(30).onChange((v:string)=>this.renameValue=v)
+          Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
+            SymbolGlyph($r('sys.symbol.checkmark')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
+          }.width(44).height(44).enabled(this.renameValue.trim().length>0 && this.renameValue.trim()!==this.canvasName)
+            .accessibilityText('保存画布名称').onClick(()=>this.renameCanvas())
+          Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL,role:ButtonRole.ERROR}) {
+            SymbolGlyph($r('sys.symbol.trash')).fontSize(18).fontColor(['#C43A35']).hitTestBehavior(HitTestMode.None)
+          }.width(44).height(44).enabled(this.canvasEntries.length>1).accessibilityText('删除当前画布')
+            .onClick(()=>{this.canvasPickerOpen=false;this.deleteCanvas();})
+        }.width('100%')
+        Text('桌面组件保持各自绑定的画布').fontSize(12).fontColor(this.appMuted()).width('100%')
+      }
+    }.width('100%').padding(16).enabled(!this.canvasChanging)
+    }.width(this.canvasPopupWidth()).constraintSize({maxHeight:Math.max(160,this.screenHeight-this.safeTop-this.safeBottom-32)})
+      .scrollBar(BarState.Off).clip(true)
   }
   private arrivalOffsets: Record<string, ShapePoint> = {};
   private startArrival(): void {
@@ -823,7 +869,7 @@ struct Index {
         .position({ x: this.boardLeft, y: this.boardTop })
       this.homeLayers()
       this.homeBackground()
-    }.width('100%').height('100%').opacity(this.boardOpacity).accessibilityLevel(this.editing || this.viewing ? 'no-hide-descendants' : 'auto').hitTestBehavior(this.editing || this.viewing ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Default)
+    }.width('100%').height('100%').opacity(this.boardOpacity).accessibilityLevel(this.editing || this.viewing ? 'no-hide-descendants' : 'auto').hitTestBehavior(this.editing || this.viewing || this.canvasChanging ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Default)
   }
   private selectLayerCard(id: string): void {
     if (!this.groupSelecting) { this.select(id); return; }
@@ -846,7 +892,10 @@ struct Index {
               Text(this.canvasName).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
               SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
             }.width('100%')
-          }.padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).width(Math.min(130,Math.max(64,this.panelWidth-220))).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).margin({right:8}).onClick(()=>{this.refreshCanvasList();this.canvasPickerOpen=true;}).bindSheet(this.canvasPickerOpen,this.canvasPicker,{height:SheetSize.LARGE,showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>{this.canvasPickerOpen=false;}})
+          }.padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).width(Math.min(130,Math.max(64,this.panelWidth-220))).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).margin({right:8}).onClick(()=>{if(this.canvasChanging)return;this.refreshCanvasList();this.canvasCreating=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
+            .bindPopup(this.canvasPickerOpen,{builder:this.canvasPicker,placement:Placement.Top,width:this.canvasPopupWidth(),radius:20,
+              popupColor:this.appSurface(),backgroundBlurStyle:BlurStyle.NONE,enableArrow:true,autoCancel:true,focusable:true,keyboardAvoidMode:KeyboardAvoidMode.DEFAULT,
+              mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible){this.canvasPickerOpen=false;this.canvasCreating=false;}}})
           Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).margin({ right: 8 }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
           Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([Color.White]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(24).backgroundColor('#262626').fontColor(Color.White).accessibilityText('添加卡片').onClick(() => this.addCard())
         }.width('100%')
@@ -882,7 +931,14 @@ struct Index {
         }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
         if (this.homeActionHeight() > 0) {
         Column({ space: 12 }) {
-        if (this.groupSelecting) { Button('组合选中卡片（' + this.groupSelection.length + '）', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.EMPHASIZED, role:ButtonRole.NORMAL }).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).height(44).width('100%').enabled(this.groupSelection.length > 1).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.confirmGroup()) }
+        if (this.groupSelecting) {
+          Row() {
+            Button('组合 ' + this.groupSelection.length + ' 张卡片', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.EMPHASIZED, role:ButtonRole.NORMAL })
+              .height(44).fontSize(14).padding({left:20,right:20}).enabled(this.groupSelection.length > 1)
+              .accessibilityText('组合选中的 '+this.groupSelection.length+' 张卡片').onClick(() => this.confirmGroup())
+            Blank()
+          }.width('100%')
+        }
         if (!this.groupSelecting && (this.store.findCard(this.selectedId)?.groupId ?? '').length > 0) { Button('取消组合', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.releaseGroup()) }
         if (!this.groupSelecting && this.selectedId.length > 0) {
           Row({ space: 12 }) {
@@ -1652,20 +1708,12 @@ struct Index {
   appearancePanel() {
     Column({ space: 12 }) {
       Text('底板配色').fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
-      Select(['白','米色','牛皮纸','绿','蓝','粉','黑'].map((value:string):SelectOption=>({value:value})))
-        .selected(Math.max(0,THEMES.indexOf(this.preview.material))).value(['白','米色','牛皮纸','绿','蓝','粉','黑'][Math.max(0,THEMES.indexOf(this.preview.material))])
-        .font({size:14}).fontColor(this.appText()).optionFontColor(this.appText()).optionBgColor(this.appSurface())
-        .selectedOptionFontColor(AppDesign.onSelected(this.appDark)).selectedOptionBgColor(AppDesign.selected(this.appDark))
-        .backgroundColor(this.appControl()).borderRadius(12).controlSize(ControlSize.NORMAL).width('100%').height(44)
-        .onSelect((index:number)=>{const card=this.current();if(card!==null&&THEMES[index]){card.material=THEMES[index];card.paper='';this.paperValue='';this.change();}})
+      SettingsSelect({labels:['白','米色','牛皮纸','绿','蓝','粉','黑'],selectedIndex:Math.max(0,THEMES.indexOf(this.preview.material)),appDark:this.appDark,
+        onSelect:(index:number)=>{const card=this.current();if(card!==null&&THEMES[index]){card.material=THEMES[index];card.paper='';this.paperValue='';this.change();}}})
       Text('形状').fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%').margin({ top: 8 })
-      Select((this.preview.cutout.length>0?['方形','椭圆','胶囊','自由边角','照片主体']:['方形','椭圆','胶囊','自由边角']).map((value:string):SelectOption=>({value:value})))
-        .selected(this.preview.shape==='subject'?4:Math.max(0,SHAPES.indexOf(this.preview.shape)))
-        .value(this.preview.shape==='subject'?'照片主体':['方形','椭圆','胶囊','自由边角'][Math.max(0,SHAPES.indexOf(this.preview.shape))])
-        .font({size:14}).fontColor(this.appText()).optionFontColor(this.appText()).optionBgColor(this.appSurface())
-        .selectedOptionFontColor(AppDesign.onSelected(this.appDark)).selectedOptionBgColor(AppDesign.selected(this.appDark))
-        .backgroundColor(this.appControl()).borderRadius(12).controlSize(ControlSize.NORMAL).width('100%').height(44)
-        .onSelect((index:number)=>{const card=this.current();if(card!==null){if(index===4&&card.cutout.length>0){card.shape='subject';card.h=card.w/card.subjectAspect;}else if(SHAPES[index])card.shape=SHAPES[index];else return;this.change();}})
+      SettingsSelect({labels:this.preview.cutout.length>0?['方形','椭圆','胶囊','自由边角','照片主体']:['方形','椭圆','胶囊','自由边角'],
+        selectedIndex:this.preview.shape==='subject'?4:Math.max(0,SHAPES.indexOf(this.preview.shape)),appDark:this.appDark,
+        onSelect:(index:number)=>{const card=this.current();if(card!==null){if(index===4&&card.cutout.length>0){card.shape='subject';card.h=card.w/card.subjectAspect;}else if(SHAPES[index])card.shape=SHAPES[index];else return;this.change();}}})
       Button(this.busy ? '正在处理照片' : '用照片主体作为形状', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).width('100%').fontSize(14)
         .fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.busy).onClick(() => this.pickImage(true))
       if (this.preview.cutout.length > 0 && this.preview.shape !== 'subject') {

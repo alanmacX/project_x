@@ -1,4 +1,5 @@
 import { CourseItem } from '../model/CardSchema';
+import { SettingsSelect } from './SettingsSelect';
 import { AppDesign } from '../model/AppDesign';
 import { SettingsSegmented } from './SettingsSegmented';
 @CustomDialog
@@ -28,11 +29,7 @@ export struct CourseEditor {
       TextInput({text:this.name,placeholder:'课程名称'}).height(44).borderRadius(14).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onChange((v:string)=>this.name=v)
       TextInput({text:this.room,placeholder:'教室 / 地点'}).height(44).borderRadius(14).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onChange((v:string)=>this.room=v)
       Text('上课日期').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
-      Select(['周一','周二','周三','周四','周五','周六','周日'].map((value:string):SelectOption=>({value:value})))
-        .selected(this.day-1).value(['周一','周二','周三','周四','周五','周六','周日'][this.day-1]).width('100%').height(44)
-        .font({size:14}).fontColor(AppDesign.text(this.appDark)).optionFontColor(AppDesign.text(this.appDark)).optionBgColor(AppDesign.surface(this.appDark))
-        .selectedOptionFontColor(AppDesign.onSelected(this.appDark)).selectedOptionBgColor(AppDesign.selected(this.appDark))
-        .backgroundColor(AppDesign.control(this.appDark)).borderRadius(12).controlSize(ControlSize.NORMAL).onSelect((index:number)=>this.day=index+1)
+      SettingsSelect({labels:['周一','周二','周三','周四','周五','周六','周日'],selectedIndex:this.day-1,appDark:this.appDark,onSelect:(index:number)=>this.day=index+1})
       Row({space:12}) {
         Button('开始 '+this.start,{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.pickTime(true))
         Button('结束 '+this.end,{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.pickTime(false))

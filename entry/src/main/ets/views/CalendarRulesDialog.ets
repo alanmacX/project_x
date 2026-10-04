@@ -1,3 +1,4 @@
+import { SettingsAction } from './SettingsAction';
 import { CapBlock, TeachingDay, CourseChange } from '../model/CardSchema';
 import { dateKey, daysBetween, holidayKnown, HolidayDate } from '../model/HolidayCalendar';
 import { importHolidayFile } from '../model/HolidayFiles';
@@ -55,8 +56,6 @@ export struct CalendarRulesDialog {
       if(!this.alive)return;this.draft.holidayDates=dates;this.update();
     }catch(e){if(this.alive)this.error=(e as Error).message;}finally{if(this.alive)this.busy=false;}
   }
-  @Builder
-  action(label:string,run:()=>void) {Button(label,{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).width('100%').fontSize(14).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).enabled(!this.busy).onClick(run)}
   build() {
     Column({space:16}) {
       Text('假期与调课').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
@@ -65,22 +64,22 @@ export struct CalendarRulesDialog {
           Row() {Text('国内假期停课').fontSize(15).fontColor(AppDesign.text(this.appDark));Blank();Toggle({type:ToggleType.Switch,isOn:this.draft.skipHolidays!==false}).onChange((value:boolean)=>{this.draft.skipHolidays=value;this.update();})}.width('100%').height(44)
           Text('内置 2025–2026 年官方放假日期，离线可用。补班日只做标记，补哪天的课按学校安排设置。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
           if(!holidayKnown(Number((this.draft.semester??'').slice(0,4)))||Number((this.draft.semester??'').slice(0,4))>=2026){Text('2027 年及以后尚无预置放假安排，可导入校历或手动设置。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
-          this.action(this.busy?'读取中':'导入假期日历 .ics',()=>this.importDays())
+          SettingsAction({label:this.busy?'读取中':'导入假期日历 .ics',onPress:()=>this.importDays(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
           if((this.draft.holidayDates??[]).length) {
             Text('已导入 '+this.draft.holidayDates!.length+' 个假期日期；保存后生效。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
-            this.action('移除导入的假期',()=>{this.draft.holidayDates=[];this.update();})
+            SettingsAction({label:'移除导入的假期',onPress:()=>{this.draft.holidayDates=[];this.update();},appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
           }
         }.width('100%')
         Column({space:12}) {
           Text('学校校历').fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
-          this.action('设置停课／整天调课',()=>this.addDay())
+          SettingsAction({label:'设置停课／整天调课',onPress:()=>this.addDay(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
           ForEach(this.draft.teachingDays??[],(day:TeachingDay)=>{
             Row({space:8}) {Text(day.date+' · '+(day.sourceDate===''?'停课':day.sourceDate===day.date?'照常上课':'上 '+day.sourceDate+' 的课')).fontSize(13).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Button('移除',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.ERROR}).height(44).fontSize(12).backgroundColor(AppDesign.control(this.appDark)).fontColor('#C43A35').onClick(()=>{this.draft.teachingDays=this.draft.teachingDays!.filter((d:TeachingDay)=>d.date!==day.date);this.update();})}.width('100%')
           },(day:TeachingDay)=>day.date)
         }.width('100%')
         Column({space:12}) {
           Text('单次课程变动').fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
-          this.action('取消一节课／单次调课',()=>this.lesson())
+          SettingsAction({label:'取消一节课／单次调课',onPress:()=>this.lesson(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
           ForEach(this.draft.courseChanges??[],(change:CourseChange)=>{
             Row({space:8}) {Column({space:4}) {Text(this.draft.courses?.find((c)=>c.id===change.courseId)?.name??'课程').fontSize(14).fontColor(AppDesign.text(this.appDark)).width('100%');Text(change.date+' → '+(change.targetDate?change.targetDate+' '+change.start:'取消')).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}.layoutWeight(1);Button('移除',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.ERROR}).height(44).fontSize(12).backgroundColor(AppDesign.control(this.appDark)).fontColor('#C43A35').onClick(()=>{this.draft.courseChanges=this.draft.courseChanges!.filter((c:CourseChange)=>c.id!==change.id);this.update();})}.width('100%')
           },(change:CourseChange)=>change.id)
