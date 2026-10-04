@@ -6,7 +6,7 @@ export function packageScene(json: string, cardId: string): TemplatePackage {
   const state=normalizeState(JSON.parse(json) as FridgeState);
   if(cardId.length>0){state.cards=state.cards.filter((c:FridgeCard)=>c.id===cardId);if(state.cards.length!==1)throw new Error('卡片不存在');state.cards[0].groupId='';state.background=defaultState().background;}
   state.canvasId='canvas_main';
-  for(const card of state.cards){const cap=card.capability;if(cap?.k==='battery'){cap.percent=-1;cap.charging=false;cap.chargeState='';cap.updatedAt=0;cap.attemptedAt=0;}if(cap?.k==='agenda'&&cap.agendaSource==='system'){cap.events=[];cap.updatedAt=0;cap.attemptedAt=0;}}
+  for(const card of state.cards){const cap=card.capability;if(cap?.k==='battery'){cap.percent=-1;cap.charging=false;cap.chargeState='';cap.updatedAt=0;cap.attemptedAt=0;}if(cap?.k==='parcel'){cap.parcels=[];cap.parcelPlace='';}if(cap?.k==='agenda'&&cap.agendaSource==='system'){cap.events=[];cap.updatedAt=0;cap.attemptedAt=0;}}
   return {format:'fridgememo-template',version:1,kind:cardId.length>0?'card':'canvas',state:state,assets:[]};
 }
 export function readPackage(json: string): TemplatePackage {

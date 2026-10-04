@@ -23,3 +23,8 @@ export function editorViewport(cardWidth: number, cardHeight: number, angle: num
   result.height = paneHeight > 0 ? paneHeight : boundsH * result.scale + 48;
   return result;
 }
+
+/** Short landscape screens spend height on artwork; layer entries become one-line native controls. */
+export function editorPreviewPaneHeight(bodyHeight:number,landscape:boolean):number {
+  return landscape ? Math.min(300,Math.max(64,bodyHeight-(bodyHeight<320?114:164)),bodyHeight*.58) : Math.min(280,bodyHeight*.36);
+}

@@ -1,3 +1,9 @@
+import { CapabilityAppearance } from '../views/CapabilityAppearance';
+import { CapabilityDetails } from '../views/CapabilityDetails';
+import { WeekTimetable } from '../views/WeekTimetable';
+import { CapabilityPicker } from '../views/CapabilityPicker';
+import { capabilityDescriptor } from '../model/CapabilityCatalog';
+import { capabilityPreset } from '../model/CanvasLayout';
 import { BatteryObserver } from '../model/BatteryObserver';
 import { needsDataRefresh, capabilityRequestKey } from '../model/CapabilityData';
 import { readCapability } from '../model/CapabilityService';
@@ -22,11 +28,11 @@ import { arrivalOffset } from '../model/ArrivalGeometry';
 import { motionFrameRate } from '../model/MotionPolicy';
 import { HdsNavigation, HdsNavigationTitleMode, TextStyleMode, ScrollEffectType, BlurStrategy, hdsMaterial } from '@kit.UIDesignKit';
 import { SegmentButton, SegmentButtonOptions } from '@kit.ArkUI';
-import { EditorViewport, editorViewport } from '../model/EditorViewport';
+import { EditorViewport, editorViewport, editorPreviewPaneHeight } from '../model/EditorViewport';
 import { SelectionHandles, selectionHandles } from '../model/SelectionHandles';
 import { CardEditHistory } from '../model/CardEditHistory';
 import { ColorSelector } from '../views/ColorSelector';
-import { FridgeStore, FridgeCard, CanvasElement, ElementBox, ShapePoint, CapBlock, BOARD_W, BOARD_H, CAPABILITIES, materialColors, shapeRadius, typeLabel } from '../model/FridgeModel';
+import { FridgeStore, FridgeCard, CanvasElement, ElementBox, ShapePoint, CapBlock, BOARD_W, BOARD_H, materialColors, shapeRadius, typeLabel } from '../model/FridgeModel';
 import { CardCanvas } from '../views/CardCanvas';
 import { cardViewSnapshot, cardRenderSnapshot } from '../model/CardViewSnapshot';
 import { CardFace } from '../views/CardFace';
@@ -103,7 +109,7 @@ struct Index {
   @State scatter: number = 0;
   @State showBackgroundOptions: boolean = false;
   @State showLayerOptions: boolean = false;
-  @State showCapabilityChoices: boolean = false;
+  private capabilityDialog: CustomDialogController | null = null;
   private resizeStart: ElementBox = new ElementBox();
   private rotateStart: number = 0;
   private rotationVector: ShapePoint = { x: 0, y: -40 };
@@ -303,7 +309,7 @@ struct Index {
       }
     } finally { this.repairingSubjects = false; }
   }
-  aboutToDisappear(): void { this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
+  aboutToDisappear(): void { this.capabilityDialog?.close(); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
     if (this.heroActive) return true;
     if (this.viewing) { this.viewing = false; this.selectedId = ''; return true; }
@@ -342,7 +348,8 @@ struct Index {
   private editorLandscape(): boolean { return this.screenWidth > this.screenHeight; }
   private editorViewportWidth(): number { return this.editorLandscape() ? this.screenWidth * .48 : this.screenWidth * .57; }
   private editorBodyHeight(): number { return Math.max(120, this.screenHeight - this.safeTop - this.safeBottom - 76); }
-  private previewPaneHeight(): number { return this.editorLandscape() ? Math.min(300, Math.max(64, this.editorBodyHeight() - 164), this.editorBodyHeight() * .58) : Math.min(280, this.editorBodyHeight() * .36); }
+  private compactEditorLayers(): boolean { return this.editorLandscape() && this.editorBodyHeight()<320; }
+  private previewPaneHeight(): number { return editorPreviewPaneHeight(this.editorBodyHeight(),this.editorLandscape()); }
   private editingAngle(): number { return this.preview.rot; }
   private previewViewport(): EditorViewport {
     return editorViewport(this.preview.w, this.preview.h, this.editingAngle(), this.editorViewportWidth(),
@@ -360,7 +367,7 @@ struct Index {
   }
   private openEditor(id: string, created: boolean = false): void {
     if (this.heroActive || this.arriving) return;
-    this.select(id, true); this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false; this.showCapabilityChoices = false; this.settingsTab = 0; this.editorTabs = [0];
+    this.select(id, true); this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false; this.settingsTab = 0; this.editorTabs = [0];
     this.heroRect = this.boardRect();
     if (created) {
       const rect = new SceneRect(); rect.w = 28; rect.h = 28 * this.preview.h / this.preview.w;
@@ -574,7 +581,7 @@ struct Index {
       }
       if(k==='timetable'){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));cap.semester=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);cap.courses=[];}
       if (k === 'weather') { cap.city = ''; cap.temp = '--°'; cap.desc = '未更新'; }
-      card.capability = cap; card.capBox = safeContentBox(card); this.layerId = 'capability';
+      card.capability = cap; card.capBox = capabilityPreset(card,'center'); this.layerId = 'capability';
     }
     this.syncFields(); this.change(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.refreshCapabilities();
   }
@@ -1113,10 +1120,17 @@ struct Index {
       HdsNavigation() {
       Scroll(this.detailScroller) {
         Column({ space: 20 }) {
-          Text(this.preview.capability?.title || typeLabel(this.preview.capability?.k ?? '')).fontSize(20).fontColor(this.appText()).fontWeight(FontWeight.Medium)
-          if (this.preview.capability !== null) {
-            CapabilityView({ cap: this.preview.capability!, ink: this.appText(), contentWidth: 280, contentHeight: 280, tick: this.tick })
-              .width(280).height(280)
+          Text(this.preview.capability?.title || capabilityDescriptor(this.preview.capability?.k??'none').detail).fontSize(20).fontColor(this.appText()).fontWeight(FontWeight.Medium)
+          if(this.preview.capability!==null) {
+            Text(capabilityDescriptor(this.preview.capability!.k).source).fontSize(12).fontColor(this.appMuted()).width('100%')
+          }
+          if(this.preview.capability!==null && ['parcel','agenda'].includes(this.preview.capability!.k)) {
+            CapabilityDetails({cap:this.preview.capability!,appDark:this.appDark,tick:this.tick,onUpdate:(next:CapBlock)=>this.updateExtraCapability(this.preview.id,next)})
+          } else if(this.preview.capability?.k==='timetable') {
+            WeekTimetable({cap:this.preview.capability!,appDark:this.appDark,editable:false,heightLimit:Math.max(200,this.screenHeight-220)})
+          } else {
+            CardFace({card:this.preview,scaleFactor:this.editorScale(),tick:this.tick})
+              .rotate({angle:this.preview.rot,centerX:0,centerY:'100%'}).width(this.preview.w*this.editorScale()).height(this.preview.h*this.editorScale()).margin({top:24,bottom:24})
           }
           if (this.preview.capability?.k === 'calendar') {
             Row({ space: 12 }) {
@@ -1130,8 +1144,6 @@ struct Index {
               .fontSize(12).fontColor(this.appMuted())
             Button(this.weatherBusy ? '更新中' : '刷新天气', { type: ButtonType.ROUNDED_RECTANGLE }).backgroundColor(Color.Transparent).fontColor(this.appText()).border({ width: .5, color: this.appMuted() }).enabled(!this.weatherBusy).onClick(() => this.refreshWeather())
           }
-          CardFace({ card: this.preview, scaleFactor: this.editorScale(), tick: this.tick })
-            .rotate({ angle: this.preview.rot, centerX: 0, centerY: '100%' }).width(this.preview.w * this.editorScale()).height(this.preview.h * this.editorScale())
         }.width('100%').padding({ bottom: 24 })
       }.width('100%').height('100%').align(Alignment.Top).padding({ top: 76, left: 24, right: 24, bottom: this.safeBottom + 8 })
       }.titleMode(HdsNavigationTitleMode.MINI)
@@ -1145,9 +1157,9 @@ struct Index {
           style: {
             blurStrategy: BlurStrategy.ADAPTIVE, thermoCtrl: true,
             scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-            scrollEffectStyle: { contentStyle: { menuStyle: { textColor: this.appText(), iconColor: this.appText() }, backIconStyle: { textColor: this.appText(), iconColor: this.appText() } }, backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } },
+            scrollEffectStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } },
             systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
-            originalStyle: { contentStyle: { menuStyle: { textColor: this.appText(), iconColor: this.appText() }, backIconStyle: { textColor: this.appText(), iconColor: this.appText() } }, backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } }
+            originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } }
           }
         })
         .bindToScrollable([this.detailScroller]).hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).width('100%').height('100%').backgroundColor(Color.Transparent)
@@ -1188,9 +1200,9 @@ struct Index {
           style: {
             blurStrategy: BlurStrategy.ADAPTIVE, thermoCtrl: true,
             scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-            scrollEffectStyle: { contentStyle: { menuStyle: { textColor: this.appText(), iconColor: this.appText() }, backIconStyle: { textColor: this.appText(), iconColor: this.appText() } }, backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } },
+            scrollEffectStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } },
             systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
-            originalStyle: { contentStyle: { menuStyle: { textColor: this.appText(), iconColor: this.appText() }, backIconStyle: { textColor: this.appText(), iconColor: this.appText() } }, backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } }
+            originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } }
           }
         })
         .bindToScrollable([this.scroller]).hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).width('100%').height('100%').backgroundColor(Color.Transparent)
@@ -1208,7 +1220,7 @@ struct Index {
     return (this.editorLandscape() ? this.screenWidth - this.editorViewportWidth() : this.screenWidth) - 32;
   }
   private editorTabChanged(): void {
-    this.settingsTab = this.editorTabs[0] ?? 0; this.showCapabilityChoices = false;
+    this.settingsTab = this.editorTabs[0] ?? 0;
     this.layerId = this.settingsTab === 0 ? (this.preview.elements.find((el: CanvasElement) => el.behindCapability)?.id ?? '') : 'capability'; this.showLayerOptions = false; this.syncFields();
     this.scroller.scrollTo({ xOffset: 0, yOffset: 0 });
   }
@@ -1250,9 +1262,17 @@ struct Index {
             if (this.showBackgroundOptions) { this.appearancePanel() }
             }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
           } else if (this.settingsTab === 1 && (this.layerId === 'capability' || this.layerId.length === 0)) {
-            Column({ space: 16 }) { this.capabilityPanel(); this.colorRow('内容默认颜色', 'ink', this.inkValue) }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
+            Column({space:16}) { this.capabilityPanel() }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
+            if(this.preview.capability!==null && ['countdown','anniversary','weather','battery','agenda','parcel','fetch','timetable'].includes(this.preview.capability!.k)) {
+              Column() { this.capabilityDataPanel() }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
+            }
+            if(this.preview.capability!==null) {
+              CapabilityAppearance({card:this.preview,appDark:this.appDark,onArrange:(anchor:string)=>this.arrangeCapability(anchor),onColor:()=>this.chooseColor('ink'),onStyle:(style:string)=>{
+                const card=this.current();if(card?.capability){card.capability.readingStyle=style;this.change();}
+              }})
+            }
           }
-          if (this.layerId === 'capability') { this.elementFields() }
+
           if (this.settingsTab === 1 && this.preview.capability !== null && capabilityBox(this.preview).w === 0) { Text('内容空间不足，请调整文字大小或位置').fontSize(12).fontColor('#846339').width('100%') }
           Row({ space: 12 }) {
             Button(this.sharing ? '生成中' : '分享作品', { type: ButtonType.Capsule }).id('shareCard').height(44).layoutWeight(1).fontSize(14).fontColor(this.appText()).backgroundColor(this.appSurface()).enabled(!this.sharing && !this.heroActive).onClick(() => this.shareMenu(true))
@@ -1418,6 +1438,15 @@ struct Index {
   @Builder
   layerEntry(id: string, label: string) {
     Button({ type: ButtonType.ROUNDED_RECTANGLE }) {
+      if(this.compactEditorLayers()) {
+        Row({space:8}) {
+          if(id!=='capability') {
+          if(id.length===0 && this.preview.shape==='subject' && this.preview.subjectPhoto && this.preview.cutout) {Image(this.preview.cutout).width(28).height(28).objectFit(ImageFit.Contain).draggable(false)}
+          else {Text(id.length===0?'▢':id==='capability'?typeLabel(this.preview.capability?.k??'').slice(0,2):this.layerElement(id)?.kind==='text'?'A':this.layerElement(id)?.kind==='image'?'图':'形').fontSize(12).fontColor(this.appText()).width(28).textAlign(TextAlign.Center)}
+          }
+          Text(label).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
+        }.padding({left:8,right:8}).width('100%')
+      } else {
       Column({ space: 6 }) {
         Stack() {
           if (id.length === 0) {
@@ -1436,7 +1465,8 @@ struct Index {
         }.width(44).height(AppDesign.controlHeight).hitTestBehavior(HitTestMode.None)
         Text(label).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
       }.padding(8).width('100%')
-    }.width(this.editorLandscape() ? 96 : '100%').height(82).backgroundColor(this.layerId === id ? this.appControl() : Color.Transparent)
+      }
+    }.width(this.compactEditorLayers()?132:this.editorLandscape() ? 96 : '100%').height(this.compactEditorLayers()?44:82).backgroundColor(this.layerId === id ? this.appControl() : Color.Transparent)
       .border({ width: this.layerId === id ? 1.5 : 0, color: this.appText() }).borderRadius(12).clip(true)
       .accessibilityText('选择图层 ' + label).onClick(() => this.chooseLayer(id))
   }
@@ -1547,29 +1577,27 @@ struct Index {
       }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
     }
   }
+  private chooseCapability(): void {
+    const id=this.preview.id;
+    this.capabilityDialog=new CustomDialogController({builder:CapabilityPicker({selected:this.preview.capability?.k??'none',appDark:this.appDark,onChoose:(key:string)=>{
+      if(this.editing && this.preview.id===id)this.setCapability(key);
+    }}),customStyle:true,autoCancel:true});this.capabilityDialog.open();
+  }
   @Builder
   capabilityPanel() {
-    Column({ space: 12 }) {
-      Row({ space: 12 }) {
-        Column({ space: 4 }) {
-          Text('卡片能力').fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
-          Text(this.preview.capability === null ? '只展示自定义元素' : typeLabel(this.preview.capability!.k)).fontSize(13).fontColor(this.appMuted()).width('100%')
-        }.layoutWeight(1)
-        Button(this.showCapabilityChoices ? '收起' : '更换', { type: ButtonType.Capsule }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText())
-          .onClick(() => { this.showCapabilityChoices = !this.showCapabilityChoices; })
-      }.width('100%')
-      if (this.preview.capability !== null) {
-        Text('随卡片大小自动适配显示').fontSize(12).fontColor(this.appMuted()).width('100%')
-      }
-      if (this.showCapabilityChoices) {
-      Flex({ wrap: FlexWrap.Wrap }) {
-        ForEach(['none'].concat(CAPABILITIES), (k: string) => {
-          Button(k === 'none' ? '无' : typeLabel(k), { type: ButtonType.Capsule }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(13).margin({ right: 8, bottom: 8 })
-            .backgroundColor(AppDesign.choice(this.appDark, (this.preview.capability?.k ?? 'none') === k)).fontColor(AppDesign.choiceText(this.appDark, (this.preview.capability?.k ?? 'none') === k)).border({ width: .5, color: AppDesign.border(this.appDark) })
-            .onClick(() => { this.setCapability(k); this.showCapabilityChoices = false; })
-        }, (k: string) => k)
-      }.width('100%')
-      }
+    Row({space:12}) {
+      Column({space:4}) {
+        Text(capabilityDescriptor(this.preview.capability?.k??'none').name).fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
+        Text(capabilityDescriptor(this.preview.capability?.k??'none').summary).fontSize(12).fontColor(this.appMuted()).width('100%')
+      }.layoutWeight(1)
+      Button('选择能力',{type:ButtonType.Capsule}).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(()=>this.chooseCapability())
+    }.width('100%')
+  }
+  @Builder
+  capabilityDataPanel() {
+    Column({space:12}) {
+      Text('内容与来源').fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
+      Text(capabilityDescriptor(this.preview.capability?.k??'none').source).fontSize(12).fontColor(this.appMuted()).width('100%')
       if (this.preview.capability?.k === 'countdown' || this.preview.capability?.k === 'anniversary') {
         TextInput({ text: this.titleValue, placeholder: '名称' }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(16).fontColor(this.appText()).placeholderColor(this.appMuted()).backgroundColor(this.appControl())
           .onChange((v: string) => { this.titleValue = v; const cap = this.current()?.capability; if (cap !== null && cap !== undefined) { cap.title = v; this.change(); } })
@@ -1586,6 +1614,10 @@ struct Index {
         CapabilitySettings({cap:this.preview.capability!,cardId:this.preview.id,appDark:this.appDark,onUpdate:(id:string,next:CapBlock)=>this.updateExtraCapability(id,next)})
       }
     }.width('100%')
+  }
+  private arrangeCapability(anchor:string):void {
+    const card=this.current();if(card===null || card.capability===null)return;
+    card.capBox=capabilityPreset(card,anchor);this.change();
   }
   private chooseColor(target: string): void {
     const card = this.current(); if (card === null) return;

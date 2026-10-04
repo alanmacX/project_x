@@ -1,7 +1,7 @@
+import { widgetActionRects } from './WidgetActions';
 import { FridgeCard, ShapePoint, BOARD_W } from './CardSchema';
 import { sceneRect } from './SceneLayout';
 import { cardContainsPoint } from './CardHitTest';
-import { capabilityPlacement } from './CanvasLayout';
 
 export class WidgetHit {
   id: string = '';
@@ -17,7 +17,7 @@ export function widgetCanvasPoint(card: FridgeCard, x: number, y: number, width:
   const r = sceneRect(card, width, height), angle = card.rot * Math.PI / 180;
   return { x: r.x + x * Math.cos(angle) - (y - r.h) * Math.sin(angle), y: r.y + r.h + x * Math.sin(angle) + (y - r.h) * Math.cos(angle) };
 }
-export function widgetHit(cards: FridgeCard[], x: number, y: number, width: number, height: number): WidgetHit {
+export function widgetHit(cards: FridgeCard[], x: number, y: number, width: number, height: number, time:number=Date.now()): WidgetHit {
   const hit = new WidgetHit();
   if (width <= 0 || height <= 0 || x < 0 || y < 0 || x > width || y > height) return hit;
   const radius = Math.min(24, width / 2, height / 2);
@@ -30,16 +30,8 @@ export function widgetHit(cards: FridgeCard[], x: number, y: number, width: numb
     if (!cardContainsPoint(card, p.x, p.y, scale)) continue;
     if (card.capability === null) return hit;
     hit.id = card.id;
-    const box = capabilityPlacement(card), rect = sceneRect(card, width, height);
-    const left = box.x * rect.w, top = box.y * rect.h, right = (box.x + box.w) * rect.w, size = 24 * scale;
-    if (p.y >= top && p.y <= top + size) {
-      if (card.capability.k === 'calendar') {
-        if (p.x >= left && p.x <= left + size) hit.operation = 'previousMonth';
-        else if (p.x >= right - size && p.x <= right) hit.operation = 'nextMonth';
-      } else if (card.capability.k === 'weather' && (card.capability.city ?? '').length > 0 && p.x >= right - size && p.x <= right) {
-        hit.operation = card.capability.refreshState === 'refreshing' ? 'disabled' : 'refreshWeather';
-      }
-    }
+    const action=widgetActionRects(card,scale,time).find((r)=>p.x>=r.x*scale&&p.x<=(r.x+r.w)*scale&&p.y>=r.y*scale&&p.y<=(r.y+r.h)*scale);
+    if(action)hit.operation=action.operation;
     return hit;
   }
   return hit;

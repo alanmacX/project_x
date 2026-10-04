@@ -1,3 +1,4 @@
+import { parsePickupNotice } from './ParcelIntake';
 import { dateKey, holidayName } from './HolidayCalendar';
 import { CapBlock, CourseItem, AgendaItem, ParcelItem } from './CardSchema';
 export interface ValueField { path: string; value: string; }
@@ -121,18 +122,7 @@ export function teachingDayLabel(cap:CapBlock,now:number):string {
   return cap.skipHolidays!==false&&name?name+' · 假期':(cap.teachingDays??[]).some((d)=>d.sourceDate===key&&d.date!==key)?'今日课程已调走':'';
 }
 /** Contextual pickup labels only: do not mistake login verification or an order number for a pickup code. */
-export function pickupCandidates(text: string): ParcelItem[] {
-  const normalized=text.replace(/[０-９]/g,(c:string)=>String(c.charCodeAt(0)-65296)).replace(/[－—–]/g,'-');
-  const out:ParcelItem[]=[],pattern=/(?:取件码|提货码|取货码|领取码)[\s：:是为]*([A-Za-z0-9]{1,8}(?:[ -][A-Za-z0-9]{1,8}){0,3})/g;
-  let match:RegExpExecArray|null;
-  while((match=pattern.exec(normalized))!==null && out.length<12) {
-    const code=match[1].trim().replace(/ /g,'-'); if(!/\d/.test(code)||out.some((v)=>v.code===code)||code.length>24)continue;
-    const before=normalized.slice(Math.max(0,match.index-80),match.index), after=normalized.slice(match.index,match.index+100);
-    const location=(before+' '+after).match(/([\u4e00-\u9fffA-Za-z0-9·]{2,24}(?:驿站|快递柜|自提点|服务站))/);
-    out.push({id:'p'+match.index,code:code,place:location?location[1]:'待填写取件地点',picked:false});
-  }
-  return out;
-}
+export function pickupCandidates(text: string): ParcelItem[] { return parsePickupNotice(text); }
 export function pendingParcels(cap: CapBlock): ParcelItem[] { return (cap.parcels??[]).filter((p)=>!p.picked); }
 export function nextDataBoundary(cap: CapBlock, now:number):number {
   const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate()+1);

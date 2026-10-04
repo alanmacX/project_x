@@ -1,6 +1,5 @@
+import { SummaryCapability } from './SummaryCapability';
 import { holidayName, holidayMarker } from '../model/HolidayCalendar';
-import { agendaItems, pendingParcels, eventWhen } from '../model/CapabilityData';
-import { AgendaItem, ParcelItem } from '../model/CardSchema';
 import { CapBlock, typeLabel, contrastingInk } from '../model/CardSchema';
 import { capabilityMinimum, compactCapability, capabilityFits } from '../model/CapabilityMetrics';
 import { TimetableCapability } from './TimetableCapability';
@@ -39,12 +38,12 @@ export struct CapabilityView {
   private now(): Date { return new Date(this.tick > 0 ? this.tick : Date.now()); }
   private unit(): number {
     const min = capabilityMinimum(this.cap, this.compact(), this.contentWidth);
-    return Math.min(1.4, this.contentWidth / min.w, this.contentHeight / min.h) * this.scaleFactor;
+    return Math.min(1, this.contentWidth / min.w, this.contentHeight / min.h) * this.scaleFactor;
   }
   private undersized(): boolean { return !capabilityFits(this.cap,this.contentWidth,this.contentHeight); }
   private counterFont(): number {
     const digits = (Math.abs(daysLeftOf(this.cap.date ?? '')) + '').length;
-    return Math.min((this.compact() ? 28 : 44) * this.unit(), (this.contentWidth * this.scaleFactor - 32 * this.unit()) / (digits * .6));
+    return Math.max(16*this.unit(),Math.min((this.compact() ? 28 : 44) * this.unit(), (this.contentWidth * this.scaleFactor - 32 * this.unit()) / (digits * .6)));
   }
   build() {
     Column({ space: 4 * this.unit() }) {
@@ -73,7 +72,7 @@ export struct CapabilityView {
         Text((this.calendarDate().getMonth() + 1) + '月').fontSize((28 * this.unit()) + 'vp').fontColor(this.ink)
         Text('点按查看月历').fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).opacity(.6)
       } else if (this.cap.k === 'calendar') {
-        Text(this.calendarDate().getFullYear() + '年' + (this.calendarDate().getMonth() + 1) + '月').fontSize((16 * this.unit()) + 'vp').fontWeight(FontWeight.Medium).fontColor(this.ink)
+        Text(this.calendarDate().getFullYear() + '年' + (this.calendarDate().getMonth() + 1) + '月').fontSize((14 * this.unit()) + 'vp').minFontSize(10*this.unit()).maxFontSize(14*this.unit()).maxLines(1).fontWeight(FontWeight.Medium).fontColor(this.ink).height(44*this.unit()).width('100%').padding({left:44*this.unit(),right:44*this.unit()}).textAlign(TextAlign.Center)
         Row() {
           ForEach(['日', '一', '二', '三', '四', '五', '六'], (day: string) => {
             Text(day).fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).opacity(0.5).layoutWeight(1).textAlign(TextAlign.Center)
@@ -107,32 +106,12 @@ export struct CapabilityView {
       } else if(this.cap.k==='battery') {
         BatteryCapability({cap:this.cap,ink:this.ink,unit:this.unit(),compact:this.compact()})
       } else if(this.cap.k==='fetch') {
-        Text(this.cap.title||'URL 内容').fontSize((12*this.unit())+'vp').fontColor(this.ink).opacity(.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
-        Text((this.cap.value||'待配置')+(this.cap.value?this.cap.unit??'':'')).fontSize((24*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(this.compact()?2:3).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').textAlign(TextAlign.Center)
-        if(this.cap.refreshState==='failed') {Text('上次结果 · 更新失败').fontSize((10*this.unit())+'vp').fontColor(this.ink).opacity(.6)}
+        Text((this.cap.title||'URL 内容')+(this.cap.refreshState==='failed'?' · 上次结果':'')).fontSize((12*this.unit())+'vp').fontColor(this.ink).opacity(.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
+        Text((this.cap.value||'待配置')+(this.cap.value?this.cap.unit??'':'')).fontSize((24*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).minFontSize(16*this.unit()).maxFontSize(24*this.unit()).heightAdaptivePolicy(TextHeightAdaptivePolicy.LAYOUT_CONSTRAINT_FIRST).maxLines(this.compact()?2:3).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').height(Math.max(1,this.contentHeight*this.scaleFactor-20*this.unit())).textAlign(TextAlign.Center)
       } else if(this.cap.k==='timetable') {
         TimetableCapability({cap:this.cap,ink:this.ink,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
-      } else if(this.cap.k==='agenda') {
-        Text('接下来').maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontSize((11*this.unit())+'vp').fontColor(this.ink).opacity(.65)
-        if(agendaItems(this.cap,this.now().getTime()).length===0) {
-          Text(this.cap.agendaSource?'暂无待办日程':'导入日程').fontSize((18*this.unit())+'vp').fontColor(this.ink)
-        } else {
-          ForEach(agendaItems(this.cap,this.now().getTime()).slice(0,this.compact()?1:3),(e:AgendaItem)=>{
-            Column({space:2*this.unit()}) {
-              Text(e.title).fontSize(((this.compact()?16:14)*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
-              Text(eventWhen(e,this.now().getTime())+(e.location?' · '+e.location:'')).fontSize((10*this.unit())+'vp').fontColor(this.ink).opacity(.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
-            }.width('100%').alignItems(HorizontalAlign.Start)
-          },(e:AgendaItem)=>e.id)
-        }
-      } else if(this.cap.k==='parcel') {
-        Text('待取 '+pendingParcels(this.cap).length+' 件').fontSize((11*this.unit())+'vp').fontColor(this.ink).opacity(.65)
-        if(!pendingParcels(this.cap).length) {Text('没有待取包裹').fontSize((16*this.unit())+'vp').fontColor(this.ink)}
-        ForEach(pendingParcels(this.cap).slice(0,this.compact()?1:3),(p:ParcelItem)=>{
-          Column({space:2*this.unit()}) {
-            Text(p.code).fontSize(((this.compact()?20:18)*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
-            Text(p.place||'取件地点').fontSize((10*this.unit())+'vp').fontColor(this.ink).opacity(.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
-          }.width('100%')
-        },(p:ParcelItem)=>p.id)
+      } else if(this.cap.k==='agenda'||this.cap.k==='parcel') {
+        SummaryCapability({cap:this.cap,ink:this.ink,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
       } else {
         Text(typeLabel(this.cap.k)).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).opacity(0.65)
         Text(Math.floor(progressOf(this.cap.k, this.now()) * 100) + '%').fontSize(((this.compact() ? 24 : 38) * this.unit()) + 'vp').fontColor(this.ink)

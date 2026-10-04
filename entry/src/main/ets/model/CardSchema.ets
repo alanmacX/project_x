@@ -15,6 +15,8 @@ export class CapType {
 export const CAPABILITIES: string[] = ['clock', 'date', 'calendar', 'countdown', 'anniversary', 'weather', 'dayprogress', 'yearprogress', 'battery', 'agenda', 'parcel', 'fetch', 'timetable'];
 export interface CapBlock {
   k: string;
+  readingStyle?: string; // auto | plain | surface; photo subjects receive a readable backing
+  parcelPlace?: string; // user's default local pickup location
   title?: string;
   date?: string;
   city?: string;
@@ -219,7 +221,7 @@ export function normalizeState(raw: FridgeState): FridgeState {
       if (CAPABILITIES.includes(cap.k)) {
         if (card.capability === null) {
           card.capability = normalizeCapability(cap);
-          if (cap.k === 'calendar') cap.calendarOffset = Math.round(bounded(cap.calendarOffset ?? 0, -120, 120, 0));
+          if (cap.k === 'calendar') card.capability.calendarOffset = Math.round(bounded(cap.calendarOffset ?? 0, -120, 120, 0));
           if (raw.schemaVersion !== 2) {
             card.capBox.y = i / caps.length; card.capBox.h = 1 / caps.length;
           }
@@ -254,6 +256,8 @@ export function contrastingInk(color: string): string {
 
 export function normalizeCapability(raw: CapBlock): CapBlock {
   const cap = JSON.parse(JSON.stringify(raw)) as CapBlock;
+  cap.readingStyle = ['plain','surface'].includes(raw.readingStyle ?? '') ? raw.readingStyle : 'auto';
+  cap.parcelPlace = typeof raw.parcelPlace === 'string' ? raw.parcelPlace.slice(0,80) : '';
   cap.title = typeof raw.title === 'string' ? raw.title.slice(0,160) : '';
   cap.interval = Math.round(bounded(raw.interval ?? 60,30,1440,60));
   if (raw.k === 'battery') cap.percent = bounded(raw.percent ?? -1,-1,100,-1);

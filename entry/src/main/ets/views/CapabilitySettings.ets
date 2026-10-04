@@ -1,11 +1,13 @@
+import { ParcelImportDialog } from './ParcelImportDialog';
+import { mergePickupParcels } from '../model/ParcelIntake';
 import { TimetableDialog } from './TimetableDialog';
 import { mondayDate } from '../model/WakeUpImport';
 import { CalendarRulesDialog } from './CalendarRulesDialog';
 import { ValuePicker } from './ValuePicker';
 import { CapBlock, ParcelItem, CourseItem, AgendaItem } from '../model/CardSchema';
-import { ValueField, pickupCandidates, pendingParcels, eventWhen } from '../model/CapabilityData';
+import { ValueField, pendingParcels, eventWhen } from '../model/CapabilityData';
 import { fetchValueFields, recognizePickup } from '../model/CapabilityWorker';
-import { readCapability } from '../model/CapabilityService';
+import { readCapability, hasWholeCalendarAccess } from '../model/CapabilityService';
 import { importScheduleFile } from '../model/ScheduleFiles';
 import { AppDesign } from '../model/AppDesign';
 import { taskpool } from '@kit.ArkTS';
@@ -20,7 +22,9 @@ export struct CapabilitySettings {
   @Prop appDark:boolean=false;
   onUpdate:(id:string,cap:CapBlock)=>void=()=>{};
   @State busy:boolean=false;
+  @State wholeCalendarAccess:boolean=false;
   @State message:string='';
+  @State manualParcel:boolean=false;
   @State code:string=''; @State place:string='';
   private dialog:CustomDialogController|null=null;
   private alive:boolean=true;
@@ -28,9 +32,12 @@ export struct CapabilitySettings {
   private inputKey:string='';
   private inputChanged():void {
     const key=this.cardId+'|'+this.cap.k+'|'+(this.cap.url??'');
-    if(key===this.inputKey)return;this.inputKey=key;this.generation++;this.busy=false;this.message='';this.code='';this.place='';
+    if(key===this.inputKey)return;this.inputKey=key;this.generation++;this.busy=false;this.message='';this.code='';this.place='';this.manualParcel=false;
   }
-  aboutToAppear():void {this.alive=true;this.inputChanged();}
+  aboutToAppear():void {
+    this.alive=true;this.inputChanged();const context=this.getUIContext().getHostContext();
+    if(context)hasWholeCalendarAccess(context).then((available:boolean)=>{if(this.alive)this.wholeCalendarAccess=available;}).catch(()=>{});
+  }
   aboutToDisappear():void {this.alive=false;this.generation++;this.dialog?.close();}
   private text():string{return AppDesign.text(this.appDark);}
   private control():string{return AppDesign.control(this.appDark);}
@@ -64,18 +71,23 @@ export struct CapabilitySettings {
     try{
       const options=new photoAccessHelper.PhotoSelectOptions();options.maxSelectNumber=1;options.MIMEType=photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
       const result=await new photoAccessHelper.PhotoViewPicker().select(options);if(!result.photoUris.length)return;
-      const candidates=pickupCandidates(await taskpool.execute(new taskpool.Task(recognizePickup,result.photoUris[0])) as string);
+      const notice=await taskpool.execute(new taskpool.Task(recognizePickup,result.photoUris[0])) as string;
       if(!this.alive||token!==this.generation)return;
-      if(!candidates.length){this.message='未找到明确的取件码，请手动填写；识别结果不会自动加入';return;}
-      this.dialog=new CustomDialogController({builder:ValuePicker({choices:candidates.map((c:ParcelItem):ValueField=>({path:c.code,value:c.place})),title:'校对取件码',appDark:this.appDark,onChoose:(value:ValueField)=>{
-        if(!this.alive||token!==this.generation)return;this.code=value.path;this.place=value.value;
-      }}),customStyle:true,alignment:DialogAlignment.Center,autoCancel:true});this.dialog.open();
+      this.importParcels(notice);
     }catch(e){if(this.alive)this.message=(e as Error).message;}finally{if(token===this.generation)this.busy=false;}
+  }
+  private importParcels(notice:string=''):void {
+    const id=this.cardId;
+    this.dialog=new CustomDialogController({builder:ParcelImportDialog({appDark:this.appDark,initialText:notice,defaultPlace:this.cap.parcelPlace??'',onImport:(items:ParcelItem[])=>{
+      if(!this.alive||this.cardId!==id||this.cap.k!=='parcel')return;
+      const next=this.copy();next.parcels=mergePickupParcels(next.parcels??[],items,next.parcelPlace??'',Date.now());this.change(next);
+    }}),customStyle:true,autoCancel:true});this.dialog.open();
   }
   private addParcel():void {
     const code=this.code.trim();if(!code){this.message='请填写取件码';return;}
-    const next=this.copy(),list=next.parcels??[];if(list.some((p)=>!p.picked&&p.code===code&&p.place===this.place.trim())){this.message='这个取件码已经在列表中';return;}
-    list.unshift({id:'p'+Date.now(),code:code.slice(0,24),place:this.place.trim().slice(0,80),picked:false});next.parcels=list.slice(0,64);this.change(next);this.code='';this.place='';
+    const next=this.copy();
+    try{next.parcels=mergePickupParcels(next.parcels??[],[{id:'',code:code,place:this.place,picked:false}],next.parcelPlace??'',Date.now());this.change(next);this.code='';this.place='';this.manualParcel=false;}
+    catch(e){this.message=(e as Error).message;}
   }
   private editCourse(course?:CourseItem):void {
     const id=this.cardId;
@@ -144,19 +156,30 @@ export struct CapabilitySettings {
         Text('只读取所选内容，失败时保留上次结果。桌面更新受系统调度限制。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       }
       if(this.cap.k==='parcel') {
-        this.action(this.busy?'识别中':'从截图识别取件码',()=>this.pickScreenshot())
-        TextInput({text:this.code,placeholder:'确认取件码'}).height(44).maxLength(24).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>this.code=v)
-        TextInput({text:this.place,placeholder:'驿站 / 取件地点'}).height(44).maxLength(80).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>this.place=v)
-        this.action('加入待取',()=>this.addParcel())
+        Row({space:8}) {
+          Button('通知文字',{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontSize(14).fontColor(this.text()).backgroundColor(this.control()).enabled(!this.busy).onClick(()=>this.importParcels())
+          Button(this.busy?'识别中':'识别截图',{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontSize(14).fontColor(this.text()).backgroundColor(this.control()).enabled(!this.busy).onClick(()=>this.pickScreenshot())
+        }.width('100%')
+        Text('常用驿站').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
+        TextInput({text:this.cap.parcelPlace??'',placeholder:'常用驿站（可留空，仅补全缺失地点）'}).height(44).maxLength(80).fontSize(14).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>{const next=this.copy();next.parcelPlace=v;this.change(next);})
+        Button(this.manualParcel?'收起手动添加':'手动添加',{type:ButtonType.Capsule}).height(44).fontSize(13).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.manualParcel=!this.manualParcel)
+        if(this.manualParcel) {
+          TextInput({text:this.code,placeholder:'取件码'}).height(44).maxLength(24).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>this.code=v)
+          TextInput({text:this.place,placeholder:'取件地点（留空使用常用驿站）'}).height(44).maxLength(80).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>this.place=v)
+          this.action('加入待取',()=>this.addParcel())
+        }
         ForEach(pendingParcels(this.cap),(p:ParcelItem)=>{
-          Row({space:12}) {Column({space:4}) {Text(p.code).fontSize(16).fontColor(this.text());Text(p.place).fontSize(12).fontColor(AppDesign.muted(this.appDark)).maxLines(1)}.layoutWeight(1).alignItems(HorizontalAlign.Start);Button('已取',{type:ButtonType.Capsule}).height(44).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>{const next=this.copy();for(const item of next.parcels??[])if(item.id===p.id)item.picked=true;this.change(next);})}.width('100%')
+          Row({space:12}) {Column({space:4}) {Text(p.code).fontSize(18).fontWeight(FontWeight.Medium).fontColor(this.text());Text(p.place||'未填写地点').fontSize(12).fontColor(AppDesign.muted(this.appDark)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})}.layoutWeight(1).alignItems(HorizontalAlign.Start);Button('已取',{type:ButtonType.Capsule}).height(44).fontSize(13).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>{const next=this.copy();for(const item of next.parcels??[])if(item.id===p.id)item.picked=true;this.change(next);})}.width('100%')
         },(p:ParcelItem)=>p.id)
-        Text('照片只用于本机识别，不保存原截图。加入前请校对；已取状态由你确认。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+        if((this.cap.parcels??[]).some((p)=>p.picked)) {
+          this.action('清理已取记录',()=>{const next=this.copy();next.parcels=(next.parcels??[]).filter((p)=>!p.picked);this.change(next);})
+        }
+        Text('识别后校对再加入；原通知与截图不保存。常用驿站无需重复输入。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       }
       if(this.cap.k==='agenda') {
-        this.action('读取系统日历',()=>this.readSystemAgenda())
+        if(this.wholeCalendarAccess) {this.action('读取系统日历',()=>this.readSystemAgenda())}
         this.action('导入日历文件 .ics',()=>this.importSchedule())
-        Text(this.cap.agendaSource==='system'?'系统日历：需要受限权限资格和用户授权':this.cap.agendaSource==='imported'?'本地日历副本；原文件修改后需要重新导入':'显示接下来三项安排，缩小时保留下一项').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+        Text(this.cap.agendaSource==='system'?'系统日历' :this.cap.agendaSource==='imported'?'本地日历副本；原文件修改后需要重新导入':'显示接下来三项安排，缩小时保留下一项').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       }
       if(this.cap.k==='timetable') {
         Text('卡片展示').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')

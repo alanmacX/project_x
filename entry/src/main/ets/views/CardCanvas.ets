@@ -1,3 +1,5 @@
+import { readingSurface, readingSurfaceColor } from '../model/CapabilityPresentation';
+import { capabilityInset } from '../model/CanvasLayout';
 import { AnimatedPhoto } from './AnimatedPhoto';
 import { FridgeCard, CanvasElement, ElementBox, materialColors, shapeRadius } from '../model/CardSchema';
 import { capabilityBox, capabilityPlacement, fitContentBox, safeContentBox, subjectSurfaceFactor } from '../model/CanvasLayout';
@@ -65,12 +67,12 @@ export struct CardCanvas {
   @Builder
   capabilityContent() {
         Column() { CapabilityView({ cap: this.card.capability!, ink: this.card.shape === 'subject' && this.card.subjectPhoto && this.card.ink.length === 0 ? this.card.subjectInk : materialColors(this.card.material, this.card.paper, this.card.ink)[1],
-          scaleFactor: this.scaleFactor, contentWidth: this.card.w * capabilityPlacement(this.card).w, contentHeight: this.card.h * capabilityPlacement(this.card).h, tick: this.tick }) }
+          scaleFactor: this.scaleFactor, contentWidth: this.card.w * capabilityPlacement(this.card).w - 2*capabilityInset(this.card), contentHeight: this.card.h * capabilityPlacement(this.card).h - 2*capabilityInset(this.card), tick: this.tick }) }.padding(capabilityInset(this.card)*this.scaleFactor)
           .width((this.capSurfaceBox().w * 100) + '%').height((this.capSurfaceBox().h * 100) + '%')
           .position({ x: (this.capSurfaceBox().x * 100) + '%', y: (this.capSurfaceBox().y * 100) + '%' })
           .translate({ x: this.movingLayerId === 'capability' ? this.moveX : 0, y: this.movingLayerId === 'capability' ? this.moveY : 0 })
-          .backgroundColor(capabilityBox(this.card).w === 0 ? materialColors(this.card.material, this.card.paper, this.card.ink)[0] : Color.Transparent)
-          .borderRadius(8).rotate({ angle: 0 }).opacity(capabilityPlacement(this.card).opacity)
+          .backgroundColor(readingSurface(this.card.capability, this.card.shape==='subject' && this.card.subjectPhoto, capabilityBox(this.card).w===0) ? readingSurfaceColor(this.card.shape==='subject' && this.card.subjectPhoto && this.card.ink.length===0 ? this.card.subjectInk : materialColors(this.card.material,this.card.paper,this.card.ink)[1]) : Color.Transparent)
+          .borderRadius(12*this.scaleFactor).rotate({ angle: 0 }).opacity(capabilityPlacement(this.card).opacity)
   }
   private elementFor(id: string): CanvasElement { return this.card.elements.find((el: CanvasElement) => el.id === id) ?? new CanvasElement(); }
   @Builder

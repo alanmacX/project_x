@@ -1,8 +1,8 @@
+import { WidgetActionRect, widgetActionRects } from '../../model/WidgetActions';
 import { CanvasBackdrop } from '../../views/CanvasBackdrop';
 import { cardRenderSnapshot } from '../../model/CardViewSnapshot';
-import { FridgeCard, CanvasBackground, normalizeBackground, BOARD_W } from '../../model/CardSchema';
+import { FridgeCard, CanvasBackground, normalizeBackground, BOARD_W, materialColors } from '../../model/CardSchema';
 import { scenePercent } from '../../model/SceneLayout';
-import { capabilityPlacement } from '../../model/CanvasLayout';
 import { widgetHit, widgetCanvasPoint } from '../../model/WidgetHitTest';
 import { CardFace } from '../../views/CardFace';
 
@@ -27,7 +27,7 @@ struct FridgeWidgetCard {
   private widthValue(): number { return this.measuredWidth > 0 ? this.measuredWidth : this.canvasWidth; }
   private heightValue(): number { return this.measuredHeight > 0 ? this.measuredHeight : this.canvasHeight; }
   private dispatch(x: number, y: number): void {
-    const hit = widgetHit(this.cardIds.map((id: string) => this.cardMap[id]), x, y, this.widthValue(), this.heightValue());
+    const hit = widgetHit(this.cardIds.map((id: string) => this.cardMap[id]), x, y, this.widthValue(), this.heightValue(),this.rev||Date.now());
     if (hit.id.length === 0 || hit.operation === 'disabled') return;
     if (hit.operation.length > 0) this.action(hit.id, hit.operation); else this.open(hit.id);
   }
@@ -51,18 +51,12 @@ struct FridgeWidgetCard {
     postCardAction(this, { action: 'message', params: { cardId: id, operation: operation } });
   }
   @Builder
-  actionButton(card: FridgeCard, symbol: string, operation: string, right: boolean) {
-    Button(symbol, { type: ButtonType.Normal }).width(24 * this.widthValue() / BOARD_W).height(24 * this.widthValue() / BOARD_W)
-      .padding(0).fontSize(14 * this.widthValue() / BOARD_W).fontColor(card.material === 'dark' ? '#F4F3EF' : '#303030').backgroundColor(Color.Transparent)
-      .position({ x: ((capabilityPlacement(card).x + (right ? capabilityPlacement(card).w : 0)) * 100) + '%', y: (capabilityPlacement(card).y * 100) + '%' })
-      .translate({ x: right ? -24 * this.widthValue() / BOARD_W : 0 })
-      .enabled(operation !== 'refreshWeather' || card.capability?.refreshState !== 'refreshing')
-      .accessibilityText(operation === 'previousMonth' ? '上个月' : (operation === 'nextMonth' ? '下个月' : '刷新天气'))
-      .onClick((event: ClickEvent) => {
-        const box = capabilityPlacement(card), scale = this.widthValue() / BOARD_W;
-        const point = widgetCanvasPoint(card, box.x * card.w * scale + (right ? box.w * card.w * scale - 24 * scale : 0) + event.x,
-          box.y * card.h * scale + event.y, this.widthValue(), this.heightValue());
-        this.dispatch(point.x, point.y);
+  actionButton(card:FridgeCard,action:WidgetActionRect) {
+    Button(action.symbol,{type:ButtonType.Circle}).width(44).height(44).padding(0).fontSize(20).fontColor(card.shape==='subject'&&card.subjectPhoto&&card.ink.length===0?card.subjectInk:materialColors(card.material,card.paper,card.ink)[1]).backgroundColor(Color.Transparent)
+      .position({x:action.x*this.widthValue()/BOARD_W,y:action.y*this.widthValue()/BOARD_W})
+      .accessibilityText(action.operation==='previousMonth'?'上个月':'下个月')
+      .onClick((event:ClickEvent)=>{
+        const scale=this.widthValue()/BOARD_W,point=widgetCanvasPoint(card,action.x*scale+event.x,action.y*scale+event.y,this.widthValue(),this.heightValue());this.dispatch(point.x,point.y);
       })
   }
   build() {
@@ -72,19 +66,17 @@ struct FridgeWidgetCard {
         Stack({ alignContent: Alignment.TopStart }) {
         CardFace({ card: this.cardMap[id], scaleFactor: this.widthValue() / BOARD_W, tick: this.rev, widget: true })
           .width('100%').height('100%').hitTestBehavior(HitTestMode.None)
-        if (this.cardMap[id].capability?.k === 'calendar') {
-          this.actionButton(this.cardMap[id], '‹', 'previousMonth', false)
-          this.actionButton(this.cardMap[id], '›', 'nextMonth', true)
-        }
-        if (this.cardMap[id].capability?.k === 'weather' && (this.cardMap[id].capability?.city ?? '').length > 0) { this.actionButton(this.cardMap[id], '↻', 'refreshWeather', true) }
+        ForEach(widgetActionRects(this.cardMap[id],this.widthValue()/BOARD_W,this.rev||Date.now()),(action:WidgetActionRect)=>{
+          this.actionButton(this.cardMap[id],action)
+        },(action:WidgetActionRect)=>action.operation)
         }
           .width(scenePercent(this.cardMap[id], this.widthValue() / this.heightValue()).w + '%').height(scenePercent(this.cardMap[id], this.widthValue() / this.heightValue()).h + '%')
           .position({ x: scenePercent(this.cardMap[id], this.widthValue() / this.heightValue()).x + '%', y: scenePercent(this.cardMap[id], this.widthValue() / this.heightValue()).y + '%' })
           .rotate({ angle: this.cardMap[id].rot, centerX: 0, centerY: '100%' }).animation({ duration: 180, curve: Curve.EaseOut }).zIndex(this.cardMap[id].z)
           .hitTestBehavior(HitTestMode.Transparent)
       }, (id: string) => id)
-      Button('打开', { type: ButtonType.Normal }).width(48).height(32).padding(0).fontSize(12).borderRadius(10)
-        .backgroundColor('#EEFFFFFF').fontColor('#303030').position({ x: '100%', y: '100%' }).translate({ x: -56, y: -40 }).zIndex(100000)
+      Button('打开', { type: ButtonType.Capsule }).width(56).height(44).padding(0).fontSize(12).borderRadius(10)
+        .backgroundColor('#EEFFFFFF').fontColor('#303030').position({ x: '100%', y: '100%' }).translate({ x: -64, y: -52 }).zIndex(100000)
         .accessibilityText('打开卡片画布').onClick(() => this.open())
     }.width('100%').height('100%').backgroundColor(Color.White).borderRadius(24).clip(true)
       .onSizeChange((_: SizeOptions, size: SizeOptions) => {

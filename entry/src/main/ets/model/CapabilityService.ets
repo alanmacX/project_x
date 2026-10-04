@@ -5,6 +5,9 @@ import { calendarManager } from '@kit.CalendarKit';
 import { abilityAccessCtrl } from '@kit.AbilityKit';
 import { CapBlock, AgendaItem } from './CardSchema';
 import { validSourceURL, selectValue } from './CapabilityData';
+export async function hasWholeCalendarAccess(context:Context):Promise<boolean> {
+  return await abilityAccessCtrl.createAtManager().checkAccessToken(context.applicationInfo.accessTokenId,'ohos.permission.READ_WHOLE_CALENDAR')===abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED;
+}
 export async function systemAgenda(context: Context): Promise<AgendaItem[]> {
   const access=abilityAccessCtrl.createAtManager();
   if(await access.checkAccessToken(context.applicationInfo.accessTokenId,'ohos.permission.READ_WHOLE_CALENDAR')!==abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED)

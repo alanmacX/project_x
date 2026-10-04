@@ -1,3 +1,4 @@
+import { readingSurface } from './CapabilityPresentation';
 import { cardOutline } from './RenderContours';
 import { FridgeCard, ElementBox, ShapePoint, BOARD_W, BOARD_H } from './CardSchema';
 import { capabilityMinimum, CapabilitySize } from './CapabilityMetrics';
@@ -59,7 +60,7 @@ export function subjectSurfaceFactor(card: FridgeCard): number {
 }
 export function safeContentBox(card: FridgeCard): ElementBox {
   if (card.shape === 'subject' && cardOutline(card).length > 0) {
-    const min = capabilityMinimum(card.capability, true), aspect = min.w > 0 ? min.w * card.h / (min.h * card.w) : 0;
+    const min = cardCapabilityMinimum(card, true), aspect = min.w > 0 ? min.w * card.h / (min.h * card.w) : 0;
     // Cache the normalized interior independently of the pixel-size white edge.
     // Proportional resizing keeps this aspect stable; floating-point noise must not rescan the outline.
     const key = Math.round(aspect * 1000000) + ':' + outlineIdentity(card);
@@ -87,7 +88,7 @@ const layoutCache = new Map<string, ElementBox>();
 const obstacleCache = new Map<string, ElementBox>();
 export function capabilityBox(card: FridgeCard): ElementBox {
   const obstacles = card.elements.filter((el) => !el.behindCapability && (el.kind === 'text' || el.kind === 'image'));
-  const minimum = capabilityMinimum(card.capability, true);
+  const minimum = cardCapabilityMinimum(card, true);
   const key = minimum.w + ':' + minimum.h + ':' + card.id + ':' + card.capability?.k + ':' + card.shape + ':' + card.cutout + ':' + card.subjectBorder + ':' + outlineIdentity(card) + ':' + card.w + ':' + card.h + ':' + JSON.stringify(card.capBox) + ':' +
     JSON.stringify(obstacles.map((el) => [el.x, el.y, el.w, el.h, el.rot]));
   const cached = layoutCache.get(key); if (cached !== undefined) return cached;
@@ -117,7 +118,7 @@ export function capabilityBox(card: FridgeCard): ElementBox {
     }
     if (obstacleCache.size > 64) obstacleCache.clear(); obstacleCache.set(obstacleKey, empty);
     }
-    const min = capabilityMinimum(card.capability, true);
+    const min = cardCapabilityMinimum(card, true);
     if (empty.w > 0 && empty.w * card.w >= min.w - .01 && empty.h * card.h >= min.h - .01) result = readableSlot(card, empty);
     else { result = new ElementBox(); result.x = safe.x; result.y = safe.y; result.w = 0; result.h = 0; }
   }
@@ -144,7 +145,7 @@ export function clampCardGeometry(card: FridgeCard, width: number = BOARD_W, hei
 }
 
 function readableSlot(card: FridgeCard, safe: ElementBox): ElementBox {
-  const min = capabilityMinimum(card.capability, true, card.w*safe.w), requested = new ElementBox();
+  const min = cardCapabilityMinimum(card, true, card.w*safe.w), requested = new ElementBox();
   requested.x = card.capBox.x; requested.y = card.capBox.y; requested.opacity = card.capBox.opacity;
   requested.w = Math.max(card.capBox.w, min.w / card.w); requested.h = Math.max(card.capBox.h, min.h / card.h);
   return fitContentBox(requested, safe);
@@ -152,7 +153,7 @@ function readableSlot(card: FridgeCard, safe: ElementBox): ElementBox {
 export function minimumCardSize(card: FridgeCard): CapabilitySize {
   const size = new CapabilitySize(); size.w = card.shape === 'subject' ? 16 : 80; size.h = card.shape === 'subject' ? 16 : 80;
   if (card.capability === null) return size;
-  const safe = safeContentBox(card), min = capabilityMinimum(card.capability, true, card.w*safe.w);
+  const safe = safeContentBox(card), min = cardCapabilityMinimum(card, true, card.w*safe.w);
   size.w = Math.max(card.shape === 'subject' ? 16 : 80, min.w / Math.max(.0001, safe.w)); size.h = Math.max(card.shape === 'subject' ? 16 : 80, min.h / Math.max(.0001, safe.h));
   return size;
 }
@@ -174,4 +175,21 @@ export function cardHandlePoint(card: FridgeCard, right: boolean, bottom: boolea
     if (distance < best) { best = distance; const f = subjectSurfaceFactor(card), inset = (1 - f) / 2; point = { x: inset + p.x * f, y: inset + p.y * f }; }
   }
   return point;
+}
+
+/** Backing and inset belong to layout, so a photo subject never silently loses readable space. */
+export function capabilityInset(card: FridgeCard): number {
+  return readingSurface(card.capability, card.shape === 'subject' && card.subjectPhoto, false) ? 8 : 0;
+}
+export function cardCapabilityMinimum(card: FridgeCard, compact: boolean = true, width: number = 0): CapabilitySize {
+  const inset = capabilityInset(card), size = capabilityMinimum(card.capability, compact, Math.max(0,width - inset*2));
+  if(card.capability!==null) { size.w += inset*2; size.h += inset*2; } return size;
+}
+/** Presets choose a readable island inside the actual silhouette; artwork geometry stays intact. */
+export function capabilityPreset(card: FridgeCard, anchor: string): ElementBox {
+  const safe = safeContentBox(card), min = cardCapabilityMinimum(card, false, card.w*safe.w), box = new ElementBox();
+  box.w = Math.min(safe.w,Math.max(cardCapabilityMinimum(card,true).w,min.w)/card.w);
+  box.h = Math.min(safe.h,min.h/card.h); box.x = safe.x + (safe.w-box.w)/2;
+  box.y = safe.y + (safe.h-box.h)*(anchor==='top'?0:anchor==='bottom'?1:.5);
+  box.opacity=1; return box;
 }
