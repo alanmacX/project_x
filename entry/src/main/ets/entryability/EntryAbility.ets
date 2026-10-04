@@ -5,10 +5,12 @@ import { window } from '@kit.ArkUI';
 const TAG: string = 'EntryAbility';
 
 export default class EntryAbility extends UIAbility {
+  private launchPage: string = 'pages/Index';
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     hilog.info(0x0000, TAG, 'onCreate');
     AppStorage.setOrCreate('appBackgrounded', false); this.updateAppearance(this.context.config.colorMode);
     this.routeCard(want);
+    if (want.parameters?.['demo'] === 'sketch') this.launchPage = 'pages/SketchLab';
   }
 
   private mainWindow: window.Window | null = null;
@@ -50,7 +52,7 @@ export default class EntryAbility extends UIAbility {
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
     const mainWindow = windowStage.getMainWindowSync(); this.mainWindow = mainWindow;
-    windowStage.loadContent('pages/Index', (err) => {
+    windowStage.loadContent(this.launchPage, (err) => {
       if (err.code) {
         hilog.error(0x0000, TAG, 'loadContent failed %{public}s', JSON.stringify(err));
         return;
