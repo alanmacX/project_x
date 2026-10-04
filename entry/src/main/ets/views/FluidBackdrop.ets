@@ -14,7 +14,7 @@ export struct FluidBackdrop {
   aboutToAppear(): void {
     this.startTimer = setTimeout(() => {
       this.startTimer = -1;
-      this.getUIContext().animateTo({ duration: 18000, iterations: -1, playMode: PlayMode.Alternate,
+      this.getUIContext().animateTo({ duration: 180000, iterations: -1, playMode: PlayMode.Alternate,
         curve: Curve.EaseInOut, expectedFrameRateRange: motionFrameRate() }, () => { this.phase = 1; });
     }, 80);
   }
@@ -33,8 +33,8 @@ export struct FluidBackdrop {
         y:(highlight?Math.max(0,Math.min(1,p.y+.24*Math.cos(k*1.7+1))):p.y)*this.viewH-this.radius(k) })
       .scale({ x:(highlight?.85:1)*(1+this.phase*.12*Math.sin(k+1)),
         y:this.ratio(k)*(highlight?.85:1)*(1+this.phase*.16*Math.cos(k+2)) })
-      .translate({ x:this.phase*this.viewW*.2*Math.sin(k*2.1+(highlight?3:1)),
-        y:this.phase*this.viewH*.2*Math.cos(k*1.8+(highlight?2:0)) })
+      .translate({ x:this.phase*this.viewW*.08*Math.sin(k*2.1+(highlight?3:1)),
+        y:this.phase*this.viewH*.08*Math.cos(k*1.8+(highlight?2:0)) })
   }
   build() {
     Stack({alignContent:Alignment.TopStart}) {

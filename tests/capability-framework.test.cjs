@@ -52,3 +52,19 @@ let travel={...placed};const started=performance.now();for(let i=0;i<5000;i++){t
 
 const material=load('ChromeMaterial');
 material.prepareChromeMaterial().then(()=>{const old={systemMaterial:()=>{throw Error('API26 method called on API24');}};material.immersiveChrome().applyNormalAttribute(old);material.immersiveReading('#E0FFFFFF').applyNormalAttribute(old);assert.equal(material.chromeMaterial(),undefined);console.log('PASS API24 material module and method guards');}).catch(e=>{console.error(e);process.exitCode=1;});
+
+const gg=load('GroupGeometry');
+for(const height of [s.BOARD_H,280,740]) {
+ const members=[{...new s.FridgeCard(),id:'ga',x:-12,y:31,w:120,h:180,rot:23},{...new s.FridgeCard(),id:'gb',x:190,y:180,w:100,h:90,rot:-40}];
+ const before=members.map(c=>({...c})),box=gg.groupBox(members,height),cx=box.x+box.w/2,cy=box.y+box.h/2;
+ const origin=c=>({x:c.x,y:c.y*height/s.BOARD_H+c.h});
+ const centre=c=>{const a=c.rot*Math.PI/180,o=origin(c);return {x:o.x+c.w/2*Math.cos(a)+c.h/2*Math.sin(a),y:o.y+c.w/2*Math.sin(a)-c.h/2*Math.cos(a)};};
+ gg.transformGroup(members,box,height,1.35,67);
+ members.forEach((c,i)=>{const b=centre(before[i]),v=centre(c),a=67*Math.PI/180;assert.ok(Math.abs(v.x-(cx+1.35*((b.x-cx)*Math.cos(a)-(b.y-cy)*Math.sin(a))))<1e-8);assert.ok(Math.abs(v.y-(cy+1.35*((b.x-cx)*Math.sin(a)+(b.y-cy)*Math.cos(a))))<1e-8);});
+ gg.transformGroup(members,box,height,1/1.35,-67);
+ members.forEach((c,i)=>{for(const key of ['x','y','w','h','rot'])assert.ok(Math.abs(c[key]-before[i][key])<1e-8,'group pose roundtrip '+height+' '+key);});
+ assert.ok(gg.groupMinimumScale(members)>0);
+ grouping.ungroupCards(members,'');assert.equal(members.length,2);
+}
+const snap=load('CardViewSnapshot'),ungrouped=new s.FridgeCard();ungrouped.id='reactive-group';ungrouped.groupId='group';const oldSnap=snap.cardRenderSnapshot(ungrouped);grouping.ungroupCards([ungrouped],'group');const newSnap=snap.cardRenderSnapshot(ungrouped);assert.notEqual(oldSnap,newSnap);assert.equal(newSnap.groupId,'','ungroup publishes a new reactive render snapshot');
+console.log('PASS group centre/pivot, scale/rotation roundtrip across widget aspects; reactive ungroup snapshot');

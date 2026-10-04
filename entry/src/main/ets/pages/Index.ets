@@ -18,7 +18,9 @@ import { CapabilitySettings } from '../views/CapabilitySettings';
 import { primeRenderContours } from '../model/RenderContours';
 import { storageSnapshot } from '../model/StorageSnapshot';
 import { CanvasEntry } from '../model/CanvasLibrary';
-import { BoardMotion } from '../model/BoardMotion';
+import { GroupSelection } from '../views/GroupSelection';
+import { GroupBox, groupBox, groupMinimumScale, transformGroup } from '../model/GroupGeometry';
+import { BoardMotion, GroupPose } from '../model/BoardMotion';
 import { layerSections, LayerSection, combineCards, ungroupCards, groupMembers, groupDragBounds, cleanGroups } from '../model/CardGroups';
 import { PhotoCrop } from '../views/PhotoCrop';
 import { CanvasBackdrop } from '../views/CanvasBackdrop';
@@ -674,7 +676,7 @@ struct Index {
     });
   }
   private boardInteraction(id: string, active: boolean): void {
-    if (active) { const card = this.store.findCard(id); this.movingGroupIds = card === null ? [] : groupMembers(this.store.state.cards, card).filter((c: FridgeCard) => c.id !== id).map((c: FridgeCard) => c.id); this.boardMotion.ids = this.movingGroupIds.length > 0 ? [id, ...this.movingGroupIds] : []; }
+    if (active) { this.selectedId=id; const card = this.store.findCard(id); this.movingGroupIds = card === null ? [] : groupMembers(this.store.state.cards, card).filter((c: FridgeCard) => c.id !== id).map((c: FridgeCard) => c.id); this.boardMotion.ids = this.movingGroupIds.length > 0 ? [id, ...this.movingGroupIds] : []; }
     else { this.boardMotion.offset = { x: 0, y: 0 }; this.boardMotion.ids = []; this.movingGroupIds = []; }
     this.activeBoardId = active ? id : '';
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer); this.saveTimer = -1;
@@ -807,6 +809,12 @@ struct Index {
           }.width('100%').height('100%').opacity(this.editorOpacity).hitTestBehavior(HitTestMode.None)
         }
         this.editingScene()
+        if(!this.editing && !this.viewing && !this.arriving && !this.groupSelecting && this.selectedGroup().length>1) {
+          GroupSelection({motion:this.boardMotion,box:this.selectedGroupBox(),minimum:groupMinimumScale(this.selectedGroup()),maximum:this.groupMaximumScale(),
+            viewportW:BOARD_W*this.boardScale,viewportH:this.boardHeight,
+            onBegin:()=>this.beginGroupTransform(),onFinish:(scale:number,angle:number)=>this.finishGroupTransform(scale,angle),onCancel:()=>this.cancelGroupTransform()})
+            .position({x:this.boardLeft,y:this.boardTop}).zIndex(100003)
+        }
         if (this.editorMounted) { this.editor() }
         if (this.viewing) { this.detail() }
       }
@@ -837,7 +845,7 @@ struct Index {
             Stack({ alignContent: Alignment.TopStart }) {
             BoardCard({ controlViewportWidth: BOARD_W * this.boardScale, controlViewportHeight: this.boardHeight, motion: this.boardMotion, card: this.sceneCard(id), localCoordinates: true, cacheSurface: this.heroActive || this.arriving, scatterAngle: 0, editingSurface: this.editing,
               displayAngle: id === this.selectedId ? this.surfaceAngle() : this.cardMap[id].rot + this.scatter * (this.cardMap[id].z % 2 === 0 ? 9 : -9),
-              selected: this.selectedId === id && !this.editing && !this.groupSelecting, scaleFactor: this.boardScale, yScaleFactor: this.boardHeight / BOARD_H,
+              selected: this.selectedId === id && !this.editing && !this.groupSelecting && this.selectedGroup().length < 2, scaleFactor: this.boardScale, yScaleFactor: this.boardHeight / BOARD_H,
               hideContent: this.editing && id === this.selectedId && this.settingsTab === 0,
               movingLayerId: id === this.selectedId ? this.layerDrag : '',
               moveX: id === this.selectedId && this.editing ? this.layerDX * this.boardScale / this.editorScale() : 0, moveY: id === this.selectedId && this.editing ? this.layerDY * this.boardScale / this.editorScale() : 0, tick: this.tick,
@@ -846,7 +854,8 @@ struct Index {
               onSelect: (id: string) => this.selectLayerCard(id), onDelete: (id: string) => this.deleteCard(id),
               onEdit: (id: string) => this.openEditor(id), onInteraction: (active: boolean) => this.boardInteraction(id, active), onCommit: (updated: FridgeCard) => this.commitGeometry(updated) })
           }.width(this.sceneCard(id).w * this.boardScale + 48).height(this.sceneCard(id).h * this.boardScale + 48)
-            .scale({ x: this.sceneScale(id), y: this.sceneScale(id), centerX: 24, centerY: 24 })
+            .scale({ x: this.sceneScale(id)*this.groupScale(id), y: this.sceneScale(id)*this.groupScale(id), centerX: this.groupPivotX(id), centerY: this.groupPivotY(id) })
+            .rotate({angle:this.boardMotion.transformIds.includes(id)?this.boardMotion.pose.angle:0,centerX:this.groupPivotX(id),centerY:this.groupPivotY(id)})
             .position({ x: this.sceneX(id) - 24 - this.creationClipX(id), y: this.sceneY(id) - 24 - this.creationClipY(id) })
             .translate({ x: this.arrivalX(id), y: this.arrivalY(id) })
             .hitTestBehavior(this.editing || this.arriving ? HitTestMode.None : HitTestMode.Transparent)
@@ -889,8 +898,31 @@ struct Index {
     if (this.groupSelection.length < 2) return;
     combineCards(this.store.state.cards, this.groupSelection, this.store.newId()); this.groupSelecting = false; this.groupSelection = []; this.renderBoard(); this.persist(true);
   }
+  private selectedGroup():FridgeCard[] {
+    const card=this.cardMap[this.selectedId];return card&&card.groupId?this.cards.filter((c:FridgeCard)=>c.groupId===card.groupId):[];
+  }
+  private selectedGroupBox():GroupBox {
+    const logical=groupBox(this.selectedGroup(),this.boardHeight/this.boardScale),box=new GroupBox();
+    box.x=logical.x*this.boardScale;box.y=logical.y*this.boardScale;box.w=logical.w*this.boardScale;box.h=logical.h*this.boardScale;return box;
+  }
+  private groupScale(id:string):number{return this.boardMotion.transformIds.includes(id)?this.boardMotion.pose.scale:1;}
+  private groupPivotX(id:string):number {if(!this.boardMotion.transformIds.includes(id))return 24;return this.boardMotion.pivot.x-this.sceneX(id)+24;}
+  private groupPivotY(id:string):number {if(!this.boardMotion.transformIds.includes(id))return 24;return this.boardMotion.pivot.y-this.sceneY(id)+24;}
+  private groupMaximumScale():number {let max=4;for(const c of this.selectedGroup())max=Math.min(max,320/c.w,420/c.h);return Math.max(groupMinimumScale(this.selectedGroup()),max);}
+  private beginGroupTransform():void {
+    if(this.saveTimer>=0)clearTimeout(this.saveTimer);this.saveTimer=-1;
+    const b=this.selectedGroupBox();this.boardMotion.pivot={x:this.boardLeft+b.x+b.w/2,y:this.boardTop+b.y+b.h/2};
+    this.boardMotion.pose=new GroupPose();this.boardMotion.transformIds=this.selectedGroup().map((c:FridgeCard)=>c.id);
+  }
+  private cancelGroupTransform():void {this.boardMotion.pose=new GroupPose();this.boardMotion.transformIds=[];}
+  private finishGroupTransform(scale:number,angle:number):void {
+    const card=this.current();if(card===null){this.cancelGroupTransform();return;}
+    const members=groupMembers(this.store.state.cards,card),height=this.boardHeight/this.boardScale;
+    transformGroup(members,groupBox(members,height),height,scale,angle);
+    this.cancelGroupTransform();this.renderBoard();this.scheduleBackground();this.persist(true);
+  }
   private releaseGroup(): void {
-    const card = this.store.findCard(this.selectedId); if (card === null) return; ungroupCards(this.store.state.cards, card.groupId); this.renderBoard(); this.persist(true);
+    const card = this.store.findCard(this.selectedId); if (card === null) return; this.cancelGroupTransform(); ungroupCards(this.store.state.cards, card.groupId); this.renderBoard(); this.persist(true);
   }
   @Builder
   homeLayerRow(id: string) {
@@ -963,8 +995,8 @@ struct Index {
           Row({ space: 12 }) {
             Button('上移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome()).onClick(() => this.moveCardLayer(this.selectedId, true))
             Button('下移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome()).onClick(() => this.moveCardLayer(this.selectedId, false))
+            if((this.cardMap[this.selectedId]?.groupId??'').length>0) { Button('取消组合',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome()).onClick(()=>this.releaseGroup()) }
             Blank()
-            if((this.store.findCard(this.selectedId)?.groupId??'').length>0) { Button('取消组合',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome()).onClick(()=>this.releaseGroup()) }
           }.width('100%')
         }
         }.width('100%').padding(8)
