@@ -72,6 +72,8 @@ function load(name) {
  const other=new FridgeCard();other.id='other';other.capability={k:'battery'};store.addCard(other);await store.save();
  assert.equal(JSON.parse(disk.get(canvasKey('canvas_main'))).cards[0].id,'original','new canvas never overwrites original');
  assert.equal(updates.at(-1).data.canvasId,'canvas_main','switching app does not replace original desktop form');
+ const inactive=await store.canvasSnapshot('canvas_main');assert.equal(inactive.cards[0].id,'original');assert.equal(store.state.canvasId,second,'sharing inactive canvas never activates it');inactive.cards[0].x=999;assert.notEqual(JSON.parse(disk.get(canvasKey('canvas_main'))).cards[0].x,999);
+ const active=await store.canvasSnapshot(second);active.cards[0].paper='#000000';assert.notEqual(store.state.cards[0].paper,'#000000','sharing snapshot is detached from live editor');
  disk.set('fridge_form_dims_json',JSON.stringify({home:'4*4',second:'4*4'}));disk.set('fridge_form_bindings_json',JSON.stringify({home:'canvas_main',second}));
  store.state.cards[0].paper='#ABCDEF';await store.save();assert.equal(updates.at(-1).id,'second');
  const reloaded=new FridgeStore();await reloaded.init({});assert.equal(reloaded.state.canvasId,second);assert.equal(reloaded.documents.length,1,'cold start loads only active artwork');

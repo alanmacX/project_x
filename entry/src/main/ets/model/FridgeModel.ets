@@ -40,6 +40,17 @@ export class FridgeStore {
     const doc=new CanvasDocument();doc.id=id;doc.name=entry.name;doc.state=normalizeState(raw);doc.state.canvasId=id;
     cleanGroups(doc.state.cards);doc.state.cards.forEach((c)=>clampCardGeometry(c));this.documents=this.documents.filter((c)=>c.id!==id);this.documents.push(doc);this.savedScenes[id]=json;return this.switchCanvas(id);
   }
+  /** Export a detached snapshot; sharing an inactive canvas never changes widget bindings. */
+  async canvasSnapshot(id: string): Promise<FridgeState> {
+    if (id === this.state.canvasId) return normalizeState(JSON.parse(storageSnapshot(this.state)) as FridgeState);
+    await this.saveQueue;
+    if (!this.catalog.canvases.some((entry)=>entry.id===id) || this.prefs===null) throw new Error('画布不存在');
+    const json=await this.prefs.get(canvasKey(id),'') as string;
+    if (!json) throw new Error('画布记录缺失');
+    const raw=JSON.parse(json) as FridgeState;
+    if (!Array.isArray(raw.cards)) throw new Error('画布数据损坏');
+    return normalizeState(raw);
+  }
   createCanvas(name: string, source?: FridgeState): string {
     const id = 'canvas_' + Date.now() + '_' + (++this.sequence);
     const doc = new CanvasDocument(); doc.id = id; doc.name = name.trim().slice(0,40) || '新画布';

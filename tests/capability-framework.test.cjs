@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
 const root=path.resolve(__dirname,'../entry/src/main/ets/model'),cache=new Map();
-function load(name){const file=path.resolve(root,name+'.ets');if(cache.has(file))return cache.get(file).exports;const mod={exports:{}};cache.set(file,mod);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;vm.runInThisContext('(function(require,module,exports){'+code+'\n})',{filename:file})(s=>s==='@kit.ArkTS'?{taskpool:{}}:load(path.relative(root,path.resolve(path.dirname(file),s))),mod,mod.exports);return mod.exports;}
+function load(name){const file=path.resolve(root,name+'.ets');if(cache.has(file))return cache.get(file).exports;const mod={exports:{}};cache.set(file,mod);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;vm.runInThisContext('(function(require,module,exports){'+code+'\n})',{filename:file})(s=>s==='@kit.ArkTS'?{taskpool:{}}:s==='@kit.BasicServicesKit'?{deviceInfo:{sdkApiVersion:24}}:load(path.relative(root,path.resolve(path.dirname(file),s))),mod,mod.exports);return mod.exports;}
 const s=load('CardSchema'),c=load('CapabilityCatalog'),p=load('CapabilityPresentation'),g=load('CanvasLayout'),m=load('CapabilityMetrics'),intake=load('ParcelIntake'),actions=load('WidgetActions'),hit=load('WidgetHitTest'),templates=load('TemplatePackage');
 assert.deepEqual(c.CAPABILITY_CATALOG.map(x=>x.key).sort(),s.CAPABILITIES.slice().sort(),'every shipped capability has a source/purpose/detail contract');
 for(const cap of c.CAPABILITY_CATALOG){assert.ok(cap.source&&cap.summary&&cap.detail);assert.ok(c.CAPABILITY_GROUPS.includes(cap.group));const min=m.capabilityMinimum({k:cap.key},true);assert.ok(min.w>=64&&min.h>=36);}
@@ -31,3 +31,24 @@ const normalized=s.normalizeState({...s.defaultState(),cards:[{...new s.FridgeCa
 console.log('PASS capability framework: complete catalog; adaptive list budgets; protected photo reading insets; shape-safe presets; local labelled pickup parsing/merge/capacity; 44vp rendered/hit geometry; compact deep links; template locality; month migration');
 
 const viewport=load('EditorViewport');for(const body of [220,260,300]){const pane=viewport.editorPreviewPaneHeight(body,true);assert.ok(pane>body-164,'short landscape gives usable height back to artwork');assert.ok(body-pane-16>=92,'one-line layers retain 44vp targets, heading and padding');const v=viewport.editorViewport(240,280,15,400,body+100,0,24,true,pane);assert.ok(v.scale*280>40,'rotated preview remains useful for placement');}
+
+const grouping=load('CardGroups');
+const grouped=['a','b','c','d'].map((id,i)=>({...new s.FridgeCard(),id,z:4-i,groupId:['a','c'].includes(id)?'same':''}));
+const order=grouped.map(x=>x.id);const sections=grouping.layerSections(grouped);assert.deepEqual(sections[0].ids,['a','c']);assert.equal(sections[0].title,'组合 1');assert.deepEqual(grouped.map(x=>x.id),order,'layer grouping does not rewrite canvas stacking');
+for(const ink of ['#262824','#FFFFFF','#777777','#AA4455','#FFDD00','#000000','#234567']) {
+ const tint=p.readingGlassColor(ink),alpha=parseInt(tint.slice(1,3),16)/255,rgb=[3,5,7].map(x=>parseInt(tint.slice(x,x+2),16));
+ for(const bg of [0,255]){const blend='#'+rgb.map(x=>Math.round(x*alpha+bg*(1-alpha)).toString(16).padStart(2,'0')).join('');assert.ok(p.textContrast(ink,blend)>=4.5,'glass tint protects text even on extreme backdrops');}
+}
+const shape=new s.FridgeCard();shape.shape='subject';shape.subjectBorder=false;shape.w=300;shape.h=300;shape.capability={k:'clock'};
+shape.outline=[[{x:0,y:0},{x:1,y:0},{x:1,y:.4},{x:.4,y:.4},{x:.4,y:1},{x:0,y:1}]];
+shape.capBox={x:.08,y:.7,w:.28,h:.14,rot:0,opacity:1};const placed=g.capabilityPlacement(shape);assert.ok(Math.abs(placed.y-.7)<.001,'requested lower arm remains outside the largest upper rectangle');
+shape.elements=[{...new s.CanvasElement(),kind:'text',x:0,y:0,w:1,h:1}];assert.ok(g.capabilityObstructed(shape));assert.ok(g.capabilityPlacement(shape).y>.5,'intentional overlap never automatically relocates a capability');
+const previous={...placed},requested={...placed,x:.65,y:.65};const constrained=g.constrainCapabilityDrag(shape,requested,previous);assert.ok(constrained.x+constrained.w<=.4+.001 || constrained.y+constrained.h<=.4+.001,'gesture never enters transparent cutout');
+console.log('PASS grouped layer ordering; detached canvas snapshots; worst-case glass contrast; whole-silhouette placement and bounded drag');
+
+const hollow={...shape,cutout:'',outline:[[{x:0,y:0},{x:1,y:0},{x:1,y:1},{x:0,y:1}],[{x:.4,y:.4},{x:.6,y:.4},{x:.6,y:.6},{x:.4,y:.6}]],elements:[],capBox:{x:.3,y:.3,w:.28,h:.14,rot:0,opacity:1}};
+const holeFit=g.capabilityPlacement(hollow);assert.ok(holeFit.x+holeFit.w<=.4 || holeFit.x>=.6 || holeFit.y+holeFit.h<=.4 || holeFit.y>=.6,'capability never covers a transparent hole');
+let travel={...placed};const started=performance.now();for(let i=0;i<5000;i++){travel=g.constrainCapabilityDrag(shape,{...travel,x:.08+(i%10)*.002,y:.7+(i%7)*.002},travel);}console.log('5000 cached capability drag queries: '+(performance.now()-started).toFixed(2)+' ms (model CPU, not device FPS)');
+
+const material=load('ChromeMaterial');
+material.prepareChromeMaterial().then(()=>{const old={systemMaterial:()=>{throw Error('API26 method called on API24');}};material.immersiveChrome().applyNormalAttribute(old);material.immersiveReading('#E0FFFFFF').applyNormalAttribute(old);assert.equal(material.chromeMaterial(),undefined);console.log('PASS API24 material module and method guards');}).catch(e=>{console.error(e);process.exitCode=1;});

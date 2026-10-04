@@ -364,7 +364,7 @@ function load(name) {
   const layout = new FridgeCard(); layout.id='avoid'; layout.capability={k:'calendar'};
   const text = new CanvasElement(); text.id='obstacle'; text.x=.1; text.y=.1; text.w=.8; text.h=.45;
   layout.elements=[text]; const free=capabilityBox(layout);
-  assert.ok(free.w > 0 && free.h*layout.h >= 62, 'compact week fits a free strip without covering the custom text');
+  assert.ok(free.w > 0 && free.h*layout.h >= 62, 'overlapping composition retains a readable compact week');
   const interior=subjectInterior([[{x:.2,y:.1},{x:.8,y:.1},{x:.8,y:.9},{x:.2,y:.9}]]);
   assert.ok(interior.x>=.2 && interior.y>=.1 && interior.x+interior.w<=.8 && interior.y+interior.h<=.9);
   assert.equal(resizeFactor(180,180,18,-18,0),1.1);
@@ -445,7 +445,7 @@ function load(name) {
   bird.outline=[[{x:.25,y:.2},{x:.75,y:.2},{x:.75,y:.8},{x:.25,y:.8}]];
   const birdMin=minimumCardSize(bird);assert.ok(birdMin.w<170 && birdMin.h<120,'weather on a half-width silhouette no longer requires a near-maximum card');
   bird.w=birdMin.w;bird.h=birdMin.h;assert.equal(ensureCapabilitySize(bird),true);
-  const slot=capabilityPlacement(bird);assert.ok(slot.w*bird.w>=72-.01 && slot.h*bird.h>=56-.01);
+  const slot=capabilityPlacement(bird);assert.ok(slot.w*bird.w>=64-.01 && slot.h*bird.h>=48-.01);
   bird.subjectBorder=true;const bordered=safeContentBox(bird);assert.ok(bordered.w<safeContentBox({...bird,subjectBorder:false}).w,'white edge remains within measured box and reserves content space');
   assert.equal(normalizeState({schemaVersion:2,cards:[bird]}).cards[0].subjectBorder,true);
   assert.equal(new FridgeCard().subjectBorder,true,'new cutouts default to sticker border');

@@ -47,3 +47,14 @@ export function readingWarning(card:FridgeCard):string {
   const colors=materialColors(card.material,card.paper,card.ink);
   return textContrast(colors[1],colors[0])<4.5?'文字对比度偏低，可启用阅读衬底或调整内容颜色':'';
 }
+
+/** Contrast against the worst possible photograph, rather than a guessed average. */
+export function readingGlassColor(ink:string):string {
+  const base=readingSurfaceColor(ink),rgb=[1,3,5].map((start:number)=>parseInt(base.slice(start,start+2),16));
+  for(let opacity=160;opacity<=255;opacity++) {
+    const alpha=opacity/255;
+    const mixed=(back:number):string=>'#'+rgb.map((value:number)=>Math.round(value*alpha+back*(1-alpha)).toString(16).padStart(2,'0')).join('');
+    if(textContrast(ink,mixed(0))>=4.5 && textContrast(ink,mixed(255))>=4.5) return '#'+opacity.toString(16).padStart(2,'0')+base.slice(1);
+  }
+  return '#FF'+base.slice(1);
+}

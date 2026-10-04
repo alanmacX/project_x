@@ -18,6 +18,6 @@ export async function sharePixelMap(context: common.UIAbilityContext, pixel: ima
 }
 
 export async function shareTemplateFile(context: common.UIAbilityContext, path: string, anchor: string): Promise<void> {
-  const data=new systemShare.SharedData({utd:uniformTypeDescriptor.UniformDataType.FILE,uri:fileUri.getUriFromPath(path),title:path.includes('/卡片_')?'可编辑卡片':'可编辑画布',description:'保存作品包后，在 App 的作品菜单中导入'});
+  const data=new systemShare.SharedData({utd:uniformTypeDescriptor.UniformDataType.FILE,uri:fileUri.getUriFromPath(path),title:path.includes('/卡片_')?'可编辑卡片':'可编辑画布',description:'保存作品包后，点击 App 首页的“导入”打开'});
   await new systemShare.ShareController(data).show(context,{anchor:anchor,previewMode:systemShare.SharePreviewMode.DETAIL});
 }

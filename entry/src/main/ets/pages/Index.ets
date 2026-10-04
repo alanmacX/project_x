@@ -1,3 +1,5 @@
+import { SymbolGlyphModifier } from '@kit.ArkUI';
+import { immersiveChrome, prepareChromeMaterial } from '../model/ChromeMaterial';
 import { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
 import { SettingsSelect } from '../views/SettingsSelect';
 import { SettingsSegmented } from '../views/SettingsSegmented';
@@ -17,7 +19,7 @@ import { primeRenderContours } from '../model/RenderContours';
 import { storageSnapshot } from '../model/StorageSnapshot';
 import { CanvasEntry } from '../model/CanvasLibrary';
 import { BoardMotion } from '../model/BoardMotion';
-import { combineCards, ungroupCards, groupMembers, groupDragBounds, cleanGroups } from '../model/CardGroups';
+import { layerSections, LayerSection, combineCards, ungroupCards, groupMembers, groupDragBounds, cleanGroups } from '../model/CardGroups';
 import { PhotoCrop } from '../views/PhotoCrop';
 import { CanvasBackdrop } from '../views/CanvasBackdrop';
 import { CanvasBackground, FridgeState, normalizeState, normalizeBackground } from '../model/CardSchema';
@@ -31,7 +33,7 @@ import { common } from '@kit.AbilityKit';
 import { AppDesign } from '../model/AppDesign';
 import { arrivalOffset } from '../model/ArrivalGeometry';
 import { motionFrameRate } from '../model/MotionPolicy';
-import { HdsNavigation, HdsNavigationTitleMode, TextStyleMode, ScrollEffectType, BlurStrategy, hdsMaterial } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode, TextStyleMode, ScrollEffectType, BlurStrategy, hdsMaterial } from '@kit.UIDesignKit';
 import { EditorViewport, editorViewport, editorPreviewPaneHeight } from '../model/EditorViewport';
 import { SelectionHandles, selectionHandles } from '../model/SelectionHandles';
 import { CardEditHistory } from '../model/CardEditHistory';
@@ -46,7 +48,7 @@ import { extractSubject, repairSubject } from '../model/SubjectShape';
 import { fetchWeather } from '../model/WeatherService';
 import { weatherNeedsRefresh } from '../model/WeatherRefresh';
 import { BoardCard } from '../views/BoardCard';
-import { capabilityBox, capabilityPlacement, safeContentBox, clampCardGeometry, ensureCapabilitySize, subjectSurfaceFactor, cardHandlePoint } from '../model/CanvasLayout';
+import { constrainCapabilityDrag, cardCapabilityMinimum, capabilityBox, capabilityPlacement, safeContentBox, clampCardGeometry, ensureCapabilitySize, subjectSurfaceFactor, cardHandlePoint } from '../model/CanvasLayout';
 import { fileIo } from '@kit.CoreFileKit';
 import { cropCardToSubject } from '../model/SubjectGeometry';
 import { applyCalendarAction } from '../model/CapabilityActions';
@@ -196,7 +198,9 @@ struct Index {
   }
   private initialize(): void {
     if (this.context === null) return;
+    const materialReady=prepareChromeMaterial();
     this.store.init(this.context).then(async () => {
+      await materialReady;
       if (this.routeCanvasId) await this.store.openCanvas(this.routeCanvasId);
       this.refreshCanvasList();
       // Resolve FormKit geometry before revealing the scene; a late aspect update jumps after arrival.
@@ -289,13 +293,19 @@ struct Index {
         List({space:4}) {
           ForEach(this.canvasEntries.map((entry:CanvasEntry)=>entry.id),(id:string)=>{
             ListItem() {
+              Row({space:8}) {
               Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {
                 Row({space:8}) {
                   Text(this.canvasTitle(id)).fontColor(this.appText()).fontSize(14).layoutWeight(1).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
                   if(id===this.store.state.canvasId) {SymbolGlyph($r('sys.symbol.checkmark')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}
                 }.width('100%')
-              }.width('100%').height(48).padding({left:12,right:12}).backgroundColor(id===this.store.state.canvasId?this.appControl():Color.Transparent)
+              }.layoutWeight(1).height(48).padding({left:12,right:12}).backgroundColor(id===this.store.state.canvasId?this.appControl():Color.Transparent)
                 .accessibilityText('切换到 '+this.canvasTitle(id)).onClick(()=>this.chooseCanvas(id))
+                Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
+                  SymbolGlyph($r('sys.symbol.rectangle_and_arrowshape_turn_up_right')).fontSize(20).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
+                }.id('shareCanvas_'+id).width(44).height(44).backgroundColor(Color.Transparent).attributeModifier(immersiveChrome()).enabled(!this.sharing)
+                  .accessibilityText('分享 '+this.canvasTitle(id)).onClick(()=>this.shareCanvasFromPicker(id))
+              }.width('100%')
             }
           },(id:string)=>id)
         }.width('100%').height(Math.min(200,Math.max(48,this.canvasEntries.length*52))).scrollBar(BarState.Off)
@@ -872,7 +882,7 @@ struct Index {
     }.width('100%').height('100%').opacity(this.boardOpacity).accessibilityLevel(this.editing || this.viewing ? 'no-hide-descendants' : 'auto').hitTestBehavior(this.editing || this.viewing || this.canvasChanging ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Default)
   }
   private selectLayerCard(id: string): void {
-    if (!this.groupSelecting) { this.select(id); return; }
+    if (!this.groupSelecting) { if(this.selectedId===id)this.selectedId='';else this.select(id); return; }
     this.groupSelection = this.groupSelection.includes(id) ? this.groupSelection.filter((value: string) => value !== id) : this.groupSelection.concat([id]);
   }
   private confirmGroup(): void {
@@ -883,26 +893,7 @@ struct Index {
     const card = this.store.findCard(this.selectedId); if (card === null) return; ungroupCards(this.store.state.cards, card.groupId); this.renderBoard(); this.persist(true);
   }
   @Builder
-  homeLayers() {
-      Column({ space: 12 }) {
-        Row() {
-          Text('图层').fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText()); Blank()
-          Button({type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
-            Row({space:6}) {
-              Text(this.canvasName).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
-              SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
-            }.width('100%')
-          }.padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).width(Math.min(130,Math.max(64,this.panelWidth-220))).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).margin({right:8}).onClick(()=>{if(this.canvasChanging)return;this.refreshCanvasList();this.canvasCreating=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
-            .bindPopup(this.canvasPickerOpen,{builder:this.canvasPicker,placement:Placement.Top,width:this.canvasPopupWidth(),radius:20,
-              popupColor:this.appSurface(),backgroundBlurStyle:BlurStyle.NONE,enableArrow:true,autoCancel:true,focusable:true,keyboardAvoidMode:KeyboardAvoidMode.DEFAULT,
-              mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible){this.canvasPickerOpen=false;this.canvasCreating=false;}}})
-          Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).margin({ right: 8 }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
-          Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([Color.White]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(24).backgroundColor('#262626').fontColor(Color.White).accessibilityText('添加卡片').onClick(() => this.addCard())
-        }.width('100%')
-        Stack({ alignContent: Alignment.Bottom }) {
-        Scroll() {
-          Column({ space: 8 }) {
-            ForEach(this.orderedCards().map((item: FridgeCard) => item.id), (id: string, index: number) => {
+  homeLayerRow(id: string) {
               Row({ space: 12 }) {
                 if (this.groupSelecting) {
                   Checkbox().select(this.groupSelection.includes(id)).shape(CheckBoxShape.CIRCLE).width(24).height(24).margin(10)
@@ -919,14 +910,43 @@ struct Index {
                     }.width(52).height(52).hitTestBehavior(HitTestMode.None)
                     Column({space:4}) {
                       Text(layerLabel(this.cardMap[id])).fontSize(14).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontColor(this.appText()).width('100%')
-                      Text((this.cardMap[id].groupId.length>0?'组合 · ':'')+(index===0?'最上层 · ':'')+(this.cardMap[id].capability!==null?typeLabel(this.cardMap[id].capability?.k??''):'自定义')).fontSize(11).fontColor(this.appMuted()).width('100%')
+                      Text((this.orderedCards()[0]?.id===id?'最上层 · ':'')+(this.cardMap[id].capability!==null?typeLabel(this.cardMap[id].capability?.k??''):'自定义')).fontSize(11).fontColor(this.appMuted()).width('100%')
                     }.layoutWeight(1).hitTestBehavior(HitTestMode.None)
                   }.width('100%')
                 }.layoutWeight(1).height(60).padding(0).backgroundColor(Color.Transparent)
                   .accessibilityText('选择卡片 '+layerLabel(this.cardMap[id])).onClick(()=>this.selectLayerCard(id))
                 Button('编辑',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(AppDesign.controlHeight).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.groupSelecting).onClick(()=>this.openEditor(id))
+                Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL,role:ButtonRole.ERROR}) {
+                  SymbolGlyph($r('sys.symbol.trash')).fontSize(18).fontColor(['#C43A35']).hitTestBehavior(HitTestMode.None)
+                }.width(44).height(44).backgroundColor(this.appControl()).enabled(!this.groupSelecting).accessibilityText('删除 '+layerLabel(this.cardMap[id])).onClick(()=>this.deleteCard(id))
               }.width('100%').padding(8).borderRadius(12).backgroundColor(this.appSurface()).border({width:!this.groupSelecting&&this.selectedId===id?1.5:0,color:this.appMuted()})
-            }, (id: string) => id)
+  }
+  @Builder
+  homeLayers() {
+      Column({ space: 12 }) {
+        Row() {
+          Text('图层').fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText()); Blank()
+          Button({type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
+            Row({space:6}) {
+              Text(this.canvasName).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
+              SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
+            }.width('100%')
+          }.id('shareCanvas').padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).width(Math.min(130,Math.max(64,this.panelWidth-220))).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).margin({right:8}).onClick(()=>{if(this.canvasChanging)return;this.refreshCanvasList();this.canvasCreating=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
+            .bindPopup(this.canvasPickerOpen,{builder:this.canvasPicker,placement:Placement.Top,width:this.canvasPopupWidth(),radius:20,
+              popupColor:this.appSurface(),backgroundBlurStyle:BlurStyle.NONE,enableArrow:true,autoCancel:true,focusable:true,keyboardAvoidMode:KeyboardAvoidMode.DEFAULT,
+              mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible){this.canvasPickerOpen=false;this.canvasCreating=false;}}})
+          Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).margin({ right: 8 }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
+          Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([Color.White]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(24).backgroundColor('#262626').fontColor(Color.White).accessibilityText('添加卡片').onClick(() => this.addCard())
+        }.width('100%')
+        Stack({ alignContent: Alignment.Bottom }) {
+        Scroll() {
+          Column({ space: 8 }) {
+            ForEach(layerSections(this.orderedCards()), (section: LayerSection) => {
+              Column({space:4}) {
+                if(section.title.length>0) { Text(section.title).fontSize(12).fontWeight(FontWeight.Medium).fontColor(this.appMuted()).width('100%').padding({left:8,top:8,bottom:4}) }
+                ForEach(section.ids,(id:string)=>{ this.homeLayerRow(id) },(id:string)=>id)
+              }.width('100%')
+            }, (section:LayerSection)=>section.id+':'+section.title+':'+section.ids.join(','))
           }.width('100%').padding({ bottom: this.homeActionHeight() + 8 })
         }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
         if (this.homeActionHeight() > 0) {
@@ -934,18 +954,17 @@ struct Index {
         if (this.groupSelecting) {
           Row() {
             Button('组合 ' + this.groupSelection.length + ' 张卡片', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.EMPHASIZED, role:ButtonRole.NORMAL })
-              .height(44).fontSize(14).padding({left:20,right:20}).enabled(this.groupSelection.length > 1)
-              .accessibilityText('组合选中的 '+this.groupSelection.length+' 张卡片').onClick(() => this.confirmGroup())
+              .height(44).fontSize(14).padding({left:20,right:20}).backgroundColor(this.groupSelection.length>1?AppDesign.selected(this.appDark):this.appControl()).fontColor(this.groupSelection.length>1?AppDesign.onSelected(this.appDark):this.appMuted()).opacity(1).attributeModifier(immersiveChrome())
+              .accessibilityText('组合选中的 '+this.groupSelection.length+' 张卡片').accessibilityDescription(this.groupSelection.length<2?'至少选择两张卡片才能组合':'组合所选卡片').onClick(() => this.confirmGroup())
             Blank()
           }.width('100%')
         }
-        if (!this.groupSelecting && (this.store.findCard(this.selectedId)?.groupId ?? '').length > 0) { Button('取消组合', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.releaseGroup()) }
         if (!this.groupSelecting && this.selectedId.length > 0) {
           Row({ space: 12 }) {
-            Button('上移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.moveCardLayer(this.selectedId, true))
-            Button('下移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.moveCardLayer(this.selectedId, false))
+            Button('上移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome()).onClick(() => this.moveCardLayer(this.selectedId, true))
+            Button('下移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome()).onClick(() => this.moveCardLayer(this.selectedId, false))
             Blank()
-            Button('删除', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.ERROR }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor('#C43A35').shadow({radius:8,color:'#18000000',offsetY:3}).onClick(() => this.deleteCard(this.selectedId))
+            if((this.store.findCard(this.selectedId)?.groupId??'').length>0) { Button('取消组合',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome()).onClick(()=>this.releaseGroup()) }
           }.width('100%')
         }
         }.width('100%').padding(8)
@@ -954,7 +973,7 @@ struct Index {
       }.width(this.panelWidth).height(this.panelHeight - 84).padding(12).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
         .position({ x: this.panelLeft, y: this.panelTop })
   }
-  private homeActionHeight():number {return this.groupSelecting?60:this.selectedId.length===0?0:(this.store.findCard(this.selectedId)?.groupId??'').length>0?108:56;}
+  private homeActionHeight():number {return this.groupSelecting?60:this.selectedId.length===0?0:56;}
   private backgroundLabel(): string {
     return this.canvasBackground.mode === 'smart' ? '智能取色' : this.canvasBackground.mode === 'blend' ? '智能多色' : this.canvasBackground.mode === 'photo' ? '本地照片' : this.canvasBackground.mode === 'preset' ? '柔色预设' : '纯色';
   }
@@ -1048,8 +1067,8 @@ struct Index {
         }.width('100%')
       }.height(56).layoutWeight(1).backgroundColor(Color.Transparent).padding(8).onClick(() => { this.backgroundOpen = true; })
         .bindSheet(this.backgroundOpen, this.backgroundEditor, { height: SheetSize.LARGE, showClose: true, backgroundColor: this.appBackground(), onDisappear: () => { this.backgroundOpen = false; } })
-      Button(this.sharing ? '生成中' : '作品', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).id('shareCanvas').height(44).fontSize(13).padding({ left: 12, right: 12 })
-        .backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.sharing && !this.backgroundBusy).onClick(() => this.shareMenu(false))
+      Button(this.sharing ? '生成中' : '导入', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).id('importTemplate').height(44).fontSize(13).padding({ left: 12, right: 12 })
+        .backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.sharing && !this.backgroundBusy).onClick(() => this.pickTemplate())
     }.width(this.panelWidth).height(72).padding(8).borderRadius(AppDesign.sectionRadius).border({ width: 1, color: AppDesign.border(this.appDark) }).backgroundColor(this.appSurface())
       .position({ x: this.panelLeft, y: this.panelTop + this.panelHeight - 72 })
   }
@@ -1132,13 +1151,21 @@ struct Index {
     console.warn('Template operation failed: '+error.name+' '+error.message);
     this.getUIContext().getPromptAction().showToast({message:prefix+'：'+(error.message??'请重试'),duration:3500});
   }
-  private async shareMenu(single: boolean): Promise<void> {
+  private shareCanvasFromPicker(id:string):void {
+    this.canvasPickerOpen=false;
+    // Native popup dismissal owns focus until its exit finishes; a simultaneous dialog is cancelled.
+    setTimeout(()=>{if(this.alive&&!this.editing&&!this.canvasChanging)this.shareMenu(false,id);},220);
+  }
+  private async shareMenu(single: boolean, canvasId: string = ''): Promise<void> {
     if(this.sharing || this.context === null)return;
-    try { const result=await this.getUIContext().getPromptAction().showActionMenu({title:single?'卡片作品':'画布作品',buttons:[
-      {text:single?'分享可编辑卡片':'分享可编辑画布',color:this.appText()}, {text:'导出成品图片',color:this.appText()}, {text:'导入作品包',color:this.appText()}]});
-      if(result.index===1){await this.shareArtwork(single);return;}if(result.index===2){await this.pickTemplate();return;}
-      const id=single?this.selectedId:'';if(single&&this.store.findCard(id)===null)return;this.sharing=true;
-      const path=await taskpool.execute(new taskpool.Task(exportTemplate,JSON.stringify(this.store.state),id,this.context.filesDir,this.context.cacheDir)) as string;
+    const id=single?this.selectedId:'';
+    this.sharing=true;
+    try { const source=await this.store.canvasSnapshot(canvasId||this.store.state.canvasId);
+      if(single && !source.cards.some((card:FridgeCard)=>card.id===id))return;
+      const result=await this.getUIContext().getPromptAction().showActionMenu({title:single?'卡片作品':'画布作品',buttons:[
+      {text:single?'分享可编辑卡片':'分享可编辑画布',color:this.appText()}, {text:'导出成品图片',color:this.appText()}]});
+      if(result.index===1){await this.shareArtwork(single,source,id);return;}
+      const path=await taskpool.execute(new taskpool.Task(exportTemplate,JSON.stringify(source),id,this.context.filesDir,this.context.cacheDir)) as string;
       await shareTemplateFile(this.context as common.UIAbilityContext,path,single?'shareCard':'shareCanvas');
     }catch(e){this.templateError('分享未完成',e as Error);}finally{this.sharing=false;}
   }
@@ -1164,21 +1191,21 @@ struct Index {
       if(cards.length>0)this.select(cards[0].id);
     }catch(e){this.templateError('导入未完成',e as Error);}finally{this.busy=false;}
   }
-  private async shareArtwork(single: boolean): Promise<void> {
-    if (this.context === null || this.sharing || this.heroActive || this.arriving) return;
+  private async shareArtwork(single: boolean, source: FridgeState, cardId: string): Promise<void> {
+    if (this.context === null || this.heroActive || this.arriving) return;
     try {
       const result = await this.getUIContext().getPromptAction().showActionMenu({ title: single ? '分享卡片图片' : '分享画布图片', buttons: [
         { text: single ? '透明 PNG' : 'PNG', color: this.appText() }, { text: '实色底 JPG', color: this.appText() }
       ] });
-      this.sharing = true; this.shareSingle = single; this.shareOpaque = result.index === 1; this.shareTick = Date.now(); this.shareBackground = normalizeBackground(JSON.parse(JSON.stringify(this.canvasBackground)) as CanvasBackground);
-      const card = this.current(); if (single && card === null) return;
-      this.shareCards = (single ? [card!] : this.store.state.cards).map((item: FridgeCard) => cardRenderSnapshot(item)).sort((a: FridgeCard,b: FridgeCard) => a.z-b.z);
+      this.sharing = true; this.shareSingle = single; this.shareOpaque = result.index === 1; this.shareTick = Date.now(); this.shareBackground = normalizeBackground(JSON.parse(JSON.stringify(source.background)) as CanvasBackground);
+      const card = source.cards.find((item:FridgeCard)=>item.id===cardId)??null; if (single && card === null) return;
+      this.shareCards = (single ? [card!] : source.cards).map((item: FridgeCard) => cardRenderSnapshot(item)).sort((a: FridgeCard,b: FridgeCard) => a.z-b.z);
       if (single) {
         const a = card!.rot * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), w = card!.w, h = card!.h;
         const xs = [0,h*s,w*c+h*s,w*c], ys = [h,h-h*c,h+w*s-h*c,h+w*s];
         this.shareX = 24-Math.min(...xs); this.shareY = 24-Math.min(...ys);
         this.shareWidth = Math.max(...xs)-Math.min(...xs)+48; this.shareHeight = Math.max(...ys)-Math.min(...ys)+48;
-      } else { this.shareWidth = BOARD_W; this.shareHeight = BOARD_W/this.canvasAspect; }
+      } else { this.shareWidth = BOARD_W; this.shareHeight = BOARD_W/source.canvasAspect; }
       const scale = Math.min(3, 1280/this.getUIContext().vp2px(Math.max(this.shareWidth,this.shareHeight)));
       const pixel = await this.getUIContext().getComponentSnapshot().createFromBuilder(() => { this.shareScene(); }, 350, true, { scale: scale, waitUntilRenderFinished: true });
       try { await sharePixelMap(this.context as common.UIAbilityContext, pixel, this.shareOpaque, single ? 'shareCard' : 'shareCanvas'); }
@@ -1186,7 +1213,7 @@ struct Index {
     } catch (e) {
       // Action-menu cancellation has no message; actual export errors are actionable.
       
-      if (this.sharing) this.getUIContext().getPromptAction().showToast({ message: '图片导出或分享未完成，请重试' });
+      this.templateError('图片分享未完成',e as Error);
     } finally { this.sharing = false; }
   }
   @Builder
@@ -1266,7 +1293,8 @@ struct Index {
         .titleBar({
           content: {
             backIcon: { label: '撤销', type: TextStyleMode.NORMAL, isEnabled: this.undoAvailable && !this.heroActive, action: () => this.restoreHistory(false) },
-            menu: { maxCount: 3, value: [
+            menu: { maxCount: 4, value: [
+              { content: { icon: new SymbolGlyphModifier($r('sys.symbol.rectangle_and_arrowshape_turn_up_right')).fontColor([this.appText()]), label: '分享卡片', type: IconStyleMode.NORMAL, componentId: 'shareCard', isEnabled: !this.sharing && !this.heroActive, action: () => this.shareMenu(true) } },
               { content: { label: '添加', type: TextStyleMode.NORMAL, isEnabled: !this.heroActive, action: () => this.showAddMenu() } },
               { content: { label: '重做', type: TextStyleMode.NORMAL, isEnabled: this.redoAvailable && !this.heroActive, action: () => this.restoreHistory(true) } },
               { content: { label: '完成', type: TextStyleMode.NORMAL, isEnabled: !this.heroActive, action: () => this.closeEditor() } }
@@ -1345,7 +1373,6 @@ struct Index {
 
           if (this.settingsTab === 1 && this.preview.capability !== null && capabilityBox(this.preview).w === 0) { Text('内容空间不足，请调整文字大小或位置').fontSize(12).fontColor('#846339').width('100%') }
           Row({ space: 12 }) {
-            Button(this.sharing ? '生成中' : '分享作品', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).id('shareCard').height(44).layoutWeight(1).fontSize(14).fontColor(this.appText()).backgroundColor(this.appSurface()).enabled(!this.sharing && !this.heroActive).onClick(() => this.shareMenu(true))
             Button('复制卡片', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).layoutWeight(1).fontSize(14).fontColor(this.appText()).backgroundColor(this.appSurface()).onClick(() => this.duplicate())
           }.width('100%').margin({ top: 4 })
         }.width('100%').padding({ left: 16, right: 16, top: 4, bottom: this.safeBottom + 16 }).transition(settingsReveal())
@@ -1438,7 +1465,7 @@ struct Index {
       const factor = Math.max(.05, (nextW / this.resizeStart.w + nextH / this.resizeStart.h) / 2);
       nextW = this.resizeStart.w * factor; nextH = this.resizeStart.h * factor;
     }
-    const min = capabilityMinimum(this.preview.capability, true);
+    const min = cardCapabilityMinimum(this.preview, true,Math.max(0,nextW)*this.preview.w);
     const minW = this.layerId === 'capability' ? min.w / this.preview.w : .04;
     const minH = this.layerId === 'capability' ? min.h / this.preview.h : .04;
     if (this.currentElement()?.kind === 'image') {
@@ -1471,11 +1498,13 @@ struct Index {
     const angle = this.editingAngle() * Math.PI / 180;
     const offset = this.fingerOffset(e);
     const dx = offset.x * Math.cos(angle) + offset.y * Math.sin(angle), dy = -offset.x * Math.sin(angle) + offset.y * Math.cos(angle);
+    const previous=new ElementBox();previous.x=live.x;previous.y=live.y;previous.w=live.w;previous.h=live.h;
     live.x = Math.max(0, Math.min(1 - live.w, this.layerStartX + dx / width));
     live.y = Math.max(0, Math.min(1 - live.h, this.layerStartY + dy / height));
     const centerX = (1 - live.w) / 2, centerY = (1 - live.h) / 2;
-    if (Math.abs(live.x - centerX) * width < 5) live.x = centerX;
-    if (Math.abs(live.y - centerY) * height < 5) live.y = centerY;
+    if (this.layerId !== 'capability' && Math.abs(live.x - centerX) * width < 5) live.x = centerX;
+    if (this.layerId !== 'capability' && Math.abs(live.y - centerY) * height < 5) live.y = centerY;
+    if(this.layerId==='capability'){const fitted=constrainCapabilityDrag(this.preview,live,previous);live.x=fitted.x;live.y=fitted.y;}
     this.layerDX = (live.x - this.layerStartX) * width; this.layerDY = (live.y - this.layerStartY) * height;
   }
   private cancelTransform(): void {

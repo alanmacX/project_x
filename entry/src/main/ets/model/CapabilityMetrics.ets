@@ -15,13 +15,13 @@ export function capabilityMinimum(cap: CapBlock | null, compact: boolean = false
     size.w = 80; size.h = 36;
     if (cap.k === 'worldclock') { size.w=104; size.h=76; }
     if (cap.k === 'lunar') { size.w=112; size.h=72; }
-    if (cap.k === 'date') { size.w = 64; size.h = 52; }
+    if (cap.k === 'date') { size.w = 64; size.h = 48; }
     if (cap.k === 'calendar') { size.w = 112; size.h = 62; }
-    if (cap.k === 'countdown' || cap.k === 'anniversary') { const date=new Date((cap.date??'')+'T00:00:00'),days=isNaN(date.getTime())?0:Math.abs(Math.round((date.getTime()-Date.now())/86400000));size.w = Math.max(80,Math.ceil(String(days).length*9.6+32)); size.h = 64; }
-    if (cap.k === 'weather') { size.w = 72; size.h = 56; }
+    if (cap.k === 'countdown' || cap.k === 'anniversary') { const date=new Date((cap.date??'')+'T00:00:00'),days=isNaN(date.getTime())?0:Math.abs(Math.round((date.getTime()-Date.now())/86400000));size.w = Math.max(80,Math.ceil(String(days).length*9.6+32)); size.h = 50; }
+    if (cap.k === 'weather') { size.w = 64; size.h = 48; }
     if (cap.k === 'dayprogress' || cap.k === 'yearprogress') { size.w = 72; size.h = 52; }
-    if (cap.k === 'battery') { size.w=88; size.h=56; }
-    if (cap.k === 'fetch') { size.w=104; size.h=88; }
+    if (cap.k === 'battery') { size.w=88; size.h=44; }
+    if (cap.k === 'fetch') { size.w=104; size.h=64; }
     if (['agenda','parcel'].includes(cap.k)) { size.w=120; size.h=82; }
     return size;
   }

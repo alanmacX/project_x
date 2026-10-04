@@ -46,10 +46,12 @@ export function subjectInterior(loops: ShapePoint[][], preferredAspect: number =
 const outlineIds = new WeakMap<ShapePoint[][], number>();
 let nextOutlineId: number = 1;
 function outlineIdentity(card: FridgeCard): string {
+  if(card.shape!=='subject')return card.shape;
   // ArkUI @Prop may deep-copy arrays. Extracted assets have immutable, unique
   // file names, so their cache identity also survives component propagation.
   if (card.cutout.length > 0) return card.cutout + ':' + card.subjectVersion;
   const outline = cardOutline(card);
+  if(outline.length===0)return 'empty';
   let id = outlineIds.get(outline);
   if (id === undefined) { id = nextOutlineId++; outlineIds.set(outline, id); }
   return String(id);
@@ -85,44 +87,86 @@ export function fitContentBox(requested: ElementBox, safe: ElementBox): ElementB
   box.rot = 0; box.opacity = requested.opacity; return box;
 }
 const layoutCache = new Map<string, ElementBox>();
-const obstacleCache = new Map<string, ElementBox>();
-export function capabilityBox(card: FridgeCard): ElementBox {
-  const obstacles = card.elements.filter((el) => !el.behindCapability && (el.kind === 'text' || el.kind === 'image'));
-  const minimum = cardCapabilityMinimum(card, true);
-  const key = minimum.w + ':' + minimum.h + ':' + card.id + ':' + card.capability?.k + ':' + card.shape + ':' + card.cutout + ':' + card.subjectBorder + ':' + outlineIdentity(card) + ':' + card.w + ':' + card.h + ':' + JSON.stringify(card.capBox) + ':' +
-    JSON.stringify(obstacles.map((el) => [el.x, el.y, el.w, el.h, el.rot]));
-  const cached = layoutCache.get(key); if (cached !== undefined) return cached;
-  const safe = safeContentBox(card), requested = readableSlot(card, safe);
-  const overlaps = (box: ElementBox, other: ElementBox): boolean => box.x < other.x + other.w && box.x + box.w > other.x && box.y < other.y + other.h && box.y + box.h > other.y;
-  let result = requested;
-  if (obstacles.some((el) => overlaps(requested, el))) {
-    const obstacleKey = JSON.stringify([safe.x, safe.y, safe.w, safe.h]) + ':' + JSON.stringify(obstacles.map((el) => [el.x, el.y, el.w, el.h, el.rot]));
-    let empty = obstacleCache.get(obstacleKey);
-    if (empty === undefined) {
-    const size = 40, heights: number[] = new Array<number>(size).fill(0); let best = 0;
-    empty = new ElementBox(); empty.w = 0; empty.h = 0;
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const cell = new ElementBox(); cell.x = safe.x + x / size * safe.w; cell.y = safe.y + y / size * safe.h;
-        cell.w = safe.w / size; cell.h = safe.h / size;
-        heights[x] = obstacles.some((el) => overlaps(cell, el)) ? 0 : heights[x] + 1;
-      }
-      for (let right = 0; right < size; right++) {
-        let height = heights[right];
-        for (let left = right; left >= 0 && height > 0; left--) {
-          height = Math.min(height, heights[left]); const area = height * (right - left + 1);
-          if (area > best) { best = area; empty.x = safe.x + left / size * safe.w; empty.y = safe.y + (y + 1 - height) / size * safe.h;
-            empty.w = (right - left + 1) / size * safe.w; empty.h = height / size * safe.h; }
-        }
-      }
+const MASK_SIZE: number = 96;
+class InteriorMask { integral: number[] = []; }
+const maskCache = new Map<string, InteriorMask>();
+function interiorMask(card: FridgeCard): InteriorMask {
+  const key=outlineIdentity(card),cached=maskCache.get(key);if(cached!==undefined)return cached;
+  const mask=new InteriorMask(),stride=MASK_SIZE+1;mask.integral=new Array<number>(stride*stride).fill(0);
+  const loops=cardOutline(card);
+  for(let y=0;y<MASK_SIZE;y++) {
+    const samples=[outlineIntervals(y/MASK_SIZE,loops),outlineIntervals((y+.5)/MASK_SIZE,loops),outlineIntervals((y+1)/MASK_SIZE,loops)];
+    let row=0;
+    for(let x=0;x<MASK_SIZE;x++) {
+      row+=samples.every((span:number[])=>spanInside(x/MASK_SIZE,(x+1)/MASK_SIZE,span))?0:1;
+      mask.integral[(y+1)*stride+x+1]=mask.integral[y*stride+x+1]+row;
     }
-    if (obstacleCache.size > 64) obstacleCache.clear(); obstacleCache.set(obstacleKey, empty);
-    }
-    const min = cardCapabilityMinimum(card, true);
-    if (empty.w > 0 && empty.w * card.w >= min.w - .01 && empty.h * card.h >= min.h - .01) result = readableSlot(card, empty);
-    else { result = new ElementBox(); result.x = safe.x; result.y = safe.y; result.w = 0; result.h = 0; }
   }
-  if (layoutCache.size > 128) layoutCache.clear(); layoutCache.set(key, result); return result;
+  if(maskCache.size>=128)maskCache.delete(Array.from(maskCache.keys())[0]);maskCache.set(key,mask);return mask;
+}
+/** Convex regular shapes need only four analytic corner checks, even while resizing. */
+function regularContains(card:FridgeCard,box:ElementBox):boolean {
+  if(box.x<0 || box.y<0 || box.x+box.w>1.000001 || box.y+box.h>1.000001)return false;
+  for(const x of [box.x,box.x+box.w]) for(const y of [box.y,box.y+box.h]) {
+    if(card.shape==='round') {if(Math.pow((x-.5)*2,2)+Math.pow((y-.5)*2,2)>1.000001)return false;}
+    else {
+      const top=y<.5,left=x<.5,fraction=top?(left?.28:.12):(left?.18:.26),radius=card.shape==='pill'?Math.min(card.w,card.h)/2:16;
+      const rx=card.shape==='blob'?fraction:Math.min(.5,radius/card.w),ry=card.shape==='blob'?fraction:Math.min(.5,radius/card.h),cx=left?rx:1-rx,cy=top?ry:1-ry;
+      if((left?x<cx:x>cx)&&(top?y<cy:y>cy)&&Math.pow((x-cx)/rx,2)+Math.pow((y-cy)/ry,2)>1.000001)return false;
+    }
+  }
+  return true;
+}
+function maskContains(mask: InteriorMask,box:ElementBox):boolean {
+  const l=Math.max(0,Math.floor(box.x*MASK_SIZE+1e-7)),t=Math.max(0,Math.floor(box.y*MASK_SIZE+1e-7));
+  const r=Math.min(MASK_SIZE,Math.ceil((box.x+box.w)*MASK_SIZE-1e-7)),b=Math.min(MASK_SIZE,Math.ceil((box.y+box.h)*MASK_SIZE-1e-7)),stride=MASK_SIZE+1;
+  return box.x>=0 && box.y>=0 && box.x+box.w<=1.000001 && box.y+box.h<=1.000001 && mask.integral[b*stride+r]-mask.integral[t*stride+r]-mask.integral[b*stride+l]+mask.integral[t*stride+l]===0;
+}
+/** Position across the entire silhouette, preserving size and intentional compositions. */
+export function fitCapabilityPosition(card:FridgeCard,requested:ElementBox):ElementBox {
+  if(card.shape==='subject'&&cardOutline(card).length===0)return fitContentBox(requested,safeContentBox(card));
+  const f=subjectSurfaceFactor(card),inset=(1-f)/2,box=new ElementBox();
+  box.w=requested.w/f;box.h=requested.h/f;box.x=(requested.x-inset)/f;box.y=(requested.y-inset)/f;box.opacity=requested.opacity;
+  const mask=card.shape==='subject'?interiorMask(card):undefined;
+  const contains=(candidate:ElementBox):boolean=>mask!==undefined?maskContains(mask,candidate):regularContains(card,candidate);
+  if(!contains(box)) {
+    let best=Number.MAX_VALUE,bx=0,by=0;
+    for(let y=0;y+box.h*MASK_SIZE<=MASK_SIZE;y++) for(let x=0;x+box.w*MASK_SIZE<=MASK_SIZE;x++) {
+      const nx=x/MASK_SIZE,ny=y/MASK_SIZE,distance=Math.pow((nx-box.x)*card.w,2)+Math.pow((ny-box.y)*card.h,2);
+      if(distance>=best)continue;
+      const candidate=new ElementBox();candidate.x=nx;candidate.y=ny;candidate.w=box.w;candidate.h=box.h;
+      if(contains(candidate)){best=distance;bx=nx;by=ny;}
+    }
+    if(best===Number.MAX_VALUE)return readableSlot(card,safeContentBox(card));
+    box.x=bx;box.y=by;
+  }
+  box.x=inset+box.x*f;box.y=inset+box.y*f;box.w*=f;box.h*=f;return box;
+}
+/** Gesture path uses constant-time mask queries, never a contour scan or nearest-position search. */
+export function constrainCapabilityDrag(card:FridgeCard,requested:ElementBox,previous:ElementBox):ElementBox {
+  if(card.shape==='subject'&&cardOutline(card).length===0)return fitContentBox(requested,safeContentBox(card));
+  const f=subjectSurfaceFactor(card),inset=(1-f)/2,mask=card.shape==='subject'?interiorMask(card):undefined;
+  const valid=(x:number,y:number):boolean=>{const box=new ElementBox();box.x=(x-inset)/f;box.y=(y-inset)/f;box.w=requested.w/f;box.h=requested.h/f;return mask!==undefined?maskContains(mask,box):regularContains(card,box);};
+  if(valid(requested.x,requested.y))return requested;
+  const result=new ElementBox();result.w=requested.w;result.h=requested.h;result.opacity=requested.opacity;
+  let low=0,high=1;
+  for(let i=0;i<10;i++){const middle=(low+high)/2;if(valid(previous.x+(requested.x-previous.x)*middle,previous.y+(requested.y-previous.y)*middle))low=middle;else high=middle;}
+  result.x=previous.x+(requested.x-previous.x)*low;result.y=previous.y+(requested.y-previous.y)*low;
+  if(valid(requested.x,result.y))result.x=requested.x;
+  if(valid(result.x,requested.y))result.y=requested.y;
+  return result;
+}
+export function capabilityObstructed(card:FridgeCard):boolean {
+  return card.elements.some((el)=>!el.behindCapability && (el.kind==='text'||el.kind==='image') && card.capBox.x<el.x+el.w && card.capBox.x+card.capBox.w>el.x && card.capBox.y<el.y+el.h && card.capBox.y+card.capBox.h>el.y);
+}
+export function capabilityBox(card: FridgeCard): ElementBox {
+  const minimum=cardCapabilityMinimum(card,true,card.w*card.capBox.w);
+  const key=minimum.w+':'+minimum.h+':'+card.shape+':'+outlineIdentity(card)+':'+card.subjectBorder+':'+card.w+':'+card.h+':'+JSON.stringify(card.capBox);
+  const cached=layoutCache.get(key);if(cached!==undefined)return cached;
+  const requested=new ElementBox();requested.x=card.capBox.x;requested.y=card.capBox.y;requested.opacity=card.capBox.opacity;
+  requested.w=Math.max(card.capBox.w,minimum.w/card.w);requested.h=Math.max(card.capBox.h,minimum.h/card.h);
+  const result=fitCapabilityPosition(card,requested);
+  if(layoutCache.size>128)layoutCache.clear();layoutCache.set(key,result);return result;
 }
 export function resizeFactor(w: number, h: number, dx: number, dy: number, angle: number): number {
   const a = angle * Math.PI / 180;
@@ -179,7 +223,7 @@ export function cardHandlePoint(card: FridgeCard, right: boolean, bottom: boolea
 
 /** Backing and inset belong to layout, so a photo subject never silently loses readable space. */
 export function capabilityInset(card: FridgeCard): number {
-  return readingSurface(card.capability, card.shape === 'subject' && card.subjectPhoto, false) ? 8 : 0;
+  return readingSurface(card.capability, card.shape === 'subject' && card.subjectPhoto, capabilityObstructed(card)) ? 8 : 0;
 }
 export function cardCapabilityMinimum(card: FridgeCard, compact: boolean = true, width: number = 0): CapabilitySize {
   const inset = capabilityInset(card), size = capabilityMinimum(card.capability, compact, Math.max(0,width - inset*2));

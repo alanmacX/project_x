@@ -1,8 +1,9 @@
-import { readingSurface, readingSurfaceColor } from '../model/CapabilityPresentation';
+import { immersiveReading } from '../model/ChromeMaterial';
+import { readingSurface, readingGlassColor } from '../model/CapabilityPresentation';
 import { capabilityInset } from '../model/CanvasLayout';
 import { AnimatedPhoto } from './AnimatedPhoto';
 import { FridgeCard, CanvasElement, ElementBox, materialColors, shapeRadius } from '../model/CardSchema';
-import { capabilityBox, capabilityPlacement, fitContentBox, safeContentBox, subjectSurfaceFactor } from '../model/CanvasLayout';
+import { capabilityObstructed, capabilityBox, capabilityPlacement, fitContentBox, safeContentBox, subjectSurfaceFactor } from '../model/CanvasLayout';
 import { CapabilityView } from './CapBlockView';
 
 @Component
@@ -49,9 +50,9 @@ export struct CardCanvas {
         Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
       }
       this.canvasElements(true)
-      if (!this.hideContent && this.card.capability !== null && capabilityBox(this.card).w > 0) { this.capabilityContent() }
+      if (!this.hideContent && this.card.capability !== null && !capabilityObstructed(this.card)) { this.capabilityContent() }
       if (!this.hideContent) { this.canvasElements(false) }
-      if (!this.hideContent && this.card.capability !== null && capabilityBox(this.card).w === 0) { this.capabilityContent() }
+      if (!this.hideContent && this.card.capability !== null && capabilityObstructed(this.card)) { this.capabilityContent() }
       if (this.card.shape === 'subject' && this.card.cutout.length > 0) {
         Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
           .blendMode(BlendMode.DST_IN, BlendApplyType.OFFSCREEN)
@@ -64,15 +65,24 @@ export struct CardCanvas {
     const surface = new ElementBox(); surface.x = (box.x - inset) / f; surface.y = (box.y - inset) / f;
     surface.w = box.w / f; surface.h = box.h / f; return surface;
   }
+  private capabilityInk():string { return this.card.shape==='subject'&&this.card.subjectPhoto&&this.card.ink.length===0?this.card.subjectInk:materialColors(this.card.material,this.card.paper,this.card.ink)[1]; }
+  private hasReadingSurface():boolean { return readingSurface(this.card.capability,this.card.shape==='subject'&&this.card.subjectPhoto,capabilityObstructed(this.card)); }
   @Builder
   capabilityContent() {
-        Column() { CapabilityView({ cap: this.card.capability!, ink: this.card.shape === 'subject' && this.card.subjectPhoto && this.card.ink.length === 0 ? this.card.subjectInk : materialColors(this.card.material, this.card.paper, this.card.ink)[1],
-          scaleFactor: this.scaleFactor, contentWidth: this.card.w * capabilityPlacement(this.card).w - 2*capabilityInset(this.card), contentHeight: this.card.h * capabilityPlacement(this.card).h - 2*capabilityInset(this.card), tick: this.tick }) }.padding(capabilityInset(this.card)*this.scaleFactor)
-          .width((this.capSurfaceBox().w * 100) + '%').height((this.capSurfaceBox().h * 100) + '%')
-          .position({ x: (this.capSurfaceBox().x * 100) + '%', y: (this.capSurfaceBox().y * 100) + '%' })
-          .translate({ x: this.movingLayerId === 'capability' ? this.moveX : 0, y: this.movingLayerId === 'capability' ? this.moveY : 0 })
-          .backgroundColor(readingSurface(this.card.capability, this.card.shape==='subject' && this.card.subjectPhoto, capabilityBox(this.card).w===0) ? readingSurfaceColor(this.card.shape==='subject' && this.card.subjectPhoto && this.card.ink.length===0 ? this.card.subjectInk : materialColors(this.card.material,this.card.paper,this.card.ink)[1]) : Color.Transparent)
-          .borderRadius(12*this.scaleFactor).rotate({ angle: 0 }).opacity(capabilityPlacement(this.card).opacity)
+    Stack() {
+      if(this.hasReadingSurface()) {
+        Column().width('100%').height('100%').backgroundColor(readingGlassColor(this.capabilityInk()))
+          .attributeModifier(this.widget?undefined:immersiveReading(readingGlassColor(this.capabilityInk())))
+          .borderRadius(14*this.scaleFactor).shadow({radius:5*this.scaleFactor,color:readingGlassColor(this.capabilityInk()),offsetX:0,offsetY:0})
+          .hitTestBehavior(HitTestMode.None)
+      }
+      Column() { CapabilityView({cap:this.card.capability!,ink:this.capabilityInk(),scaleFactor:this.scaleFactor,
+        contentWidth:this.card.w*capabilityPlacement(this.card).w-2*capabilityInset(this.card),contentHeight:this.card.h*capabilityPlacement(this.card).h-2*capabilityInset(this.card),tick:this.tick}) }
+        .padding(capabilityInset(this.card)*this.scaleFactor).width('100%').height('100%')
+    }.width((this.capSurfaceBox().w*100)+'%').height((this.capSurfaceBox().h*100)+'%')
+      .position({x:(this.capSurfaceBox().x*100)+'%',y:(this.capSurfaceBox().y*100)+'%'})
+      .translate({x:this.movingLayerId==='capability'?this.moveX:0,y:this.movingLayerId==='capability'?this.moveY:0})
+      .opacity(capabilityPlacement(this.card).opacity)
   }
   private elementFor(id: string): CanvasElement { return this.card.elements.find((el: CanvasElement) => el.id === id) ?? new CanvasElement(); }
   @Builder
