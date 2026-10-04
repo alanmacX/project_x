@@ -5,6 +5,7 @@ export struct CourseEditor {
   controller: CustomDialogController;
   course: CourseItem = {id:'',name:'',room:'',day:1,start:'08:00',end:'09:40',firstWeek:1,lastWeek:16,parity:0};
   appDark: boolean = false;
+  onDelete:()=>void=()=>{};
   onSave: (course:CourseItem)=>void = ()=>{};
   @State name:string=''; @State room:string=''; @State day:number=1; @State start:string='08:00'; @State end:string='09:40';
   @State first:string='1'; @State last:string='16'; @State parity:number=0; @State error:string='';
@@ -39,6 +40,7 @@ export struct CourseEditor {
       Row({space:8}) {ForEach(['每周','单周','双周'],(v:string,i:number)=>{Button(v,{type:ButtonType.Capsule}).height(44).layoutWeight(1).backgroundColor(AppDesign.choice(this.appDark,this.parity===i)).fontColor(AppDesign.choiceText(this.appDark,this.parity===i)).onClick(()=>this.parity=i)},(v:string)=>v)}.width('100%')
       }.width('100%')
       }.width('100%').layoutWeight(1).scrollBar(BarState.Off)
+      if(this.course.id) {Button('删除这门课程',{type:ButtonType.Capsule}).height(44).width('100%').fontColor('#B34735').backgroundColor(AppDesign.control(this.appDark)).onClick(()=>{this.onDelete();this.controller.close();})}
       if(this.error) {Text(this.error).fontSize(12).fontColor('#C43A35')}
       Row({space:12}) {Button('取消',{type:ButtonType.Capsule}).height(44).layoutWeight(1).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.controller.close());Button('保存',{type:ButtonType.Capsule}).height(44).layoutWeight(1).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).onClick(()=>this.save());}.width('100%')
     }.padding(20).width('90%').height('85%').constraintSize({maxWidth:480,maxHeight:560}).borderRadius(24).backgroundColor(AppDesign.surface(this.appDark))

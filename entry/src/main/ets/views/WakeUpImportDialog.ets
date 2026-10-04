@@ -1,3 +1,5 @@
+import { WeekTimetable } from './WeekTimetable';
+import { CapBlock } from '../model/CardSchema';
 import { SchoolImportDialog } from './SchoolImportDialog';
 import { AppDesign } from '../model/AppDesign';
 import { CourseItem } from '../model/CardSchema';
@@ -16,6 +18,8 @@ export struct WakeUpImportDialog {
   @State parsed:WakeImport=new WakeImport();
   @State slots:WakeSlot[]=[];
   @State semester:string='';
+  @State previewCap:CapBlock={k:'timetable'};
+  @State previewReady:boolean=false;
   @State stage:boolean=false;
   @State periods:boolean=false;
   @State replace:boolean=false;
@@ -26,7 +30,7 @@ export struct WakeUpImportDialog {
   private school():void {this.schoolDialog=new CustomDialogController({builder:SchoolImportDialog({appDark:this.appDark,onRead:(json:string)=>this.accept(json)}),customStyle:true,autoCancel:false,alignment:DialogAlignment.Center});this.schoolDialog.open();}
   aboutToDisappear():void {this.alive=false;this.schoolDialog?.close();}
   private accept(json:string):void {
-    if(!this.alive)return;this.parsed=JSON.parse(json) as WakeImport;this.slots=this.parsed.slots;this.semester=this.parsed.semester;this.stage=true;this.periods=this.slots.some((s)=>!s.start||!s.end);this.error='';
+    if(!this.alive)return;this.parsed=JSON.parse(json) as WakeImport;this.slots=this.parsed.slots;this.semester=this.parsed.semester;this.stage=true;this.periods=this.slots.some((s)=>!s.start||!s.end);this.error='';this.refreshPreview();
   }
   private async parseText():Promise<void> {
     if(this.busy)return;this.busy=true;this.error='';
@@ -40,19 +44,20 @@ export struct WakeUpImportDialog {
   }
   private date():void {
     this.getUIContext().showDatePickerDialog({selected:this.semester?new Date(this.semester+'T12:00:00'):new Date(),onAccept:(v:DatePickerResult)=>{
-      if(this.alive)this.semester=mondayDate(v.year+'-'+('0'+((v.month??0)+1)).slice(-2)+'-'+('0'+v.day).slice(-2));
+      if(this.alive){this.semester=mondayDate(v.year+'-'+('0'+((v.month??0)+1)).slice(-2)+'-'+('0'+v.day).slice(-2));this.refreshPreview();}
     }});
   }
   private time(node:number,start:boolean):void {
     const s=this.slots.find((v)=>v.node===node),value=(start?s?.start:s?.end)||'08:00',d=new Date();d.setHours(Number(value.slice(0,2)),Number(value.slice(3)),0,0);
     this.getUIContext().showTimePickerDialog({selected:d,useMilitaryTime:true,onAccept:(v:TimePickerResult)=>{
       if(!this.alive)return;const value=('0'+v.hour).slice(-2)+':'+('0'+v.minute).slice(-2);
-      this.slots=this.slots.map((s:WakeSlot):WakeSlot=>({node:s.node,start:s.node===node&&start?value:s.start,end:s.node===node&&!start?value:s.end}));
+      this.slots=this.slots.map((s:WakeSlot):WakeSlot=>({node:s.node,start:s.node===node&&start?value:s.start,end:s.node===node&&!start?value:s.end}));this.refreshPreview();
     }});
   }
-  private courseTime(c:WakeCourse):string {
-    const a=c.start||this.slots.find((s)=>s.node===c.firstNode)?.start,b=c.end||this.slots.find((s)=>s.node===c.lastNode)?.end;
-    return a&&b?a+'–'+b:'第 '+c.firstNode+'–'+c.lastNode+' 节 · 待补作息';
+  private refreshPreview():void {
+    try {const courses=resolveWakeUp(this.parsed,this.semester,this.slots);courses.forEach((c:CourseItem,i:number)=>c.id='preview_'+i);
+      this.previewCap={k:'timetable',semester:mondayDate(this.semester),courses:courses,skipHolidays:false};this.previewReady=true;
+    }catch(_){this.previewReady=false;}
   }
   private confirm():void {
     try {const courses=resolveWakeUp(this.parsed,this.semester,this.slots);this.onImport(mondayDate(this.semester),courses,this.replace);this.controller.close();}catch(e){this.error=(e as Error).message;}
@@ -87,16 +92,11 @@ export struct WakeUpImportDialog {
                 Row({space:8}) {Text('第 '+s.node+' 节').fontSize(14).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);this.action(s.start||'开始',()=>this.time(s.node,true));this.action(s.end||'结束',()=>this.time(s.node,false))}.width('100%').padding(10).borderRadius(14).backgroundColor(AppDesign.control(this.appDark))
               },(s:WakeSlot)=>String(s.node))
             } else {
-              ForEach(this.parsed.courses,(c:WakeCourse,i:number)=>{
-                Column({space:5}) {
-                  Text(c.name).fontSize(15).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
-                  Text('周'+['一','二','三','四','五','六','日'][c.day-1]+' · '+this.courseTime(c)+(c.room?' · '+c.room:'')).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
-                  Text('第 '+c.firstWeek+'–'+c.lastWeek+' 周 · '+['每周','单周','双周'][c.parity]).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
-                }.width('100%').padding(14).borderRadius(16).backgroundColor(AppDesign.control(this.appDark))
-              },(c:WakeCourse,i:number)=>String(i))
+              if(this.previewReady) {WeekTimetable({cap:this.previewCap,appDark:this.appDark,initialWeek:1,heightLimit:230,editable:false})}
+              else {Text('选择开学日期并补全作息后，即可预览周课表。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')}
             }
           }.width('100%')
-        }.width('100%').height(230).scrollBar(BarState.Off).align(Alignment.Top)
+        }.width('100%').height(this.periods?230:310).scrollBar(BarState.Off).align(Alignment.Top)
         if(this.existingCount>0) {Row({space:12}) {Text(this.replace?'替换现有 '+this.existingCount+' 条课程':'追加到现有课程').fontSize(13).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:this.replace}).onChange((v:boolean)=>this.replace=v)}.width('100%')}
       }
       if(this.error){Text(this.error).fontSize(12).fontColor('#B34735').width('100%').maxLines(3).textOverflow({overflow:TextOverflow.Ellipsis})}

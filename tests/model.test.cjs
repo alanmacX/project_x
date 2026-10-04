@@ -439,7 +439,7 @@ function load(name) {
   assert.ok(cleanSubjectMask(thinMask,80,80).some(a=>a===255),'legitimate thin subject is not erased');
   const {compactCapability,capabilityMinimum}=load('CapabilityMetrics');
   for(const k of CAPABILITIES){const min=capabilityMinimum({k},true),full=capabilityMinimum({k});
-    assert.ok(min.w<=full.w && min.h<=full.h);assert.equal(compactCapability({k},min.w,min.h),true);
+    assert.ok(min.w<=full.w && min.h<=full.h);assert.equal(compactCapability({k},min.w,min.h),k!=='timetable','timetable uses a single stable typography layout per mode');
     assert.equal(compactCapability({k},full.w,full.h),false);}
   const bird=new FridgeCard();bird.shape='subject';bird.w=300;bird.h=360;bird.capability={k:'weather'};
   bird.outline=[[{x:.25,y:.2},{x:.75,y:.2},{x:.75,y:.8},{x:.25,y:.8}]];

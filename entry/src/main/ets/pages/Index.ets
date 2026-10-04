@@ -168,7 +168,7 @@ struct Index {
   private backgroundGeneration: number = 0;
   private backgroundTimer: number = -1;
   @StorageLink('appBackgrounded') @Watch('appWentBackground') appBackgrounded: boolean = false;
-  private appWentBackground(): void { if(!this.appBackgrounded && this.ready) {this.refreshCapabilities();this.refreshDueWeather();} if (this.appBackgrounded && this.ready) { if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); } }
+  private appWentBackground(): void { if(!this.appBackgrounded && this.ready) {this.tick=Date.now();this.refreshCapabilities();this.refreshDueWeather();} if (this.appBackgrounded && this.ready) { if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); } }
 
   @State repairingSubjects: boolean = false;
   @State weatherBusy: boolean = false;
@@ -190,7 +190,7 @@ struct Index {
       await this.store.refreshCanvasSpecs().catch(() => {});
       if (!this.alive) return;
       for (const card of this.store.state.cards) {
-        if (!ensureCapabilitySize(card)) this.error = '部分主体内部空间不足，请移除能力或更换形状';
+        if (!ensureCapabilitySize(card)) this.error = '部分卡片内部空间不足，请放大、更换形状或移除能力';
         this.clamp(card);
       }
       this.canvasDimension = this.widgetDimension || '4*4';
@@ -297,7 +297,7 @@ struct Index {
           }
           if (card.shape === 'subject') { cropCardToSubject(card, result.crop); card.h = card.w / result.aspect; }
           card.subjectAspect = result.aspect; card.cutout = result.src; card.outline = result.outline; card.subjectVersion = 4; card.subjectInk = result.ink;
-          if (!ensureCapabilitySize(card)) this.error = '部分主体内部空间不足，请移除能力或更换形状';
+          if (!ensureCapabilitySize(card)) this.error = '部分卡片内部空间不足，请放大、更换形状或移除能力';
           this.clamp(card); this.render(); this.persist();
         } catch (_) { if (this.alive) this.error = '部分旧主体照片未能更新，请重新选择本地照片'; }
       }
@@ -511,7 +511,7 @@ struct Index {
       if (!ensureCapabilitySize(card)) {
         const index = this.store.state.cards.findIndex((item: FridgeCard) => item.id === card.id);
         if (this.preview.id === card.id && index >= 0) this.store.state.cards[index] = cardViewSnapshot(this.preview);
-        this.getUIContext().getPromptAction().showToast({ message: '这个主体的内部空间不足以显示紧凑能力，请更换形状或移除能力' });
+        this.getUIContext().getPromptAction().showToast({ message: card.capability?.k==='timetable' && card.capability.timetableMode==='day' ? '这张卡片放不下完整概览，请换更宽的底板或使用下一课' : '卡片内部空间不足，请放大、更换形状或移除能力' });
         this.syncFields(); this.render(); return;
       }
       if (card.capability !== null) card.capBox = capabilityPlacement(card);
@@ -680,7 +680,7 @@ struct Index {
   }
   private autoWeatherBusy: boolean = false;
   onPageHide(): void { if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); }
-  onPageShow(): void { if (this.ready) {this.refreshDueWeather();this.refreshCapabilities();} }
+  onPageShow(): void { this.tick=Date.now();if (this.ready) {this.refreshDueWeather();this.refreshCapabilities();} }
   private updateExtraCapability(id:string,next:CapBlock):void {
     const card=this.store.findCard(id);if(!card||card.capability?.k!==next.k)return;
     card.capability=next;this.syncFields();this.change();

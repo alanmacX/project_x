@@ -1,8 +1,9 @@
 import { holidayName, holidayMarker } from '../model/HolidayCalendar';
-import { agendaItems, courseInstances, teachingDayLabel, pendingParcels, eventWhen } from '../model/CapabilityData';
+import { agendaItems, pendingParcels, eventWhen } from '../model/CapabilityData';
 import { AgendaItem, ParcelItem } from '../model/CardSchema';
 import { CapBlock, typeLabel, contrastingInk } from '../model/CardSchema';
-import { capabilityMinimum, compactCapability } from '../model/CapabilityMetrics';
+import { capabilityMinimum, compactCapability, capabilityFits } from '../model/CapabilityMetrics';
+import { TimetableCapability } from './TimetableCapability';
 import { BatteryCapability } from './BatteryCapability';
 export { typeLabel } from '../model/CardSchema';
 export function daysLeftOf(date: string): number {
@@ -37,16 +38,19 @@ export struct CapabilityView {
   }
   private now(): Date { return new Date(this.tick > 0 ? this.tick : Date.now()); }
   private unit(): number {
-    const min = capabilityMinimum(this.cap, this.compact());
-    return Math.min(2, this.contentWidth / min.w, this.contentHeight / min.h) * this.scaleFactor;
+    const min = capabilityMinimum(this.cap, this.compact(), this.contentWidth);
+    return Math.min(1.4, this.contentWidth / min.w, this.contentHeight / min.h) * this.scaleFactor;
   }
+  private undersized(): boolean { return !capabilityFits(this.cap,this.contentWidth,this.contentHeight); }
   private counterFont(): number {
     const digits = (Math.abs(daysLeftOf(this.cap.date ?? '')) + '').length;
     return Math.min((this.compact() ? 28 : 44) * this.unit(), (this.contentWidth * this.scaleFactor - 32 * this.unit()) / (digits * .6));
   }
   build() {
     Column({ space: 4 * this.unit() }) {
-      if (this.cap.k === 'clock') {
+      if (this.undersized()) {
+        Text('放大卡片').fontSize(12*this.scaleFactor).fontColor(this.ink).maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').textAlign(TextAlign.Center)
+      } else if (this.cap.k === 'clock') {
         TextClock().format('HH:mm').fontSize(((this.compact() ? 26 : 42) * this.unit()) + 'vp').fontWeight(FontWeight.Medium).fontColor(this.ink)
       } else if (this.cap.k === 'date') {
         TextClock().format('dd').fontSize(((this.compact() ? 28 : 54) * this.unit()) + 'vp').fontWeight(FontWeight.Medium).fontColor(this.ink)
@@ -106,12 +110,14 @@ export struct CapabilityView {
         Text(this.cap.title||'URL 内容').fontSize((12*this.unit())+'vp').fontColor(this.ink).opacity(.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
         Text((this.cap.value||'待配置')+(this.cap.value?this.cap.unit??'':'')).fontSize((24*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(this.compact()?2:3).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').textAlign(TextAlign.Center)
         if(this.cap.refreshState==='failed') {Text('上次结果 · 更新失败').fontSize((10*this.unit())+'vp').fontColor(this.ink).opacity(.6)}
-      } else if(this.cap.k==='agenda'||this.cap.k==='timetable') {
-        Text(this.cap.k==='agenda'?'接下来':teachingDayLabel(this.cap,this.now().getTime())||'下一课').maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontSize((11*this.unit())+'vp').fontColor(this.ink).opacity(.65)
-        if((this.cap.k==='agenda'?agendaItems(this.cap,this.now().getTime()):courseInstances(this.cap,this.now().getTime())).length===0) {
-          Text(this.cap.k==='agenda'?(this.cap.agendaSource?'暂无待办日程':'导入日程'):((this.cap.courses??[]).length?'近期没有课程':'添加课程')).fontSize((18*this.unit())+'vp').fontColor(this.ink)
+      } else if(this.cap.k==='timetable') {
+        TimetableCapability({cap:this.cap,ink:this.ink,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
+      } else if(this.cap.k==='agenda') {
+        Text('接下来').maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontSize((11*this.unit())+'vp').fontColor(this.ink).opacity(.65)
+        if(agendaItems(this.cap,this.now().getTime()).length===0) {
+          Text(this.cap.agendaSource?'暂无待办日程':'导入日程').fontSize((18*this.unit())+'vp').fontColor(this.ink)
         } else {
-          ForEach((this.cap.k==='agenda'?agendaItems(this.cap,this.now().getTime()):courseInstances(this.cap,this.now().getTime())).slice(0,this.compact()?1:3),(e:AgendaItem)=>{
+          ForEach(agendaItems(this.cap,this.now().getTime()).slice(0,this.compact()?1:3),(e:AgendaItem)=>{
             Column({space:2*this.unit()}) {
               Text(e.title).fontSize(((this.compact()?16:14)*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
               Text(eventWhen(e,this.now().getTime())+(e.location?' · '+e.location:'')).fontSize((10*this.unit())+'vp').fontColor(this.ink).opacity(.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')

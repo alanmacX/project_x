@@ -1,3 +1,5 @@
+import { TimetableDialog } from './TimetableDialog';
+import { mondayDate } from '../model/WakeUpImport';
 import { CalendarRulesDialog } from './CalendarRulesDialog';
 import { ValuePicker } from './ValuePicker';
 import { CapBlock, ParcelItem, CourseItem, AgendaItem } from '../model/CardSchema';
@@ -29,7 +31,7 @@ export struct CapabilitySettings {
     if(key===this.inputKey)return;this.inputKey=key;this.generation++;this.busy=false;this.message='';this.code='';this.place='';
   }
   aboutToAppear():void {this.alive=true;this.inputChanged();}
-  aboutToDisappear():void {this.alive=false;this.generation++;}
+  aboutToDisappear():void {this.alive=false;this.generation++;this.dialog?.close();}
   private text():string{return AppDesign.text(this.appDark);}
   private control():string{return AppDesign.control(this.appDark);}
   private copy():CapBlock {return JSON.parse(JSON.stringify(this.cap)) as CapBlock;}
@@ -77,7 +79,7 @@ export struct CapabilitySettings {
   }
   private editCourse(course?:CourseItem):void {
     const id=this.cardId;
-    this.dialog=new CustomDialogController({builder:CourseEditor({course:course??{id:'',name:'',room:'',day:1,start:'08:00',end:'09:40',firstWeek:1,lastWeek:16,parity:0},appDark:this.appDark,onSave:(value:CourseItem)=>{
+    this.dialog=new CustomDialogController({builder:CourseEditor({course:course??{id:'',name:'',room:'',day:1,start:'08:00',end:'09:40',firstWeek:1,lastWeek:16,parity:0},appDark:this.appDark,onDelete:()=>{if(!this.alive||this.cardId!==id||!course)return;const next=this.copy();next.courses=(next.courses??[]).filter((c)=>c.id!==course.id);next.courseChanges=(next.courseChanges??[]).filter((c)=>c.courseId!==course.id);this.change(next);},onSave:(value:CourseItem)=>{
       if(!this.alive||this.cardId!==id)return;const next=this.copy(),courses=(next.courses??[]).filter((c)=>c.id!==value.id);courses.push(value);next.courses=courses;this.change(next);
     }}),customStyle:true,alignment:DialogAlignment.Center,autoCancel:true});this.dialog.open();
   }
@@ -88,8 +90,10 @@ export struct CapabilitySettings {
     }}),customStyle:true,autoCancel:true});this.dialog.open();
   }
   private semesterDate():void {
-    this.getUIContext().showDatePickerDialog({selected:new Date((this.cap.semester??'')+'T00:00:00'),onAccept:(v:DatePickerResult)=>{
-      const next=this.copy();next.semester=v.year+'-'+('0'+((v.month??0)+1)).slice(-2)+'-'+('0'+v.day).slice(-2);this.change(next);
+    const id=this.cardId,initial=new Date((this.cap.semester??'')+'T12:00:00');
+    this.getUIContext().showDatePickerDialog({selected:isNaN(initial.getTime())?new Date():initial,onAccept:(v:DatePickerResult)=>{
+      if(!this.alive||this.cardId!==id||this.cap.k!=='timetable'||v.year===undefined||v.month===undefined||v.day===undefined)return;
+      const next=this.copy();next.semester=mondayDate(v.year+'-'+('0'+((v.month??0)+1)).slice(-2)+'-'+('0'+v.day).slice(-2));this.change(next);
     }});
   }
   private async importSchedule():Promise<void> {
@@ -113,6 +117,12 @@ export struct CapabilitySettings {
       if(list.length>128)throw new Error('合并后超过 128 条，请分成两张课程卡');
       next.semester=semester;next.courses=list;if(replace)next.courseChanges=[];this.change(next);
     }}),customStyle:true,alignment:DialogAlignment.Center,autoCancel:true});this.dialog.open();
+  }
+  private showTimetable():void {
+    const id=this.cardId;
+    this.dialog=new CustomDialogController({builder:TimetableDialog({cap:this.copy(),appDark:this.appDark,onCourse:(c:CourseItem)=>{
+      if(this.alive&&this.cardId===id)this.editCourse(c);
+    }}),customStyle:true,autoCancel:true});this.dialog.open();
   }
   @Builder
   action(label:string,action:()=>void) {
@@ -149,15 +159,26 @@ export struct CapabilitySettings {
         Text(this.cap.agendaSource==='system'?'系统日历：需要受限权限资格和用户授权':this.cap.agendaSource==='imported'?'本地日历副本；原文件修改后需要重新导入':'显示接下来三项安排，缩小时保留下一项').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       }
       if(this.cap.k==='timetable') {
-        this.action('导入课程表',()=>this.importTimetable())
-        Text('学期与课程').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
-        this.action('学期第一周周一  '+(this.cap.semester??''),()=>this.semesterDate())
-        this.action('假期与调课',()=>this.calendarRules())
-        this.action('添加课程',()=>this.editCourse())
-        ForEach(this.cap.courses??[],(c:CourseItem)=>{
-          Row({space:8}) {Button(c.name+' · 周'+['一','二','三','四','五','六','日'][c.day-1]+' '+c.start,{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontSize(12).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.editCourse(c));Button('删除',{type:ButtonType.Capsule}).height(44).fontSize(12).fontColor('#C43A35').backgroundColor(this.control()).onClick(()=>{const next=this.copy();next.courses=(next.courses??[]).filter((v)=>v.id!==c.id);this.change(next);})}.width('100%')
-        },(c:CourseItem)=>c.id)
-        Text('按周次、单双周和时间自动显示下一课及后续安排。桌面展示单个能力，不挤入完整微缩课表。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+        Text('卡片展示').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
+        Row({space:8}) {
+          ForEach(['next','day'],(mode:string)=>{
+            Button(mode==='next'?'下一课':'每日概览',{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontSize(14)
+              .fontColor(AppDesign.choiceText(this.appDark,(this.cap.timetableMode??'next')===mode)).backgroundColor(AppDesign.choice(this.appDark,(this.cap.timetableMode??'next')===mode))
+              .onClick(()=>{const next=this.copy();next.timetableMode=mode;this.change(next);})
+          },(mode:string)=>mode)
+        }.width('100%')
+        Text(this.cap.timetableMode==='day'?'网格展示当天全部课程和地点；最后一课结束后展示明天。卡片会为学期内最忙的一天预留空间。':'下课前 10 分钟切到下一课；只在前一晚 20:00 后预告次日，假期中不提前展示远期课程。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+        Divider().color(AppDesign.border(this.appDark)).margin({top:4,bottom:4})
+        Row() {
+          Text('学期课表').fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.text()).layoutWeight(1)
+          Button('添加课程',{type:ButtonType.Capsule}).height(44).fontSize(13).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.editCourse())
+        }.width('100%')
+        this.action('查看周课表 · '+(this.cap.courses??[]).length+' 条安排',()=>this.showTimetable())
+        Row({space:8}) {
+          Button('导入课表',{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontSize(14).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.importTimetable())
+          Button('假期与调课',{type:ButtonType.Capsule}).height(44).layoutWeight(1).fontSize(14).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.calendarRules())
+        }.width('100%')
+        this.action('第一周周一  '+(this.cap.semester??'选择开学日期'),()=>this.semesterDate())
       }
       if(this.message || this.cap.refreshState==='failed') {Text(this.message||this.cap.desc||'更新失败，保留上次结果').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
     }.width('100%')

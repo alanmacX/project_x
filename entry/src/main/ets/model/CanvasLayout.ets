@@ -87,7 +87,8 @@ const layoutCache = new Map<string, ElementBox>();
 const obstacleCache = new Map<string, ElementBox>();
 export function capabilityBox(card: FridgeCard): ElementBox {
   const obstacles = card.elements.filter((el) => !el.behindCapability && (el.kind === 'text' || el.kind === 'image'));
-  const key = card.id + ':' + card.capability?.k + ':' + card.shape + ':' + card.cutout + ':' + card.subjectBorder + ':' + outlineIdentity(card) + ':' + card.w + ':' + card.h + ':' + JSON.stringify(card.capBox) + ':' +
+  const minimum = capabilityMinimum(card.capability, true);
+  const key = minimum.w + ':' + minimum.h + ':' + card.id + ':' + card.capability?.k + ':' + card.shape + ':' + card.cutout + ':' + card.subjectBorder + ':' + outlineIdentity(card) + ':' + card.w + ':' + card.h + ':' + JSON.stringify(card.capBox) + ':' +
     JSON.stringify(obstacles.map((el) => [el.x, el.y, el.w, el.h, el.rot]));
   const cached = layoutCache.get(key); if (cached !== undefined) return cached;
   const safe = safeContentBox(card), requested = readableSlot(card, safe);
@@ -143,7 +144,7 @@ export function clampCardGeometry(card: FridgeCard, width: number = BOARD_W, hei
 }
 
 function readableSlot(card: FridgeCard, safe: ElementBox): ElementBox {
-  const min = capabilityMinimum(card.capability, true), requested = new ElementBox();
+  const min = capabilityMinimum(card.capability, true, card.w*safe.w), requested = new ElementBox();
   requested.x = card.capBox.x; requested.y = card.capBox.y; requested.opacity = card.capBox.opacity;
   requested.w = Math.max(card.capBox.w, min.w / card.w); requested.h = Math.max(card.capBox.h, min.h / card.h);
   return fitContentBox(requested, safe);
@@ -151,7 +152,7 @@ function readableSlot(card: FridgeCard, safe: ElementBox): ElementBox {
 export function minimumCardSize(card: FridgeCard): CapabilitySize {
   const size = new CapabilitySize(); size.w = card.shape === 'subject' ? 16 : 80; size.h = card.shape === 'subject' ? 16 : 80;
   if (card.capability === null) return size;
-  const safe = safeContentBox(card), min = capabilityMinimum(card.capability, true);
+  const safe = safeContentBox(card), min = capabilityMinimum(card.capability, true, card.w*safe.w);
   size.w = Math.max(card.shape === 'subject' ? 16 : 80, min.w / Math.max(.0001, safe.w)); size.h = Math.max(card.shape === 'subject' ? 16 : 80, min.h / Math.max(.0001, safe.h));
   return size;
 }
