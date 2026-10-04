@@ -241,7 +241,7 @@ function load(name) {
   kits['@kit.FormKit'].formProvider.getFormRect=previousRect;
   assert.equal(contrastingInk('#FFFFFF'),'#262824'); assert.equal(contrastingInk('#262824'),'#FFFFFF');
   assert.equal(defaultState().cards.length, 0);
-  assert.deepEqual(CAPABILITIES,['clock','date','calendar','countdown','anniversary','weather','dayprogress','yearprogress','battery','agenda','parcel','fetch','timetable']);
+  assert.deepEqual(CAPABILITIES,['clock','date','calendar','countdown','anniversary','weather','dayprogress','yearprogress','battery','agenda','parcel','fetch','timetable','worldclock','lunar']);
   assert.ok(!CAPABILITIES.includes('np'));
   const legacy = {id:'legacy',w:999,h:-1,x:800,y:-20,z:42,caps:[
     {k:'text',text:'自己的文字 ☕',fs:22}, {k:'clock'}, {k:'countdown',title:'生日',date:'2027-01-01'},

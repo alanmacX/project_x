@@ -1,3 +1,4 @@
+import { nextCityBoundary } from './TimeCapabilities';
 import { parsePickupNotice } from './ParcelIntake';
 import { dateKey, holidayName } from './HolidayCalendar';
 import { CapBlock, CourseItem, AgendaItem, ParcelItem } from './CardSchema';
@@ -129,6 +130,8 @@ export function nextDataBoundary(cap: CapBlock, now:number):number {
   const events=cap.k==='agenda'?agendaItems(cap,now):cap.k==='timetable'?coursesOnDay(cap,now).concat(coursesOnDay(cap,tomorrow.getTime())):[];
   const midnight=new Date(now);midnight.setHours(24,0,0,0);
   const boundaries=events.reduce((all:number[],e:AgendaItem):number[]=>all.concat([e.start,e.end]),[]).filter((t)=>t>now);
+  if(cap.k==='worldclock')boundaries.push(nextCityBoundary(cap.zone??'',now));
+  if(cap.k==='lunar')boundaries.push(midnight.getTime());
   if(cap.k==='timetable'||cap.k==='agenda')boundaries.push(midnight.getTime());
   if(cap.k==='timetable') {
     const evening=new Date(now);evening.setHours(TIMETABLE_EVENING,0,0,0);

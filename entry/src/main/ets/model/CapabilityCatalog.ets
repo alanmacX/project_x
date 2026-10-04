@@ -3,6 +3,8 @@ export interface CapabilityDescriptor { key: string; name: string; group: string
 export const CAPABILITY_GROUPS: string[] = ['时间', '生活', '自定义'];
 export const CAPABILITY_CATALOG: CapabilityDescriptor[] = [
   {key:'clock',name:'时钟',group:'时间',summary:'当前时间',source:'系统时间',detail:'时间'},
+  {key:'worldclock',name:'世界时钟',group:'时间',summary:'另一座城市的时间、日期与时差',source:'系统时区规则 · 自动适配夏令时',detail:'城市时间'},
+  {key:'lunar',name:'农历',group:'时间',summary:'农历月日与干支年份',source:'系统农历计算 · 完全离线',detail:'农历日期'},
   {key:'date',name:'日期',group:'时间',summary:'日期、星期与节日',source:'本机日历计算',detail:'日期'},
   {key:'calendar',name:'台历',group:'时间',summary:'小卡看本周，大卡看整月',source:'本机日历计算',detail:'月历'},
   {key:'countdown',name:'倒计时',group:'时间',summary:'距离重要日子还有多久',source:'本机计算',detail:'目标日期'},

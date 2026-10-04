@@ -1,3 +1,4 @@
+import { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
 import { CapabilityAppearance } from '../views/CapabilityAppearance';
 import { CapabilityDetails } from '../views/CapabilityDetails';
 import { WeekTimetable } from '../views/WeekTimetable';
@@ -50,6 +51,8 @@ import { capabilityMinimum } from '../model/CapabilityMetrics';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 
 const THEMES: string[] = ['white', 'cream', 'kraft', 'mint', 'blue', 'pink', 'dark'];
+const EDITOR_NAV_INSET: number = 56;
+const EDITOR_SAFE_GAP: number = 4;
 const SHAPES: string[] = ['rect', 'round', 'pill', 'blob'];
 
 @Entry
@@ -359,7 +362,7 @@ struct Index {
   private editorRect(): SceneRect {
     const rect = new SceneRect(), scale = this.editorScale();
     rect.w = this.preview.w * scale; rect.h = this.preview.h * scale;
-    rect.x = this.previewViewport().left; rect.y = this.safeTop + 76 + this.previewViewport().top; rect.rot = this.editingAngle(); return rect;
+    rect.x = this.previewViewport().left; rect.y = this.safeTop + EDITOR_SAFE_GAP + EDITOR_NAV_INSET + this.previewViewport().top; rect.rot = this.editingAngle(); return rect;
   }
   private boardRect(): SceneRect {
     const rect = sceneRect(this.preview, this.boardScale * BOARD_W, this.boardHeight);
@@ -468,7 +471,7 @@ struct Index {
   }
   private current(): FridgeCard | null { return this.store.findCard(this.selectedId); }
   private currentElement(): CanvasElement | null { return this.current()?.elements.find((e: CanvasElement) => e.id === this.layerId) ?? null; }
-  private currentBox(): ElementBox | null { return this.layerId === 'capability' ? this.current()?.capBox ?? null : this.currentElement(); }
+  private currentBox(): ElementBox | null { const card=this.current();return this.layerId==='capability'?(card?.capability?card.capBox:null):this.currentElement(); }
   private renderBoard(): void {
     const next = this.store.state.cards.map((card: FridgeCard) => cardRenderSnapshot(card));
     if (next.length === this.cards.length && next.every((card: FridgeCard, index: number) => card === this.cards[index])) return;
@@ -580,6 +583,7 @@ struct Index {
         cap.title = '';
       }
       if(k==='timetable'){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));cap.semester=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);cap.courses=[];}
+      if (k === 'worldclock') cap.zone = 'Asia/Shanghai';
       if (k === 'weather') { cap.city = ''; cap.temp = '--°'; cap.desc = '未更新'; }
       card.capability = cap; card.capBox = capabilityPreset(card,'center'); this.layerId = 'capability';
     }
@@ -1186,7 +1190,7 @@ struct Index {
             }.width('100%').height(this.previewPaneHeight())
             this.editorControls(); this.editorInspector()
           }
-        }.width('100%').height('100%').padding({ top: 56 }).backgroundColor(Color.Transparent)
+        }.width('100%').height('100%').padding({ top: EDITOR_NAV_INSET }).backgroundColor(Color.Transparent)
       }.titleMode(HdsNavigationTitleMode.MINI)
         .titleBar({
           content: {
@@ -1206,7 +1210,7 @@ struct Index {
           }
         })
         .bindToScrollable([this.scroller]).hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).width('100%').height('100%').backgroundColor(Color.Transparent)
-    }.width('100%').height('100%').padding({ top: this.safeTop + 4 }).opacity(this.editorOpacity)
+    }.width('100%').height('100%').padding({ top: this.safeTop + EDITOR_SAFE_GAP }).opacity(this.editorOpacity)
       .hitTestBehavior(!this.editing || this.heroActive ? HitTestMode.None : HitTestMode.Default)
       .visibility(this.editing ? Visibility.Visible : Visibility.Hidden)
       .accessibilityLevel(this.editing ? 'yes' : 'no-hide-descendants')
@@ -1221,7 +1225,7 @@ struct Index {
   }
   private editorTabChanged(): void {
     this.settingsTab = this.editorTabs[0] ?? 0;
-    this.layerId = this.settingsTab === 0 ? (this.preview.elements.find((el: CanvasElement) => el.behindCapability)?.id ?? '') : 'capability'; this.showLayerOptions = false; this.syncFields();
+    this.layerId = this.settingsTab === 0 ? (this.preview.elements.find((el: CanvasElement) => el.behindCapability)?.id ?? '') : (this.preview.capability!==null?'capability':''); this.showLayerOptions = false; this.syncFields();
     this.scroller.scrollTo({ xOffset: 0, yOffset: 0 });
   }
   @Builder
@@ -1263,7 +1267,7 @@ struct Index {
             }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
           } else if (this.settingsTab === 1 && (this.layerId === 'capability' || this.layerId.length === 0)) {
             Column({space:16}) { this.capabilityPanel() }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
-            if(this.preview.capability!==null && ['countdown','anniversary','weather','battery','agenda','parcel','fetch','timetable'].includes(this.preview.capability!.k)) {
+            if(this.preview.capability!==null && ['countdown','anniversary','weather','battery','agenda','parcel','fetch','timetable','worldclock'].includes(this.preview.capability!.k)) {
               Column() { this.capabilityDataPanel() }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
             }
             if(this.preview.capability!==null) {
@@ -1300,7 +1304,7 @@ struct Index {
         .rotate({ angle: this.editingAngle(), centerX: 0, centerY: '100%' })
         .position({ x: this.previewViewport().left, y: this.previewViewport().top })
       
-      if (this.layerId.length > 0 && this.layerDrag.length === 0) {
+      if (this.layerId.length > 0 && (this.layerId!=='capability'||this.preview.capability!==null) && this.layerDrag.length === 0) {
         Button('↘', { type: ButtonType.Circle }).width(44).height(AppDesign.controlHeight).fontSize(18).backgroundColor(this.appSurface()).fontColor(this.appText()).shadow({ radius: 6, color: '#18000000', offsetY: 2 })
           .border({ width: 1, color: '#B8B8B8' }).position({ x: this.editorHandle(true).x - 22, y: this.editorHandle(true).y - 22 })
           .accessibilityText('缩放选中元素')
@@ -1435,48 +1439,50 @@ struct Index {
     this.syncFields(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 });
   }
   private layerElement(id: string): CanvasElement | null { return this.preview.elements.find((el: CanvasElement) => el.id === id) ?? null; }
+  private layerTitle(id:string):string {
+    if(id==='capability')return typeLabel(this.preview.capability?.k??'');
+    if(id.length===0)return this.settingsTab===0?'背景底板':'添加能力';
+    return this.layerElement(id)?.kind==='image'?'图片':this.layerElement(id)?.kind==='shape'?'形状':'文字';
+  }
   @Builder
-  layerEntry(id: string, label: string) {
-    Button({ type: ButtonType.ROUNDED_RECTANGLE }) {
-      if(this.compactEditorLayers()) {
-        Row({space:8}) {
-          if(id!=='capability') {
-          if(id.length===0 && this.preview.shape==='subject' && this.preview.subjectPhoto && this.preview.cutout) {Image(this.preview.cutout).width(28).height(28).objectFit(ImageFit.Contain).draggable(false)}
-          else {Text(id.length===0?'▢':id==='capability'?typeLabel(this.preview.capability?.k??'').slice(0,2):this.layerElement(id)?.kind==='text'?'A':this.layerElement(id)?.kind==='image'?'图':'形').fontSize(12).fontColor(this.appText()).width(28).textAlign(TextAlign.Center)}
-          }
-          Text(label).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
-        }.padding({left:8,right:8}).width('100%')
+  layerThumbnail(id:string) {
+    Stack() {
+      if(id.length===0 && this.settingsTab===0) {
+        if(this.preview.shape==='subject' && this.preview.subjectPhoto && this.preview.cutout) {
+          Image(this.preview.cutout).width(32).height(32).objectFit(ImageFit.Contain).draggable(false)
+        } else {Column().width(26).height(26).borderRadius(6).backgroundColor(materialColors(this.preview.material,this.preview.paper,this.preview.ink)[0]).border({width:.5,color:AppDesign.border(this.appDark)})}
+      } else if(this.layerElement(id)?.kind==='image') {
+        Image(this.layerElement(id)?.src??'').width(32).height(32).objectFit(ImageFit.Contain).draggable(false)
+      } else if(this.layerElement(id)?.kind==='shape') {
+        Column().width(24).height(this.layerElement(id)?.primitive==='line'?3:24).borderRadius(this.layerElement(id)?.primitive==='circle'?12:4).backgroundColor(this.layerElement(id)?.color||this.appText())
+      } else if(id==='capability' && ['clock','worldclock','date','lunar','calendar'].includes(this.preview.capability?.k??'')) {SymbolGlyph($r('sys.symbol.clock')).fontSize(20).fontColor([this.appText()])}
+      else {Text(id==='capability'?typeLabel(this.preview.capability?.k??'').slice(0,2):id.length===0?'+':'A').fontSize(id==='capability'?12:18).fontWeight(FontWeight.Medium).fontColor(this.appText())}
+    }.width(36).height(36).hitTestBehavior(HitTestMode.None)
+  }
+  @Builder
+  layerEntry(id:string) {
+    Button({type:ButtonType.ROUNDED_RECTANGLE}) {
+      if(this.editorLandscape() && !this.compactEditorLayers()) {
+        Column({space:4}) {this.layerThumbnail(id);Text(this.layerTitle(id)).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})}.width('100%').padding(8)
       } else {
-      Column({ space: 6 }) {
-        Stack() {
-          if (id.length === 0) {
-            if (this.preview.shape === 'subject' && this.preview.subjectPhoto && this.preview.cutout.length > 0) {
-              Image(this.preview.cutout).width(AppDesign.controlHeight).height(AppDesign.controlHeight).objectFit(ImageFit.Contain).draggable(false)
-            } else {
-              Column().width(32).height(32).borderRadius(8).backgroundColor(materialColors(this.preview.material, this.preview.paper, this.preview.ink)[0]).border({ width: .5, color: '#999999' })
-            }
-          } else if (this.layerElement(id)?.kind === 'image') {
-            Image(this.layerElement(id)?.src ?? '').width(AppDesign.controlHeight).height(AppDesign.controlHeight).objectFit(ImageFit.Contain).draggable(false)
-          } else if (this.layerElement(id)?.kind === 'shape') {
-            Column().width(28).height(this.layerElement(id)?.primitive === 'line' ? 3 : 28).borderRadius(this.layerElement(id)?.primitive === 'circle' ? 14 : 4).backgroundColor(this.layerElement(id)?.color || this.appText())
-          } else {
-            Text(id === 'capability' ? typeLabel(this.preview.capability?.k ?? '').slice(0, 2) : 'A').fontSize(15).fontColor(this.appText()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-          }
-        }.width(44).height(AppDesign.controlHeight).hitTestBehavior(HitTestMode.None)
-        Text(label).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-      }.padding(8).width('100%')
+        Row({space:8}) {
+          this.layerThumbnail(id)
+          Text(this.layerTitle(id)).fontSize(13).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
+          if(this.layerId===id) {Text('•').fontSize(16).fontColor(this.appText())}
+        }.width('100%').padding({left:8,right:12})
       }
-    }.width(this.compactEditorLayers()?132:this.editorLandscape() ? 96 : '100%').height(this.compactEditorLayers()?44:82).backgroundColor(this.layerId === id ? this.appControl() : Color.Transparent)
-      .border({ width: this.layerId === id ? 1.5 : 0, color: this.appText() }).borderRadius(12).clip(true)
-      .accessibilityText('选择图层 ' + label).onClick(() => this.chooseLayer(id))
+    }.width(this.editorLandscape()?(this.compactEditorLayers()?132:96):'100%').height(this.editorLandscape()&&!this.compactEditorLayers()?76:52)
+      .backgroundColor(this.layerId===id?this.appControl():Color.Transparent).borderRadius(12)
+      .accessibilityText('选择图层 '+this.layerTitle(id)).onClick(()=>this.chooseLayer(id))
   }
   @Builder
   layerEntries() {
     ForEach(this.preview.elements.filter((el: CanvasElement) => el.behindCapability === (this.settingsTab === 0)).slice().reverse(), (el: CanvasElement) => {
-      this.layerEntry(el.id, el.kind === 'text' ? '文字' : (el.kind === 'image' ? '图片' : '形状'))
+      this.layerEntry(el.id)
     }, (el: CanvasElement) => el.id)
-    if (this.settingsTab === 1 && this.preview.capability !== null) { this.layerEntry('capability', typeLabel(this.preview.capability!.k)) }
-    this.layerEntry('', this.settingsTab === 0 ? '背景底板' : '能力设置')
+    if (this.settingsTab === 1 && this.preview.capability !== null) { this.layerEntry('capability') }
+    if(this.settingsTab===0) {this.layerEntry('')}
+    else if(this.preview.capability===null) {this.layerEntry('')}
   }
   @Builder
   layersPanel() {
@@ -1602,6 +1608,9 @@ struct Index {
         TextInput({ text: this.titleValue, placeholder: '名称' }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(16).fontColor(this.appText()).placeholderColor(this.appMuted()).backgroundColor(this.appControl())
           .onChange((v: string) => { this.titleValue = v; const cap = this.current()?.capability; if (cap !== null && cap !== undefined) { cap.title = v; this.change(); } })
         Button('日期  ' + (this.preview.capability?.date ?? ''), { type: ButtonType.ROUNDED_RECTANGLE }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontColor(this.appText()).backgroundColor(this.appControl()).border({ width: .5, color: AppDesign.border(this.appDark) }).onClick(() => this.pickDate())
+      }
+      if (this.preview.capability?.k === 'worldclock') {
+        TimeCapabilitySettings({cap:this.preview.capability!,appDark:this.appDark,onUpdate:(next:CapBlock)=>this.updateExtraCapability(this.preview.id,next)})
       }
       if (this.preview.capability?.k === 'weather') {
         TextInput({ text: this.cityValue, placeholder: '城市' }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(16).fontColor(this.appText()).placeholderColor(this.appMuted()).backgroundColor(this.appControl())

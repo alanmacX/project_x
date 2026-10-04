@@ -1,3 +1,4 @@
+import { clockZone } from './TimeCapabilities';
 import { validDay, HolidayDate } from './HolidayCalendar';
 /** Pure, versioned schema shared by the app and FormKit renderer. */
 export const BOARD_W: number = 344;
@@ -12,7 +13,7 @@ export class CapType {
   static readonly DAY_PROGRESS: string = 'dayprogress';
   static readonly YEAR_PROGRESS: string = 'yearprogress';
 }
-export const CAPABILITIES: string[] = ['clock', 'date', 'calendar', 'countdown', 'anniversary', 'weather', 'dayprogress', 'yearprogress', 'battery', 'agenda', 'parcel', 'fetch', 'timetable'];
+export const CAPABILITIES: string[] = ['clock', 'date', 'calendar', 'countdown', 'anniversary', 'weather', 'dayprogress', 'yearprogress', 'battery', 'agenda', 'parcel', 'fetch', 'timetable', 'worldclock', 'lunar'];
 export interface CapBlock {
   k: string;
   readingStyle?: string; // auto | plain | surface; photo subjects receive a readable backing
@@ -20,6 +21,7 @@ export interface CapBlock {
   title?: string;
   date?: string;
   city?: string;
+  zone?: string; // IANA time zone; system rules include daylight-saving time
   calendarOffset?: number;
   updatedAt?: number;
   attemptedAt?: number;
@@ -138,7 +140,7 @@ export class FridgeState {
 }
 export function typeLabel(k: string): string {
   const index = CAPABILITIES.indexOf(k);
-  const names: string[] = ['时间', '日期', '台历', '倒计时', '纪念日', '天气', '今日进度', '年度进度', '本机电量', '日程', '取件码', 'URL 内容', '课程表'];
+  const names: string[] = ['时间', '日期', '台历', '倒计时', '纪念日', '天气', '今日进度', '年度进度', '本机电量', '日程', '取件码', 'URL 内容', '课程表', '世界时钟', '农历'];
   return index >= 0 ? names[index] : '自定义';
 }
 export function materialColors(material: string, paper: string = '', ink: string = ''): string[] {
@@ -256,6 +258,7 @@ export function contrastingInk(color: string): string {
 
 export function normalizeCapability(raw: CapBlock): CapBlock {
   const cap = JSON.parse(JSON.stringify(raw)) as CapBlock;
+  if (raw.k === 'worldclock') cap.zone = clockZone(typeof raw.zone === 'string' ? raw.zone : '');
   cap.readingStyle = ['plain','surface'].includes(raw.readingStyle ?? '') ? raw.readingStyle : 'auto';
   cap.parcelPlace = typeof raw.parcelPlace === 'string' ? raw.parcelPlace.slice(0,80) : '';
   cap.title = typeof raw.title === 'string' ? raw.title.slice(0,160) : '';
