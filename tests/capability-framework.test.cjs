@@ -36,15 +36,20 @@ const grouping=load('CardGroups');
 const grouped=['a','b','c','d'].map((id,i)=>({...new s.FridgeCard(),id,z:4-i,groupId:['a','c'].includes(id)?'same':''}));
 const order=grouped.map(x=>x.id);const sections=grouping.layerSections(grouped);assert.deepEqual(sections[0].ids,['a','c']);assert.equal(sections[0].title,'组合 1');assert.deepEqual(grouped.map(x=>x.id),order,'layer grouping does not rewrite canvas stacking');
 for(const ink of ['#262824','#FFFFFF','#777777','#AA4455','#FFDD00','#000000','#234567']) {
- const tint=p.readingGlassColor(ink),alpha=parseInt(tint.slice(1,3),16)/255,rgb=[3,5,7].map(x=>parseInt(tint.slice(x,x+2),16));
- for(const bg of [0,255]){const blend='#'+rgb.map(x=>Math.round(x*alpha+bg*(1-alpha)).toString(16).padStart(2,'0')).join('');assert.ok(p.textContrast(ink,blend)>=4.5,'glass tint protects text even on extreme backdrops');}
+ for(const strength of [-1,0,.1,.3,.42,1]) {
+  const tint=p.readingVeilColor(ink,strength),alpha=parseInt(tint.slice(1,3),16)/255;
+  assert.ok(alpha<=.421,'reading field preserves at least 58% of the photograph');
+  if(strength===0)assert.equal(alpha,0,'feather ends fully transparent');
+ }
+ assert.ok(p.textContrast(ink,p.readingSurfaceColor(ink))>=4.5,'glyph halo chooses the contrasting luminance');
+ assert.equal(p.readingHalo(ink,1,false).length,0,'plain solid cards need no extra text effects');
 }
 const shape=new s.FridgeCard();shape.shape='subject';shape.subjectBorder=false;shape.w=300;shape.h=300;shape.capability={k:'clock'};
 shape.outline=[[{x:0,y:0},{x:1,y:0},{x:1,y:.4},{x:.4,y:.4},{x:.4,y:1},{x:0,y:1}]];
 shape.capBox={x:.08,y:.7,w:.28,h:.14,rot:0,opacity:1};const placed=g.capabilityPlacement(shape);assert.ok(Math.abs(placed.y-.7)<.001,'requested lower arm remains outside the largest upper rectangle');
 shape.elements=[{...new s.CanvasElement(),kind:'text',x:0,y:0,w:1,h:1}];assert.ok(g.capabilityObstructed(shape));assert.ok(g.capabilityPlacement(shape).y>.5,'intentional overlap never automatically relocates a capability');
 const previous={...placed},requested={...placed,x:.65,y:.65};const constrained=g.constrainCapabilityDrag(shape,requested,previous);assert.ok(constrained.x+constrained.w<=.4+.001 || constrained.y+constrained.h<=.4+.001,'gesture never enters transparent cutout');
-console.log('PASS grouped layer ordering; detached canvas snapshots; worst-case glass contrast; whole-silhouette placement and bounded drag');
+console.log('PASS grouped layer ordering; detached canvas snapshots; transparent reading veil and contrasting glyph halos; whole-silhouette placement and bounded drag');
 
 const hollow={...shape,cutout:'',outline:[[{x:0,y:0},{x:1,y:0},{x:1,y:1},{x:0,y:1}],[{x:.4,y:.4},{x:.6,y:.4},{x:.6,y:.6},{x:.4,y:.6}]],elements:[],capBox:{x:.3,y:.3,w:.28,h:.14,rot:0,opacity:1}};
 const holeFit=g.capabilityPlacement(hollow);assert.ok(holeFit.x+holeFit.w<=.4 || holeFit.x>=.6 || holeFit.y+holeFit.h<=.4 || holeFit.y>=.6,'capability never covers a transparent hole');
@@ -68,3 +73,9 @@ for(const height of [s.BOARD_H,280,740]) {
 }
 const snap=load('CardViewSnapshot'),ungrouped=new s.FridgeCard();ungrouped.id='reactive-group';ungrouped.groupId='group';const oldSnap=snap.cardRenderSnapshot(ungrouped);grouping.ungroupCards([ungrouped],'group');const newSnap=snap.cardRenderSnapshot(ungrouped);assert.notEqual(oldSnap,newSnap);assert.equal(newSnap.groupId,'','ungroup publishes a new reactive render snapshot');
 console.log('PASS group centre/pivot, scale/rotation roundtrip across widget aspects; reactive ungroup snapshot');
+
+const mutable=new s.FridgeCard();mutable.id='snapshot-cache-contract';mutable.capability={k:'weather',temp:'18'};mutable.elements=[{...new s.CanvasElement(),id:'caption',text:'before'}];
+const stable=snap.cardRenderSnapshot(mutable);assert.equal(snap.cardRenderSnapshot(mutable),stable,'unchanged cards reuse their render parameter');
+mutable.capability.temp='19';mutable.elements[0].text='after';mutable.rot=23;mutable.capBox.x=.3;
+const changed=snap.cardRenderSnapshot(mutable);assert.notEqual(changed,stable);assert.equal(stable.capability.temp,'18');assert.equal(stable.elements[0].text,'before');assert.equal(changed.rot,23);assert.equal(changed.capBox.x,.3);
+console.log('PASS render-cache reuse and isolated nested content/geometry updates');

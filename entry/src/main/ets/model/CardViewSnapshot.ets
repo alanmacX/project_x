@@ -36,13 +36,19 @@ const renderSignatures = new Map<string, string>();
 
 /** A lightweight render parameter. Storage and undo snapshots retain their original contours. */
 export function cardRenderSnapshot(source: FridgeCard): FridgeCard {
-  const copy = cardViewSnapshot(source);
-  copy.renderContourKey = registerRenderContour(source);
-  copy.outline = [];
-  // Compare only lightweight values. Reopening an unchanged card must not rebuild every capability.
-  const signature = JSON.stringify(copy);
+  const contourKey = registerRenderContour(source);
+  // Compare mutable values before cloning. Reopening/committing one card should
+  // not deep-copy every unchanged capability, course list and background layer.
+  const signature = JSON.stringify([source.id, source.groupId, source.x, source.y, source.w, source.h, source.rot, source.z,
+    source.shape, source.frame, source.material, source.paper, source.ink, source.subjectPhoto, source.subjectAspect,
+    source.subjectInk, source.subjectVersion, source.cutout, source.inDoor, contourKey, source.capability, source.capBox, source.elements]);
   const previous = renderSnapshots.get(source.id);
   if (previous !== undefined && renderSignatures.get(source.id) === signature) return previous;
+  const copy = cardViewSnapshot(source); copy.renderContourKey = contourKey; copy.outline = [];
+  if (!renderSnapshots.has(source.id) && renderSnapshots.size >= 128) {
+    const oldest = renderSnapshots.keys().next().value as string;
+    renderSnapshots.delete(oldest); renderSignatures.delete(oldest);
+  }
   renderSignatures.set(source.id, signature); renderSnapshots.set(source.id, copy);
   return copy;
 }

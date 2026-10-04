@@ -48,13 +48,15 @@ export function readingWarning(card:FridgeCard):string {
   return textContrast(colors[1],colors[0])<4.5?'文字对比度偏低，可启用阅读衬底或调整内容颜色':'';
 }
 
-/** Contrast against the worst possible photograph, rather than a guessed average. */
-export function readingGlassColor(ink:string):string {
-  const base=readingSurfaceColor(ink),rgb=[1,3,5].map((start:number)=>parseInt(base.slice(start,start+2),16));
-  for(let opacity=160;opacity<=255;opacity++) {
-    const alpha=opacity/255;
-    const mixed=(back:number):string=>'#'+rgb.map((value:number)=>Math.round(value*alpha+back*(1-alpha)).toString(16).padStart(2,'0')).join('');
-    if(textContrast(ink,mixed(0))>=4.5 && textContrast(ink,mixed(255))>=4.5) return '#'+opacity.toString(16).padStart(2,'0')+base.slice(1);
-  }
-  return '#FF'+base.slice(1);
+/** A transparent field, not a panel. Glyph halos supply local contrast without
+ * replacing the photograph with a nearly opaque rectangular surface. */
+export function readingVeilColor(ink: string, strength: number): string {
+  const alpha = Math.round(Math.max(0, Math.min(.42, strength)) * 255);
+  return '#' + alpha.toString(16).padStart(2, '0') + readingSurfaceColor(ink).slice(1);
+}
+export function readingHalo(ink: string, scale: number, enabled: boolean): ShadowOptions[] {
+  if (!enabled) return [];
+  const color = '#D9' + readingSurfaceColor(ink).slice(1);
+  return [{ radius: .65 * scale, color: color, offsetX: 0, offsetY: 0 },
+    { radius: 1.8 * scale, color: color, offsetX: 0, offsetY: 0 }];
 }

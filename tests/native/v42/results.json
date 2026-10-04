@@ -1,0 +1,288 @@
+{
+  "device": "MatePad Mini, HarmonyOS 7 API 26",
+  "active_display_hz": 120,
+  "measurement": "screen compositor timestamps within native animation windows; not per-card touch sample rate",
+  "stress_build": "snapshot transition candidate before final 6-card warming and interaction-end fixes",
+  "samples": {
+    "fridge-baseline": [
+      {
+        "kind": "entry",
+        "sample": 0,
+        "frames": 29,
+        "fps": 76.3,
+        "maxInterval_ms": 25.03,
+        "intervalsOver12_5ms": 15,
+        "touchToAnimation_ms": 30.5
+      },
+      {
+        "kind": "exit",
+        "sample": 0,
+        "frames": 28,
+        "fps": 80.9,
+        "maxInterval_ms": 41.7,
+        "intervalsOver12_5ms": 10,
+        "touchToAnimation_ms": null
+      },
+      {
+        "kind": "entry",
+        "sample": 1,
+        "frames": 30,
+        "fps": 77.3,
+        "maxInterval_ms": 25.12,
+        "intervalsOver12_5ms": 14,
+        "touchToAnimation_ms": 30.3
+      },
+      {
+        "kind": "exit",
+        "sample": 1,
+        "frames": 27,
+        "fps": 79.9,
+        "maxInterval_ms": 41.71,
+        "intervalsOver12_5ms": 10,
+        "touchToAnimation_ms": null
+      },
+      {
+        "kind": "entry",
+        "sample": 2,
+        "frames": 30,
+        "fps": 77.3,
+        "maxInterval_ms": 16.75,
+        "intervalsOver12_5ms": 16,
+        "touchToAnimation_ms": 31.0
+      },
+      {
+        "kind": "exit",
+        "sample": 2,
+        "frames": 27,
+        "fps": 80.0,
+        "maxInterval_ms": 41.71,
+        "intervalsOver12_5ms": 10,
+        "touchToAnimation_ms": null
+      }
+    ],
+    "fridge-finalwarm6": [
+      {
+        "kind": "entry",
+        "sample": 0,
+        "frames": 44,
+        "fps": 117.2,
+        "maxInterval_ms": 16.67,
+        "intervalsOver12_5ms": 1,
+        "touchToAnimation_ms": 103.0
+      },
+      {
+        "kind": "exit",
+        "sample": 0,
+        "frames": 40,
+        "fps": 117.0,
+        "maxInterval_ms": 16.68,
+        "intervalsOver12_5ms": 1,
+        "touchToAnimation_ms": null
+      },
+      {
+        "kind": "entry",
+        "sample": 1,
+        "frames": 43,
+        "fps": 114.5,
+        "maxInterval_ms": 16.7,
+        "intervalsOver12_5ms": 2,
+        "touchToAnimation_ms": 39.8
+      },
+      {
+        "kind": "exit",
+        "sample": 1,
+        "frames": 40,
+        "fps": 116.9,
+        "maxInterval_ms": 16.64,
+        "intervalsOver12_5ms": 1,
+        "touchToAnimation_ms": null
+      },
+      {
+        "kind": "entry",
+        "sample": 2,
+        "frames": 43,
+        "fps": 114.5,
+        "maxInterval_ms": 25.03,
+        "intervalsOver12_5ms": 1,
+        "touchToAnimation_ms": 41.1
+      },
+      {
+        "kind": "exit",
+        "sample": 2,
+        "frames": 40,
+        "fps": 116.9,
+        "maxInterval_ms": 16.69,
+        "intervalsOver12_5ms": 1,
+        "touchToAnimation_ms": null
+      }
+    ],
+    "fridge-stress12": [
+      {
+        "kind": "entry",
+        "sample": 0,
+        "frames": 40,
+        "fps": 103.9,
+        "maxInterval_ms": 25.11,
+        "intervalsOver12_5ms": 4,
+        "touchToAnimation_ms": 205.8
+      },
+      {
+        "kind": "exit",
+        "sample": 0,
+        "frames": 39,
+        "fps": 113.9,
+        "maxInterval_ms": 25.03,
+        "intervalsOver12_5ms": 1,
+        "touchToAnimation_ms": null
+      },
+      {
+        "kind": "entry",
+        "sample": 1,
+        "frames": 41,
+        "fps": 111.8,
+        "maxInterval_ms": 16.72,
+        "intervalsOver12_5ms": 3,
+        "touchToAnimation_ms": 69.8
+      },
+      {
+        "kind": "exit",
+        "sample": 1,
+        "frames": 36,
+        "fps": 104.9,
+        "maxInterval_ms": 33.32,
+        "intervalsOver12_5ms": 3,
+        "touchToAnimation_ms": null
+      },
+      {
+        "kind": "entry",
+        "sample": 2,
+        "frames": 42,
+        "fps": 111.8,
+        "maxInterval_ms": 16.7,
+        "intervalsOver12_5ms": 3,
+        "touchToAnimation_ms": 55.7
+      },
+      {
+        "kind": "exit",
+        "sample": 2,
+        "frames": 37,
+        "fps": 107.9,
+        "maxInterval_ms": 41.84,
+        "intervalsOver12_5ms": 1,
+        "touchToAnimation_ms": null
+      }
+    ],
+    "fridge-stress24": [
+      {
+        "kind": "entry",
+        "sample": 0,
+        "frames": 35,
+        "fps": 90.5,
+        "maxInterval_ms": 66.73,
+        "intervalsOver12_5ms": 5,
+        "touchToAnimation_ms": 238.2
+      },
+      {
+        "kind": "exit",
+        "sample": 0,
+        "frames": 33,
+        "fps": 95.9,
+        "maxInterval_ms": 58.35,
+        "intervalsOver12_5ms": 3,
+        "touchToAnimation_ms": null
+      },
+      {
+        "kind": "entry",
+        "sample": 1,
+        "frames": 38,
+        "fps": 100.8,
+        "maxInterval_ms": 33.34,
+        "intervalsOver12_5ms": 5,
+        "touchToAnimation_ms": 93.4
+      },
+      {
+        "kind": "exit",
+        "sample": 1,
+        "frames": 31,
+        "fps": 89.9,
+        "maxInterval_ms": 41.67,
+        "intervalsOver12_5ms": 5,
+        "touchToAnimation_ms": null
+      },
+      {
+        "kind": "entry",
+        "sample": 2,
+        "frames": 38,
+        "fps": 100.8,
+        "maxInterval_ms": 25.01,
+        "intervalsOver12_5ms": 6,
+        "touchToAnimation_ms": 93.1
+      },
+      {
+        "kind": "exit",
+        "sample": 2,
+        "frames": 31,
+        "fps": 89.9,
+        "maxInterval_ms": 33.38,
+        "intervalsOver12_5ms": 6,
+        "touchToAnimation_ms": null
+      }
+    ],
+    "fridge-stress48": [
+      {
+        "kind": "entry",
+        "sample": 0,
+        "frames": 23,
+        "fps": 58.6,
+        "maxInterval_ms": 91.77,
+        "intervalsOver12_5ms": 7,
+        "touchToAnimation_ms": 304.5
+      },
+      {
+        "kind": "exit",
+        "sample": 0,
+        "frames": 25,
+        "fps": 72.0,
+        "maxInterval_ms": 66.72,
+        "intervalsOver12_5ms": 4,
+        "touchToAnimation_ms": null
+      },
+      {
+        "kind": "entry",
+        "sample": 1,
+        "frames": 28,
+        "fps": 71.9,
+        "maxInterval_ms": 58.4,
+        "intervalsOver12_5ms": 8,
+        "touchToAnimation_ms": 153.5
+      },
+      {
+        "kind": "exit",
+        "sample": 1,
+        "frames": 21,
+        "fps": 59.9,
+        "maxInterval_ms": 58.4,
+        "intervalsOver12_5ms": 6,
+        "touchToAnimation_ms": null
+      },
+      {
+        "kind": "entry",
+        "sample": 2,
+        "frames": 27,
+        "fps": 76.2,
+        "maxInterval_ms": 50.05,
+        "intervalsOver12_5ms": 7,
+        "touchToAnimation_ms": 156.2
+      },
+      {
+        "kind": "exit",
+        "sample": 2,
+        "frames": 18,
+        "fps": 51.0,
+        "maxInterval_ms": 75.03,
+        "intervalsOver12_5ms": 7,
+        "touchToAnimation_ms": null
+      }
+    ]
+  }
+}

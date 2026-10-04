@@ -1,5 +1,4 @@
-import { immersiveReading } from '../model/ChromeMaterial';
-import { readingSurface, readingGlassColor } from '../model/CapabilityPresentation';
+import { readingSurface, readingVeilColor } from '../model/CapabilityPresentation';
 import { capabilityInset } from '../model/CanvasLayout';
 import { AnimatedPhoto } from './AnimatedPhoto';
 import { FridgeCard, CanvasElement, ElementBox, materialColors, shapeRadius } from '../model/CardSchema';
@@ -71,12 +70,18 @@ export struct CardCanvas {
   capabilityContent() {
     Stack() {
       if(this.hasReadingSurface()) {
-        Column().width('100%').height('100%').backgroundColor(readingGlassColor(this.capabilityInk()))
-          .attributeModifier(this.widget?undefined:immersiveReading(readingGlassColor(this.capabilityInk())))
-          .borderRadius(14*this.scaleFactor).shadow({radius:5*this.scaleFactor,color:readingGlassColor(this.capabilityInk()),offsetX:0,offsetY:0})
+        // Feather the entire field to zero before its perimeter. No border,
+        // backdrop blur or additional offscreen material pass per capability.
+        Column().width('100%').height('100%')
+          .radialGradient({center:['50%','50%'],radius:'50%',colors:[
+            [readingVeilColor(this.capabilityInk(), .42), 0],
+            [readingVeilColor(this.capabilityInk(), .30), .38],
+            [readingVeilColor(this.capabilityInk(), .10), .72],
+            [readingVeilColor(this.capabilityInk(), 0), 1]]})
+          .scale({x:1.45,y:1.45})
           .hitTestBehavior(HitTestMode.None)
       }
-      Column() { CapabilityView({cap:this.card.capability!,ink:this.capabilityInk(),scaleFactor:this.scaleFactor,
+      Column() { CapabilityView({cap:this.card.capability!,ink:this.capabilityInk(),readingHaloEnabled:this.hasReadingSurface(),scaleFactor:this.scaleFactor,
         contentWidth:this.card.w*capabilityPlacement(this.card).w-2*capabilityInset(this.card),contentHeight:this.card.h*capabilityPlacement(this.card).h-2*capabilityInset(this.card),tick:this.tick}) }
         .padding(capabilityInset(this.card)*this.scaleFactor).width('100%').height('100%')
     }.width((this.capSurfaceBox().w*100)+'%').height((this.capSurfaceBox().h*100)+'%')

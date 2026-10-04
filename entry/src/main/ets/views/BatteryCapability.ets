@@ -1,9 +1,11 @@
+import { readingHalo } from '../model/CapabilityPresentation';
 import { CapBlock } from '../model/CardSchema';
 import { batteryLevel, batteryStatus, batteryTint } from '../model/BatteryPresentation';
 @Component
 export struct BatteryCapability {
   @Prop cap:CapBlock={k:'battery'};
   @Prop ink:string='#262824';
+  @Prop readingHaloEnabled: boolean = false;
   @Prop unit:number=1;
   @Prop compact:boolean=false;
   @Builder
@@ -19,8 +21,8 @@ export struct BatteryCapability {
   @Builder
   percentage(font:number) {
     Row({space:1*this.unit}) {
-      Text(batteryLevel(this.cap)<0?'—':String(batteryLevel(this.cap))).fontSize(font*this.unit).fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(1)
-      if(batteryLevel(this.cap)>=0){Text('%').fontSize((this.compact?10:12)*this.unit).fontColor(this.ink).opacity(.55).margin({bottom:4*this.unit})}
+      Text(batteryLevel(this.cap)<0?'—':String(batteryLevel(this.cap))).fontSize(font*this.unit).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit, this.readingHaloEnabled)).maxLines(1)
+      if(batteryLevel(this.cap)>=0){Text('%').fontSize((this.compact?10:12)*this.unit).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit, this.readingHaloEnabled)).opacity(.55).margin({bottom:4*this.unit})}
     }.alignItems(VerticalAlign.Bottom)
   }
   build() {
@@ -31,7 +33,7 @@ export struct BatteryCapability {
         this.percentage(34)
         this.cell(100,24)
       }
-      Text(batteryStatus(this.cap)).fontSize((this.compact?10:11)*this.unit).fontColor(this.ink).opacity(.6).maxLines(1)
+      Text(batteryStatus(this.cap)).fontSize((this.compact?10:11)*this.unit).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit, this.readingHaloEnabled)).opacity(.6).maxLines(1)
     }.width('100%').height('100%').justifyContent(FlexAlign.Center)
   }
 }

@@ -1,3 +1,4 @@
+import { readingHalo } from '../model/CapabilityPresentation';
 import { cityReading, clockOffset, lunarReading } from '../model/TimeCapabilities';
 import { SummaryCapability } from './SummaryCapability';
 import { holidayName, holidayMarker } from '../model/HolidayCalendar';
@@ -26,6 +27,7 @@ export function progressOf(k: string, now: Date): number {
 export struct CapabilityView {
   @Prop cap: CapBlock = { k: 'clock' };
   @Prop ink: string = '#262824';
+  @Prop readingHaloEnabled: boolean = false;
   @Prop scaleFactor: number = 1;
   @Prop contentWidth: number = 150;
   @Prop contentHeight: number = 140;
@@ -53,47 +55,47 @@ export struct CapabilityView {
   build() {
     Column({ space: 4 * this.unit() }) {
       if (this.undersized()) {
-        Text('放大卡片').fontSize(12*this.scaleFactor).fontColor(this.ink).maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').textAlign(TextAlign.Center)
+        Text('放大卡片').fontSize(12*this.scaleFactor).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').textAlign(TextAlign.Center)
       } else if (this.cap.k === 'clock') {
-        TextClock().format('HH:mm').fontSize(((this.compact() ? 24 : 42) * this.unit()) + 'vp').fontWeight(FontWeight.Medium).fontColor(this.ink)
+        TextClock().format('HH:mm').fontSize(((this.compact() ? 24 : 42) * this.unit()) + 'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled))
       } else if (this.cap.k === 'worldclock') {
-        Text(cityReading(this.cap.zone??'',this.now().getTime()).city).fontSize((12*this.unit())+'vp').fontColor(this.ink).opacity(.65).maxLines(1)
+        Text(cityReading(this.cap.zone??'',this.now().getTime()).city).fontSize((12*this.unit())+'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(.65).maxLines(1)
         ForEach([clockOffset(this.cap.zone??'',this.now().getTime())],(offset:number)=>{
           Column({space:4*this.unit()}) {
-            TextClock({timeZoneOffset:offset}).format('HH:mm').fontSize(((this.compact()?28:40)*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink)
-            TextClock({timeZoneOffset:offset}).format('M月d日 · EEE').fontSize((11*this.unit())+'vp').fontColor(this.ink)
+            TextClock({timeZoneOffset:offset}).format('HH:mm').fontSize(((this.compact()?28:40)*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled))
+            TextClock({timeZoneOffset:offset}).format('M月d日 · EEE').fontSize((11*this.unit())+'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled))
           }
         },(offset:number)=>String(offset))
-        if(!this.compact()) {Text(cityReading(this.cap.zone??'',this.now().getTime()).difference).fontSize((11*this.unit())+'vp').fontColor(this.ink).opacity(.65).maxLines(1)}
+        if(!this.compact()) {Text(cityReading(this.cap.zone??'',this.now().getTime()).difference).fontSize((11*this.unit())+'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(.65).maxLines(1)}
       } else if (this.cap.k === 'lunar') {
-        Text('农历').fontSize((12*this.unit())+'vp').fontColor(this.ink).opacity(.65)
-        Text(lunarReading(this.now().getTime()).date).fontSize(this.lunarFont()+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(1)
-        Text(lunarReading(this.now().getTime()).year).fontSize((12*this.unit())+'vp').fontColor(this.ink).opacity(.65).maxLines(1)
+        Text('农历').fontSize((12*this.unit())+'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(.65)
+        Text(lunarReading(this.now().getTime()).date).fontSize(this.lunarFont()+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).maxLines(1)
+        Text(lunarReading(this.now().getTime()).year).fontSize((12*this.unit())+'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(.65).maxLines(1)
       } else if (this.cap.k === 'date') {
-        TextClock().format('dd').fontSize(((this.compact() ? 24 : 54) * this.unit()) + 'vp').fontWeight(FontWeight.Medium).fontColor(this.ink)
-        Text(holidayName(this.now()) || (this.now().getFullYear()+'年'+(this.now().getMonth()+1)+'月 · '+['周日','周一','周二','周三','周四','周五','周六'][this.now().getDay()]+(holidayMarker(this.now())==='班'?' · 班':''))).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).opacity(0.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
+        TextClock().format('dd').fontSize(((this.compact() ? 24 : 54) * this.unit()) + 'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled))
+        Text(holidayName(this.now()) || (this.now().getFullYear()+'年'+(this.now().getMonth()+1)+'月 · '+['周日','周一','周二','周三','周四','周五','周六'][this.now().getDay()]+(holidayMarker(this.now())==='班'?' · 班':''))).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(0.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
       } else if (this.cap.k === 'calendar' && this.compact() && (this.cap.calendarOffset ?? 0) === 0) {
-        Text((this.now().getMonth() + 1) + '月 · 本周').fontSize((12 * this.unit()) + 'vp').fontColor(this.ink)
+        Text((this.now().getMonth() + 1) + '月 · 本周').fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled))
         Row() {
           ForEach(this.weekDays(), (day: number, index: number) => {
             Column({ space: 2 * this.unit() }) {
-              Text(['日', '一', '二', '三', '四', '五', '六'][index]).fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).opacity(.6)
+              Text(['日', '一', '二', '三', '四', '五', '六'][index]).fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(.6)
               Text('' + day).fontSize((12 * this.unit()) + 'vp').fontColor(day === this.now().getDate() && (this.cap.calendarOffset ?? 0) === 0 ? contrastingInk(this.ink) : this.ink)
                 .width('100%').height(20 * this.unit()).textAlign(TextAlign.Center)
                 .backgroundColor(day === this.now().getDate() && (this.cap.calendarOffset ?? 0) === 0 ? this.ink : Color.Transparent).borderRadius(4)
-            Text(holidayMarker(new Date(this.now().getFullYear(),this.now().getMonth(),this.now().getDate()-this.now().getDay()+index))).fontSize((7*this.unit())+'vp').fontColor(this.ink).height(8*this.unit()).opacity(.65)
+            Text(holidayMarker(new Date(this.now().getFullYear(),this.now().getMonth(),this.now().getDate()-this.now().getDay()+index))).fontSize((7*this.unit())+'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).height(8*this.unit()).opacity(.65)
             }.layoutWeight(1)
           }, (day: number, index: number) => index + ':' + day)
         }.width('100%')
       } else if (this.cap.k === 'calendar' && this.compact()) {
-        Text((this.calendarDate().getFullYear()) + '年').fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).opacity(.65)
-        Text((this.calendarDate().getMonth() + 1) + '月').fontSize((28 * this.unit()) + 'vp').fontColor(this.ink)
-        Text('点按查看月历').fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).opacity(.6)
+        Text((this.calendarDate().getFullYear()) + '年').fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(.65)
+        Text((this.calendarDate().getMonth() + 1) + '月').fontSize((28 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled))
+        Text('点按查看月历').fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(.6)
       } else if (this.cap.k === 'calendar') {
-        Text(this.calendarDate().getFullYear() + '年' + (this.calendarDate().getMonth() + 1) + '月').fontSize((14 * this.unit()) + 'vp').minFontSize(10*this.unit()).maxFontSize(14*this.unit()).maxLines(1).fontWeight(FontWeight.Medium).fontColor(this.ink).height(44*this.unit()).width('100%').padding({left:44*this.unit(),right:44*this.unit()}).textAlign(TextAlign.Center)
+        Text(this.calendarDate().getFullYear() + '年' + (this.calendarDate().getMonth() + 1) + '月').fontSize((14 * this.unit()) + 'vp').minFontSize(10*this.unit()).maxFontSize(14*this.unit()).maxLines(1).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).height(44*this.unit()).width('100%').padding({left:44*this.unit(),right:44*this.unit()}).textAlign(TextAlign.Center)
         Row() {
           ForEach(['日', '一', '二', '三', '四', '五', '六'], (day: string) => {
-            Text(day).fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).opacity(0.5).layoutWeight(1).textAlign(TextAlign.Center)
+            Text(day).fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(0.5).layoutWeight(1).textAlign(TextAlign.Center)
           }, (day: string) => day)
         }.width('100%')
         Grid() {
@@ -104,35 +106,35 @@ export struct CapabilityView {
                 .fontColor(day === this.now().getDate() && (this.cap.calendarOffset ?? 0) === 0 ? contrastingInk(this.ink) : this.ink)
                 .width('100%').height(20 * this.unit()).textAlign(TextAlign.Center)
                 .backgroundColor(day === this.now().getDate() && (this.cap.calendarOffset ?? 0) === 0 ? this.ink : Color.Transparent).borderRadius(4)
-              Text(day>0?holidayMarker(new Date(this.calendarDate().getFullYear(),this.calendarDate().getMonth(),day)):'').fontSize((6*this.unit())+'vp').fontColor(this.ink).opacity(.65)
+              Text(day>0?holidayMarker(new Date(this.calendarDate().getFullYear(),this.calendarDate().getMonth(),day)):'').fontSize((6*this.unit())+'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(.65)
               }.width('100%')
             }
           }, (day: number, index: number) => this.now().getFullYear() + ':' + this.now().getMonth() + ':' + this.now().getDate() + ':' + index + ':' + day)
         }.columnsTemplate('1fr 1fr 1fr 1fr 1fr 1fr 1fr').rowsGap(2 * this.unit()).width('100%')
           .height(Math.ceil(calendarCells(this.calendarDate()).length / 7) * (20 * this.unit() + 2 * this.unit()))
       } else if (this.cap.k === 'countdown' || this.cap.k === 'anniversary') {
-        Text(this.cap.title || typeLabel(this.cap.k)).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).width('100%').textAlign(TextAlign.Center).maxLines(this.compact() ? 1 : 2).textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(this.cap.title || typeLabel(this.cap.k)).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).width('100%').textAlign(TextAlign.Center).maxLines(this.compact() ? 1 : 2).textOverflow({ overflow: TextOverflow.Ellipsis })
         Row({ space: 3 * this.unit() }) {
-          Text(Math.abs(daysLeftOf(this.cap.date ?? '')) + '').fontSize((this.counterFont()) + 'vp').maxLines(1).fontWeight(FontWeight.Medium).fontColor(this.ink)
+          Text(Math.abs(daysLeftOf(this.cap.date ?? '')) + '').fontSize((this.counterFont()) + 'vp').maxLines(1).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled))
           Text(this.cap.k === 'anniversary' ? (daysLeftOf(this.cap.date ?? '') > 0 ? '天后' : '天') : (daysLeftOf(this.cap.date ?? '') < 0 ? '天前' : '天'))
-            .fontSize((12 * this.unit()) + 'vp').fontColor(this.ink)
+            .fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled))
         }.width('100%').justifyContent(FlexAlign.Center).alignItems(VerticalAlign.Bottom)
-        if (!this.compact()) { Text(this.cap.date ?? '').fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).opacity(0.6) }
+        if (!this.compact()) { Text(this.cap.date ?? '').fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(0.6) }
       } else if (this.cap.k === 'weather') {
-        Text(this.cap.temp ?? '--°').fontSize(((this.compact() ? 24 : 42) * this.unit()) + 'vp').fontWeight(FontWeight.Medium).fontColor(this.ink)
-        Text(this.cap.refreshState === 'refreshing' ? '更新中' : (this.cap.refreshState === 'failed' ? '更新失败，点按重试' : (this.compact() ? (this.cap.city || '设置城市') : ((this.cap.city || '设置城市') + ' · ' + (this.cap.desc || '未更新'))))).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).width('100%').textAlign(TextAlign.Center).maxLines(this.compact() ? 1 : 2).textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(this.cap.temp ?? '--°').fontSize(((this.compact() ? 24 : 42) * this.unit()) + 'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled))
+        Text(this.cap.refreshState === 'refreshing' ? '更新中' : (this.cap.refreshState === 'failed' ? '更新失败，点按重试' : (this.compact() ? (this.cap.city || '设置城市') : ((this.cap.city || '设置城市') + ' · ' + (this.cap.desc || '未更新'))))).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).width('100%').textAlign(TextAlign.Center).maxLines(this.compact() ? 1 : 2).textOverflow({ overflow: TextOverflow.Ellipsis })
       } else if(this.cap.k==='battery') {
-        BatteryCapability({cap:this.cap,ink:this.ink,unit:this.unit(),compact:this.compact()})
+        BatteryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,unit:this.unit(),compact:this.compact()})
       } else if(this.cap.k==='fetch') {
-        Text((this.cap.title||'URL 内容')+(this.cap.refreshState==='failed'?' · 上次结果':'')).fontSize((12*this.unit())+'vp').fontColor(this.ink).opacity(.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
-        Text((this.cap.value||'待配置')+(this.cap.value?this.cap.unit??'':'')).fontSize((24*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).minFontSize(16*this.unit()).maxFontSize(24*this.unit()).heightAdaptivePolicy(TextHeightAdaptivePolicy.LAYOUT_CONSTRAINT_FIRST).maxLines(this.compact()?2:3).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').height(Math.max(1,this.contentHeight*this.scaleFactor-20*this.unit())).textAlign(TextAlign.Center)
+        Text((this.cap.title||'URL 内容')+(this.cap.refreshState==='failed'?' · 上次结果':'')).fontSize((12*this.unit())+'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
+        Text((this.cap.value||'待配置')+(this.cap.value?this.cap.unit??'':'')).fontSize((24*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).minFontSize(16*this.unit()).maxFontSize(24*this.unit()).heightAdaptivePolicy(TextHeightAdaptivePolicy.LAYOUT_CONSTRAINT_FIRST).maxLines(this.compact()?2:3).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').height(Math.max(1,this.contentHeight*this.scaleFactor-20*this.unit())).textAlign(TextAlign.Center)
       } else if(this.cap.k==='timetable') {
-        TimetableCapability({cap:this.cap,ink:this.ink,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
+        TimetableCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
       } else if(this.cap.k==='agenda'||this.cap.k==='parcel') {
-        SummaryCapability({cap:this.cap,ink:this.ink,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
+        SummaryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
       } else {
-        Text(typeLabel(this.cap.k)).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).opacity(0.65)
-        Text(Math.floor(progressOf(this.cap.k, this.now()) * 100) + '%').fontSize(((this.compact() ? 24 : 38) * this.unit()) + 'vp').fontColor(this.ink)
+        Text(typeLabel(this.cap.k)).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(0.65)
+        Text(Math.floor(progressOf(this.cap.k, this.now()) * 100) + '%').fontSize(((this.compact() ? 24 : 38) * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled))
         Stack({ alignContent: Alignment.Start }) {
           Row().width('100%').height(4 * this.unit()).backgroundColor(this.ink).opacity(0.12)
           Row().width((progressOf(this.cap.k, this.now()) * 100) + '%').height(4 * this.unit()).backgroundColor(this.ink)

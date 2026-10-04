@@ -51,7 +51,6 @@ export struct BoardCard {
   @Prop @Watch('syncHandles') selected: boolean = false;
   @Prop heroHidden: boolean = false;
   @Prop localCoordinates: boolean = false;
-  @Prop cacheSurface: boolean = false;
   private frameRate: ExpectedFrameRateRange = motionFrameRate();
   @Prop @Watch('syncHandles') editingSurface: boolean = false;
   @Prop hideContent: boolean = false;
@@ -251,7 +250,7 @@ export struct BoardCard {
           CardFace({ card: this.faceCard(), scaleFactor: this.scaleFactor, tick: this.tick, lifted: this.moving || this.motion.ids.includes(this.card.id), hideContent: this.hideContent, movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
             .width(this.w()).height(this.h()).position({ x: 24, y: 24 }).hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS)
         }.width(this.w() + 48).height(this.h() + 48).position({ x: -24, y: -24 })
-          .renderGroup(this.cacheSurface || this.moving || (!this.editingSurface && this.card.elements.every(el => !el.animated))).hitTestBehavior(HitTestMode.None)
+          .renderGroup(this.moving || (this.movingLayerId.length === 0 && this.card.elements.every(el => !el.animated))).hitTestBehavior(HitTestMode.None)
       }.scale({ x: this.motion.ids.includes(this.card.id) ? 1 : this.liftScale, y: this.motion.ids.includes(this.card.id) ? 1 : this.liftScale })
         .rotate({ angle: this.motion.ids.includes(this.card.id) ? 0 : this.tilt })
         .width(this.w()).height(this.h()).position({ x: 24, y: 24 })

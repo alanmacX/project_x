@@ -1,4 +1,5 @@
-import { SymbolGlyphModifier } from '@kit.ArkUI';
+import { image } from '@kit.ImageKit';
+import { SymbolGlyphModifier, FrameCallback } from '@kit.ArkUI';
 import { immersiveChrome, prepareChromeMaterial } from '../model/ChromeMaterial';
 import { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
 import { SettingsSelect } from '../views/SettingsSelect';
@@ -63,9 +64,21 @@ const EDITOR_NAV_INSET: number = 56;
 const EDITOR_SAFE_GAP: number = 4;
 const SHAPES: string[] = ['rect', 'round', 'pill', 'blob'];
 
+/** Start a transition after the inspector's first measure, not on a guessed timer. */
+class PreparedTransition extends FrameCallback {
+  private start: () => void;
+  constructor(start: () => void) { super(); this.start = start; }
+  onFrame(_time: number): void {}
+  onIdle(_budget: number): void { this.start(); }
+}
+
 @Entry
 @Component
 struct Index {
+  @State chromeSnapshot: image.PixelMap | undefined = undefined;
+  private retiredChrome: image.PixelMap | undefined = undefined;
+  private chromeSignature: string = '';
+  @State heroHideContent: boolean = false;
   private batteryObserver:BatteryObserver=new BatteryObserver();
   private refreshingCapabilities:boolean=false;
   private widgetRouteTimer:number=-1;
@@ -217,7 +230,7 @@ struct Index {
       const routedLaunch = this.routedId.length > 0 || this.viewRouteId.length > 0;
       this.canvasBackground = this.store.state.background; this.layoutBoard(); this.ready = true; this.render(); this.scheduleBackground(); this.routeChanged(); this.viewRouteChanged();
       if (!routedLaunch) this.startArrival();
-      this.maintenanceTimer = setTimeout(() => { if (this.alive) { this.editorMounted = true; this.persist(); this.repairStoredSubjects(); this.refreshDueWeather(); this.refreshCapabilities(); } }, 750);
+      this.maintenanceTimer = setTimeout(() => { if (this.alive) { this.warmEditor(); this.persist(); this.repairStoredSubjects(); this.refreshDueWeather(); this.refreshCapabilities(); } }, 750);
 
     }).catch((e: Error) => { this.error = e.message; });
   }
@@ -370,7 +383,7 @@ struct Index {
       }
     } finally { this.repairingSubjects = false; }
   }
-  aboutToDisappear(): void { this.capabilityDialog?.close(); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
+  aboutToDisappear(): void { this.capabilityDialog?.close(); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
     if (this.heroActive) return true;
     if (this.viewing) { this.viewing = false; this.selectedId = ''; return true; }
@@ -406,6 +419,19 @@ struct Index {
     return (horizontal ? dx : dy) / length * Math.max(BOARD_W * this.boardScale, this.boardHeight) * 1.2 * this.scatter;
   }
 
+  private warmEditor(): void {
+    if (!this.editing && !this.viewing && !this.selectedId) {
+      const card = this.cards.slice().sort((a:FridgeCard,b:FridgeCard)=>b.z-a.z).find((item:FridgeCard)=>item.elements.some((el:CanvasElement)=>el.behindCapability));
+      if(card !== undefined) {
+        const element = card.elements.find((el:CanvasElement)=>el.behindCapability)!;
+        this.preview = card; this.layerId = element.id;
+        this.boxPreview = JSON.parse(JSON.stringify(element)) as ElementBox;
+        this.elementPreview = JSON.parse(JSON.stringify(element)) as CanvasElement;
+        this.textValue = element.text; this.elementColor = element.color;
+      }
+    }
+    this.editorMounted = true;
+  }
   private editorLandscape(): boolean { return this.screenWidth > this.screenHeight; }
   private editorViewportWidth(): number { return this.editorLandscape() ? this.screenWidth * .48 : this.screenWidth * .57; }
   private editorBodyHeight(): number { return Math.max(120, this.screenHeight - this.safeTop - this.safeBottom - 76); }
@@ -428,7 +454,7 @@ struct Index {
   }
   private openEditor(id: string, created: boolean = false): void {
     if (this.heroActive || this.arriving) return;
-    this.select(id, true); this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false; this.settingsTab = 0; this.editorTabs = [0];
+    this.heroHideContent = false; this.select(id, true); this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false; this.settingsTab = 0; this.editorTabs = [0];
     this.heroRect = this.boardRect();
     if (created) {
       const rect = new SceneRect(); rect.w = 28; rect.h = 28 * this.preview.h / this.preview.w;
@@ -437,12 +463,37 @@ struct Index {
     this.layerId = this.preview.elements.find((el: CanvasElement) => el.behindCapability)?.id ?? ''; this.syncFields();
     this.creatingTransition = created; this.heroBase = this.editorRect(); this.setHeroPose(this.heroRect); this.setTransitionClip(true);
     this.editorMounted = true; this.editorReady = true; this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.editorOpacity = 0; this.boardOpacity = 1; this.heroActive = true; this.editing = true;
-    this.transitionTimer = setTimeout(() => {
-      if (!this.alive) return;
-      this.getUIContext().animateTo({ duration: 380, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: () => { if (this.alive) { this.heroActive = false; this.creatingTransition = false; } } }, () => {
+    this.prepareEditorMotion(() => {
+      if (!this.alive || !this.editing || !this.heroActive) return;
+      this.getUIContext().animateTo({ duration: 380, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: () => { if (this.alive) { this.heroActive = false; this.creatingTransition = false; this.retireChrome(); } } }, () => {
         this.setHeroPose(this.editorRect()); this.setTransitionClip(false); this.scatter = 1; this.boardOpacity = 0; this.editorOpacity = 1;
       });
-    }, 16);
+    });
+  }
+  private retireChrome(): void {
+    this.retiredChrome = this.chromeSnapshot; this.chromeSnapshot = undefined;
+  }
+  private async prepareEditorMotion(start: () => void): Promise<void> {
+    const signature = [this.selectedId, this.layerId, this.settingsTab, this.revision, this.screenWidth, this.screenHeight,
+      this.appDark, this.showBackgroundOptions, this.showLayerOptions, this.undoAvailable, this.redoAvailable,
+      this.scroller.currentOffset().yOffset].join(':');
+    if (this.retiredChrome !== undefined && this.chromeSignature === signature) {
+      this.chromeSnapshot = this.retiredChrome; this.retiredChrome = undefined;
+      this.getUIContext().postFrameCallback(new PreparedTransition(() => { if(this.alive && this.heroActive) start(); })); return;
+    }
+    if (this.retiredChrome !== undefined) { this.retiredChrome.release(); this.retiredChrome = undefined; }
+    // Material samples moving pixels behind it and cannot be renderGroup-cached.
+    // Capture the tools once; keep the actual card surface alive and interactive
+    // tools hidden only during the transition. Restore native material afterward.
+    this.getUIContext().postFrameCallback(new PreparedTransition(async () => {
+      try {
+        const snapshot = await this.getUIContext().getComponentSnapshot().get('editorMotionChrome', {scale: 1, waitUntilRenderFinished: true});
+        if (!this.alive || !this.heroActive) { snapshot.release(); return; }
+        this.chromeSignature = signature; this.chromeSnapshot = snapshot;
+      } catch (_) { /* Native tools remain a usable fallback if capture is unavailable. */ }
+      if (!this.alive || !this.editing || !this.heroActive) return;
+      this.getUIContext().postFrameCallback(new PreparedTransition(() => { if (this.alive && this.heroActive) start(); }));
+    }));
   }
   private setTransitionClip(board: boolean): void {
     this.transitionClipX = board ? this.boardLeft : 0; this.transitionClipY = board ? this.boardTop : 0;
@@ -471,13 +522,13 @@ struct Index {
   private closeEditor(): void {
     if (this.heroActive || !this.editing) return;
     if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview();
-    this.creatingTransition = false;
+    this.creatingTransition = false; this.heroHideContent = this.settingsTab === 0;
     this.heroBase = this.editorRect(); this.setHeroPose(this.heroBase); this.setTransitionClip(false); this.heroActive = true;
     // Publish the edited card to the board once, before it fades back in.
-    this.renderBoard(); this.persist(true); this.scheduleBackground();
-    this.getUIContext().animateTo({ duration: 340, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: () => {
-      if (this.alive) { this.editing = false; this.editorReady = false; this.heroActive = false; this.selectedId = ''; this.persist(); }
-    } }, () => { this.setHeroPose(this.boardRect()); this.setTransitionClip(true); this.editorOpacity = 0; this.boardOpacity = 1; this.scatter = 0; });
+    this.renderBoard();
+    this.prepareEditorMotion(() => { this.getUIContext().animateTo({ duration: 340, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: () => {
+      if (this.alive) { this.editing = false; this.editorReady = false; this.heroActive = false; this.retireChrome(); this.selectedId = ''; this.persist(true); this.scheduleBackground(); }
+    } }, () => { this.setHeroPose(this.boardRect()); this.setTransitionClip(true); this.editorOpacity = 0; this.boardOpacity = 1; this.scatter = 0; }); });
   }
   private orderedCards(): FridgeCard[] { return this.cards.slice().sort((a: FridgeCard, b: FridgeCard) => b.z - a.z); }
   private moveCardLayer(id: string, upward: boolean): void {
@@ -508,7 +559,7 @@ struct Index {
       await primeRenderContours(this.store.state.cards,storageSnapshot(this.store.state));
       if(!this.alive)return;
       this.refreshCanvasList();this.canvasBackground=this.store.state.background;
-      this.editing=false;this.heroActive=false;this.viewing=false;this.selectedId='';this.activeBoardId='';this.boardOpacity=1;this.render();this.layoutBoard();
+      this.retireChrome();this.editing=false;this.heroActive=false;this.viewing=false;this.selectedId='';this.activeBoardId='';this.boardOpacity=1;this.render();this.layoutBoard();
       AppStorage.setOrCreate('viewCardId','');
       if(this.routeCanvasId===canvas)AppStorage.setOrCreate('routeCanvasId','');
       if(id&&this.store.findCard(id)){this.select(id);this.viewing=true;}
@@ -680,7 +731,12 @@ struct Index {
     else { this.boardMotion.offset = { x: 0, y: 0 }; this.boardMotion.ids = []; this.movingGroupIds = []; }
     this.activeBoardId = active ? id : '';
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer); this.saveTimer = -1;
-    if (!active) { this.scheduleBackground(); this.persist(true); }
+    if (!active) {
+      this.scheduleBackground();
+      // Commit and interaction-end belong to the same gesture. Publish once,
+      // after the geometry handoff; backgrounding still flushes immediately.
+      this.saveTimer = setTimeout(() => { this.saveTimer = -1; if (this.alive) this.persist(true); }, 120);
+    }
   }
   private commitGeometry(updated: FridgeCard): void {
     const card = this.store.findCard(updated.id); if (card === null) return;
@@ -692,7 +748,6 @@ struct Index {
     // Geometry handoff only updates the visible board; hydrate inspector on entry.
     if (this.editing || this.viewing) this.render(); else this.renderBoard();
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer);
-    this.scheduleBackground(); this.persist(true);
   }
   private async pickImage(subject: boolean = false, group: string = ''): Promise<void> {
     if (this.context === null || this.busy) return;
@@ -816,6 +871,10 @@ struct Index {
             .position({x:this.boardLeft,y:this.boardTop}).zIndex(100003)
         }
         if (this.editorMounted) { this.editor() }
+        if (this.chromeSnapshot !== undefined) {
+          Image(this.chromeSnapshot).width(this.screenWidth).height(this.screenHeight - this.safeTop - EDITOR_SAFE_GAP)
+            .position({x:0,y:this.safeTop + EDITOR_SAFE_GAP}).opacity(this.editorOpacity).hitTestBehavior(HitTestMode.None)
+        }
         if (this.viewing) { this.detail() }
       }
     }.width('100%').height('100%').backgroundColor(this.appBackground())
@@ -843,10 +902,10 @@ struct Index {
         ForEach(this.cardIds, (id: string) => {
           Stack({ alignContent: Alignment.TopStart }) {
             Stack({ alignContent: Alignment.TopStart }) {
-            BoardCard({ controlViewportWidth: BOARD_W * this.boardScale, controlViewportHeight: this.boardHeight, motion: this.boardMotion, card: this.sceneCard(id), localCoordinates: true, cacheSurface: this.heroActive || this.arriving, scatterAngle: 0, editingSurface: this.editing,
+            BoardCard({ controlViewportWidth: BOARD_W * this.boardScale, controlViewportHeight: this.boardHeight, motion: this.boardMotion, card: this.sceneCard(id), localCoordinates: true, scatterAngle: 0, editingSurface: this.editing,
               displayAngle: id === this.selectedId ? this.surfaceAngle() : this.cardMap[id].rot + this.scatter * (this.cardMap[id].z % 2 === 0 ? 9 : -9),
               selected: this.selectedId === id && !this.editing && !this.groupSelecting && this.selectedGroup().length < 2, scaleFactor: this.boardScale, yScaleFactor: this.boardHeight / BOARD_H,
-              hideContent: this.editing && id === this.selectedId && this.settingsTab === 0,
+              hideContent: this.editing && id === this.selectedId && (this.heroActive ? this.heroHideContent : this.settingsTab === 0),
               movingLayerId: id === this.selectedId ? this.layerDrag : '',
               moveX: id === this.selectedId && this.editing ? this.layerDX * this.boardScale / this.editorScale() : 0, moveY: id === this.selectedId && this.editing ? this.layerDY * this.boardScale / this.editorScale() : 0, tick: this.tick,
               getMoveBounds: (card: FridgeCard) => groupDragBounds(this.store.state.cards, card),
@@ -856,8 +915,9 @@ struct Index {
           }.width(this.sceneCard(id).w * this.boardScale + 48).height(this.sceneCard(id).h * this.boardScale + 48)
             .scale({ x: this.sceneScale(id)*this.groupScale(id), y: this.sceneScale(id)*this.groupScale(id), centerX: this.groupPivotX(id), centerY: this.groupPivotY(id) })
             .rotate({angle:this.boardMotion.transformIds.includes(id)?this.boardMotion.pose.angle:0,centerX:this.groupPivotX(id),centerY:this.groupPivotY(id)})
-            .position({ x: this.sceneX(id) - 24 - this.creationClipX(id), y: this.sceneY(id) - 24 - this.creationClipY(id) })
-            .translate({ x: this.arrivalX(id), y: this.arrivalY(id) })
+            .position({ x: 0, y: 0 })
+            .translate({ x: this.sceneX(id) - 24 - this.creationClipX(id) + this.arrivalX(id),
+              y: this.sceneY(id) - 24 - this.creationClipY(id) + this.arrivalY(id) })
             .hitTestBehavior(this.editing || this.arriving ? HitTestMode.None : HitTestMode.Transparent)
           }.width(this.creationClip(id) ? this.transitionClipW : this.screenWidth)
             .height(this.creationClip(id) ? this.transitionClipH : this.screenHeight)
@@ -867,10 +927,10 @@ struct Index {
             .hitTestBehavior(this.editing || this.arriving ? HitTestMode.None : HitTestMode.Transparent)
         }, (id: string) => id)
       }.width(this.screenWidth).height(this.screenHeight)
-        .position({ x: -this.sceneClipX(), y: -this.sceneClipY() }).hitTestBehavior(HitTestMode.Transparent)
+        .position({ x: 0, y: 0 }).translate({ x: -this.sceneClipX(), y: -this.sceneClipY() }).hitTestBehavior(HitTestMode.Transparent)
     }.width(this.creatingTransition ? this.screenWidth : this.editing ? (this.heroActive ? this.transitionClipW : this.screenWidth) : BOARD_W * this.boardScale)
       .height(this.creatingTransition ? this.screenHeight : this.editing ? (this.heroActive ? this.transitionClipH : this.screenHeight) : this.boardHeight)
-      .position({ x: this.sceneClipX(), y: this.sceneClipY() })
+      .position({ x: 0, y: 0 }).translate({ x: this.sceneClipX(), y: this.sceneClipY() })
       .borderRadius(this.creatingTransition ? 0 : this.editing ? (this.heroActive ? this.transitionClipRadius : 0) : 24).clip(true)
       .hitTestBehavior(this.editing || this.arriving ? HitTestMode.None : HitTestMode.Transparent)
   }
@@ -878,7 +938,7 @@ struct Index {
   board() {
     Stack({ alignContent: Alignment.TopStart }) {
       Stack({ alignContent: Alignment.TopStart }) {
-        CanvasBackdrop({ sceneBackground: this.canvasBackground, liveFluid: true }).width('100%').height('100%')
+        CanvasBackdrop({ sceneBackground: this.canvasBackground, liveFluid: !this.editing && !this.heroActive && !this.appBackgrounded && this.activeBoardId.length === 0 }).width('100%').height('100%')
         Column().width('100%').height('100%').onClick(() => { this.selectedId = ''; })
         if (this.cards.length === 0) {
           Text('放一张自己的卡片').fontSize(16).fontColor('#989898').width('100%').height('100%').textAlign(TextAlign.Center).hitTestBehavior(HitTestMode.None)
@@ -1340,10 +1400,10 @@ struct Index {
             originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } }
           }
         })
-        .bindToScrollable([this.scroller]).hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).width('100%').height('100%').backgroundColor(Color.Transparent)
+        .id('editorMotionChrome').bindToScrollable([this.scroller]).hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).width('100%').height('100%').backgroundColor(Color.Transparent)
     }.width('100%').height('100%').padding({ top: this.safeTop + EDITOR_SAFE_GAP }).opacity(this.editorOpacity)
       .hitTestBehavior(!this.editing || this.heroActive ? HitTestMode.None : HitTestMode.Default)
-      .visibility(this.editing ? Visibility.Visible : Visibility.Hidden)
+      .visibility(this.editing && this.chromeSnapshot === undefined ? Visibility.Visible : Visibility.Hidden)
       .accessibilityLevel(this.editing ? 'yes' : 'no-hide-descendants')
   }
   private showAddMenu(): void {
