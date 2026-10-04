@@ -34,6 +34,7 @@ import { HdsNavigation, HdsNavigationTitleMode, TextStyleMode, ScrollEffectType,
 import { EditorViewport, editorViewport, editorPreviewPaneHeight } from '../model/EditorViewport';
 import { SelectionHandles, selectionHandles } from '../model/SelectionHandles';
 import { CardEditHistory } from '../model/CardEditHistory';
+import { ColorSetting } from '../views/ColorSetting';
 import { ColorSelector } from '../views/ColorSelector';
 import { FridgeStore, FridgeCard, CanvasElement, ElementBox, ShapePoint, CapBlock, BOARD_W, BOARD_H, materialColors, shapeRadius, typeLabel } from '../model/FridgeModel';
 import { CardCanvas } from '../views/CardCanvas';
@@ -840,7 +841,12 @@ struct Index {
       Column({ space: 12 }) {
         Row() {
           Text('图层').fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText()); Blank()
-          Button(this.canvasName+' ⌄',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).width(Math.min(130,Math.max(64,this.panelWidth-220))).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).margin({right:8}).onClick(()=>{this.refreshCanvasList();this.canvasPickerOpen=true;}).bindSheet(this.canvasPickerOpen,this.canvasPicker,{height:SheetSize.LARGE,showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>{this.canvasPickerOpen=false;}})
+          Button({type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
+            Row({space:6}) {
+              Text(this.canvasName).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
+              SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
+            }.width('100%')
+          }.padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).width(Math.min(130,Math.max(64,this.panelWidth-220))).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).margin({right:8}).onClick(()=>{this.refreshCanvasList();this.canvasPickerOpen=true;}).bindSheet(this.canvasPickerOpen,this.canvasPicker,{height:SheetSize.LARGE,showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>{this.canvasPickerOpen=false;}})
           Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).margin({ right: 8 }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
           Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([Color.White]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(24).backgroundColor('#262626').fontColor(Color.White).accessibilityText('添加卡片').onClick(() => this.addCard())
         }.width('100%')
@@ -849,6 +855,13 @@ struct Index {
           Column({ space: 8 }) {
             ForEach(this.orderedCards().map((item: FridgeCard) => item.id), (id: string, index: number) => {
               Row({ space: 12 }) {
+                if (this.groupSelecting) {
+                  Checkbox().select(this.groupSelection.includes(id)).shape(CheckBoxShape.CIRCLE).width(24).height(24).margin(10)
+                    .responseRegion({x:-10,y:-10,width:44,height:44}).selectedColor(AppDesign.selected(this.appDark))
+                    .unselectedColor(this.appMuted()).mark({strokeColor:AppDesign.onSelected(this.appDark)})
+                    .accessibilityText('选择 '+layerLabel(this.cardMap[id]))
+                    .onChange((checked:boolean)=>{if(this.groupSelecting && checked!==this.groupSelection.includes(id))this.selectLayerCard(id);})
+                }
                 Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {
                   Row({space:12}) {
                     Stack() {
@@ -863,7 +876,7 @@ struct Index {
                 }.layoutWeight(1).height(60).padding(0).backgroundColor(Color.Transparent)
                   .accessibilityText('选择卡片 '+layerLabel(this.cardMap[id])).onClick(()=>this.selectLayerCard(id))
                 Button('编辑',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(AppDesign.controlHeight).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.groupSelecting).onClick(()=>this.openEditor(id))
-              }.width('100%').padding(8).borderRadius(12).backgroundColor(this.appSurface()).border({width:(this.groupSelecting?this.groupSelection.includes(id):this.selectedId===id)?1.5:0,color:this.appMuted()})
+              }.width('100%').padding(8).borderRadius(12).backgroundColor(this.appSurface()).border({width:!this.groupSelecting&&this.selectedId===id?1.5:0,color:this.appMuted()})
             }, (id: string) => id)
           }.width('100%').padding({ bottom: this.homeActionHeight() + 8 })
         }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
@@ -918,10 +931,16 @@ struct Index {
     const bg = new CanvasBackground(); bg.mode = mode; bg.color = this.canvasBackground.color; bg.photo = this.canvasBackground.photo;
     this.applyBackground(bg); if (mode === 'smart' || mode === 'blend') this.refreshBackground(true);
   }
+  private backgroundColorKey(): string { return 'canvas:' + this.store.state.canvasId; }
+  private setBackgroundColor(color: string, key: string): void {
+    if (!this.alive || key !== this.backgroundColorKey() || this.canvasBackground.mode !== 'solid') return;
+    const bg = new CanvasBackground(); bg.color = color || '#FFFFFF'; bg.photo = this.canvasBackground.photo; this.applyBackground(bg);
+  }
   private chooseBackgroundColor(): void {
-    this.colorDialog = new CustomDialogController({ builder: ColorSelector({ initialColor: this.canvasBackground.color, onPick: (color: string) => {
-      const bg = new CanvasBackground(); bg.color = color || '#FFFFFF'; bg.photo = this.canvasBackground.photo; this.applyBackground(bg);
-    } }), customStyle: true, openAnimation: settingsDialogOpen(), closeAnimation: settingsDialogClose(), alignment: DialogAlignment.Center, autoCancel: true }); this.colorDialog.open();
+    const key = this.backgroundColorKey();
+    this.colorDialog = new CustomDialogController({ builder: ColorSelector({ initialColor: this.canvasBackground.color,
+      onPick: (color: string) => this.setBackgroundColor(color, key) }), customStyle: true,
+      openAnimation: settingsDialogOpen(), closeAnimation: settingsDialogClose(), alignment: DialogAlignment.Center, autoCancel: true }); this.colorDialog.open();
   }
   private async pickBackgroundPhoto(): Promise<void> {
     if (this.context === null || this.backgroundBusy) return;
@@ -998,7 +1017,8 @@ struct Index {
           ForEach([this.canvasBackground.mode],(_mode:string)=>{
           Column({space:16}) {
           if (this.canvasBackground.mode === 'solid') {
-            Button('自定义颜色', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).width('100%').fontColor(this.appText()).backgroundColor(this.appControl()).onClick(() => this.chooseBackgroundColor())
+            ColorSetting({label:'背景颜色',color:this.canvasBackground.color,canReset:false,sourceKey:this.backgroundColorKey(),appDark:this.appDark,
+              onPick:(color:string,key:string)=>this.setBackgroundColor(color,key),onFallback:()=>this.chooseBackgroundColor()})
             Flex({ wrap: FlexWrap.Wrap }) {
               ForEach(['#FFFFFF','#F1EEE6','#E9E5DF','#E2E8E2','#E3E9EF','#292B2B'], (color: string) => {
                 Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).width(44).height(44).backgroundColor(color).margin({ right: 8, bottom: 8 })
@@ -1248,9 +1268,9 @@ struct Index {
           if (this.settingsTab === 0 && this.layerId.length === 0) {
             Column({ space: 16 }) {
               Text('底板').fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
+            this.colorRow('底色', 'paper')
             Row({ space: 8 }) {
-              Button('底色', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).height(AppDesign.controlHeight).fontSize(14).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(() => this.chooseColor('paper'))
-              Button(this.showBackgroundOptions ? '收起底板设置' : '底板形状与边缘', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(2).height(AppDesign.controlHeight).fontSize(14).fontColor(this.appText()).backgroundColor(this.appControl())
+              Button(this.showBackgroundOptions ? '收起底板设置' : '底板形状与边缘', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).height(AppDesign.controlHeight).fontSize(14).fontColor(this.appText()).backgroundColor(this.appControl())
                 .onClick(() => { this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut, expectedFrameRateRange: this.frameRate }, () => { this.showBackgroundOptions = !this.showBackgroundOptions; }); })
             }.width('100%')
             if (this.showBackgroundOptions) {Column(){this.appearancePanel()}.width('100%').transition(settingsReveal())}
@@ -1261,7 +1281,7 @@ struct Index {
               Column() { this.capabilityDataPanel() }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
             }
             if(this.preview.capability!==null) {
-              CapabilityAppearance({card:this.preview,appDark:this.appDark,onArrange:(anchor:string)=>this.arrangeCapability(anchor),onColor:()=>this.chooseColor('ink'),onStyle:(style:string)=>{
+              CapabilityAppearance({card:this.preview,appDark:this.appDark,onArrange:(anchor:string)=>this.arrangeCapability(anchor),onColor:()=>this.chooseColor('ink'),onColorPick:(color:string,key:string)=>this.setCardColor('ink',color,key),onStyle:(style:string)=>{
                 const card=this.current();if(card?.capability){card.capability.readingStyle=style;this.change();}
               }})
             }
@@ -1448,7 +1468,8 @@ struct Index {
       } else if(this.layerElement(id)?.kind==='shape') {
         Column().width(24).height(this.layerElement(id)?.primitive==='line'?3:24).borderRadius(this.layerElement(id)?.primitive==='circle'?12:4).backgroundColor(this.layerElement(id)?.color||this.appText())
       } else if(id==='capability' && ['clock','worldclock','date','lunar','calendar'].includes(this.preview.capability?.k??'')) {SymbolGlyph($r('sys.symbol.clock')).fontSize(20).fontColor([this.appText()])}
-      else {Text(id==='capability'?typeLabel(this.preview.capability?.k??'').slice(0,2):id.length===0?'+':'A').fontSize(id==='capability'?12:18).fontWeight(FontWeight.Medium).fontColor(this.appText())}
+      else if(id.length===0) {SymbolGlyph($r('sys.symbol.plus')).fontSize(18).fontColor([this.appText()])}
+      else {Text(id==='capability'?typeLabel(this.preview.capability?.k??'').slice(0,2):'A').fontSize(id==='capability'?12:18).fontWeight(FontWeight.Medium).fontColor(this.appText())}
     }.width(36).height(36).hitTestBehavior(HitTestMode.None)
   }
   @Builder
@@ -1460,7 +1481,7 @@ struct Index {
         Row({space:8}) {
           this.layerThumbnail(id)
           Text(this.layerTitle(id)).fontSize(13).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
-          if(this.layerId===id) {Text('•').fontSize(16).fontColor(this.appText())}
+          if(this.layerId===id) {SymbolGlyph($r('sys.symbol.checkmark')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}
         }.width('100%').padding({left:8,right:12})
       }
     }.width(this.editorLandscape()?(this.compactEditorLayers()?132:96):'100%').height(this.editorLandscape()&&!this.compactEditorLayers()?76:52)
@@ -1507,7 +1528,7 @@ struct Index {
           SettingsSegmented({labels:['矩形','圆形','线条'],selectedIndex:Math.max(0,['rect','circle','line'].indexOf(this.elementPreview.primitive)),appDark:this.appDark,
             onSelect:(index:number)=>{const el=this.currentElement();if(el!==null){el.primitive=['rect','circle','line'][index];this.change();}}})
         }
-        if (this.elementPreview.kind !== 'image') { this.colorRow('元素颜色', 'element', this.elementColor) }
+        if (this.elementPreview.kind !== 'image') { this.colorRow('元素颜色', 'element') }
       }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
     }
     if (this.layerId.length > 0) {
@@ -1603,29 +1624,29 @@ struct Index {
     const card=this.current();if(card===null || card.capability===null)return;
     card.capBox=capabilityPreset(card,anchor);this.change();
   }
+  private cardColorKey(target: string): string { return this.preview.id + ':' + target + ':' + (target === 'element' ? this.layerId : ''); }
+  private setCardColor(target: string, color: string, key: string): void {
+    if (!this.alive || !this.editing || key !== this.cardColorKey(target)) return;
+    const card = this.current(); if (card === null) return;
+    if (target === 'element') { const element = this.currentElement(); if (element === null) return; element.color = color; }
+    if (target === 'paper') card.paper = color; if (target === 'ink') card.ink = color;
+    this.syncFields(); this.change();
+  }
   private chooseColor(target: string): void {
     const card = this.current(); if (card === null) return;
-    const element = this.currentElement(), id = card.id;
-    const initial = target === 'element' ? (element?.color || materialColors(card.material, card.paper, card.ink)[1]) : materialColors(card.material, card.paper, card.ink)[target === 'paper' ? 0 : 1];
-    this.colorDialog = new CustomDialogController({ builder: ColorSelector({ initialColor: initial, onPick: (color: string) => {
-      if (this.store.findCard(id) !== card) return;
-      if (target === 'element' && element !== null && card.elements.includes(element)) element.color = color;
-      if (target === 'paper') card.paper = color; if (target === 'ink') card.ink = color;
-      this.syncFields(); this.change();
-    } }), customStyle: true, openAnimation: settingsDialogOpen(), closeAnimation: settingsDialogClose(), alignment: DialogAlignment.Center, autoCancel: true });
+    const element = this.currentElement(), key = this.cardColorKey(target);
+    const initial = target === 'element' ? (element?.color || materialColors(card.material, card.paper, card.ink)[1]) :
+      target === 'ink' && card.shape === 'subject' && card.subjectPhoto && !card.ink ? card.subjectInk : materialColors(card.material, card.paper, card.ink)[target === 'paper' ? 0 : 1];
+    this.colorDialog = new CustomDialogController({ builder: ColorSelector({ initialColor: initial,
+      onPick: (color: string) => this.setCardColor(target, color, key) }), customStyle: true,
+      openAnimation: settingsDialogOpen(), closeAnimation: settingsDialogClose(), alignment: DialogAlignment.Center, autoCancel: true });
     this.colorDialog.open();
   }
   @Builder
-  colorRow(label: string, target: string, value: string) {
-    Button({type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
-    Row({ space: 12 }) {
-      Text(label).fontSize(14).fontColor(this.appText()); Blank()
-      Text(value.length === 0 ? '自动' : '自定义').fontSize(12).fontColor(this.appMuted())
-      Column().width(28).height(28).borderRadius(8).backgroundColor(value || materialColors(this.preview.material, this.preview.paper, this.preview.ink)[target === 'paper' ? 0 : 1])
-        .border({ width: .5, color: AppDesign.border(this.appDark) })
-    }.width('100%').padding({ left: 12, right: 12 })
-    }.width('100%').height(48).backgroundColor(this.appControl())
-      .accessibilityText('选择' + label).onClick(() => this.chooseColor(target))
+  colorRow(label: string, target: string) {
+    ColorSetting({ label: label, color: (target === 'element' ? this.elementColor : target === 'paper' ? this.paperValue : this.inkValue) || materialColors(this.preview.material, this.preview.paper, this.preview.ink)[target === 'paper' ? 0 : 1],
+      automatic: (target === 'element' ? this.elementColor : target === 'paper' ? this.paperValue : this.inkValue).length === 0, sourceKey: this.cardColorKey(target), appDark: this.appDark,
+      onPick: (color: string, key: string) => this.setCardColor(target, color, key), onFallback: () => this.chooseColor(target) })
   }
   @Builder
   appearancePanel() {
@@ -1637,7 +1658,6 @@ struct Index {
         .selectedOptionFontColor(AppDesign.onSelected(this.appDark)).selectedOptionBgColor(AppDesign.selected(this.appDark))
         .backgroundColor(this.appControl()).borderRadius(12).controlSize(ControlSize.NORMAL).width('100%').height(44)
         .onSelect((index:number)=>{const card=this.current();if(card!==null&&THEMES[index]){card.material=THEMES[index];card.paper='';this.paperValue='';this.change();}})
-      this.colorRow('底色', 'paper', this.paperValue)
       Text('形状').fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%').margin({ top: 8 })
       Select((this.preview.cutout.length>0?['方形','椭圆','胶囊','自由边角','照片主体']:['方形','椭圆','胶囊','自由边角']).map((value:string):SelectOption=>({value:value})))
         .selected(this.preview.shape==='subject'?4:Math.max(0,SHAPES.indexOf(this.preview.shape)))

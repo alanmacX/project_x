@@ -163,10 +163,10 @@ struct SketchLab {
     this.hasDraft=false;this.canUndo=this.previous!==null;this.canRedo=false;this.undone=null;this.metrics='';this.status=this.hint();this.redraw();
   }
   @Builder
-  command(title:string,action:()=>void) {
-    Button(title,{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL,role:title==='清空'?ButtonRole.ERROR:ButtonRole.NORMAL}).height(44).fontSize(14).fontColor(AppDesign.text(this.dark))
-      .backgroundColor(AppDesign.surface(this.dark)).enabled(title==='撤销'?this.canUndo:title==='重做'?this.canRedo:title==='清空'?this.hasDraft:true)
-      .onClick(action)
+  tool(title:string,symbol:Resource,action:()=>void) {
+    Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL,role:title==='清空'?ButtonRole.ERROR:ButtonRole.NORMAL}) {
+      SymbolGlyph(symbol).fontSize(20).fontColor([title==='清空'?'#C43A35':AppDesign.text(this.dark)]).hitTestBehavior(HitTestMode.None)
+    }.width(44).height(44).backgroundColor(AppDesign.surface(this.dark)).enabled(title==='撤销'?this.canUndo:title==='重做'?this.canRedo:title==='清空'?this.hasDraft:true).accessibilityText(title).onClick(action)
   }
   @Builder
   drawing() {
@@ -188,6 +188,7 @@ struct SketchLab {
       Row() {Text('底板预览').fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.dark)).layoutWeight(1);Text('独立实验').fontSize(12).fontColor(AppDesign.muted(this.dark))}.width('100%')
       Canvas(this.preview).width('100%').layoutWeight(1).onReady(()=>{this.previewReady=true;this.redraw();})
         .onAreaChange((_old,area)=>{this.previewWidth=Number(area.width);this.previewHeight=Number(area.height);this.redraw();})
+      Row() {Text('仅手写笔').fontSize(14).fontColor(AppDesign.text(this.dark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:this.penOnly}).onChange((v)=>{this.cancelStroke();this.penOnly=v;})}.width('100%')
       Row() {Text('对比原稿').fontSize(14).fontColor(AppDesign.text(this.dark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:this.compare}).onChange((v)=>{this.compare=v;this.redraw();})}.width('100%')
       Row() {Text('预览填色').fontSize(14).fontColor(AppDesign.text(this.dark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:this.filled}).onChange((v)=>{this.filled=v;this.redraw();})}.width('100%')
       Text(this.metrics).fontSize(11).fontColor(AppDesign.muted(this.dark)).width('100%').maxLines(2)
@@ -197,21 +198,22 @@ struct SketchLab {
   build() {
     Column({space:16}) {
       Row({space:8}) {
-        this.command('返回',()=>{this.getUIContext().getRouter().replaceUrl({url:'pages/Index'});})
-        Blank();this.command('撤销',()=>this.undo());this.command('重做',()=>this.redo());this.command('清空',()=>this.clear())
+        this.tool('返回',$r('sys.symbol.chevron_left'),()=>{this.getUIContext().getRouter().replaceUrl({url:'pages/Index'});})
+        Text('手绘实验').fontSize(18).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.dark)).layoutWeight(1)
+        this.tool('撤销',$r('sys.symbol.arrowshape_turn_up_left'),()=>this.undo())
+        this.tool('重做',$r('sys.symbol.arrowshape_turn_up_right'),()=>this.redo())
+        this.tool('清空',$r('sys.symbol.trash'),()=>this.clear())
       }.width('100%')
-      Row({space:8}) {
-        SettingsSegmented({labels:['自由轮廓','一笔成形'],selectedIndex:this.mode,appDark:this.dark,onSelect:(index:number)=>this.switchMode(index)}).layoutWeight(1)
-        Blank();Text('仅手写笔').fontSize(13).fontColor(AppDesign.text(this.dark))
-        Toggle({type:ToggleType.Switch,isOn:this.penOnly}).onChange((v)=>{this.cancelStroke();this.penOnly=v;})
-      }.width('100%')
+      SettingsSegmented({labels:['自由轮廓','一笔成形'],selectedIndex:this.mode,appDark:this.dark,onSelect:(index:number)=>this.switchMode(index)}).width('100%')
       Text(this.status).fontSize(13).fontColor(AppDesign.muted(this.dark)).width('100%').height(36).maxLines(2)
       if(this.landscape()) {
         Row({space:16}) {Column(){this.drawing()}.layoutWeight(1).height('100%');Column(){this.inspector()}.width('30%').height('100%')}.width('100%').layoutWeight(1)
       } else {
         Column({space:16}) {Column(){this.drawing()}.width('100%').layoutWeight(1.8);Column(){this.inspector()}.width('100%').layoutWeight(1)}.width('100%').layoutWeight(1)
       }
-      Row({space:8}) {Text('试试示例').fontSize(13).fontColor(AppDesign.muted(this.dark));this.command('粗略椭圆',()=>this.sample('oval'));this.command('自由边缘',()=>this.sample('leaf'))}.width('100%')
+      Button('试画示例',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL,role:ButtonRole.NORMAL})
+        .height(44).fontSize(14).fontColor(AppDesign.text(this.dark)).backgroundColor(AppDesign.surface(this.dark))
+        .bindMenu([{value:'粗略椭圆',action:()=>this.sample('oval')},{value:'自由边缘',action:()=>this.sample('leaf')}])
     }.width('100%').height('100%').padding({top:this.safeTop+8,bottom:this.safeBottom+8,left:20,right:20})
       .backgroundColor(AppDesign.background(this.dark))
       .onAreaChange((_old,area)=>{this.screenWidth=Number(area.width);this.screenHeight=Number(area.height);})

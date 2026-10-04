@@ -1,6 +1,7 @@
 import { FridgeCard, materialColors } from '../model/CardSchema';
 import { readingWarning } from '../model/CapabilityPresentation';
 import { AppDesign } from '../model/AppDesign';
+import { ColorSetting } from './ColorSetting';
 import { SettingsSegmented } from './SettingsSegmented';
 /** All capabilities use this inspector. Data-specific controls never redefine appearance or gestures. */
 @Component
@@ -10,6 +11,7 @@ export struct CapabilityAppearance {
   onArrange:(anchor:string)=>void=()=>{};
   onStyle:(style:string)=>void=()=>{};
   onColor:()=>void=()=>{};
+  onColorPick:(color:string,key:string)=>void=()=>{};
   private ink():string {return this.card.shape==='subject'&&this.card.subjectPhoto&&!this.card.ink?this.card.subjectInk:materialColors(this.card.material,this.card.paper,this.card.ink)[1];}
   build() {
     Column({space:12}) {
@@ -23,13 +25,8 @@ export struct CapabilityAppearance {
       Text('阅读衬底').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
       SettingsSegmented({labels:['自动','融入底板','始终显示'],selectedIndex:Math.max(0,['auto','plain','surface'].indexOf(this.card.capability?.readingStyle??'auto')),appDark:this.appDark,
         onSelect:(index:number)=>this.onStyle(['auto','plain','surface'][index])})
-      Button({type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
-        Row({space:12}) {
-          Text('内容颜色').fontSize(14).fontColor(AppDesign.text(this.appDark)).layoutWeight(1)
-          Text(this.card.ink?'自定义':'自动').fontSize(12).fontColor(AppDesign.muted(this.appDark))
-          Column().width(28).height(28).backgroundColor(this.ink()).border({width:.5,color:AppDesign.border(this.appDark)}).borderRadius(8)
-        }.width('100%').padding({left:12,right:12})
-      }.width('100%').height(48).backgroundColor(AppDesign.control(this.appDark)).accessibilityText('选择内容颜色').onClick(()=>this.onColor())
+      ColorSetting({label:'内容颜色',color:this.ink(),automatic:!this.card.ink,sourceKey:this.card.id+':ink:',appDark:this.appDark,
+        onPick:(color:string,key:string)=>this.onColorPick(color,key),onFallback:()=>this.onColor()})
       if(readingWarning(this.card)) {Text(readingWarning(this.card)).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
     }.width('100%').padding(16).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(AppDesign.sectionRadius)
   }
