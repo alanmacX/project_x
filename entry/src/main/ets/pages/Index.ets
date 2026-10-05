@@ -1518,8 +1518,7 @@ struct Index {
             }.width('100%').layoutWeight(1)
           } else {
             this.canvasEditor()
-            this.editorLayers()
-            this.editorControls(); this.editorInspector()
+            this.editorControls(); this.editorLayers(); this.editorInspector()
           }
         }.width('100%').height('100%').padding({ top: EDITOR_NAV_INSET }).backgroundColor(Color.Transparent)
       }.titleMode(HdsNavigationTitleMode.MINI)
@@ -1529,7 +1528,7 @@ struct Index {
             menu: { maxCount: 4, value: [
               { content: { icon: new SymbolGlyphModifier($r('sys.symbol.rectangle_and_arrowshape_turn_up_right')).fontColor([this.appText()]), label: '分享卡片', type: IconStyleMode.NORMAL, componentId: 'shareCard', isEnabled: !this.sharing && !this.heroActive, action: () => this.shareMenu(true) } },
               { content: { icon:new SymbolGlyphModifier($r('sys.symbol.plus')).fontColor([this.appText()]),label: '添加', type: IconStyleMode.NORMAL, isEnabled: !this.heroActive && this.preview.capability?.k!=='album', action: () => this.showAddMenu() } },
-              { content: { icon:new SymbolGlyphModifier($r('sys.symbol.arrow_clockwise')).fontColor([this.appText()]),label: '重做', type: IconStyleMode.NORMAL, isEnabled: this.redoAvailable && !this.heroActive, action: () => this.restoreHistory(true) } },
+              { content: { icon:new SymbolGlyphModifier($r('sys.symbol.ellipsis_circle')).fontColor([this.appText()]),label: '更多操作', type: IconStyleMode.NORMAL, isEnabled: !this.heroActive, action: () => this.showEditorActions() } },
               { content: { label: '完成', type: TextStyleMode.NORMAL, isEnabled: !this.heroActive, action: () => this.closeEditor() } }
             ] }
           },
@@ -1549,6 +1548,11 @@ struct Index {
       .hitTestBehavior(!this.editing || this.heroActive ? HitTestMode.None : HitTestMode.Default)
       .visibility(this.editing && this.chromeSnapshot === undefined ? Visibility.Visible : Visibility.Hidden)
       .accessibilityLevel(this.editing ? 'yes' : 'no-hide-descendants')
+  }
+  private showEditorActions():void {
+    const redo=this.redoAvailable;
+    this.getUIContext().getPromptAction().showActionMenu({systemMaterial:chromeMaterial(),title:'卡片操作',buttons:redo?[{text:'重做',color:this.appText()},{text:'复制卡片',color:this.appText()}]:[{text:'复制卡片',color:this.appText()}]})
+      .then((result)=>{if(!this.alive||!this.editing||this.heroActive)return;if(redo&&result.index===0)this.restoreHistory(true);else this.duplicate();}).catch(()=>{});
   }
   private showAddMenu(): void {
     this.getUIContext().getPromptAction().showActionMenu({ systemMaterial:chromeMaterial(), title: '添加到当前图层', buttons: [
@@ -1572,14 +1576,17 @@ struct Index {
       .width(this.editorControlsWidth()).margin({top:4,bottom:12})
   }
   }
+  private hasEditorLayers():boolean {
+    if(this.preview.capability?.k==='album')return false;
+    return this.preview.elements.filter((el:CanvasElement)=>el.behindCapability===(this.settingsTab===0)).length>0;
+  }
   @Builder
   editorLayers() {
-    Row({ space: 8 }) {
-      Text('图层').fontSize(12).fontWeight(FontWeight.Medium).fontColor(this.appMuted()).width(32)
-      Scroll() { Row({ space: 6 }) { this.layerEntries() }.padding(2) }
-        .layoutWeight(1).height(56).scrollable(ScrollDirection.Horizontal).align(Alignment.Start).scrollBar(BarState.Off)
-    }.width(this.editorViewportWidth()-32).height(64).padding({left:12,right:8})
-      .backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).margin({left:16,right:16,top:0,bottom:12})
+    if(this.hasEditorLayers()) {
+      Scroll() { Row({space:6}) {this.layerEntries()}.padding(4) }
+        .width(this.editorViewportWidth()-32).height(56).scrollable(ScrollDirection.Horizontal).align(Alignment.Start).scrollBar(BarState.Off)
+        .backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).margin({left:16,right:16,bottom:8})
+    }
   }
   @Builder
   editorInspector() {
@@ -1605,22 +1612,19 @@ struct Index {
             if (this.showBackgroundOptions) {Column(){this.appearancePanel()}.width('100%').transition(settingsReveal())}
             }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
           } else if (this.settingsTab === 1 && (this.layerId === 'capability' || this.layerId.length === 0)) {
-            Column({space:16}) { this.capabilityPanel() }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
-            if(this.preview.capability!==null && ['countdown','anniversary','battery','agenda','timetable','worldclock'].includes(this.preview.capability!.k)) {
-              Column() { this.capabilityDataPanel() }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
-            }
+            if(this.preview.capability===null){Column({space:16}) {this.capabilityPanel()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)}
             if(this.preview.capability!==null) {
-              CapabilityAppearance({card:this.preview,appDark:this.appDark,onCompare:()=>this.compareReading(),onBlend:(blend)=>{const card=this.current();if(card?.capability){card.capability.readingBlend=blend;card.capability.readingStyle='surface';this.change();}},onArrange:(anchor:string)=>this.arrangeCapability(anchor),onColor:()=>this.chooseColor('ink'),onColorPick:(color:string,key:string)=>this.setCardColor('ink',color,key),onStyle:(style:string)=>{
+              CapabilityAppearance({card:this.preview,appDark:this.appDark,onChoose:()=>this.chooseCapability(),onCompare:()=>this.compareReading(),onBlend:(blend)=>{const card=this.current();if(card?.capability){card.capability.readingBlend=blend;card.capability.readingStyle='surface';this.change();}},onArrange:(anchor:string)=>this.arrangeCapability(anchor),onColor:()=>this.chooseColor('ink'),onColorPick:(color:string,key:string)=>this.setCardColor('ink',color,key),onStyle:(style:string)=>{
                 const card=this.current();if(card?.capability){card.capability.readingStyle=style;this.change();}
               }})
+            }
+            if(this.preview.capability!==null && ['countdown','anniversary','battery','agenda','timetable','worldclock'].includes(this.preview.capability!.k)) {
+              Column() { this.capabilityDataPanel() }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
             }
           }
 
           if (this.settingsTab === 1 && this.preview.capability !== null && capabilityBox(this.preview).w === 0) { Text('内容空间不足，请调整文字大小或位置').fontSize(12).fontColor('#846339').width('100%') }
           }
-          Row({ space: 12 }) {
-            Button('复制卡片', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).layoutWeight(1).fontSize(14).fontColor(this.appText()).backgroundColor(this.appSurface()).onClick(() => this.duplicate())
-          }.width('100%').margin({ top: 4 })
         }.width('100%').padding({ left: 16, right: 16, top: 4, bottom: this.safeBottom + 16 }).transition(settingsReveal())
         },(key:string)=>key)
         }.width('100%')
@@ -1840,14 +1844,17 @@ struct Index {
     }
     if (this.layerId.length > 0) {
       Column({ space: 12 }) {
-        Text('位置与显示').fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
+        Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
+          Row(){Text('布局与图层').fontSize(14).fontColor(this.appText());Blank();SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appMuted()]).rotate({angle:this.showLayerOptions?180:0})}.width('100%')
+        }.width('100%').height(44).backgroundColor(this.appControl()).onClick(()=>this.getUIContext().animateTo({duration:180,curve:Curve.EaseOut,expectedFrameRateRange:this.frameRate},()=>this.showLayerOptions=!this.showLayerOptions))
+        if(this.showLayerOptions) {
+        Column({space:12}) {
         if (this.layerId !== 'capability') {
           if (this.settingsTab === 0) {
             Button('铺满底板', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).width('100%').height(AppDesign.controlHeight).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText())
               .onClick(() => { const el = this.currentElement(); if (el !== null) { el.x = 0; el.y = 0; el.w = 1; el.h = 1; el.rot = 0; this.change(); } })
           }
         }
-        Text('在预览中直接调整大小与位置').fontSize(12).fontColor(this.appMuted()).width('100%')
         Flex({ wrap: FlexWrap.Wrap }) {
           Button('水平居中', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).margin({ right: 8, bottom: 8 }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => { const box = this.currentBox(); if (box !== null) { box.x = (1 - box.w) / 2; this.change(); } })
           Button('垂直居中', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).margin({ right: 8, bottom: 8 }).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => { const box = this.currentBox(); if (box !== null) { box.y = (1 - box.h) / 2; this.change(); } })
@@ -1858,10 +1865,6 @@ struct Index {
           SettingsSegmented({labels:['实色','柔和','轻透'],selectedIndex:this.boxPreview.opacity>.85?0:this.boxPreview.opacity>.55?1:2,appDark:this.appDark,
             onSelect:(index:number)=>{const box=this.currentBox();if(box!==null){box.opacity=[1,.7,.4][index];this.change();}}})
         }.width('100%').alignItems(HorizontalAlign.Start)
-        Button(this.showLayerOptions ? '收起图层操作' : '图层操作', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).width('100%').fontSize(13).fontColor(this.appText()).backgroundColor(this.appControl())
-          .onClick(() => { this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut, expectedFrameRateRange: this.frameRate }, () => { this.showLayerOptions = !this.showLayerOptions; }); })
-        if (this.showLayerOptions) {
-        Column({space:12}) {
         if (this.layerId !== 'capability') {
           Row({ space: 8 }) {
             Button('复制元素', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => this.duplicateElement())
