@@ -1,6 +1,6 @@
 import { readingSurface } from './CapabilityPresentation';
 import { cardOutline } from './RenderContours';
-import { FridgeCard, ElementBox, ShapePoint, BOARD_W, BOARD_H } from './CardSchema';
+import { FridgeCard, ElementBox, ShapePoint, BOARD_W, BOARD_H, MIN_CARD_EDGE, MIN_SUBJECT_EDGE } from './CardSchema';
 import { capabilityMinimum, capabilityReadableMinimum, CapabilitySize } from './CapabilityMetrics';
 
 function outlineIntervals(y: number, loops: ShapePoint[][]): number[] {
@@ -197,7 +197,7 @@ function readableSlot(card: FridgeCard, safe: ElementBox): ElementBox {
   return fitContentBox(requested, safe);
 }
 export function minimumCardSize(card: FridgeCard): CapabilitySize {
-  const size = new CapabilitySize(); size.w = card.shape === 'subject' ? 16 : 80; size.h = card.shape === 'subject' ? 16 : 80;
+  const size = new CapabilitySize(); size.w = card.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE; size.h = card.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE;
   if (card.capability === null || card.capability.k==='album') return size;
   const safe = safeContentBox(card), min = cardCapabilityMinimum(card, true, card.w*safe.w);
   if (card.shape === 'subject' && cardOutline(card).length > 0) {
@@ -205,10 +205,10 @@ export function minimumCardSize(card: FridgeCard): CapabilitySize {
     // Solve the fixed 6-unit white edge at the target size, not today's size.
     // Both dimensions share a scale: a thin silhouette must retain its aspect.
     const edge=card.subjectBorder?6/Math.min(card.w,card.h):0;
-    size.w=Math.max(16,min.w/Math.max(.0001,interiorW)+card.w*edge);
-    size.h=Math.max(16,min.h/Math.max(.0001,interiorH)+card.h*edge);return size;
+    size.w=Math.max(MIN_SUBJECT_EDGE,min.w/Math.max(.0001,interiorW)+card.w*edge);
+    size.h=Math.max(MIN_SUBJECT_EDGE,min.h/Math.max(.0001,interiorH)+card.h*edge);return size;
   }
-  size.w = Math.max(card.shape === 'subject' ? 16 : 80, min.w / Math.max(.0001, safe.w)); size.h = Math.max(card.shape === 'subject' ? 16 : 80, min.h / Math.max(.0001, safe.h));
+  size.w = Math.max(card.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE, min.w / Math.max(.0001, safe.w)); size.h = Math.max(card.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE, min.h / Math.max(.0001, safe.h));
   return size;
 }
 /** Expand proportionally and refuse a shape whose interior cannot support this capability on the board. */

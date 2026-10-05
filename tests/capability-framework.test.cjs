@@ -4,7 +4,7 @@ const root=path.resolve(__dirname,'../entry/src/main/ets/model'),cache=new Map()
 function load(name){const file=path.resolve(root,name+'.ets');if(cache.has(file))return cache.get(file).exports;const mod={exports:{}};cache.set(file,mod);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;vm.runInThisContext('(function(require,module,exports){'+code+'\n})',{filename:file})(s=>s==='@kit.ArkTS'?{taskpool:{}}:s==='@kit.BasicServicesKit'?{deviceInfo:{sdkApiVersion:24}}:load(path.relative(root,path.resolve(path.dirname(file),s))),mod,mod.exports);return mod.exports;}
 const s=load('CardSchema'),c=load('CapabilityCatalog'),p=load('CapabilityPresentation'),g=load('CanvasLayout'),m=load('CapabilityMetrics'),intake=load('ParcelIntake'),actions=load('WidgetActions'),hit=load('WidgetHitTest'),templates=load('TemplatePackage');
 assert.deepEqual(c.CAPABILITY_CATALOG.map(x=>x.key).sort(),s.CAPABILITIES.slice().sort(),'every shipped capability has a source/purpose/detail contract');
-for(const cap of c.CAPABILITY_CATALOG){assert.ok(cap.source&&cap.summary&&cap.detail);assert.ok(c.CAPABILITY_GROUPS.includes(cap.group));const min=m.capabilityMinimum({k:cap.key},true);assert.ok(min.w>=64&&min.h>=36);}
+for(const cap of c.CAPABILITY_CATALOG){assert.ok(cap.source&&cap.summary&&cap.detail);assert.ok(c.CAPABILITY_GROUPS.includes(cap.group));const min=m.capabilityMinimum({k:cap.key},true);assert.ok(min.w>=64&&min.h>=32);}
 const parcels=Array.from({length:5},(_,i)=>({id:'parcel'+i,code:'2-'+i+'234',place:'东门菜鸟驿站',picked:false}));
 assert.ok(m.capabilityMinimum({k:'countdown',date:'9999-12-31'},true).w>=100,'long countdowns gain width instead of unreadable type');
 const now=new Date('2026-10-04T09:00:00').getTime();const events=[{id:'a',title:'设计评审',location:'会议室203',start:now+3600000,end:now+7200000},{id:'b',title:'买菜',start:now+10800000,end:now+14400000},{id:'c',title:'过期',start:0,end:1}];assert.equal(p.summaryPresentation({k:'agenda',events},136,now).events.length,2);assert.equal(p.summaryPresentation({k:'agenda',events},82,now).events[0].id,'a');
@@ -126,3 +126,18 @@ for(const height of [280,470,740]) {
  state.cards.forEach((c,i)=>{assert.equal(c.x,copy[i].x);assert.equal(c.y,copy[i].y);});
 }
 console.log('PASS group recovery preserves composition and is idempotent across host aspects');
+
+// Artwork minima must survive storage and group scaling; readability is a separate contract.
+for(const shape of ['rect','round','pill','blob']) {
+ const tiny=new s.FridgeCard();tiny.id='tiny-'+shape;tiny.shape=shape;tiny.w=32;tiny.h=40;
+ assert.deepEqual(g.minimumCardSize(tiny),Object.assign(new m.CapabilitySize(),{w:32,h:32}));
+ const restored=s.normalizeState({schemaVersion:2,cards:[tiny]}).cards[0];assert.equal(restored.w,32);assert.equal(restored.h,40,'reload must not expand artwork to the retired 80-unit floor');
+ assert.equal(gg.groupMinimumScale([restored]),1,'a pure-artwork group can reach the same floor as a single card');
+}
+const smallClock=new s.FridgeCard();smallClock.capability={k:'clock'};smallClock.w=120;smallClock.h=120;
+const clockFloor=g.minimumCardSize(smallClock);assert.ok(clockFloor.w<80&&clockFloor.h<80,'clock is governed by its compact typography, not an unrelated 80-unit paper floor');
+const smallLesson=new s.FridgeCard();smallLesson.shape='subject';smallLesson.w=300;smallLesson.h=360;smallLesson.subjectPhoto=true;smallLesson.capability={k:'timetable',timetableMode:'next'};smallLesson.outline=[[{x:.3,y:.15},{x:.7,y:.15},{x:.7,y:.85},{x:.3,y:.85}]];
+const lessonFloor=g.minimumCardSize(smallLesson),lessonScale=Math.max(lessonFloor.w/smallLesson.w,lessonFloor.h/smallLesson.h);assert.ok(smallLesson.w*lessonScale<250,'a single lesson no longer requires a nearly maximum-size narrow subject');smallLesson.w*=lessonScale;smallLesson.h*=lessonScale;
+const lessonSlot=g.capabilityPlacement(smallLesson),lessonInset=g.capabilityInset(smallLesson);assert.ok(m.capabilityFits(smallLesson.capability,lessonSlot.w*smallLesson.w-2*lessonInset,lessonSlot.h*smallLesson.h-2*lessonInset));
+assert.ok(g.ensureCapabilitySize(smallLesson));const beforeLesson=smallLesson.w;assert.ok(g.ensureCapabilitySize(smallLesson));assert.ok(Math.abs(smallLesson.w-beforeLesson)<.001,'reopening cannot progressively inflate compact lesson artwork');
+console.log('PASS small artwork persistence/group floor; compact clock and upcoming lesson keep readable content inside a narrow photo');

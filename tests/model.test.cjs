@@ -255,7 +255,7 @@ function load(name) {
   assert.equal(migrated.cards[0].elements[1].text, '一首歌\n艺术家');
   assert.equal(migrated.cards[0].elements[3].text, '海边');
   assert.ok(migrated.cards.every(c => !c.caps));
-  assert.equal(migrated.cards[0].w, 320); assert.equal(migrated.cards[0].h, 80);
+  assert.equal(migrated.cards[0].w, 320); assert.equal(migrated.cards[0].h, 32);
   assert.equal(migrated.cards[0].x, 312); assert.equal(migrated.cards[0].y, -20);
   assert.deepEqual(normalizeState(migrated), migrated, 'migration is idempotent');
   const box = normalizeBox({w:1,h:1}); assert.equal(box.x, 0); assert.equal(box.y, 0);
@@ -454,7 +454,7 @@ function load(name) {
   assert.ok(cleanSubjectMask(thinMask,80,80).some(a=>a===255),'legitimate thin subject is not erased');
   const {compactCapability,capabilityMinimum}=load('CapabilityMetrics');
   for(const k of CAPABILITIES){const min=capabilityMinimum({k},true),full=capabilityMinimum({k});
-    assert.ok(min.w<=full.w && min.h<=full.h);assert.equal(compactCapability({k},min.w,min.h),k!=='timetable','timetable uses a single stable typography layout per mode');
+    assert.ok(min.w<=full.w && min.h<=full.h);assert.equal(compactCapability({k},min.w,min.h),true,'each upcoming capability has a distinct compact presentation');
     assert.equal(compactCapability({k},full.w,full.h),false);}
   const bird=new FridgeCard();bird.shape='subject';bird.w=300;bird.h=360;bird.capability={k:'date'};
   bird.outline=[[{x:.25,y:.2},{x:.75,y:.2},{x:.75,y:.8},{x:.25,y:.8}]];

@@ -3,7 +3,7 @@ import { readingHalo } from '../model/CapabilityPresentation';
 import { CapBlock, AgendaItem } from '../model/CardSchema';
 import { timetableDisplay, TimetableDisplay, timeText } from '../model/CapabilityData';
 import { briefColumns, briefHeight, LESSON_CELL_HEIGHT, BRIEF_HEADER_HEIGHT } from '../model/TimetableLayout';
-import { capabilityFits, capabilityContentScale } from '../model/CapabilityMetrics';
+import { capabilityFits, capabilityContentScale, compactCapability } from '../model/CapabilityMetrics';
 @Component
 export struct TimetableCapability {
   @Prop @Watch('update') cap: CapBlock = {k:'timetable'};
@@ -21,6 +21,7 @@ export struct TimetableCapability {
   private calendarPending():boolean {const date=new Date(this.display.date),key=dateKey(date);return this.cap.skipHolidays!==false&&!holidayKnown(date.getFullYear())&&!(this.cap.teachingDays??[]).some((d)=>d.date===key)&&!(this.cap.holidayDates??[]).some((d)=>d.date===key);}
   private dateLabel(): string { const d = new Date(this.display.date); return (d.getMonth()+1)+'.'+d.getDate(); }
   private columns(): number { return briefColumns(this.contentWidth/Math.max(.001,this.contentScale())+.01); }
+  private compactUpcoming():boolean {return this.cap.timetableMode!=='day' && compactCapability(this.cap,this.contentWidth,this.contentHeight);}
   private fits(): boolean { return capabilityFits(this.cap,this.contentWidth,this.contentHeight); }
   @Builder
   heading() {
@@ -36,7 +37,7 @@ export struct TimetableCapability {
         Text('放大卡片以显示课程').fontSize(12*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled)).layoutWeight(1).width('100%').maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis})
       } else if (!this.display.lessons.length) {
         Column({space:6*this.s()}) {
-          Text(this.display.empty).fontSize(17*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled)).maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
+          Text(this.display.empty).fontSize((this.compactUpcoming()?15:17)*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled)).maxLines(this.compactUpcoming()?1:2).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
           Text((this.cap.courses??[]).length?(this.cap.timetableMode==='day'?'查看周课表安排':'开课前一晚显示下一课'):'导入或添加你的课程').fontSize(11*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled)).opacity(.55).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
         }.layoutWeight(1).width('100%').alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Center)
       } else if (this.cap.timetableMode === 'day') {
@@ -52,8 +53,8 @@ export struct TimetableCapability {
         }.columnsTemplate(this.columns()===3?'1fr 1fr 1fr':this.columns()===2?'1fr 1fr':'1fr').width('100%')
           .height((briefHeight(this.display.lessons.length,this.columns())-BRIEF_HEADER_HEIGHT)*this.s()).scrollBar(BarState.Off)
       } else {
-        Column({space:5*this.s()}) {
-          Text(this.display.lessons[0].title).fontSize(20*this.s()).minFontSize(16*this.s()).maxFontSize(20*this.s()).height(48*this.s()).align(Alignment.TopStart).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled)).width('100%').maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis})
+        Column({space:(this.compactUpcoming()?3:5)*this.s()}) {
+          Text(this.display.lessons[0].title).fontSize((this.compactUpcoming()?16:20)*this.s()).minFontSize(14*this.s()).maxFontSize((this.compactUpcoming()?16:20)*this.s()).height((this.compactUpcoming()?22:48)*this.s()).align(Alignment.TopStart).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled)).width('100%').maxLines(this.compactUpcoming()?1:2).textOverflow({overflow:TextOverflow.Ellipsis})
           Row({space:6*this.s()}) {
             Text(timeText(this.display.lessons[0].start)+'–'+timeText(this.display.lessons[0].end)).fontSize(11*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled)).opacity(.65)
           }.width('100%')

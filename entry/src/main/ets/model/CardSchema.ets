@@ -3,6 +3,9 @@ import { validDay, HolidayDate } from './HolidayCalendar';
 /** Pure, versioned schema shared by the app and FormKit renderer. */
 export const BOARD_W: number = 344;
 export const BOARD_H: number = 470;
+/** Artwork bounds only; capability readability is enforced separately by layout. */
+export const MIN_CARD_EDGE: number = 32;
+export const MIN_SUBJECT_EDGE: number = 16;
 export class CapType {
   static readonly CLOCK: string = 'clock';
   static readonly DATE: string = 'date';
@@ -211,7 +214,7 @@ export function normalizeState(raw: FridgeState): FridgeState {
   for (const source of (Array.isArray(raw.cards) ? raw.cards : [])) {
     if (source === null || typeof source.id !== 'string') continue;
     const card = new FridgeCard(); card.id = source.id; card.groupId = typeof source.groupId === 'string' ? source.groupId.slice(0, 96) : '';
-    card.w = bounded(source.w, source.shape === 'subject' ? 16 : 80, 320, 180); card.h = bounded(source.h, source.shape === 'subject' ? 16 : 80, 420, 180);
+    card.w = bounded(source.w, source.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE, 320, 180); card.h = bounded(source.h, source.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE, 420, 180);
     // Validate finite coordinates here. Rotated/host-aware recovery belongs to
     // the whole canvas, where grouping and the actual aspect are available.
     card.x = bounded(source.x, -840, BOARD_W + 840, 24); card.y = bounded(source.y, -840, BOARD_H + 840, 32);
