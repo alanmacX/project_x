@@ -309,7 +309,7 @@ struct Index {
           .backgroundColor(this.appControl()).borderRadius(12).maxLength(30).onChange((value:string)=>this.canvasDraftName=value)
         Text(this.canvasDuplicate?'保留当前布局，创建一份独立副本':'从空白开始，添加你的卡片').fontSize(12).fontColor(this.appMuted()).width('100%')
         Button(this.canvasChanging?'创建中':'创建画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.EMPHASIZED})
-          .height(44).width('100%').enabled(!this.canvasChanging && this.canvasDraftName.trim().length>0)
+          .height(44).width('100%').backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).enabled(!this.canvasChanging && this.canvasDraftName.trim().length>0)
           .onClick(()=>this.newCanvas(this.canvasDuplicate,this.canvasDraftName))
       } else {
         List({space:4}) {
@@ -332,8 +332,8 @@ struct Index {
           },(id:string)=>id)
         }.width('100%').height(Math.min(200,Math.max(48,this.canvasEntries.length*52))).scrollBar(BarState.Off)
         Row({space:8}) {
-          Button('新画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).onClick(()=>this.prepareCanvas(false))
-          Button('复制画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).onClick(()=>this.prepareCanvas(true))
+          Button('新画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(()=>this.prepareCanvas(false))
+          Button('复制画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(()=>this.prepareCanvas(true))
         }.width('100%')
         Row({space:8}) {
           TextInput({text:this.renameValue,placeholder:'画布名称'}).height(44).layoutWeight(1).fontColor(this.appText()).placeholderColor(this.appMuted())
@@ -1086,6 +1086,7 @@ struct Index {
     try {
       const json = await taskpool.execute(new taskpool.Task(createSmartBackground, JSON.stringify(state), this.context.filesDir)) as string;
       if (!this.alive || generation !== this.backgroundGeneration) return;
+      if(signature!==backgroundSignature(this.store.state)){this.scheduleBackground();return;}
       const next = normalizeBackground(JSON.parse(json) as CanvasBackground); this.applyBackground(next);
     } catch (_) { if (this.alive && generation === this.backgroundGeneration) this.getUIContext().getPromptAction().showToast({ message: '取色未完成，保留原背景，请重试' }); }
     finally { if (generation === this.backgroundGeneration) this.backgroundBusy = false; }
@@ -1153,8 +1154,9 @@ struct Index {
           CanvasBackdrop({ sceneBackground: this.canvasBackground }).width(40).height(40).borderRadius(10).clip(true).border({ width: .5, color: AppDesign.border(this.appDark) })
           Column({ space: 3 }) { Text('画布背景').fontSize(14).fontColor(this.appText()); Text(this.backgroundBusy ? '正在取色' : this.backgroundLabel()).fontSize(11).fontColor(this.appMuted()) }.alignItems(HorizontalAlign.Start)
           Blank()
+          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([this.appMuted()]).hitTestBehavior(HitTestMode.None)
         }.width('100%')
-      }.height(56).layoutWeight(1).backgroundColor(Color.Transparent).padding(8).onClick(() => { this.backgroundOpen = true; })
+      }.height(56).layoutWeight(1).backgroundColor(Color.Transparent).padding(8).accessibilityText('调整画布背景，'+this.backgroundLabel()).onClick(() => { this.backgroundOpen = true; })
         .bindSheet(this.backgroundOpen, this.backgroundEditor, { height: SheetSize.LARGE, showClose: true, backgroundColor: this.appBackground(), onDisappear: () => { this.backgroundOpen = false; } })
       Button(this.sharing ? '生成中' : '导入', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).id('importTemplate').height(44).fontSize(13).padding({ left: 12, right: 12 })
         .backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.sharing && !this.backgroundBusy).onClick(() => this.pickTemplate())

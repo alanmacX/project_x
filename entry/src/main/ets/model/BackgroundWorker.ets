@@ -4,21 +4,21 @@ import { fileIo } from '@kit.CoreFileKit';
 import { BackgroundAnchor, CanvasBackground, FridgeState, FridgeCard, materialColors, BOARD_W, BOARD_H } from './CardSchema';
 import { representativeColor, smartTone, blendPixels, combineColors, WeightedColor, colorLab } from './BackgroundPalette';
 
-import { imagePalette, imageColor, cardSource, backgroundSignature, hash } from './BackgroundInputs';
+import { imageSwatches, imageColor, cardSource, backgroundSignature, hash } from './BackgroundInputs';
 export { backgroundSignature } from './BackgroundInputs';
 @Concurrent
 export async function createSmartBackground(json:string,filesDir:string):Promise<string> {
   const state=JSON.parse(json) as FridgeState,bg=new CanvasBackground();bg.mode=state.background.mode;
-  const colors:WeightedColor[]=[],anchors:BackgroundAnchor[]=[],cache=new Map<string,string[]>();
+  const colors:WeightedColor[]=[],anchors:BackgroundAnchor[]=[],cache=new Map<string,WeightedColor[]>();
   for(const card of state.cards){
     const samples:WeightedColor[]=[],paper=materialColors(card.material,card.paper)[0];
     const cutout=card.shape==='subject'&&card.subjectPhoto?card.cutout:'';
-    if(cutout.startsWith('file://')){try{const palette=cache.get(cutout)??await imagePalette(cutout);cache.set(cutout,palette);palette.forEach((color: string, i: number) => samples.push({color:color,weight:1/(i+1)}));}catch(_){}}
-    if(card.capability?.k==='album'&&card.capability.albumCover?.startsWith('file://')) {try{const palette=await imagePalette(card.capability.albumCover);palette.forEach((color:string,i:number)=>samples.push({color:color,weight:1/(i+1)}));}catch(_){}}
+    if(cutout.startsWith('file://')){try{const palette=cache.get(cutout)??await imageSwatches(cutout);cache.set(cutout,palette);palette.forEach((p:WeightedColor)=>samples.push(p));}catch(_){}}
+    if(card.capability?.k==='album'&&card.capability.albumCover?.startsWith('file://')) {try{const palette=await imageSwatches(card.capability.albumCover);palette.forEach((p:WeightedColor)=>samples.push(p));}catch(_){}}
     let filled=0;
     for(const el of card.elements.filter((el)=>el.kind==='image'||el.kind==='shape').sort((a,b)=>b.w*b.h-a.w*a.h).slice(0,4)){
       const weight=Math.max(0,Math.min(1,el.w*el.h*el.opacity));filled+=weight;
-      if(el.kind==='image'&&el.src.startsWith('file://')){try{const palette=cache.get(el.src)??await imagePalette(el.src);cache.set(el.src,palette);palette.forEach((color: string, i: number) => samples.push({color:color,weight:weight/(i+1)}));}catch(_){}}
+      if(el.kind==='image'&&el.src.startsWith('file://')){try{const palette=cache.get(el.src)??await imageSwatches(el.src);cache.set(el.src,palette);palette.forEach((p:WeightedColor)=>samples.push({color:p.color,weight:weight*p.weight}));}catch(_){}}
       if(el.kind==='shape'&&el.color.length>0)samples.push({color:el.color,weight:weight});
     }
     if(samples.length===0||paper.toUpperCase()!=='#FFFFFF'&&cutout.length===0)samples.push({color:paper,weight:Math.max(.1,1-filled)});
@@ -27,7 +27,7 @@ export async function createSmartBackground(json:string,filesDir:string):Promise
     const x=card.x/BOARD_W+w*Math.cos(a)/2+shapeH*Math.sin(a)/2,y=card.y/BOARD_H+h+w*state.canvasAspect*Math.sin(a)/2-h*Math.cos(a)/2;
     const boundsW=Math.abs(w*Math.cos(a))+Math.abs(shapeH*Math.sin(a)),boundsH=Math.abs(w*state.canvasAspect*Math.sin(a))+Math.abs(h*Math.cos(a));
     const visible=Math.max(0,Math.min(1,x+boundsW/2)-Math.max(0,x-boundsW/2))*Math.max(0,Math.min(1,y+boundsH/2)-Math.max(0,y-boundsH/2));
-    if(visible<=0)continue;const weight=Math.sqrt(visible);
+    if(visible<=0)continue;const weight=visible;
     colors.push({color:color,weight:weight});
     const influences=samples.slice().sort((a:WeightedColor,b:WeightedColor)=>b.weight-a.weight).slice(0,3),total=influences.reduce((sum:number,p:WeightedColor)=>sum+p.weight,0);
     influences.forEach((p:WeightedColor,i:number)=>anchors.push({x:Math.max(0,Math.min(1,x+(i===1?-.2:i===2?.2:0))),y:Math.max(0,Math.min(1,y+(i===1?.16:i===2?-.16:0))),color:p.color,weight:weight*p.weight/Math.max(total,.001)}));
@@ -45,7 +45,7 @@ export async function createSmartBackground(json:string,filesDir:string):Promise
   }
   bg.anchors=fields.sort((a:BackgroundAnchor,b:BackgroundAnchor)=>b.weight-a.weight).slice(0,6);
   if(bg.mode==='smart')return JSON.stringify(bg);
-  const width=320,height=Math.max(160,Math.min(512,Math.round(width/state.canvasAspect))),path=filesDir+'/canvas_blend_'+hash(bg.signature)+'.png';
+  const width=320,height=Math.max(160,Math.min(512,Math.round(width/state.canvasAspect))),path=filesDir+'/canvas_blend_'+hash(bg.signature+'|'+JSON.stringify(bg.anchors))+'.png';
   try{if(await fileIo.access(path)){bg.src='file://'+path;return JSON.stringify(bg);}}catch(_){}
   const rgba=blendPixels(bg.anchors,bg.color,width,height);let pixel:image.PixelMap|null=null,packer:image.ImagePacker|null=null,file:fileIo.File|null=null;
   try{

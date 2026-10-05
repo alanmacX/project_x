@@ -39,6 +39,6 @@ export struct CapabilityPicker {
         }.width('100%')
       }.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Off)
       Button('纯创作 · 不添加能力',{type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).width('100%').height(48).fontSize(14).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.choose('none'))
-    }.padding(20).width('92%').constraintSize({maxWidth:520}).height('78%').backgroundColor(AppDesign.surface(this.appDark)).borderRadius(24)
+    }.padding(20).width('92%').height(264+Math.min(360,Math.max(88,this.items().length*88))).constraintSize({maxWidth:520,maxHeight:'78%'}).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(24)
   }
 }
