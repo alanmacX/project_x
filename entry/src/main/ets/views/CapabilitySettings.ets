@@ -1,15 +1,13 @@
 import { AlbumSettings } from './AlbumSettings';
 import { SettingsAction } from './SettingsAction';
 import { applyTimetableImport } from '../model/TimetableImport';
-import { ParcelImportDialog } from './ParcelImportDialog';
-import { mergePickupParcels } from '../model/ParcelIntake';
 import { TimetableDialog } from './TimetableDialog';
 import { mondayDate } from '../model/WakeUpImport';
 import { CalendarRulesDialog } from './CalendarRulesDialog';
 import { ValuePicker } from './ValuePicker';
-import { CapBlock, ParcelItem, CourseItem, AgendaItem } from '../model/CardSchema';
-import { ValueField, pendingParcels, eventWhen } from '../model/CapabilityData';
-import { fetchValueFields, recognizePickup } from '../model/CapabilityWorker';
+import { CapBlock, CourseItem, AgendaItem } from '../model/CardSchema';
+import { ValueField, eventWhen } from '../model/CapabilityData';
+import { fetchValueFields } from '../model/CapabilityWorker';
 import { readCapability, hasWholeCalendarAccess } from '../model/CapabilityService';
 import { importScheduleFile } from '../model/ScheduleFiles';
 import { AppDesign } from '../model/AppDesign';
@@ -17,7 +15,6 @@ import { SettingsSegmented } from './SettingsSegmented';
 import { settingsReveal, settingsDialogOpen, settingsDialogClose } from '../model/SettingsMotion';
 import { taskpool } from '@kit.ArkTS';
 import { picker } from '@kit.CoreFileKit';
-import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { CourseEditor } from './CourseEditor';
 import { WakeUpImportDialog } from './WakeUpImportDialog';
 @Component
@@ -29,15 +26,13 @@ export struct CapabilitySettings {
   @State busy:boolean=false;
   @State wholeCalendarAccess:boolean=false;
   @State message:string='';
-  @State manualParcel:boolean=false;
-  @State code:string=''; @State place:string='';
   private dialog:CustomDialogController|null=null;
   private alive:boolean=true;
   private generation:number=0;
   private inputKey:string='';
   private inputChanged():void {
     const key=this.cardId+'|'+this.cap.k+'|'+(this.cap.url??'');
-    if(key===this.inputKey)return;this.inputKey=key;this.generation++;this.busy=false;this.message='';this.code='';this.place='';this.manualParcel=false;
+    if(key===this.inputKey)return;this.inputKey=key;this.generation++;this.busy=false;this.message='';
   }
   aboutToAppear():void {
     this.alive=true;this.inputChanged();const context=this.getUIContext().getHostContext();
@@ -71,29 +66,9 @@ export struct CapabilitySettings {
       }}),customStyle:true,openAnimation:settingsDialogOpen(),closeAnimation:settingsDialogClose(),alignment:DialogAlignment.Center,autoCancel:true});this.dialog.open();
     }catch(e){if(this.alive)this.message=(e as Error).message;}finally{if(token===this.generation)this.busy=false;}
   }
-  private async pickScreenshot():Promise<void> {
-    if(this.busy)return;const token=++this.generation;this.busy=true;
-    try{
-      const options=new photoAccessHelper.PhotoSelectOptions();options.maxSelectNumber=1;options.MIMEType=photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
-      const result=await new photoAccessHelper.PhotoViewPicker().select(options);if(!result.photoUris.length)return;
-      const notice=await taskpool.execute(new taskpool.Task(recognizePickup,result.photoUris[0])) as string;
-      if(!this.alive||token!==this.generation)return;
-      this.importParcels(notice);
-    }catch(e){if(this.alive)this.message=(e as Error).message;}finally{if(token===this.generation)this.busy=false;}
-  }
-  private importParcels(notice:string=''):void {
-    const id=this.cardId;
-    this.dialog=new CustomDialogController({builder:ParcelImportDialog({appDark:this.appDark,initialText:notice,defaultPlace:this.cap.parcelPlace??'',onImport:(items:ParcelItem[])=>{
-      if(!this.alive||this.cardId!==id||this.cap.k!=='parcel')return;
-      const next=this.copy();next.parcels=mergePickupParcels(next.parcels??[],items,next.parcelPlace??'',Date.now());this.change(next);
-    }}),customStyle:true,openAnimation:settingsDialogOpen(),closeAnimation:settingsDialogClose(),autoCancel:true});this.dialog.open();
-  }
-  private addParcel():void {
-    const code=this.code.trim();if(!code){this.message='请填写取件码';return;}
-    const next=this.copy();
-    try{next.parcels=mergePickupParcels(next.parcels??[],[{id:'',code:code,place:this.place,picked:false}],next.parcelPlace??'',Date.now());this.change(next);this.code='';this.place='';this.manualParcel=false;}
-    catch(e){this.message=(e as Error).message;}
-  }
+
+
+
   private editCourse(course?:CourseItem):void {
     const id=this.cardId;
     this.dialog=new CustomDialogController({builder:CourseEditor({course:course??{id:'',name:'',room:'',day:1,start:'08:00',end:'09:40',firstWeek:1,lastWeek:16,parity:0},appDark:this.appDark,onDelete:()=>{if(!this.alive||this.cardId!==id||!course)return;const next=this.copy();next.courses=(next.courses??[]).filter((c)=>c.id!==course.id);next.courseChanges=(next.courseChanges??[]).filter((c)=>c.courseId!==course.id);this.change(next);},onSave:(value:CourseItem)=>{
@@ -155,29 +130,7 @@ export struct CapabilitySettings {
           onSelect:(index:number)=>{const next=this.copy();next.interval=[30,60,180][index];this.change(next);}})
         Text('只读取所选内容，失败时保留上次结果。桌面更新受系统调度限制。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       }
-      if(this.cap.k==='parcel') {
-        Row({space:8}) {
-          Button('通知文字',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).fontSize(14).fontColor(this.text()).backgroundColor(this.control()).enabled(!this.busy).onClick(()=>this.importParcels())
-          Button(this.busy?'识别中':'识别截图',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).fontSize(14).fontColor(this.text()).backgroundColor(this.control()).enabled(!this.busy).onClick(()=>this.pickScreenshot())
-        }.width('100%')
-        Text('常用驿站').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
-        TextInput({text:this.cap.parcelPlace??'',placeholder:'常用驿站（可留空，仅补全缺失地点）'}).height(44).maxLength(80).fontSize(14).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>{const next=this.copy();next.parcelPlace=v;this.change(next);})
-        Button(this.manualParcel?'收起手动添加':'手动添加',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).fontSize(13).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.manualParcel=!this.manualParcel)
-        if(this.manualParcel) {
-          Column({space:12}) {
-          TextInput({text:this.code,placeholder:'取件码'}).height(44).maxLength(24).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>this.code=v)
-          TextInput({text:this.place,placeholder:'取件地点（留空使用常用驿站）'}).height(44).maxLength(80).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>this.place=v)
-          SettingsAction({label:'加入待取',onPress:()=>this.addParcel(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
-          }.width('100%').transition(settingsReveal())
-        }
-        ForEach(pendingParcels(this.cap),(p:ParcelItem)=>{
-          Row({space:12}) {Column({space:4}) {Text(p.code).fontSize(18).fontWeight(FontWeight.Medium).fontColor(this.text());Text(p.place||'未填写地点').fontSize(12).fontColor(AppDesign.muted(this.appDark)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})}.layoutWeight(1).alignItems(HorizontalAlign.Start);Button('已取',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).fontSize(13).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>{const next=this.copy();for(const item of next.parcels??[])if(item.id===p.id)item.picked=true;this.change(next);})}.width('100%')
-        },(p:ParcelItem)=>p.id)
-        if((this.cap.parcels??[]).some((p)=>p.picked)) {
-          SettingsAction({label:'清理已取记录',onPress:()=>{const next=this.copy();next.parcels=(next.parcels??[]).filter((p)=>!p.picked);this.change(next);},appDark:this.appDark,isEnabled:!this.busy,fillWidth:true,error:true})
-        }
-        Text('识别后校对再加入；原通知与截图不保存。常用驿站无需重复输入。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
-      }
+
       if(this.cap.k==='agenda') {
         if(this.wholeCalendarAccess) {SettingsAction({label:'读取系统日历',onPress:()=>this.readSystemAgenda(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})}
         SettingsAction({label:'导入日历文件 .ics',onPress:()=>this.importSchedule(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})

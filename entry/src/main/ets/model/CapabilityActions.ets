@@ -3,7 +3,7 @@ export interface CapabilityAction { cardId: string; operation: string; }
 export function parseCapabilityAction(event: string): CapabilityAction | null {
   try {
     const value = JSON.parse(event) as CapabilityAction;
-    if (typeof value.cardId !== 'string' || !['previousMonth', 'nextMonth', 'currentMonth', 'refreshWeather'].includes(value.operation)) return null;
+    if (typeof value.cardId !== 'string' || !['previousMonth', 'nextMonth', 'currentMonth'].includes(value.operation)) return null;
     return { cardId: value.cardId, operation: value.operation };
   } catch (_) { return null; }
 }

@@ -8,8 +8,6 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import preferences from '@ohos.data.preferences';
 import { FridgeState, defaultState, normalizeState } from '../model/FridgeModel';
 import { parseCapabilityAction, applyCalendarAction } from '../model/CapabilityActions';
-import { fetchWeather } from '../model/WeatherService';
-import { weatherNeedsRefresh } from '../model/WeatherRefresh';
 import { updateWidget } from '../model/WidgetSync';
 
 const STORE_NAME: string = 'fridge_store';
@@ -80,7 +78,7 @@ export default class FridgeFormAbility extends FormExtensionAbility {
 
   onUpdateForm(formId: string): void {
     this.actionQueue = this.actionQueue.catch(() => {}).then(async () => {
-      await this.pushForm(formId); await this.refreshDueData(formId); await this.refreshDueWeather(formId);await this.scheduleForm(formId);
+      await this.pushForm(formId); await this.refreshDueData(formId); await this.scheduleForm(formId);
     }).catch((e: Error) => hilog.error(0x0000, 'FridgeForm', 'update %{public}s', e.message));
   }
 
@@ -106,45 +104,12 @@ export default class FridgeFormAbility extends FormExtensionAbility {
       const action = parseCapabilityAction(event); if (action === null) return;
       let state = await this.loadState(formId), card = state.cards.find((item) => item.id === action.cardId);
       if (card === undefined) return;
-      if (action.operation === 'refreshWeather') {
-        const city = card.capability?.k === 'weather' ? card.capability.city ?? '' : '';
-        if (city.length === 0) return;
-        card.capability!.attemptedAt = Date.now(); card.capability!.refreshState = 'refreshing'; await this.saveStateAndWidgets(state);
-        const weather = await fetchWeather(city);
-        // Re-read after network I/O so other edits are not overwritten by an old snapshot.
-        state = await this.loadState(formId); card = state.cards.find((item) => item.id === action.cardId);
-        if (card?.capability?.k !== 'weather' || card.capability.city !== city) return;
-        if (weather === null) { card.capability.refreshState = 'failed'; }
-        else { card.capability.temp = weather.temp; card.capability.desc = weather.desc; card.capability.updatedAt = Date.now(); card.capability.refreshState = 'done'; }
-      } else if (!applyCalendarAction(card, action.operation)) return;
+      if (!applyCalendarAction(card, action.operation)) return;
       await this.saveStateAndWidgets(state);
     }).catch((e: Error) => hilog.error(0x0000, 'FridgeForm', 'action %{public}s', e.message));
   }
 
-  private async refreshDueWeather(formId: string): Promise<void> {
-    let state = await this.loadState(formId);
-    const cities: string[] = [];
-    for (const card of state.cards) {
-      if (weatherNeedsRefresh(card.capability)) {
-        const city = card.capability!.city!.trim(); if (!cities.includes(city)) cities.push(city);
-      }
-    }
-    for (const city of cities) {
-      const ids = state.cards.filter((card) => weatherNeedsRefresh(card.capability) && card.capability!.city!.trim() === city).map((card) => card.id);
-      const attempted = Date.now();
-      for (const card of state.cards) if (ids.includes(card.id)) { card.capability!.attemptedAt = attempted; card.capability!.refreshState = 'refreshing'; }
-      await this.saveStateAndWidgets(state);
-      const weather = await fetchWeather(city);
-      state = await this.loadState(formId);
-      for (const card of state.cards) {
-        const cap = card.capability;
-        if (!ids.includes(card.id) || cap?.k !== 'weather' || cap.city?.trim() !== city || cap.attemptedAt !== attempted) continue;
-        cap.refreshState = weather === null ? 'failed' : 'done';
-        if (weather !== null) { cap.temp = weather.temp; cap.desc = weather.desc; cap.updatedAt = Date.now(); }
-      }
-      await this.saveStateAndWidgets(state);
-    }
-  }
+
 
   private async saveStateAndWidgets(state: FridgeState): Promise<void> {
     const prefs = await preferences.getPreferences(this.context, STORE_NAME);

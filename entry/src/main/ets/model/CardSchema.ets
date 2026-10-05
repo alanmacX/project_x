@@ -9,11 +9,10 @@ export class CapType {
   static readonly CALENDAR: string = 'calendar';
   static readonly COUNTDOWN: string = 'countdown';
   static readonly ANNIVERSARY: string = 'anniversary';
-  static readonly WEATHER: string = 'weather';
   static readonly DAY_PROGRESS: string = 'dayprogress';
   static readonly YEAR_PROGRESS: string = 'yearprogress';
 }
-export const CAPABILITIES: string[] = ['clock', 'date', 'calendar', 'countdown', 'anniversary', 'weather', 'dayprogress', 'yearprogress', 'battery', 'agenda', 'parcel', 'fetch', 'timetable', 'worldclock', 'lunar', 'album'];
+export const CAPABILITIES: string[] = ['clock', 'date', 'calendar', 'countdown', 'anniversary', 'dayprogress', 'yearprogress', 'battery', 'agenda', 'fetch', 'timetable', 'worldclock', 'lunar', 'album'];
 export interface CapBlock {
   k: string;
   albumId?: string;
@@ -224,6 +223,8 @@ export function normalizeState(raw: FridgeState): FridgeState {
     state.maxZ = Math.max(state.maxZ, card.z);
     for (let i = 0; i < caps.length; i++) {
       const cap = caps[i]; if (cap === null || typeof cap.k !== 'string') continue;
+      // Retired capabilities leave the user's card artwork intact.
+      if (cap.k === 'weather' || cap.k === 'parcel') continue;
       if (CAPABILITIES.includes(cap.k)) {
         if (card.capability === null) {
           card.capability = normalizeCapability(cap);

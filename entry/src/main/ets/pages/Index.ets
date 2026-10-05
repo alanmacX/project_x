@@ -49,8 +49,6 @@ import { cardViewSnapshot, cardRenderSnapshot } from '../model/CardViewSnapshot'
 import { CardFace } from '../views/CardFace';
 import { sceneRect, SceneRect, layerLabel } from '../model/SceneLayout';
 import { extractSubject, repairSubject } from '../model/SubjectShape';
-import { fetchWeather } from '../model/WeatherService';
-import { weatherNeedsRefresh } from '../model/WeatherRefresh';
 import { BoardCard } from '../views/BoardCard';
 import { constrainCapabilityDrag, cardCapabilityMinimum, capabilityBox, capabilityPlacement, safeContentBox, clampCardGeometry, ensureCapabilitySize, subjectSurfaceFactor, cardHandlePoint } from '../model/CanvasLayout';
 import { fileIo } from '@kit.CoreFileKit';
@@ -187,7 +185,6 @@ struct Index {
   @State elementPreview: CanvasElement = new CanvasElement();
   @State textValue: string = '';
   @State titleValue: string = '';
-  @State cityValue: string = '';
   @State paperValue: string = '';
   @State inkValue: string = '';
   @State elementColor: string = '';
@@ -199,17 +196,16 @@ struct Index {
   private backgroundGeneration: number = 0;
   private backgroundTimer: number = -1;
   @StorageLink('appBackgrounded') @Watch('appWentBackground') appBackgrounded: boolean = false;
-  private appWentBackground(): void { if(!this.appBackgrounded && this.ready) {this.tick=Date.now();this.refreshCapabilities();this.refreshDueWeather();} if (this.appBackgrounded && this.ready) { if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); } }
+  private appWentBackground(): void { if(!this.appBackgrounded && this.ready) {this.tick=Date.now();this.refreshCapabilities();} if (this.appBackgrounded && this.ready) { if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); } }
 
   @State repairingSubjects: boolean = false;
-  @State weatherBusy: boolean = false;
   @State tick: number = Date.now();
 
   aboutToAppear(): void {
     this.alive = true;
     this.context = this.getUIContext().getHostContext() ?? null;
     this.initialize();
-    this.clockTimer = setInterval(() => { this.tick = Date.now(); this.refreshDueWeather(); this.refreshCapabilities(); }, 60000);
+    this.clockTimer = setInterval(() => { this.tick = Date.now();  this.refreshCapabilities(); }, 60000);
     this.batteryObserver.start(()=>this.refreshCapabilities());
   }
   private initialize(): void {
@@ -231,7 +227,7 @@ struct Index {
       const routedLaunch = this.routedId.length > 0 || this.viewRouteId.length > 0;
       this.canvasBackground = this.store.state.background; this.layoutBoard(); this.ready = true; this.render(); this.scheduleBackground(); this.routeChanged(); this.viewRouteChanged();
       if (!routedLaunch) this.startArrival();
-      this.maintenanceTimer = setTimeout(() => { if (this.alive) { this.warmEditor(); this.persist(); this.repairStoredSubjects(); this.refreshDueWeather(); this.refreshCapabilities(); } }, 750);
+      this.maintenanceTimer = setTimeout(() => { if (this.alive) { this.warmEditor(); this.persist(); this.repairStoredSubjects();  this.refreshCapabilities(); } }, 750);
 
     }).catch((e: Error) => { this.error = e.message; });
   }
@@ -254,7 +250,7 @@ struct Index {
       this.canvasBackground = this.store.state.background; this.refreshCanvasList();
       await primeRenderContours(this.store.state.cards,storageSnapshot(this.store.state));
       this.render(); this.persist(true); this.scheduleBackground(); this.canvasPickerOpen = false;
-      this.refreshCapabilities(); this.refreshDueWeather();
+      this.refreshCapabilities();
     } catch (e) { this.templateError('画布切换未完成',e as Error); }
   }
   private async newCanvas(duplicate: boolean, name: string = ''): Promise<void> {
@@ -615,7 +611,7 @@ struct Index {
     this.syncPreviewFields();
     const card = this.current(), element = this.currentElement();
     this.textValue = element?.text ?? ''; this.elementColor = element?.color ?? '';
-    this.titleValue = card?.capability?.title ?? ''; this.cityValue = card?.capability?.city ?? '';
+    this.titleValue = card?.capability?.title ?? '';
     this.paperValue = card?.paper ?? ''; this.inkValue = card?.ink ?? '';
   }
   private change(group: string = this.gestureGroup): void {
@@ -692,7 +688,6 @@ struct Index {
       }
       if(k==='timetable'){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));cap.semester=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);cap.courses=[];}
       if (k === 'worldclock') cap.zone = 'Asia/Shanghai';
-      if (k === 'weather') { cap.city = ''; cap.temp = '--°'; cap.desc = '未更新'; }
       if(k==='album') {card.shape='rect';card.frame=false;this.editorTabs=[1];this.settingsTab=1;}
       card.capability = cap; card.capBox = capabilityPreset(card,'center'); this.layerId = 'capability';
     }
@@ -803,9 +798,8 @@ struct Index {
       }
     });
   }
-  private autoWeatherBusy: boolean = false;
   onPageHide(): void { if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); }
-  onPageShow(): void { this.tick=Date.now();if (this.ready) {this.refreshDueWeather();this.refreshCapabilities();} }
+  onPageShow(): void { this.tick=Date.now();if (this.ready) {this.refreshCapabilities();} }
   private updateExtraCapability(id:string,next:CapBlock):void {
     const card=this.store.findCard(id);if(!card||card.capability?.k!==next.k)return;
     card.capability=next;this.syncFields();this.change();
@@ -824,34 +818,8 @@ struct Index {
       }
     }finally{this.refreshingCapabilities=false;}
   }
-  private async refreshDueWeather(): Promise<void> {
-    if (!this.ready || !this.alive || this.autoWeatherBusy || this.weatherBusy) return;
-    this.autoWeatherBusy = true;
-    try {
-      const cards = this.store.state.cards.filter((card: FridgeCard) => weatherNeedsRefresh(card.capability));
-      for (const card of cards) {
-        if (!this.alive) break;
-        const cap = card.capability!, city = cap.city!.trim(), attempted = Date.now();
-        cap.attemptedAt = attempted; cap.refreshState = 'refreshing';
-        const result = await fetchWeather(city);
-        if (!this.alive || this.store.findCard(card.id)?.capability !== cap || cap.city?.trim() !== city || cap.attemptedAt !== attempted) continue;
-        cap.refreshState = result === null ? 'failed' : 'done';
-        if (result !== null) { cap.temp = result.temp; cap.desc = result.desc; cap.updatedAt = Date.now(); }
-        this.render(); this.persist();
-      }
-    } finally { this.autoWeatherBusy = false; }
-  }
-  private async refreshWeather(): Promise<void> {
-    const card = this.current(), cap = card?.capability; if (cap?.k !== 'weather' || this.weatherBusy) return;
-    const city = this.cityValue.trim(); if (city.length === 0) { this.getUIContext().getPromptAction().showToast({ message: '请输入城市' }); return; }
-    this.weatherBusy = true; cap.attemptedAt = Date.now();
-    try {
-      const result = await fetchWeather(city);
-      if (card?.capability !== cap || cap.city !== city) return;
-      if (result === null) { cap.refreshState = 'failed'; this.change(); this.getUIContext().getPromptAction().showToast({ message: '天气更新失败，请重试' }); return; }
-      cap.temp = result.temp; cap.desc = result.desc; cap.updatedAt = Date.now(); cap.refreshState = 'done'; this.change();
-    } finally { this.weatherBusy = false; }
-  }
+
+
 
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
@@ -1322,7 +1290,7 @@ struct Index {
       finally { await pixel.release(); }
     } catch (e) {
       // Action-menu cancellation has no message; actual export errors are actionable.
-      
+
       this.templateError('图片分享未完成',e as Error);
     } finally { this.sharing = false; }
   }
@@ -1336,7 +1304,7 @@ struct Index {
           if(this.preview.capability!==null) {
             Text(capabilityDescriptor(this.preview.capability!.k).source).fontSize(12).fontColor(this.appMuted()).width('100%')
           }
-          if(this.preview.capability!==null && ['parcel','agenda'].includes(this.preview.capability!.k)) {
+          if(this.preview.capability!==null && ['agenda'].includes(this.preview.capability!.k)) {
             CapabilityDetails({cap:this.preview.capability!,appDark:this.appDark,tick:this.tick,onUpdate:(next:CapBlock)=>this.updateExtraCapability(this.preview.id,next)})
           } else if(this.preview.capability?.k==='timetable') {
             WeekTimetable({cap:this.preview.capability!,appDark:this.appDark,editable:false,heightLimit:Math.max(200,this.screenHeight-220)})
@@ -1351,11 +1319,7 @@ struct Index {
               Button('下月', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(14).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => this.calendarAction('nextMonth'))
             }
           }
-          if (this.preview.capability?.k === 'weather') {
-            Text(this.preview.capability!.updatedAt ? '更新于 ' + new Date(this.preview.capability!.updatedAt!).toLocaleString() : '尚无更新记录')
-              .fontSize(12).fontColor(this.appMuted())
-            Button(this.weatherBusy ? '更新中' : '刷新天气', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.weatherBusy).onClick(() => this.refreshWeather())
-          }
+
         }.width('100%').padding({ bottom: 24 })
       }.width('100%').height('100%').align(Alignment.Top).padding({ top: 76, left: 24, right: 24, bottom: this.safeBottom + 8 })
       }.titleMode(HdsNavigationTitleMode.MINI)
@@ -1479,7 +1443,7 @@ struct Index {
             }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
           } else if (this.settingsTab === 1 && (this.layerId === 'capability' || this.layerId.length === 0)) {
             Column({space:16}) { this.capabilityPanel() }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
-            if(this.preview.capability!==null && ['countdown','anniversary','weather','battery','agenda','parcel','fetch','timetable','worldclock'].includes(this.preview.capability!.k)) {
+            if(this.preview.capability!==null && ['countdown','anniversary','battery','agenda','fetch','timetable','worldclock'].includes(this.preview.capability!.k)) {
               Column() { this.capabilityDataPanel() }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
             }
             if(this.preview.capability!==null) {
@@ -1517,7 +1481,7 @@ struct Index {
       }.width(this.preview.w * this.editorScale()).height(this.preview.h * this.editorScale())
         .rotate({ angle: this.editingAngle(), centerX: 0, centerY: '100%' })
         .position({ x: this.previewViewport().left, y: this.previewViewport().top })
-      
+
       if (this.preview.capability?.k!=='album' && this.layerId.length > 0 && (this.layerId!=='capability'||this.preview.capability!==null) && this.layerDrag.length === 0) {
         Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right')).fontSize(20).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(18).backgroundColor(this.appSurface()).fontColor(this.appText()).shadow({ radius: 6, color: '#18000000', offsetY: 2 })
           .border({ width: 1, color: '#B8B8B8' }).position({ x: this.editorHandle(true).x - 22, y: this.editorHandle(true).y - 22 })
@@ -1816,14 +1780,8 @@ struct Index {
       if (this.preview.capability?.k === 'worldclock') {
         TimeCapabilitySettings({cap:this.preview.capability!,appDark:this.appDark,onUpdate:(next:CapBlock)=>this.updateExtraCapability(this.preview.id,next)})
       }
-      if (this.preview.capability?.k === 'weather') {
-        TextInput({ text: this.cityValue, placeholder: '城市' }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(16).fontColor(this.appText()).placeholderColor(this.appMuted()).backgroundColor(this.appControl())
-          .onChange((v: string) => { this.cityValue = v; const cap = this.current()?.capability; if (cap !== null && cap !== undefined) { if (cap.city !== v.trim()) { cap.city = v.trim(); cap.temp = '--°'; cap.desc = '未更新'; cap.updatedAt = 0; cap.attemptedAt = 0; cap.refreshState = ''; this.change(); } } })
-          .onSubmit(() => this.refreshWeather())
-        Button(this.weatherBusy ? '更新中' : '更新天气', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.weatherBusy).onClick(() => this.refreshWeather())
-        Text(this.preview.capability?.refreshState === 'failed' ? '暂时无法获取天气，稍后自动重试' : '天气自动更新；打开 App 时会补刷过期数据').fontSize(12).fontColor(this.appMuted()).width('100%')
-      }
-      if(this.preview.capability!==null && ['album','battery','agenda','parcel','fetch','timetable'].includes(this.preview.capability!.k)) {
+
+      if(this.preview.capability!==null && ['album','battery','agenda','fetch','timetable'].includes(this.preview.capability!.k)) {
         CapabilitySettings({cap:this.preview.capability!,cardId:this.preview.id,appDark:this.appDark,onUpdate:(id:string,next:CapBlock)=>this.updateExtraCapability(id,next)})
       }
     }.width('100%')

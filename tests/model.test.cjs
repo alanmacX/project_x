@@ -241,7 +241,7 @@ function load(name) {
   kits['@kit.FormKit'].formProvider.getFormRect=previousRect;
   assert.equal(contrastingInk('#FFFFFF'),'#262824'); assert.equal(contrastingInk('#262824'),'#FFFFFF');
   assert.equal(defaultState().cards.length, 0);
-  assert.deepEqual(CAPABILITIES,['clock','date','calendar','countdown','anniversary','weather','dayprogress','yearprogress','battery','agenda','parcel','fetch','timetable','worldclock','lunar','album']);
+  assert.deepEqual(CAPABILITIES,['clock','date','calendar','countdown','anniversary','dayprogress','yearprogress','battery','agenda','fetch','timetable','worldclock','lunar','album']);
   assert.ok(!CAPABILITIES.includes('np'));
   const legacy = {id:'legacy',w:999,h:-1,x:800,y:-20,z:42,caps:[
     {k:'text',text:'自己的文字 ☕',fs:22}, {k:'clock'}, {k:'countdown',title:'生日',date:'2027-01-01'},
@@ -456,9 +456,9 @@ function load(name) {
   for(const k of CAPABILITIES){const min=capabilityMinimum({k},true),full=capabilityMinimum({k});
     assert.ok(min.w<=full.w && min.h<=full.h);assert.equal(compactCapability({k},min.w,min.h),k!=='timetable','timetable uses a single stable typography layout per mode');
     assert.equal(compactCapability({k},full.w,full.h),false);}
-  const bird=new FridgeCard();bird.shape='subject';bird.w=300;bird.h=360;bird.capability={k:'weather'};
+  const bird=new FridgeCard();bird.shape='subject';bird.w=300;bird.h=360;bird.capability={k:'date'};
   bird.outline=[[{x:.25,y:.2},{x:.75,y:.2},{x:.75,y:.8},{x:.25,y:.8}]];
-  const birdMin=minimumCardSize(bird);assert.ok(birdMin.w<170 && birdMin.h<120,'weather on a half-width silhouette no longer requires a near-maximum card');
+  const birdMin=minimumCardSize(bird);assert.ok(birdMin.w<170 && birdMin.h<120,'date on a half-width silhouette no longer requires a near-maximum card');
   bird.w=birdMin.w;bird.h=birdMin.h;assert.equal(ensureCapabilitySize(bird),true);
   const slot=capabilityPlacement(bird);assert.ok(slot.w*bird.w>=64-.01 && slot.h*bird.h>=48-.01);
   bird.subjectBorder=true;const bordered=safeContentBox(bird);assert.ok(bordered.w<safeContentBox({...bird,subjectBorder:false}).w,'white edge remains within measured box and reserves content space');
@@ -478,11 +478,6 @@ function load(name) {
   assert.equal(normalizeState({cards:[]}).canvasAspect,1);
   kits['@kit.FormKit'].FormExtensionAbility=class {context={};};
   kits['@kit.AbilityKit']={};
-  let weatherResult={temp:'18°',desc:'晴'};
-  kits['../model/WeatherService']={fetchWeather:async city=>{
-    const latest=JSON.parse(disk.get('fridge_state_json'));latest.cards[1].elements[0].text='updated while fetching';disk.set('fridge_state_json',JSON.stringify(latest));
-    return weatherResult;
-  }};
   const FormAbility=load('../form/FridgeFormAbility').default, formAbility=new FormAbility();
   cal.id='action-calendar';custom.id='untouched';custom.elements[0].text='preserved';
   disk.set('fridge_state_json',JSON.stringify({schemaVersion:2,cards:[cal,custom]}));disk.set('fridge_form_dims_json',JSON.stringify({native:'6*4'}));
@@ -490,38 +485,14 @@ function load(name) {
   formAbility.onFormEvent('native','{"cardId":"action-calendar","operation":"nextMonth"}');await formAbility.actionQueue;
   let actionState=JSON.parse(disk.get('fridge_state_json'));assert.equal(actionState.cards[0].capability.calendarOffset,2,'serialized native message actions do not lose increments');
   assert.equal(actionState.cards[1].elements[0].text,'preserved');
-  cal.capability={k:'weather',city:'杭州',temp:'--°'};disk.set('fridge_state_json',JSON.stringify({schemaVersion:2,cards:[cal,custom]}));
-  formAbility.onFormEvent('native','{"cardId":"action-calendar","operation":"refreshWeather"}');await formAbility.actionQueue;
-  actionState=JSON.parse(disk.get('fridge_state_json'));assert.equal(actionState.cards[0].capability.temp,'18°');assert.equal(actionState.cards[0].capability.refreshState,'done');
-  assert.equal(actionState.cards[1].elements[0].text,'updated while fetching','weather refresh re-reads edits made during network I/O');
-  weatherResult=null;formAbility.onFormEvent('native','{"cardId":"action-calendar","operation":"refreshWeather"}');await formAbility.actionQueue;
-  actionState=JSON.parse(disk.get('fridge_state_json'));assert.equal(actionState.cards[0].capability.refreshState,'failed');assert.equal(actionState.cards[0].capability.temp,'18°','failed refresh preserves last real weather');
-  const {weatherNeedsRefresh,WEATHER_REFRESH_MS,WEATHER_RETRY_MS}=load('WeatherRefresh');
-  const now=Date.now();
-  assert.equal(weatherNeedsRefresh({k:'weather',city:'杭州',temp:'--°',updatedAt:now},now),true,'legacy cleared weather must refresh even with a recent timestamp');
-  assert.equal(weatherNeedsRefresh({k:'weather',city:'杭州',temp:'24°',updatedAt:now},now),false);
-  assert.equal(weatherNeedsRefresh({k:'weather',city:'杭州',updatedAt:now-WEATHER_REFRESH_MS},now),true);
-  assert.equal(weatherNeedsRefresh({k:'weather',city:' '},now),false);
-  assert.equal(weatherNeedsRefresh({k:'weather',city:'杭州',refreshState:'failed',attemptedAt:now},now),false);
-  assert.equal(weatherNeedsRefresh({k:'weather',city:'杭州',refreshState:'failed',attemptedAt:now-WEATHER_RETRY_MS},now),true);
-  assert.equal(weatherNeedsRefresh({k:'weather',city:'杭州',refreshState:'refreshing',attemptedAt:now-120000},now),true,'recover refresh interrupted by process exit');
-  weatherResult={temp:'19°',desc:'阴'};actionState.cards[0].capability.updatedAt=1;actionState.cards[0].capability.attemptedAt=1;
-  disk.set('fridge_state_json',JSON.stringify(actionState));
-  formAbility.onUpdateForm('native');await formAbility.actionQueue;
-  actionState=JSON.parse(disk.get('fridge_state_json'));assert.equal(actionState.cards[0].capability.temp,'19°','system refresh fetches real weather instead of replaying old values');
-  const savedAt=actionState.cards[0].capability.updatedAt;
-  formAbility.onUpdateForm('native');await formAbility.actionQueue;
-  actionState=JSON.parse(disk.get('fridge_state_json'));assert.equal(actionState.cards[0].capability.updatedAt,savedAt,'duplicate host callbacks do not fetch fresh data twice');
-  let httpCalls=0;
-  kits['@ohos.net.http']={default:{RequestMethod:{GET:0},HttpDataType:{OBJECT:0},createHttp:()=>({destroy:()=>{},request:async url=>{
-    httpCalls++;await new Promise(resolve=>setTimeout(resolve,2));
-    return {responseCode:200,result:url.includes('geocoding-api')?{results:[{latitude:30,longitude:120}]}:{current:{temperature_2m:24,weather_code:3}}};
-  }})}};
-  const realWeather=load('WeatherService');
-  const results=await Promise.all([realWeather.fetchWeather('Hangzhou'),realWeather.fetchWeather(' Hangzhou ')]);
-  assert.equal(httpCalls,2,'concurrent requests for one city share one geocode and one forecast');
-  assert.equal(results[0].temp,'24°');assert.equal(results[1].desc,'阴');
-  await realWeather.fetchWeather('Hangzhou');assert.equal(httpCalls,3,'later refresh reuses coordinates and still requests fresh forecast');
+  for (const retired of ['parcel']) {
+    const oldCard={...custom,capability:{k:retired,city:'杭州',parcels:[{id:'p',code:'1234'}]}};
+    const migrated=normalizeState({schemaVersion:2,cards:[oldCard]});
+    assert.equal(migrated.cards[0].capability,null);
+    assert.equal(migrated.cards[0].elements[0].text,'preserved','retirement keeps artwork');
+    assert.equal(migrated.cards[0].id,custom.id);
+  }
+  assert.equal(parseCapabilityAction('{"cardId":"action-calendar","operation":"refreshWeather"}'),null);
   const {photoFrame}=load('PhotoCropGeometry');
   for(const [sw,sh] of [[4000,3000],[3000,4000],[4000,700]]) for(const aspect of [.73,1,1.5,2]) for(const zoom of [1,2,5]) for(const [x,y] of [[0,0],[10000,-10000],[-10000,10000]]) {
     const fw=280,fh=280/aspect,f=photoFrame(sw,sh,fw,fh,zoom,x,y),scale=f.width/sw;
@@ -555,5 +526,5 @@ function load(name) {
   await updateWidget('123',JSON.stringify({schemaVersion:2,cards:[albumCard]}),'4*4');
   const albumTransfer=JSON.parse(updates.at(-1).data.faceCards)[0].capability;
   assert.equal(albumTransfer.albumCover,'memory://'+widgetImageKey('album_albumCover',albumCard.capability.albumCover));assert.equal(albumTransfer.albumBackground,'memory://'+widgetImageKey('album_albumBackground',albumCard.capability.albumBackground));assert.equal(closed.length,closedBeforeAlbum+2,'album descriptors released');
-  console.log('PASS: compact/full capability layouts and substantially smaller subject weather minimum; isolated noise/spur cleanup with preserved interior/thin subject; subject white-edge safe bounds; serialized FormExtension calendar actions and weather refresh success/failure preserving concurrent edits; one widget size; app/widget geometry parity across four viewports, preserved card aspect and off-canvas positions, actual FormKit dimensions; TaskPool dispatch and failure cleanup, 1024px decode limit, optimized/reference Gaussian equality; smoothing alpha, tight crop, coordinate preservation, 32 capability minima, thin-shape refusal; safe layout, non-overlap, cropped bounds, resize projection, full-foreground overlay; v2 zero/one capability, legacy migration, canvas content/captions, box constraints, save queue/retry/reload, corrupt-data preservation, image+subject form transfer/cleanup, mask contours/holes/disconnected parts, native segmentation cleanup/failures');
+  console.log('PASS: compact/full capability layouts and substantially smaller subject date minimum; isolated noise/spur cleanup with preserved interior/thin subject; subject white-edge safe bounds; serialized FormExtension calendar actions and retired-capability migration; one widget size; app/widget geometry parity across four viewports, preserved card aspect and off-canvas positions, actual FormKit dimensions; TaskPool dispatch and failure cleanup, 1024px decode limit, optimized/reference Gaussian equality; smoothing alpha, tight crop, coordinate preservation, 32 capability minima, thin-shape refusal; safe layout, non-overlap, cropped bounds, resize projection, full-foreground overlay; v2 zero/one capability, legacy migration, canvas content/captions, box constraints, save queue/retry/reload, corrupt-data preservation, image+subject form transfer/cleanup, mask contours/holes/disconnected parts, native segmentation cleanup/failures');
 })().catch(error => { console.error(error); process.exitCode=1; });

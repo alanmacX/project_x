@@ -1,11 +1,9 @@
-import { CapBlock, AgendaItem, ParcelItem, FridgeCard, materialColors } from './CardSchema';
-import { pendingParcels } from './CapabilityData';
+import { CapBlock, AgendaItem, FridgeCard, materialColors } from './CardSchema';
 /** Stable type hierarchy in card coordinates. Larger cards gain content, not inflated typography. */
 export class SummaryPresentation {
   heading: string = '';
   empty: string = '';
   events: AgendaItem[] = [];
-  parcels: ParcelItem[] = [];
   remaining: number = 0;
 }
 export function summaryRowCapacity(height: number): number {
@@ -13,11 +11,7 @@ export function summaryRowCapacity(height: number): number {
 }
 export function summaryPresentation(cap: CapBlock, height: number, now: number): SummaryPresentation {
   const out = new SummaryPresentation(), capacity = summaryRowCapacity(height);
-  if (cap.k === 'parcel') {
-    const all = pendingParcels(cap); out.heading = '待取包裹 · ' + all.length;
-    out.parcels = all.slice(0, capacity); out.remaining = all.length - out.parcels.length;
-    out.empty = '暂无待取包裹';
-  } else {
+  {
     const all = (cap.events??[]).filter((event)=>event.end>now).slice().sort((a,b)=>a.start-b.start); out.heading = '接下来'; out.events = all.slice(0, capacity);
     out.remaining = all.length - out.events.length;
     out.empty = cap.agendaSource ? '暂无日程' : '尚未添加日程';

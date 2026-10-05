@@ -120,9 +120,6 @@ export struct CapabilityView {
             .fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled))
         }.width('100%').justifyContent(FlexAlign.Center).alignItems(VerticalAlign.Bottom)
         if (!this.compact()) { Text(this.cap.date ?? '').fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(0.6) }
-      } else if (this.cap.k === 'weather') {
-        Text(this.cap.temp ?? '--°').fontSize(((this.compact() ? 24 : 42) * this.unit()) + 'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled))
-        Text(this.cap.refreshState === 'refreshing' ? '更新中' : (this.cap.refreshState === 'failed' ? '更新失败，点按重试' : (this.compact() ? (this.cap.city || '设置城市') : ((this.cap.city || '设置城市') + ' · ' + (this.cap.desc || '未更新'))))).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).width('100%').textAlign(TextAlign.Center).maxLines(this.compact() ? 1 : 2).textOverflow({ overflow: TextOverflow.Ellipsis })
       } else if(this.cap.k==='battery') {
         BatteryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,unit:this.unit(),compact:this.compact()})
       } else if(this.cap.k==='fetch') {
@@ -130,7 +127,7 @@ export struct CapabilityView {
         Text((this.cap.value||'待配置')+(this.cap.value?this.cap.unit??'':'')).fontSize((24*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).minFontSize(16*this.unit()).maxFontSize(24*this.unit()).heightAdaptivePolicy(TextHeightAdaptivePolicy.LAYOUT_CONSTRAINT_FIRST).maxLines(this.compact()?2:3).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').height(Math.max(1,this.contentHeight*this.scaleFactor-20*this.unit())).textAlign(TextAlign.Center)
       } else if(this.cap.k==='timetable') {
         TimetableCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
-      } else if(this.cap.k==='agenda'||this.cap.k==='parcel') {
+      } else if(this.cap.k==='agenda') {
         SummaryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
       } else {
         Text(typeLabel(this.cap.k)).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(0.65)
