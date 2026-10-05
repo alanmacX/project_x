@@ -163,11 +163,11 @@ export function materialColors(material: string, paper: string = '', ink: string
   if (material === 'dark') base = ['#292A28', '#F4F3EF'];
   return [/^#[0-9a-fA-F]{6}$/.test(paper) ? paper : base[0], /^#[0-9a-fA-F]{6}$/.test(ink) ? ink : base[1]];
 }
-export function shapeRadius(shape: string): BorderRadiuses | Length {
+export function shapeRadius(shape: string, scale: number = 1): BorderRadiuses | Length {
   if (shape === 'round') return '50%';
   if (shape === 'pill') return 999;
   if (shape === 'blob') return { topLeft: '28%', topRight: '12%', bottomLeft: '18%', bottomRight: '26%' };
-  return shape === 'subject' ? 0 : 16;
+  return shape === 'subject' ? 0 : 16 * scale;
 }
 export function defaultState(): FridgeState { return new FridgeState(); }
 export function bounded(value: number, min: number, max: number, fallback: number): number {

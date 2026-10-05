@@ -148,3 +148,6 @@ const lessonFloor=g.minimumCardSize(smallLesson),lessonScale=Math.max(lessonFloo
 const lessonSlot=g.capabilityPlacement(smallLesson),lessonInset=g.capabilityInset(smallLesson);assert.ok(m.capabilityFits(smallLesson.capability,lessonSlot.w*smallLesson.w-2*lessonInset,lessonSlot.h*smallLesson.h-2*lessonInset));
 assert.ok(g.ensureCapabilitySize(smallLesson));const beforeLesson=smallLesson.w;assert.ok(g.ensureCapabilitySize(smallLesson));assert.ok(Math.abs(smallLesson.w-beforeLesson)<.001,'reopening cannot progressively inflate compact lesson artwork');
 console.log('PASS small artwork persistence/group floor; compact clock and upcoming lesson keep readable content inside a narrow photo');
+
+const depth=load("CardDepth");
+for(const factor of [.25,.5,1,2,3]) {assert.equal(depth.cardDepthScale(factor)/factor,1,"desktop relief follows the same normalized artwork proportions as app");assert.equal(s.shapeRadius("rect",factor)/factor,16,"rounded substrate corners scale with the same scene");}

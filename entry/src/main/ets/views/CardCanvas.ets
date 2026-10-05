@@ -79,7 +79,7 @@ export struct CardCanvas {
           .blendMode(BlendMode.DST_IN, BlendApplyType.OFFSCREEN)
       }
       }
-    }.width('100%').height('100%').borderRadius(shapeRadius(this.card.shape)).clip(true)
+    }.width('100%').height('100%').borderRadius(shapeRadius(this.card.shape,this.scaleFactor)).clip(true)
       .blendMode(BlendMode.SRC_OVER, this.card.shape === 'subject' ? BlendApplyType.OFFSCREEN : BlendApplyType.FAST)
   }
   private capSurfaceBox(): ElementBox {

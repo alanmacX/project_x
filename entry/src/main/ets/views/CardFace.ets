@@ -42,7 +42,7 @@ export struct CardFace {
         .strokeWidth(this.card.subjectBorder?6*this.scaleFactor:0).strokeLineJoin(LineJoinStyle.Round).antiAlias(true)
         .width('100%').height('100%').blur(radius).translate({y:offset+shadowY}).hitTestBehavior(HitTestMode.None)
     } else {
-      Column().width('100%').height('100%').backgroundColor(color).borderRadius(shapeRadius(this.card.shape))
+      Column().width('100%').height('100%').backgroundColor(color).borderRadius(shapeRadius(this.card.shape,this.scaleFactor))
         .translate({y:offset}).shadow({radius:vp2px(radius),color:shadowColor,offsetY:vp2px(shadowY)}).hitTestBehavior(HitTestMode.None)
     }
   }
@@ -59,9 +59,9 @@ export struct CardFace {
       CardCanvas({ layerMotion:this.layerMotion, card: this.card, scaleFactor: this.scaleFactor, tick: this.tick, widget: this.widget, hideContent: this.hideContent,
         movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
         .width((subjectSurfaceFactor(this.card) * 100) + '%').height((subjectSurfaceFactor(this.card) * 100) + '%')
-        .borderRadius(shapeRadius(this.card.shape)).border({ width: this.card.frame && this.card.shape !== 'subject' ? 3 * this.scaleFactor : 0, color: '#FFFFFF' })
+        .borderRadius(shapeRadius(this.card.shape,this.scaleFactor)).border({ width: this.card.frame && this.card.shape !== 'subject' ? 3 * this.scaleFactor : 0, color: '#FFFFFF' })
       if(this.card.shape!=='subject') {
-        Column().width('100%').height('100%').borderRadius(shapeRadius(this.card.shape))
+        Column().width('100%').height('100%').borderRadius(shapeRadius(this.card.shape,this.scaleFactor))
           .border({width:.6,color:{top:'#88FFFFFF',left:'#48FFFFFF',right:'#14000000',bottom:'#20000000'}})
           .hitTestBehavior(HitTestMode.None)
       }

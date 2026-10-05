@@ -1,5 +1,5 @@
-/** Physical edge stays restrained on large cards and visible in small previews. */
-export function cardDepthScale(scale: number): number { return Math.max(.65,Math.min(1.5,scale)); }
+/** All physical relief scales with artwork, including smaller desktop hosts. */
+export function cardDepthScale(scale: number): number { return Number.isFinite(scale)?Math.max(0,scale):1; }
 export function cardEdgeColor(color: string, photoSubject: boolean): string {
   const source=photoSubject?'#FFFFFF':color;
   if(!/^#[0-9a-fA-F]{6}$/.test(source))return '#D2CEC5';
