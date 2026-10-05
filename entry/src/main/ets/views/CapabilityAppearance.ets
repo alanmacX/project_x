@@ -8,6 +8,7 @@ import { SettingsSegmented } from './SettingsSegmented';
 export struct CapabilityAppearance {
   @Prop card:FridgeCard=new FridgeCard();
   @Prop appDark:boolean=false;
+  @State readingExpanded:boolean=false;
   onCompare:()=>void=()=>{};
   onBlend:(blend:string)=>void=()=>{};
   onArrange:(anchor:string)=>void=()=>{};
@@ -24,14 +25,19 @@ export struct CapabilityAppearance {
           Button(['靠上','居中','靠下'][index],{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).fontSize(13).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.onArrange(anchor))
         },(anchor:string)=>anchor)
       }.width('100%')
+      ColorSetting({label:'内容颜色',color:this.ink(),automatic:!this.card.ink,sourceKey:this.card.id+':ink:',appDark:this.appDark,
+        onPick:(color:string,key:string)=>this.onColorPick(color,key),onFallback:()=>this.onColor()})
+      Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
+        Row(){Text('阅读与融合').fontSize(14).fontColor(AppDesign.text(this.appDark));Blank();SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([AppDesign.muted(this.appDark)]).rotate({angle:this.readingExpanded?180:0})}.width('100%')
+      }.width('100%').height(44).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.getUIContext().animateTo({duration:180,curve:Curve.EaseOut},()=>this.readingExpanded=!this.readingExpanded))
+      if(this.readingExpanded) {
       Text('阅读衬底').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
       SettingsSegmented({labels:['自动','融入底板','始终显示'],selectedIndex:Math.max(0,['auto','plain','surface'].indexOf(this.card.capability?.readingStyle??'auto')),appDark:this.appDark,
         onSelect:(index:number)=>this.onStyle(['auto','plain','surface'][index])})
       SettingsSegmented({labels:['柔光','衬光','描光'],selectedIndex:Math.max(0,['feather','scrim','halo'].indexOf(this.card.capability?.readingBlend??'feather')),appDark:this.appDark,
         onSelect:(index:number)=>this.onBlend(['feather','scrim','halo'][index])})
       Button('对比融合方案',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).width('100%').fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.onCompare())
-      ColorSetting({label:'内容颜色',color:this.ink(),automatic:!this.card.ink,sourceKey:this.card.id+':ink:',appDark:this.appDark,
-        onPick:(color:string,key:string)=>this.onColorPick(color,key),onFallback:()=>this.onColor()})
+      }
       if(readingWarning(this.card)) {Text(readingWarning(this.card)).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
     }.width('100%').padding(16).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(AppDesign.sectionRadius)
   }

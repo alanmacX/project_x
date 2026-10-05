@@ -1,3 +1,4 @@
+import { workspaceLayout } from '../model/WorkspaceLayout';
 import { cardContainsPoint } from '../model/CardHitTest';
 import { SceneSchedulePanel } from '../views/SceneSchedulePanel';
 import { SceneRule, SavedSceneLayout, normalizeSceneRules } from '../model/SceneScheduleSchema';
@@ -45,7 +46,7 @@ import { AppDesign } from '../model/AppDesign';
 import { arrivalOffset } from '../model/ArrivalGeometry';
 import { motionFrameRate } from '../model/MotionPolicy';
 import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode, TextStyleMode, ScrollEffectType, BlurStrategy, hdsMaterial } from '@kit.UIDesignKit';
-import { EditorViewport, editorViewport, editorPreviewPaneHeight } from '../model/EditorViewport';
+import { EditorViewport, editorViewport } from '../model/EditorViewport';
 import { SelectionHandles, selectionHandles } from '../model/SelectionHandles';
 import { CardEditHistory } from '../model/CardEditHistory';
 import { ColorSetting } from '../views/ColorSetting';
@@ -159,7 +160,7 @@ struct Index {
   @State scatter: number = 0;
   @State showBackgroundOptions: boolean = false;
   @State showLayerOptions: boolean = false;
-  private capabilityDialog: CustomDialogController | null = null;
+  @State capabilityPickerOpen:boolean=false;
   private resizeStart: ElementBox = new ElementBox();
   private rotateStart: number = 0;
   private rotationVector: ShapePoint = { x: 0, y: -40 };
@@ -481,8 +482,9 @@ struct Index {
       }
     } finally { this.repairingSubjects = false; }
   }
-  aboutToDisappear(): void { this.capabilityDialog?.close();this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
+  aboutToDisappear(): void { this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
+    if(this.capabilityPickerOpen){this.capabilityPickerOpen=false;return true;}
     if (this.heroActive) return true;
     if (this.viewing) { this.viewing = false; this.selectedId = ''; this.incomingTemplateChanged(); return true; }
     if (this.editing) { this.closeEditor(); return true; }
@@ -493,17 +495,9 @@ struct Index {
     if (this.widgetAspect > 0) { this.canvasDimension = this.widgetDimension || this.canvasDimension; this.canvasAspect = this.widgetAspect; this.layoutBoard(); }
   }
   private layoutBoard(): void {
-    const landscape = this.screenWidth > this.screenHeight;
-    const available = Math.max(180, this.screenHeight - this.safeTop - this.safeBottom - 40);
-    const side = Math.min(320, Math.max(240, this.screenWidth * .3));
-    const width = Math.min(landscape ? this.screenWidth - side - 60 : this.screenWidth - 40,
-      (landscape ? available : Math.max(100, available - 294)) * this.canvasAspect);
-    this.boardScale = width / BOARD_W; this.boardHeight = width / this.canvasAspect;
-    this.boardLeft = landscape ? 20 : (this.screenWidth - width) / 2; this.boardTop = this.safeTop + 20;
-    this.panelLeft = landscape ? this.boardLeft + width + 20 : 20;
-    this.panelTop = landscape ? this.boardTop : this.boardTop + this.boardHeight + 16;
-    this.panelWidth = this.screenWidth - this.panelLeft - 20;
-    this.panelHeight = Math.max(120, this.screenHeight - this.panelTop - this.safeBottom - 20);
+    const layout=workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect);
+    this.boardScale=layout.boardW/BOARD_W;this.boardHeight=layout.boardH;this.boardLeft=layout.boardX;this.boardTop=layout.boardY;
+    this.panelLeft=layout.panelX;this.panelTop=layout.panelY;this.panelWidth=layout.panelW;this.panelHeight=layout.panelH;
   }
   private scatterOffset(id: string, horizontal: boolean): number {
     const card = this.cardMap[id]; if (card === undefined || id === this.selectedId) return 0;
@@ -530,11 +524,9 @@ struct Index {
     }
     this.editorMounted = true;
   }
-  private editorLandscape(): boolean { return this.screenWidth > this.screenHeight; }
-  private editorViewportWidth(): number { return this.editorLandscape() ? this.screenWidth * .48 : this.screenWidth * .57; }
-  private editorBodyHeight(): number { return Math.max(120, this.screenHeight - this.safeTop - this.safeBottom - 76); }
-  private compactEditorLayers(): boolean { return this.editorLandscape() && this.editorBodyHeight()<320; }
-  private previewPaneHeight(): number { return editorPreviewPaneHeight(this.editorBodyHeight(),this.editorLandscape()); }
+  private editorLandscape(): boolean { return workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).wide; }
+  private editorViewportWidth(): number { return workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).previewW; }
+  private previewPaneHeight(): number { return workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).previewH; }
   private editingAngle(): number { return this.preview.rot; }
   private previewViewport(): EditorViewport {
     return editorViewport(this.preview.w, this.preview.h, this.editingAngle(), this.editorViewportWidth(),
@@ -1101,13 +1093,13 @@ struct Index {
                     Stack() {
                       CardFace({card:this.cardMap[id],scaleFactor:Math.min(44/this.cardMap[id].w,44/this.cardMap[id].h),tick:this.tick})
                         .width(this.cardMap[id].w*Math.min(44/this.cardMap[id].w,44/this.cardMap[id].h)).height(this.cardMap[id].h*Math.min(44/this.cardMap[id].w,44/this.cardMap[id].h))
-                    }.width(52).height(52).hitTestBehavior(HitTestMode.None)
+                    }.width(44).height(44).hitTestBehavior(HitTestMode.None)
                     Column({space:4}) {
                       Text(layerLabel(this.cardMap[id])).fontSize(14).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontColor(this.appText()).width('100%')
                       Text((this.orderedCards()[0]?.id===id?'最上层 · ':'')+(this.cardMap[id].capability!==null?typeLabel(this.cardMap[id].capability?.k??''):'自定义')).fontSize(11).fontColor(this.appMuted()).width('100%')
                     }.layoutWeight(1).hitTestBehavior(HitTestMode.None)
                   }.width('100%')
-                }.layoutWeight(1).height(60).padding(0).backgroundColor(Color.Transparent)
+                }.layoutWeight(1).height(48).padding(0).backgroundColor(Color.Transparent)
                   .accessibilityText('选择卡片 '+layerLabel(this.cardMap[id])).onClick(()=>this.selectLayerCard(id))
                 Button('编辑',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(AppDesign.controlHeight).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.groupSelecting&&!this.scheduledName).onClick(()=>this.openEditor(id))
                 Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL,role:ButtonRole.ERROR}) {
@@ -1119,14 +1111,13 @@ struct Index {
   homeLayers() {
       Column({ space: 12 }) {
         Row() {
-          Text(this.scheduledName?'场景图层':'图层').fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText())
-          Blank()
+
           Button({type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
             Row({space:6}) {
-              Text(this.canvasName).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
+              Text(this.canvasName).fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
               SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
             }.width('100%')
-          }.id('shareCanvas').padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).width(Math.min(130,Math.max(64,this.panelWidth-220))).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).margin({right:8}).onClick(()=>{if(this.canvasChanging)return;this.refreshCanvasList();this.canvasCreating=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
+          }.id('shareCanvas').padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).layoutWeight(1).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).margin({right:8}).onClick(()=>{if(this.canvasChanging)return;this.refreshCanvasList();this.canvasCreating=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
             .bindPopup(this.canvasPickerOpen,{builder:this.canvasPicker,placement:Placement.Top,width:this.canvasPopupWidth(),radius:20,systemMaterial:popupMaterial(this.appDark),
               popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:true,autoCancel:true,focusable:true,keyboardAvoidMode:KeyboardAvoidMode.DEFAULT,
               mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible){this.canvasPickerOpen=false;this.canvasCreating=false;}}})
@@ -1173,7 +1164,7 @@ struct Index {
         }.width('100%').padding(8)
         }
         }.width('100%').layoutWeight(1)
-      }.width(this.panelWidth).height(this.panelHeight - 84).padding(12).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
+      }.width(this.panelWidth).height(this.panelHeight - 76).padding(12).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
         .position({ x: this.panelLeft, y: this.panelTop })
   }
   private homeActionHeight():number {return this.groupSelecting?60:this.selectedId.length===0?0:56;}
@@ -1274,8 +1265,8 @@ struct Index {
         .bindSheet(this.backgroundOpen, this.backgroundEditor, { height: SheetSize.LARGE, showClose: true, backgroundColor: this.appBackground(), onDisappear: () => { this.backgroundOpen = false; } })
       Button(this.sharing ? '生成中' : '导入', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).id('importTemplate').height(44).fontSize(13).padding({ left: 12, right: 12 })
         .backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.sharing && !this.backgroundBusy).onClick(() => this.pickTemplate())
-    }.width(this.panelWidth).height(72).padding(8).borderRadius(AppDesign.sectionRadius).border({ width: 1, color: AppDesign.border(this.appDark) }).backgroundColor(this.appSurface())
-      .position({ x: this.panelLeft, y: this.panelTop + this.panelHeight - 72 })
+    }.width(this.panelWidth).height(64).padding(4).borderRadius(AppDesign.sectionRadius).border({ width: 1, color: AppDesign.border(this.appDark) }).backgroundColor(this.appSurface())
+      .position({ x: this.panelLeft, y: this.panelTop + this.panelHeight - 64 })
   }
   @Builder
   backgroundEditor() {
@@ -1502,10 +1493,10 @@ struct Index {
             blurStrategy: BlurStrategy.ADAPTIVE, thermoCtrl: true,
             scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
             scrollEffectStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 },
-              contentStyle: { menuStyle: {textColor:this.appText(),iconColor:this.appText()}, backIconStyle: {textColor:this.appText(),iconColor:this.appText()} } },
+              contentStyle: { menuStyle: {backgroundColor:this.appSurface(),textColor:this.appText(),iconColor:this.appText()}, backIconStyle: {backgroundColor:this.appSurface(),textColor:this.appText(),iconColor:this.appText()} } },
             systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
             originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 },
-              contentStyle: { menuStyle: {textColor:this.appText(),iconColor:this.appText()}, backIconStyle: {textColor:this.appText(),iconColor:this.appText()} } }
+              contentStyle: { menuStyle: {backgroundColor:this.appSurface(),textColor:this.appText(),iconColor:this.appText()}, backIconStyle: {backgroundColor:this.appSurface(),textColor:this.appText(),iconColor:this.appText()} } }
           }
         })
         .bindToScrollable([this.detailScroller]).hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).width('100%').height('100%').backgroundColor(Color.Transparent)
@@ -1526,21 +1517,19 @@ struct Index {
               Column() { this.editorControls(); this.editorInspector() }.layoutWeight(1).height('100%')
             }.width('100%').layoutWeight(1)
           } else {
-            Row({ space: 8 }) {
-              Column() { this.canvasEditor() }.width(this.editorViewportWidth()).height(this.previewPaneHeight())
-              Column() { this.editorLayers() }.layoutWeight(1).height(this.previewPaneHeight())
-            }.width('100%').height(this.previewPaneHeight())
+            this.canvasEditor()
+            this.editorLayers()
             this.editorControls(); this.editorInspector()
           }
         }.width('100%').height('100%').padding({ top: EDITOR_NAV_INSET }).backgroundColor(Color.Transparent)
       }.titleMode(HdsNavigationTitleMode.MINI)
         .titleBar({
           content: {
-            backIcon: { label: '撤销', type: TextStyleMode.NORMAL, isEnabled: this.undoAvailable && !this.heroActive, action: () => this.restoreHistory(false) },
+            backIcon: { icon:new SymbolGlyphModifier($r('sys.symbol.arrow_counterclockwise')).fontColor([this.appText()]),label: '撤销', type: IconStyleMode.NORMAL, isEnabled: this.undoAvailable && !this.heroActive, action: () => this.restoreHistory(false) },
             menu: { maxCount: 4, value: [
               { content: { icon: new SymbolGlyphModifier($r('sys.symbol.rectangle_and_arrowshape_turn_up_right')).fontColor([this.appText()]), label: '分享卡片', type: IconStyleMode.NORMAL, componentId: 'shareCard', isEnabled: !this.sharing && !this.heroActive, action: () => this.shareMenu(true) } },
-              { content: { label: '添加', type: TextStyleMode.NORMAL, isEnabled: !this.heroActive && this.preview.capability?.k!=='album', action: () => this.showAddMenu() } },
-              { content: { label: '重做', type: TextStyleMode.NORMAL, isEnabled: this.redoAvailable && !this.heroActive, action: () => this.restoreHistory(true) } },
+              { content: { icon:new SymbolGlyphModifier($r('sys.symbol.plus')).fontColor([this.appText()]),label: '添加', type: IconStyleMode.NORMAL, isEnabled: !this.heroActive && this.preview.capability?.k!=='album', action: () => this.showAddMenu() } },
+              { content: { icon:new SymbolGlyphModifier($r('sys.symbol.arrow_clockwise')).fontColor([this.appText()]),label: '重做', type: IconStyleMode.NORMAL, isEnabled: this.redoAvailable && !this.heroActive, action: () => this.restoreHistory(true) } },
               { content: { label: '完成', type: TextStyleMode.NORMAL, isEnabled: !this.heroActive, action: () => this.closeEditor() } }
             ] }
           },
@@ -1548,12 +1537,13 @@ struct Index {
             blurStrategy: BlurStrategy.ADAPTIVE, thermoCtrl: true,
             scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
             scrollEffectStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 },
-              contentStyle: { menuStyle: {textColor:this.appText(),iconColor:this.appText()}, backIconStyle: {textColor:this.appText(),iconColor:this.appText()} } },
+              contentStyle: { menuStyle: {backgroundColor:this.appSurface(),textColor:this.appText(),iconColor:this.appText()}, backIconStyle: {backgroundColor:this.appSurface(),textColor:this.appText(),iconColor:this.appText()} } },
             systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
             originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 },
-              contentStyle: { menuStyle: {textColor:this.appText(),iconColor:this.appText()}, backIconStyle: {textColor:this.appText(),iconColor:this.appText()} } }
+              contentStyle: { menuStyle: {backgroundColor:this.appSurface(),textColor:this.appText(),iconColor:this.appText()}, backIconStyle: {backgroundColor:this.appSurface(),textColor:this.appText(),iconColor:this.appText()} } }
           }
         })
+        .bindSheet(this.capabilityPickerOpen,this.capabilityPickerSheet,{height:SheetSize.LARGE,showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>this.capabilityPickerOpen=false})
         .id('editorMotionChrome').bindToScrollable([this.scroller]).hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).width('100%').height('100%').backgroundColor(Color.Transparent)
     }.width('100%').height('100%').padding({ top: this.safeTop + EDITOR_SAFE_GAP }).opacity(this.editorOpacity)
       .hitTestBehavior(!this.editing || this.heroActive ? HitTestMode.None : HitTestMode.Default)
@@ -1584,11 +1574,12 @@ struct Index {
   }
   @Builder
   editorLayers() {
-    Column({ space: 8 }) { this.layersPanel() }
-      .width(this.editorLandscape() ? this.editorViewportWidth() - 32 : this.screenWidth - this.editorViewportWidth() - 24)
-      .height(this.editorLandscape() ? Math.min(148, this.editorBodyHeight() - this.previewPaneHeight() - 16) : this.previewPaneHeight() - 12).padding(12).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
-      .clip(true)
-      .margin({ left: this.editorLandscape() ? 16 : 0, right: 16, bottom: 12 })
+    Row({ space: 8 }) {
+      Text('图层').fontSize(12).fontWeight(FontWeight.Medium).fontColor(this.appMuted()).width(32)
+      Scroll() { Row({ space: 6 }) { this.layerEntries() }.padding(2) }
+        .layoutWeight(1).height(56).scrollable(ScrollDirection.Horizontal).align(Alignment.Start).scrollBar(BarState.Off)
+    }.width(this.editorViewportWidth()-32).height(64).padding({left:12,right:8})
+      .backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).margin({left:16,right:16,top:0,bottom:12})
   }
   @Builder
   editorInspector() {
@@ -1803,16 +1794,11 @@ struct Index {
   @Builder
   layerEntry(id:string) {
     Button({type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
-      if(this.editorLandscape() && !this.compactEditorLayers()) {
-        Column({space:4}) {this.layerThumbnail(id);Text(this.layerTitle(id)).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})}.width('100%').padding(8)
-      } else {
-        Row({space:8}) {
-          this.layerThumbnail(id)
-          Text(this.layerTitle(id)).fontSize(13).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
-          if(this.layerId===id) {SymbolGlyph($r('sys.symbol.checkmark')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}
-        }.width('100%').padding({left:8,right:12})
-      }
-    }.width(this.editorLandscape()?(this.compactEditorLayers()?132:96):'100%').height(this.editorLandscape()&&!this.compactEditorLayers()?76:52)
+      Row({space:6}) {
+        this.layerThumbnail(id)
+        Text(this.layerTitle(id)).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
+      }.width('100%').padding({left:6,right:10})
+    }.width(112).height(48)
       .backgroundColor(this.layerId===id?this.appControl():Color.Transparent)
       .accessibilityText('选择图层 '+this.layerTitle(id)).onClick(()=>this.chooseLayer(id))
   }
@@ -1825,15 +1811,6 @@ struct Index {
     if (this.settingsTab === 1 && this.preview.capability !== null) { this.layerEntry('capability') }
     if(this.settingsTab===0 && this.preview.capability?.k!=='album') {this.layerEntry('')}
     else if(this.preview.capability===null) {this.layerEntry('')}
-    }
-  }
-  @Builder
-  layersPanel() {
-    Text('图层').fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
-    if (this.editorLandscape()) {
-      Scroll() { Row({ space: 8 }) { this.layerEntries() }.padding(2) }.width('100%').layoutWeight(1).scrollable(ScrollDirection.Horizontal).align(Alignment.TopStart).scrollBar(BarState.Off)
-    } else {
-      Scroll() { Column({ space: 8 }) { this.layerEntries() }.width('100%') }.width('100%').layoutWeight(1).scrollable(ScrollDirection.Vertical).align(Alignment.Top).scrollBar(BarState.Off)
     }
   }
   @Builder
@@ -1910,10 +1887,12 @@ struct Index {
     }
   }
   private chooseCapability(): void {
-    const id=this.preview.id;
-    this.capabilityDialog=new CustomDialogController({builder:CapabilityPicker({selected:this.preview.capability?.k??'none',appDark:this.appDark,onChoose:(key:string)=>{
-      if(this.editing && this.preview.id===id)this.setCapability(key);
-    }}),customStyle:true,openAnimation:settingsDialogOpen(),closeAnimation:settingsDialogClose(),autoCancel:true});this.capabilityDialog.open();
+    this.capabilityPickerOpen=true;
+  }
+  @Builder
+  capabilityPickerSheet() {
+    CapabilityPicker({selected:this.preview.capability?.k??'none',appDark:this.appDark,onClose:()=>this.capabilityPickerOpen=false,
+      onChoose:(key:string)=>{if(this.editing&&!this.heroActive)this.setCapability(key);}})
   }
   @Builder
   capabilityPanel() {
