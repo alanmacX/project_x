@@ -927,7 +927,7 @@ struct Index {
   board() {
     Stack({ alignContent: Alignment.TopStart }) {
       Stack({ alignContent: Alignment.TopStart }) {
-        CanvasBackdrop({ sceneBackground: this.canvasBackground, liveFluid: !this.editing && !this.heroActive && !this.appBackgrounded && this.activeBoardId.length === 0 }).width('100%').height('100%')
+        CanvasBackdrop({ sceneBackground: this.canvasBackground }).width('100%').height('100%')
         Column().width('100%').height('100%').onClick(() => { this.selectedId = ''; })
         if (this.cards.length === 0) {
           Text('放一张自己的卡片').fontSize(16).fontColor('#989898').width('100%').height('100%').textAlign(TextAlign.Center).hitTestBehavior(HitTestMode.None)

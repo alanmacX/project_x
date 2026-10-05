@@ -1,6 +1,6 @@
 # FluidGradient
 
-The background renderer in `BackgroundPalette.ets` adapts the radial core, layered compositing and blur design of [Cindori/FluidGradient](https://github.com/Cindori/FluidGradient). The ArkUI compositor implementation in `FluidBackdrop.ets` animates radial layers. The bitmap renderer produces a deterministic pose for FormKit and export. Neither implementation uses Apple CoreAnimation.
+The background renderer in `BackgroundPalette.ets` adapts the radial core, layered compositing and blur design of [Cindori/FluidGradient](https://github.com/Cindori/FluidGradient). The bitmap renderer produces a fixed, blurred light-fold pose shared by the App, FormKit and export. The App displays this bitmap without a separate animated layer. This implementation does not use Apple CoreAnimation.
 
 MIT License
 
