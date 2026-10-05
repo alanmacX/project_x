@@ -1,4 +1,5 @@
 import { FridgeState, FridgeCard, normalizeState, defaultState, BOARD_W, BOARD_H } from './CardSchema';
+import { assertCanvasCapacity } from './CanvasCapacity';
 export interface TemplateSummary { kind: string; count: number; images: number; }
 export interface TemplateAsset { key: string; extension: string; data: string; }
 export interface TemplatePackage { format: string; version: number; kind: string; state: FridgeState; assets: TemplateAsset[]; }
@@ -13,6 +14,7 @@ export function readPackage(json: string): TemplatePackage {
   if(json.length>90*1024*1024)throw new Error('作品包超过大小限制');
   const raw=JSON.parse(json) as TemplatePackage;
   if(raw.format!=='fridgememo-template'||raw.version!==1||!['card','canvas'].includes(raw.kind)||raw.state?.schemaVersion!==2||!Array.isArray(raw.state?.cards)||raw.state.cards.length>128||!Array.isArray(raw.assets)||raw.assets.length>256)throw new Error('不是支持的作品包');
+  assertCanvasCapacity(0, raw.state.cards.length);
   if(raw.kind==='card'&&raw.state.cards.length!==1)throw new Error('卡片包内容不完整');
   const keys:string[]=[];for(const a of raw.assets){if(typeof a.key!=='string'||keys.includes(a.key)||!/^asset:\/\/\d+$/.test(a.key)||!/^\.(png|jpg|jpeg|gif|webp)$/.test(a.extension)||typeof a.data!=='string'||a.data.length>32*1024*1024)throw new Error('作品图片无效');keys.push(a.key);}
   const refs:string[]=[raw.state.background?.src??'',raw.state.background?.photo??''];

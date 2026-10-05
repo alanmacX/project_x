@@ -1,4 +1,5 @@
 import { CanvasCatalog, CanvasDocument, canvasKey, readCatalog, cloneCanvas } from './CanvasLibrary';
+import { assertCanvasCapacity } from './CanvasCapacity';
 import { cleanGroups } from './CardGroups';
 import { LatestWidgetQueue } from './LatestWidgetQueue';
 import { primeRenderContours } from './RenderContours';
@@ -52,6 +53,7 @@ export class FridgeStore {
     return normalizeState(raw);
   }
   createCanvas(name: string, source?: FridgeState): string {
+    assertCanvasCapacity(0, source?.cards.length ?? 0);
     const id = 'canvas_' + Date.now() + '_' + (++this.sequence);
     const doc = new CanvasDocument(); doc.id = id; doc.name = name.trim().slice(0,40) || '新画布';
     doc.state = source === undefined ? defaultState() : cloneCanvas(source, id); doc.state.canvasId = id;
@@ -128,7 +130,12 @@ export class FridgeStore {
   nextZ(): number { return ++this.state.maxZ; }
   bringToFront(card: FridgeCard): void { card.z = this.nextZ(); }
   findCard(id: string): FridgeCard | null { return this.state.cards.find((c: FridgeCard) => c.id === id) ?? null; }
-  addCard(card: FridgeCard): void { card.z = this.nextZ(); this.state.cards.push(card); }
+  addCard(card: FridgeCard): void { this.addCards([card]); }
+  /** Validate the whole import before assigning layers or mutating the canvas. */
+  addCards(cards: FridgeCard[]): void {
+    assertCanvasCapacity(this.state.cards.length, cards.length);
+    for (const card of cards) { card.z = this.nextZ(); this.state.cards.push(card); }
+  }
   removeCard(id: string): void { this.state.cards = this.state.cards.filter((c: FridgeCard) => c.id !== id); }
   newId(): string { return 'c' + Date.now() + '_' + (++this.sequence); }
 }

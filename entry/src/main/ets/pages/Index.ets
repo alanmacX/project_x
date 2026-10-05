@@ -1,4 +1,5 @@
 import { image } from '@kit.ImageKit';
+import { assertCanvasCapacity, CANVAS_CARD_TARGET, CANVAS_CARD_LIMIT, canvasCapacityHint } from '../model/CanvasCapacity';
 import { SymbolGlyphModifier, FrameCallback } from '@kit.ArkUI';
 import { immersiveChrome, prepareChromeMaterial } from '../model/ChromeMaterial';
 import { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
@@ -257,7 +258,7 @@ struct Index {
     } catch (e) { this.templateError('画布切换未完成',e as Error); }
   }
   private async newCanvas(duplicate: boolean, name: string = ''): Promise<void> {
-    if(this.canvasChanging)return;this.canvasChanging=true;
+    if(this.canvasChanging || this.busy || this.sharing)return;this.canvasChanging=true;
     try {
       await this.store.save(false);this.backgroundGeneration++;
       const source = duplicate ? this.store.state : undefined;
@@ -669,7 +670,12 @@ struct Index {
   private clamp(card: FridgeCard): void {
     clampCardGeometry(card);
   }
+  private canAddCards(count: number): boolean {
+    try { assertCanvasCapacity(this.store.state.cards.length, count); return true; }
+    catch (e) { this.getUIContext().getPromptAction().showToast({message:(e as Error).message}); return false; }
+  }
   private addCard(): void {
+    if (this.busy || this.canvasChanging || !this.canAddCards(1)) return;
     const card = new FridgeCard(); card.id = this.store.newId();
     const offset = (this.cards.length % 6) * 20; card.x += offset; card.y += offset;
     this.clamp(card); this.store.addCard(card); this.select(card.id); this.change(); this.openEditor(card.id, true);
@@ -713,6 +719,7 @@ struct Index {
     this.layerId = ''; this.syncFields(); this.change();
   }
   private duplicate(): void {
+    if (this.busy || this.canvasChanging || !this.canAddCards(1)) return;
     const card = this.current(); if (card === null) return;
     const copy = JSON.parse(JSON.stringify(card)) as FridgeCard; copy.id = this.store.newId(); copy.groupId = ''; copy.x += 16; copy.y += 16;
     copy.elements.forEach((e: CanvasElement) => { e.id = this.store.newId(); });
@@ -1017,7 +1024,8 @@ struct Index {
   homeLayers() {
       Column({ space: 12 }) {
         Row() {
-          Text('图层').fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText()); Blank()
+          Text('图层').fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText())
+          Blank()
           Button({type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
             Row({space:6}) {
               Text(this.canvasName).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
@@ -1030,6 +1038,13 @@ struct Index {
           Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).margin({ right: 8 }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
           Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([Color.White]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(24).backgroundColor('#262626').fontColor(Color.White).accessibilityText('添加卡片').onClick(() => this.addCard())
         }.width('100%')
+        if (this.cards.length >= CANVAS_CARD_TARGET) {
+          Row({space:8}) {
+            Text(this.cards.length + ' / ' + CANVAS_CARD_LIMIT).fontSize(12).fontColor(this.appMuted())
+              .accessibilityText('当前画布 '+this.cards.length+' 张卡片，最多 '+CANVAS_CARD_LIMIT+' 张')
+            Text(canvasCapacityHint(this.cards.length)).fontSize(12).fontColor(this.appMuted()).layoutWeight(1).maxLines(2)
+          }.width('100%')
+        }
         Stack({ alignContent: Alignment.Bottom }) {
         Scroll() {
           Column({ space: 8 }) {
@@ -1267,19 +1282,21 @@ struct Index {
   }
   private async reviewTemplate(uri:string):Promise<void>{
     try{const summary=JSON.parse(await taskpool.execute(new taskpool.Task(inspectTemplate,uri)) as string) as TemplateSummary;
+      assertCanvasCapacity(summary.kind==='canvas'?0:this.store.state.cards.length,summary.count);
       this.getUIContext().showAlertDialog({title:summary.kind==='card'?'导入卡片':'导入画布',message:summary.count+' 张卡片，'+summary.images+' 个图片资源。'+(summary.kind==='canvas'?'保存为独立画布，保留现有作品。':'添加到当前画布。'),primaryButton:{value:'取消',action:()=>{}},secondaryButton:{value:summary.kind==='canvas'?'保存新画布':'添加到画布',action:()=>{this.importTemplate(uri,summary.kind);}}});
     }catch(e){this.templateError('无法导入',e as Error);}
   }
   private async importTemplate(uri:string,kind:string):Promise<void>{
-    if(this.context===null)return;
-    try{this.busy=true;const state=normalizeState(JSON.parse(await taskpool.execute(new taskpool.Task(materializeTemplateUri,uri,this.context.filesDir)) as string) as FridgeState);
+    if(this.context===null || this.busy || this.sharing || this.canvasChanging)return;
+    try{this.busy=true;const available=kind==='canvas'?CANVAS_CARD_LIMIT:Math.max(0,CANVAS_CARD_LIMIT-this.store.state.cards.length);
+      const state=normalizeState(JSON.parse(await taskpool.execute(new taskpool.Task(materializeTemplateUri,uri,this.context.filesDir,available)) as string) as FridgeState);
       const cards=importedCards(state,()=>this.store.newId());
       if(kind==='canvas') {
         await this.store.save(false); this.backgroundGeneration++; fitImportedCanvas(cards,state.canvasAspect,this.canvasAspect); state.cards=cards; state.canvasAspect=this.canvasAspect;
         const id=this.store.createCanvas('导入的画布',state); this.busy=false; await this.chooseCanvas(id); return;
       }
       if(kind==='card'&&cards.length===1){cards[0].x=Math.max(0,(BOARD_W-cards[0].w)/2);cards[0].y=Math.max(0,(BOARD_H-cards[0].h)/2);}
-      for(const c of cards.slice().sort((a:FridgeCard,b:FridgeCard)=>a.z-b.z)){this.clamp(c);this.store.addCard(c);}this.render();this.persist(true);this.scheduleBackground();
+      cards.forEach((c:FridgeCard)=>this.clamp(c));this.store.addCards(cards.slice().sort((a:FridgeCard,b:FridgeCard)=>a.z-b.z));this.render();this.persist(true);this.scheduleBackground();
       if(cards.length>0)this.select(cards[0].id);
     }catch(e){this.templateError('导入未完成',e as Error);}finally{this.busy=false;}
   }
