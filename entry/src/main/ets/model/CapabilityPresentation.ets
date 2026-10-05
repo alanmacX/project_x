@@ -44,13 +44,13 @@ export function readingWarning(card:FridgeCard):string {
 
 /** A transparent field, not a panel. Glyph halos supply local contrast without
  * replacing the photograph with a nearly opaque rectangular surface. */
-export function readingVeilColor(ink: string, strength: number): string {
-  const alpha = Math.round(Math.max(0, Math.min(.42, strength)) * 255);
+export function readingVeilColor(ink: string, strength: number, blend:string = 'feather'): string {
+  const alpha = Math.round(Math.max(0, Math.min(blend==='scrim'?.72:.42, strength)) * 255);
   return '#' + alpha.toString(16).padStart(2, '0') + readingSurfaceColor(ink).slice(1);
 }
-export function readingHalo(ink: string, scale: number, enabled: boolean): ShadowOptions[] {
+export function readingHalo(ink: string, scale: number, enabled: boolean, blend:string = 'feather'): ShadowOptions[] {
   if (!enabled) return [];
   const color = '#D9' + readingSurfaceColor(ink).slice(1);
-  return [{ radius: .65 * scale, color: color, offsetX: 0, offsetY: 0 },
-    { radius: 1.8 * scale, color: color, offsetX: 0, offsetY: 0 }];
+  return [{ radius: (blend==='halo'?1.1:.65) * scale, color: color, offsetX: 0, offsetY: 0 },
+    { radius: (blend==='halo'?2.2:1.8) * scale, color: color, offsetX: 0, offsetY: 0 }];
 }

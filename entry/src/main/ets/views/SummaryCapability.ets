@@ -21,16 +21,16 @@ export struct SummaryCapability {
   build() {
     Column({space:8*this.s()}) {
       Row() {
-        Text(this.presentation.heading).fontSize(11*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.s(), this.readingHaloEnabled)).opacity(.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
-        if(this.presentation.remaining>0) { Text('+'+this.presentation.remaining).fontSize(11*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.s(), this.readingHaloEnabled)).opacity(.65) }
+        Text(this.presentation.heading).fontSize(11*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.s(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
+        if(this.presentation.remaining>0) { Text('+'+this.presentation.remaining).fontSize(11*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.s(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.65) }
       }.width('100%').height(16*this.s())
       if(!this.presentation.events.length) {
-        Text(this.presentation.empty).fontSize(16*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.s(), this.readingHaloEnabled)).maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
+        Text(this.presentation.empty).fontSize(16*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.s(), this.readingHaloEnabled,this.cap.readingBlend)).maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
       }
       ForEach(this.presentation.events,(e:AgendaItem)=>{
         Column({space:3*this.s()}) {
-          Text(e.title).fontSize(16*this.s()).minFontSize(14*this.s()).maxFontSize(16*this.s()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.s(), this.readingHaloEnabled)).width('100%')
-          Text(eventWhen(e,this.tick||Date.now())+(e.location?' · '+e.location:'')).fontSize(11*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.s(), this.readingHaloEnabled)).opacity(.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
+          Text(e.title).fontSize(16*this.s()).minFontSize(14*this.s()).maxFontSize(16*this.s()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.s(), this.readingHaloEnabled,this.cap.readingBlend)).width('100%')
+          Text(eventWhen(e,this.tick||Date.now())+(e.location?' · '+e.location:'')).fontSize(11*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.s(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
         }.width('100%').height(40*this.s()).alignItems(HorizontalAlign.Start)
       },(e:AgendaItem)=>e.id)
     }.width('100%').height('100%').justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Start)

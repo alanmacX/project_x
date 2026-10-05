@@ -1,3 +1,4 @@
+import { EditorLayerMotion } from '../model/EditorLayerMotion';
 import { contourPath } from '../model/ContourPath';
 import { cardOutline } from '../model/RenderContours';
 import { FridgeCard, materialColors, shapeRadius } from '../model/CardSchema';
@@ -13,6 +14,7 @@ export struct CardFace {
   @Prop lifted: boolean = false;
   @Prop widget: boolean = false;
   @Prop hideContent: boolean = false;
+  @State layerMotion: EditorLayerMotion = new EditorLayerMotion();
   @Prop movingLayerId: string = '';
   @Prop moveX: number = 0;
   @Prop moveY: number = 0;
@@ -48,11 +50,13 @@ export struct CardFace {
     Stack() {
       // Soft cast shadow + tight contact shadow + a solid, slightly warm sidewall.
       // The cached face owns these layers; pan/rotation only transform its texture.
+      Stack() {
       this.backing(this.edge(),2*this.depthScale(),(this.lifted?9:5.5)*this.depthScale(),this.lifted?'#38000000':'#30000000',(this.lifted?7:4)*this.depthScale())
       this.backing(this.edge(),2*this.depthScale(),1.4*this.depthScale(),'#48000000',1.2*this.depthScale())
       this.backing(this.edge(),2*this.depthScale(),0,'#00000000',0)
       this.backing(this.card.shape==='subject'&&this.card.subjectPhoto?'#FFFFFF':this.paper(),0,0,'#00000000',0)
-      CardCanvas({ card: this.card, scaleFactor: this.scaleFactor, tick: this.tick, widget: this.widget, hideContent: this.hideContent,
+      }.width('100%').height('100%').renderGroup(true)
+      CardCanvas({ layerMotion:this.layerMotion, card: this.card, scaleFactor: this.scaleFactor, tick: this.tick, widget: this.widget, hideContent: this.hideContent,
         movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
         .width((subjectSurfaceFactor(this.card) * 100) + '%').height((subjectSurfaceFactor(this.card) * 100) + '%')
         .borderRadius(shapeRadius(this.card.shape)).border({ width: this.card.frame && this.card.shape !== 'subject' ? 3 * this.scaleFactor : 0, color: '#FFFFFF' })

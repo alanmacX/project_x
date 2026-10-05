@@ -41,6 +41,13 @@ for(const ink of ['#262824','#FFFFFF','#777777','#AA4455','#FFDD00','#000000','#
  assert.ok(p.textContrast(ink,p.readingSurfaceColor(ink))>=4.5,'glyph halo chooses the contrasting luminance');
  assert.equal(p.readingHalo(ink,1,false).length,0,'plain solid cards need no extra text effects');
 }
+for(const blend of ['feather','scrim','halo']) {
+ const input=new s.FridgeState(),card=new s.FridgeCard();card.capability={k:'clock',readingBlend:blend,readingStyle:'surface'};input.cards=[card];
+ const restored=s.normalizeState(JSON.parse(JSON.stringify(input)));
+ assert.equal(restored.cards[0].capability.readingBlend,blend,'reading comparison choice survives storage/import normalization');
+ const maxAlpha=parseInt(p.readingVeilColor('#FFFFFF',1,blend).slice(1,3),16)/255;
+ assert.ok(maxAlpha<=(blend==='scrim'?.722:.421));assert.equal(p.readingVeilColor('#FFFFFF',0,blend).slice(1,3),'00');
+}
 const shape=new s.FridgeCard();shape.shape='subject';shape.subjectBorder=false;shape.w=300;shape.h=300;shape.capability={k:'clock'};
 shape.outline=[[{x:0,y:0},{x:1,y:0},{x:1,y:.4},{x:.4,y:.4},{x:.4,y:1},{x:0,y:1}]];
 shape.capBox={x:.08,y:.7,w:.28,h:.14,rot:0,opacity:1};const placed=g.capabilityPlacement(shape);assert.ok(Math.abs(placed.y-.7)<.001,'requested lower arm remains outside the largest upper rectangle');

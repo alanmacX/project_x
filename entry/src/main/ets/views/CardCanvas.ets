@@ -1,3 +1,4 @@
+import { EditorLayerMotion } from '../model/EditorLayerMotion';
 import { AlbumCapability } from './AlbumCapability';
 import { readingSurface, readingVeilColor } from '../model/CapabilityPresentation';
 import { capabilityInset } from '../model/CanvasLayout';
@@ -32,6 +33,22 @@ export struct ElementView {
   }
 }
 
+@Component
+struct CanvasElementLayer {
+  @ObjectLink motion:EditorLayerMotion;
+  @Prop element:CanvasElement=new CanvasElement();
+  @Prop ink:string='#262824';
+  @Prop scaleFactor:number=1;
+  @Prop widget:boolean=false;
+  private box():ElementBox {return this.motion.id===this.element.id?this.motion.box:this.element;}
+  build() {
+    Column() {ElementView({element:this.element,ink:this.ink,scaleFactor:this.scaleFactor,widget:this.widget})}
+      .width(this.box().w*100+'%').height(this.box().h*100+'%')
+      .position({x:this.box().x*100+'%',y:this.box().y*100+'%'})
+      .rotate({angle:this.box().rot}).opacity(this.box().opacity).renderGroup(!this.element.animated)
+  }
+}
+
 /** Render-only component: positions are relative to each card's own little canvas. */
 @Component
 export struct CardCanvas {
@@ -40,6 +57,7 @@ export struct CardCanvas {
   @Prop widget: boolean = false;
   @Prop hideContent: boolean = false;
   @Prop tick: number = 0;
+  @State layerMotion: EditorLayerMotion = new EditorLayerMotion();
   @Prop movingLayerId: string = '';
   @Prop moveX: number = 0;
   @Prop moveY: number = 0;
@@ -74,14 +92,14 @@ export struct CardCanvas {
   @Builder
   capabilityContent() {
     Stack() {
-      if(this.hasReadingSurface()) {
+      if(this.hasReadingSurface() && this.card.capability?.readingBlend!=='halo') {
         // Feather the entire field to zero before its perimeter. No border,
         // backdrop blur or additional offscreen material pass per capability.
         Column().width('100%').height('100%')
           .radialGradient({center:['50%','50%'],radius:'50%',colors:[
-            [readingVeilColor(this.capabilityInk(), .42), 0],
-            [readingVeilColor(this.capabilityInk(), .30), .38],
-            [readingVeilColor(this.capabilityInk(), .10), .72],
+            [readingVeilColor(this.capabilityInk(), this.card.capability?.readingBlend==='scrim'?.70:.42,this.card.capability?.readingBlend), 0],
+            [readingVeilColor(this.capabilityInk(), this.card.capability?.readingBlend==='scrim'?.62:.30,this.card.capability?.readingBlend), .38],
+            [readingVeilColor(this.capabilityInk(), this.card.capability?.readingBlend==='scrim'?.22:.12,this.card.capability?.readingBlend), .72],
             [readingVeilColor(this.capabilityInk(), 0), 1]]})
           .scale({x:1.45,y:1.45})
           .hitTestBehavior(HitTestMode.None)
@@ -98,11 +116,7 @@ export struct CardCanvas {
   @Builder
   canvasElements(behind: boolean) {
     ForEach(this.card.elements.filter((el: CanvasElement) => el.behindCapability === behind).map((el: CanvasElement) => el.id), (id: string) => {
-        Column() { ElementView({ element: this.elementFor(id), ink: materialColors(this.card.material, this.card.paper, this.card.ink)[1], scaleFactor: this.scaleFactor, widget: this.widget }) }
-          .width((this.elementFor(id).w * 100) + '%').height((this.elementFor(id).h * 100) + '%')
-          .position({ x: (this.elementFor(id).x * 100) + '%', y: (this.elementFor(id).y * 100) + '%' })
-          .translate({ x: this.movingLayerId === id ? this.moveX : 0, y: this.movingLayerId === id ? this.moveY : 0 })
-          .rotate({ angle: this.elementFor(id).rot }).opacity(this.elementFor(id).opacity)
+        CanvasElementLayer({motion:this.layerMotion,element:this.elementFor(id),ink:materialColors(this.card.material,this.card.paper,this.card.ink)[1],scaleFactor:this.scaleFactor,widget:this.widget})
       }, (id: string) => id)
   }
 

@@ -20,6 +20,12 @@ async function loadMaterial():Promise<void> {
   } catch (_) { /* Native styling and the contrast tint remain usable without material support. */ }
 }
 export function chromeMaterial():uiMaterial.ImmersiveMaterial|undefined {return chrome;}
+const popupMaterials=new Map<string,uiMaterial.ImmersiveMaterial>();
+export function popupMaterial(dark:boolean):uiMaterial.ImmersiveMaterial|undefined {
+  if(factory===undefined)return undefined;
+  const tint=dark?'#E62C2B27':'#E6F6F2E9';
+  let material=popupMaterials.get(tint);if(material===undefined){material=factory(tint,true);popupMaterials.set(tint,material);}return material;
+}
 const readingMaterials=new Map<string,uiMaterial.ImmersiveMaterial>();
 export function readingMaterial(tint:string):uiMaterial.ImmersiveMaterial|undefined {
   if(factory===undefined)return undefined;

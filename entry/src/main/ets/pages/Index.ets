@@ -1,8 +1,10 @@
+import { EditorLayerMotion } from '../model/EditorLayerMotion';
+import { EditorLayerTarget, EditorLayerHandles } from '../views/EditorLayerControls';
 import { startupMark } from '../model/StartupTrace';
 import { image } from '@kit.ImageKit';
 import { assertCanvasCapacity, CANVAS_CARD_TARGET, CANVAS_CARD_LIMIT, canvasCapacityHint } from '../model/CanvasCapacity';
 import { SymbolGlyphModifier, FrameCallback } from '@kit.ArkUI';
-import { chromeMaterial, immersiveChrome, prepareChromeMaterial } from '../model/ChromeMaterial';
+import { chromeMaterial, popupMaterial, immersiveChrome, prepareChromeMaterial } from '../model/ChromeMaterial';
 import { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
 import { SettingsSelect } from '../views/SettingsSelect';
 import { SettingsSegmented } from '../views/SettingsSegmented';
@@ -102,6 +104,7 @@ struct Index {
   private maintenanceTimer: number = -1;
   @State arriving: boolean = false;
   @State arrival: number = 0;
+  @State private layerMotion:EditorLayerMotion = new EditorLayerMotion();
   private saveTimer: number = -1;
   private previewTimer: number = -1;
   private alive: boolean = true;
@@ -212,7 +215,7 @@ struct Index {
     this.alive = true;
     this.context = this.getUIContext().getHostContext() ?? null;
     this.initialize();
-    this.clockTimer = setInterval(() => { this.tick = Date.now();  this.refreshCapabilities(); }, 60000);
+    this.clockTimer = setInterval(() => { if(this.gestureGroup.length>0)return;this.tick = Date.now();  this.refreshCapabilities(); }, 60000);
     this.batteryObserver.start(()=>this.refreshCapabilities());
   }
   private initialize(): void {
@@ -297,16 +300,16 @@ struct Index {
         if (this.canvasCreating) {
           Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
             SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
-          }.width(44).height(44).accessibilityText('返回画布列表').onClick(()=>this.canvasCreating=false)
+          }.width(44).height(44).backgroundColor(Color.Transparent).accessibilityText('返回画布列表').onClick(()=>this.canvasCreating=false)
         }
         Text(this.canvasCreating?'新建画布':'我的画布').fontSize(18).fontWeight(FontWeight.Medium).fontColor(this.appText()).layoutWeight(1)
         Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
           SymbolGlyph($r('sys.symbol.xmark')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
-        }.width(44).height(44).accessibilityText('关闭画布菜单').onClick(()=>this.canvasPickerOpen=false)
+        }.width(44).height(44).backgroundColor(Color.Transparent).accessibilityText('关闭画布菜单').onClick(()=>this.canvasPickerOpen=false)
       }.width('100%')
       if (this.canvasCreating) {
         TextInput({text:this.canvasDraftName,placeholder:'画布名称'}).height(44).fontColor(this.appText()).placeholderColor(this.appMuted())
-          .backgroundColor(this.appControl()).borderRadius(12).maxLength(30).onChange((value:string)=>this.canvasDraftName=value)
+          .backgroundColor(AppDesign.popupChoice(this.appDark,false)).borderRadius(12).maxLength(30).onChange((value:string)=>this.canvasDraftName=value)
         Text(this.canvasDuplicate?'保留当前布局，创建一份独立副本':'从空白开始，添加你的卡片').fontSize(12).fontColor(this.appMuted()).width('100%')
         Button(this.canvasChanging?'创建中':'创建画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.EMPHASIZED})
           .height(44).width('100%').backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).enabled(!this.canvasChanging && this.canvasDraftName.trim().length>0)
@@ -321,30 +324,30 @@ struct Index {
                   Text(this.canvasTitle(id)).fontColor(this.appText()).fontSize(14).layoutWeight(1).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
                   if(id===this.store.state.canvasId) {SymbolGlyph($r('sys.symbol.checkmark')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}
                 }.width('100%')
-              }.layoutWeight(1).height(48).padding({left:12,right:12}).backgroundColor(id===this.store.state.canvasId?this.appControl():Color.Transparent)
+              }.layoutWeight(1).height(48).padding({left:12,right:12}).backgroundColor(AppDesign.popupChoice(this.appDark,id===this.store.state.canvasId))
                 .accessibilityText('切换到 '+this.canvasTitle(id)).onClick(()=>this.chooseCanvas(id))
                 Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
                   SymbolGlyph($r('sys.symbol.rectangle_and_arrowshape_turn_up_right')).fontSize(20).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
-                }.id('shareCanvas_'+id).width(44).height(44).backgroundColor(Color.Transparent).attributeModifier(immersiveChrome(this.appDark)).enabled(!this.sharing)
+                }.id('shareCanvas_'+id).width(44).height(44).backgroundColor(AppDesign.popupChoice(this.appDark,true)).enabled(!this.sharing)
                   .accessibilityText('分享 '+this.canvasTitle(id)).onClick(()=>this.shareCanvasFromPicker(id))
               }.width('100%')
             }
           },(id:string)=>id)
         }.width('100%').height(Math.min(200,Math.max(48,this.canvasEntries.length*52))).scrollBar(BarState.Off)
         Row({space:8}) {
-          Button('新画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(()=>this.prepareCanvas(false))
-          Button('复制画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(()=>this.prepareCanvas(true))
+          Button('新画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).backgroundColor(AppDesign.popupChoice(this.appDark,false)).fontColor(this.appText()).onClick(()=>this.prepareCanvas(false))
+          Button('复制画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).backgroundColor(AppDesign.popupChoice(this.appDark,false)).fontColor(this.appText()).onClick(()=>this.prepareCanvas(true))
         }.width('100%')
         Row({space:8}) {
           TextInput({text:this.renameValue,placeholder:'画布名称'}).height(44).layoutWeight(1).fontColor(this.appText()).placeholderColor(this.appMuted())
-            .backgroundColor(this.appControl()).borderRadius(12).maxLength(30).onChange((v:string)=>this.renameValue=v)
+            .backgroundColor(AppDesign.popupChoice(this.appDark,false)).borderRadius(12).maxLength(30).onChange((v:string)=>this.renameValue=v)
           Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
             SymbolGlyph($r('sys.symbol.checkmark')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
-          }.width(44).height(44).enabled(this.renameValue.trim().length>0 && this.renameValue.trim()!==this.canvasName)
+          }.width(44).height(44).backgroundColor(Color.Transparent).enabled(this.renameValue.trim().length>0 && this.renameValue.trim()!==this.canvasName)
             .accessibilityText('保存画布名称').onClick(()=>this.renameCanvas())
           Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL,role:ButtonRole.ERROR}) {
             SymbolGlyph($r('sys.symbol.trash')).fontSize(18).fontColor(['#C43A35']).hitTestBehavior(HitTestMode.None)
-          }.width(44).height(44).enabled(this.canvasEntries.length>1).accessibilityText('删除当前画布')
+          }.width(44).height(44).backgroundColor(Color.Transparent).enabled(this.canvasEntries.length>1).accessibilityText('删除当前画布')
             .onClick(()=>{this.canvasPickerOpen=false;this.deleteCanvas();})
         }.width('100%')
         Text('桌面组件保持各自绑定的画布').fontSize(12).fontColor(this.appMuted()).width('100%')
@@ -520,7 +523,7 @@ struct Index {
   private appBackground(): string { return AppDesign.background(this.appDark); }
   private appSurface(): string { return AppDesign.surface(this.appDark); }
   private appPanel(): string { return this.appBackground(); }
-  private appControl(): string { return this.appBackground(); }
+  private appControl(): string { return AppDesign.control(this.appDark); }
   private appText(): string { return AppDesign.text(this.appDark); }
   private appMuted(): string { return AppDesign.muted(this.appDark); }
   private setHeroPose(rect: SceneRect): void {
@@ -604,7 +607,7 @@ struct Index {
     this.previewTimer = setTimeout(() => { this.previewTimer = -1; if (this.alive) this.render(); }, 16);
   }
   private flushPreview(): void {
-    if (this.previewTimer >= 0) clearTimeout(this.previewTimer); this.previewTimer = -1; this.change(); this.gestureGroup = '';
+    if (this.previewTimer >= 0) clearTimeout(this.previewTimer); this.previewTimer = -1; this.change(); this.layerMotion.clear(); this.layerDrag=''; this.gestureGroup = '';
   }
   private select(id: string, refresh: boolean = false): void {
     if (!refresh && !this.editing && !this.viewing && this.selectedId === id) return;
@@ -811,18 +814,23 @@ struct Index {
     });
   }
   onPageHide(): void { if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); }
+  private compareReading():void {
+    const card=this.current();if(!card?.capability)return;AppStorage.setOrCreate('readingDemoCard',cardViewSnapshot(card));
+    this.getUIContext().getRouter().pushUrl({url:'pages/ReadingDemo'}).catch(()=>{AppStorage.delete('readingDemoCard');if(this.alive)this.getUIContext().getPromptAction().showToast({message:'暂时无法打开对比，请重试'});});
+  }
   onPageShow(): void { this.tick=Date.now();if (this.ready) {this.refreshCapabilities();} }
   private updateExtraCapability(id:string,next:CapBlock):void {
     const card=this.store.findCard(id);if(!card||card.capability?.k!==next.k)return;
     card.capability=next;this.syncFields();this.change();
   }
   private async refreshCapabilities():Promise<void> {
-    if(!this.ready||!this.alive||this.appBackgrounded||this.activeBoardId||this.refreshingCapabilities||!this.context)return;
+    if(!this.ready||!this.alive||this.appBackgrounded||this.activeBoardId||this.gestureGroup.length>0||this.refreshingCapabilities||!this.context)return;
     this.refreshingCapabilities=true;const canvasId=this.store.state.canvasId;
     try {
       for(const card of this.store.state.cards.slice()) {
         const cap=card.capability;if(!needsDataRefresh(cap)||!cap)continue;
         const key=capabilityRequestKey(cap),next=await readCapability(cap,this.context);
+        if(this.gestureGroup.length>0||this.layerDrag.length>0||this.heroActive||this.appBackgrounded)break;
         if(!this.alive||this.store.state.canvasId!==canvasId||this.store.findCard(card.id)!==card||card.capability!==cap||capabilityRequestKey(cap)!==key)continue;
         if(cap.k==='battery'&&cap.percent===next.percent&&cap.charging===next.charging&&cap.chargeState===next.chargeState&&cap.refreshState===next.refreshState)continue;
         if(JSON.stringify(next)===JSON.stringify(cap))continue;card.capability=next;
@@ -890,7 +898,7 @@ struct Index {
         ForEach(this.cardIds, (id: string) => {
           Stack({ alignContent: Alignment.TopStart }) {
             Stack({ alignContent: Alignment.TopStart }) {
-            BoardCard({ controlViewportWidth: BOARD_W * this.boardScale, controlViewportHeight: this.boardHeight, motion: this.boardMotion, card: this.sceneCard(id), localCoordinates: true, scatterAngle: 0, editingSurface: this.editing,
+            BoardCard({ layerMotion:this.layerMotion, controlViewportWidth: BOARD_W * this.boardScale, controlViewportHeight: this.boardHeight, motion: this.boardMotion, card: this.sceneCard(id), localCoordinates: true, scatterAngle: 0, editingSurface: this.editing,
               displayAngle: id === this.selectedId ? this.surfaceAngle() : this.cardMap[id].rot + this.scatter * (this.cardMap[id].z % 2 === 0 ? 9 : -9),
               selected: this.selectedId === id && !this.editing && !this.groupSelecting && this.selectedGroup().length < 2, scaleFactor: this.boardScale, yScaleFactor: this.boardHeight / BOARD_H,
               hideContent: this.editing && id === this.selectedId && (this.heroActive ? this.heroHideContent : this.settingsTab === 0),
@@ -1014,8 +1022,8 @@ struct Index {
               SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
             }.width('100%')
           }.id('shareCanvas').padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).width(Math.min(130,Math.max(64,this.panelWidth-220))).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).margin({right:8}).onClick(()=>{if(this.canvasChanging)return;this.refreshCanvasList();this.canvasCreating=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
-            .bindPopup(this.canvasPickerOpen,{builder:this.canvasPicker,placement:Placement.Top,width:this.canvasPopupWidth(),radius:20,systemMaterial:chromeMaterial(),
-              popupColor:chromeMaterial()!==undefined?(this.appDark?'#CC25231F':'#CCF6F2E9'):this.appSurface(),backgroundBlurStyle:BlurStyle.NONE,enableArrow:true,autoCancel:true,focusable:true,keyboardAvoidMode:KeyboardAvoidMode.DEFAULT,
+            .bindPopup(this.canvasPickerOpen,{builder:this.canvasPicker,placement:Placement.Top,width:this.canvasPopupWidth(),radius:20,systemMaterial:popupMaterial(this.appDark),
+              popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:true,autoCancel:true,focusable:true,keyboardAvoidMode:KeyboardAvoidMode.DEFAULT,
               mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible){this.canvasPickerOpen=false;this.canvasCreating=false;}}})
           Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).margin({ right: 8 }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
           Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([Color.White]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(24).backgroundColor('#262626').fontColor(Color.White).accessibilityText('添加卡片').onClick(() => this.addCard())
@@ -1505,7 +1513,7 @@ struct Index {
               Column() { this.capabilityDataPanel() }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
             }
             if(this.preview.capability!==null) {
-              CapabilityAppearance({card:this.preview,appDark:this.appDark,onArrange:(anchor:string)=>this.arrangeCapability(anchor),onColor:()=>this.chooseColor('ink'),onColorPick:(color:string,key:string)=>this.setCardColor('ink',color,key),onStyle:(style:string)=>{
+              CapabilityAppearance({card:this.preview,appDark:this.appDark,onCompare:()=>this.compareReading(),onBlend:(blend)=>{const card=this.current();if(card?.capability){card.capability.readingBlend=blend;card.capability.readingStyle='surface';this.change();}},onArrange:(anchor:string)=>this.arrangeCapability(anchor),onColor:()=>this.chooseColor('ink'),onColorPick:(color:string,key:string)=>this.setCardColor('ink',color,key),onStyle:(style:string)=>{
                 const card=this.current();if(card?.capability){card.capability.readingStyle=style;this.change();}
               }})
             }
@@ -1527,7 +1535,6 @@ struct Index {
     return selectionHandles(this.touchBox(this.layerId), this.preview.w * this.editorScale(), this.preview.h * this.editorScale(),
       this.editingAngle(), this.editorViewportWidth(), this.editorCanvasHeight(), this.previewViewport().left, this.previewViewport().top);
   }
-  private editorHandle(resize: boolean): ShapePoint { const handles = this.selectionGeometry(); return resize ? handles.resize : handles.rotate; }
   @Builder
   canvasEditor() {
     Stack({ alignContent: Alignment.TopStart }) {
@@ -1540,19 +1547,10 @@ struct Index {
         .rotate({ angle: this.editingAngle(), centerX: 0, centerY: '100%' })
         .position({ x: this.previewViewport().left, y: this.previewViewport().top })
 
-      if (this.preview.capability?.k!=='album' && this.layerId.length > 0 && (this.layerId!=='capability'||this.preview.capability!==null) && this.layerDrag.length === 0) {
-        Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right')).fontSize(20).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(18).backgroundColor(this.appSurface()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark))
-          .border({ width: 1, color: '#B8B8B8' }).position({ x: this.editorHandle(true).x - 22, y: this.editorHandle(true).y - 22 })
-          .accessibilityText('缩放选中元素')
-          .gesture(PanGesture({ distance: 2 }).onActionStart((e: GestureEvent) => this.startTransform(this.layerId, e)).onActionUpdate((e: GestureEvent) => this.resizeElement(e))
-            .onActionEnd((e: GestureEvent) => { this.resizeElement(e); this.flushPreview(); }).onActionCancel(() => this.cancelTransform()))
-        if (this.layerId !== 'capability') {
-          Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(20).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(18).backgroundColor(this.appSurface()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark))
-            .border({ width: 1, color: '#B8B8B8' }).position({ x: this.editorHandle(false).x - 22, y: this.editorHandle(false).y - 22 })
-            .accessibilityText('旋转选中元素')
-            .gesture(PanGesture({ distance: 2 }).onActionStart((e: GestureEvent) => this.startTransform(this.layerId, e)).onActionUpdate((e: GestureEvent) => this.rotateElement(e))
-              .onActionEnd((e: GestureEvent) => { this.rotateElement(e); this.flushPreview(); }).onActionCancel(() => this.cancelTransform()))
-        }
+      if (this.preview.capability?.k!=='album' && this.layerId.length > 0 && (this.layerId!=='capability'||this.preview.capability!==null)  ) {
+        EditorLayerHandles({motion:this.layerMotion,targetId:this.layerId,box:this.boxPreview,factor:this.layerId==='capability'?1:subjectSurfaceFactor(this.preview),
+          contentW:this.preview.w*this.editorScale(),contentH:this.preview.h*this.editorScale(),angle:this.editingAngle(),viewportWidth:this.editorViewportWidth(),viewportHeight:this.editorCanvasHeight(),
+          left:this.previewViewport().left,top:this.previewViewport().top,appDark:this.appDark,onStart:(e)=>this.startTransform(this.layerId,e),onResize:(e)=>this.resizeElement(e),onRotate:(e)=>this.rotateElement(e),onEnd:()=>this.flushPreview(),onCancel:()=>this.cancelTransform()})
       }
 
     }.width('100%').height(this.editorCanvasHeight())
@@ -1565,7 +1563,7 @@ struct Index {
   }
   private finishLayerDrag(cancelled: boolean = false): void {
     if (cancelled) { const box = this.currentBox(); if (box !== null) { box.x = this.layerStartX; box.y = this.layerStartY; } }
-    this.layerDrag = ''; this.layerDX = 0; this.layerDY = 0; this.syncFields(); this.change(); this.gestureGroup = '';
+    this.syncFields(); this.change(); this.layerMotion.clear(); this.layerDrag = ''; this.layerDX = 0; this.layerDY = 0; this.gestureGroup = '';
   }
   private beginFinger(e: GestureEvent, degrees: number): void {
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer); this.saveTimer = -1;
@@ -1590,6 +1588,7 @@ struct Index {
     const box = this.currentBox(); if (box === null) return;
     this.resizeStart = JSON.parse(JSON.stringify(box)) as ElementBox;
     this.rotateStart = box.rot;
+    if(id!=='capability'){this.layerDrag=id;this.layerMotion.update(id,box);}
     const geometry = this.selectionGeometry();
     this.rotationVector = { x: geometry.rotate.x - geometry.pivot.x, y: geometry.rotate.y - geometry.pivot.y };
   }
@@ -1606,7 +1605,7 @@ struct Index {
       const factor = Math.max(.05, (nextW / this.resizeStart.w + nextH / this.resizeStart.h) / 2);
       nextW = this.resizeStart.w * factor; nextH = this.resizeStart.h * factor;
     }
-    const min = cardCapabilityMinimum(this.preview, true,Math.max(0,nextW)*this.preview.w);
+    const min = this.layerId==='capability'?cardCapabilityMinimum(this.preview,true,Math.max(0,nextW)*this.preview.w):new ElementBox();
     const minW = this.layerId === 'capability' ? min.w / this.preview.w : .04;
     const minH = this.layerId === 'capability' ? min.h / this.preview.h : .04;
     if (this.currentElement()?.kind === 'image') {
@@ -1621,7 +1620,7 @@ struct Index {
     const dw = (this.resizeStart.w - box.w) * w, dh = (this.resizeStart.h - box.h) * h;
     box.x = Math.max(0, Math.min(1 - box.w, this.resizeStart.x + (dw * (1 - c) + dh * sn) / (2 * w)));
     box.y = Math.max(0, Math.min(1 - box.h, this.resizeStart.y + (dh * (1 - c) - dw * sn) / (2 * h)));
-    this.continuousChange(SliderChangeMode.Moving);
+    if(this.layerId==='capability')this.continuousChange(SliderChangeMode.Moving);else this.layerMotion.update(this.layerId,box);
   }
   private rotateElement(e: GestureEvent): void {
     const live = this.currentBox(); if (live === null) return;
@@ -1630,7 +1629,7 @@ struct Index {
     if (delta > Math.PI) delta -= 2 * Math.PI; if (delta < -Math.PI) delta += 2 * Math.PI;
     const value = this.rotateStart + delta * 180 / Math.PI;
     live.rot = Math.abs(value - Math.round(value / 15) * 15) < 3 ? Math.round(value / 15) * 15 : value;
-    this.continuousChange(SliderChangeMode.Moving);
+    this.layerMotion.update(this.layerId,live);
   }
   private moveElement(e: GestureEvent): void {
     const live = this.currentBox(); if (live === null) return;
@@ -1646,7 +1645,7 @@ struct Index {
     if (this.layerId !== 'capability' && Math.abs(live.x - centerX) * width < 5) live.x = centerX;
     if (this.layerId !== 'capability' && Math.abs(live.y - centerY) * height < 5) live.y = centerY;
     if(this.layerId==='capability'){const fitted=constrainCapabilityDrag(this.preview,live,previous);live.x=fitted.x;live.y=fitted.y;}
-    this.layerDX = (live.x - this.layerStartX) * width; this.layerDY = (live.y - this.layerStartY) * height;
+    if(this.layerId==='capability'){this.layerMotion.update(this.layerId,live);this.layerDX = (live.x - this.layerStartX) * width; this.layerDY = (live.y - this.layerStartY) * height;}else this.layerMotion.update(this.layerId,live);
   }
   private cancelTransform(): void {
     const box = this.currentBox(); if (box !== null) { box.x = this.resizeStart.x; box.y = this.resizeStart.y; box.w = this.resizeStart.w; box.h = this.resizeStart.h; box.rot = this.resizeStart.rot; }
@@ -1658,20 +1657,15 @@ struct Index {
   }
   @Builder
   layerTouch(id: string) {
-    Stack() {
-      Column().width('100%').height('100%').hitTestBehavior(HitTestMode.None)
-    }.width((this.touchBox(id).w * 100) + '%').height((this.touchBox(id).h * 100) + '%')
-      .position({ x: (this.touchBox(id).x * 100) + '%', y: (this.touchBox(id).y * 100) + '%' })
-      .border({ width: this.layerId === id ? 1 : 0, color: '#7A7A7A' })
-      .translate({ x: this.layerDrag === id ? this.layerDX : 0, y: this.layerDrag === id ? this.layerDY : 0 })
-      .rotate({ angle: this.touchBox(id).rot }).zIndex(this.layerId === id ? 10000 : 0)
-      .onClick(() => { this.layerId = id; this.syncFields(); })
-      .gesture(PanGesture({ distance: 3 }).onActionStart((e: GestureEvent) => {
-        this.layerId = id; this.beginFinger(e, this.editingAngle() + (this.currentBox()?.rot ?? 0)); this.layerDrag = id; const card = this.current();
-        if (id === 'capability' && card !== null) card.capBox = JSON.parse(JSON.stringify(capabilityPlacement(card))) as ElementBox;
-        const live = this.currentBox(); this.layerStartX = live?.x ?? 0; this.layerStartY = live?.y ?? 0; this.syncFields();
-      }).onActionUpdate((e: GestureEvent) => this.moveElement(e)).onActionEnd((e: GestureEvent) => { this.moveElement(e); this.finishLayerDrag(); }).onActionCancel(() => this.finishLayerDrag(true)))
+    EditorLayerTarget({motion:this.layerMotion,targetId:id,box:id==='capability'?capabilityPlacement(this.preview):this.preview.elements.find((el)=>el.id===id)??new ElementBox(),
+      factor:id==='capability'?1:subjectSurfaceFactor(this.preview),selected:this.layerId===id,
+      onSelect:()=>{this.layerId=id;this.syncFields();},onStart:(e)=>{
+        this.layerId=id;this.beginFinger(e,this.editingAngle()+(this.currentBox()?.rot??0));this.layerDrag=id;const card=this.current();
+        if(id==='capability'&&card!==null)card.capBox=JSON.parse(JSON.stringify(capabilityPlacement(card))) as ElementBox;
+        const live=this.currentBox();this.layerStartX=live?.x??0;this.layerStartY=live?.y??0;if(live&&id!=='capability')this.layerMotion.update(id,live);this.syncFields();
+      },onUpdate:(e)=>this.moveElement(e),onEnd:(e)=>{this.moveElement(e);this.finishLayerDrag();},onCancel:()=>this.finishLayerDrag(true)})
   }
+
   private chooseLayer(id: string): void {
     this.layerId = id; this.showLayerOptions = false; this.showBackgroundOptions = id.length === 0;
     this.syncFields(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 });

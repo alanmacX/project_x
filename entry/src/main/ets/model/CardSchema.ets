@@ -22,6 +22,7 @@ export interface CapBlock {
   albumCover?: string;
   albumBackground?: string;
   albumSource?: string;
+  readingBlend?: string; // feather | scrim | halo; identical app/widget/export rendering
   readingStyle?: string; // auto | plain | surface; photo subjects receive a readable backing
   parcelPlace?: string; // user's default local pickup location
   title?: string;
@@ -297,6 +298,7 @@ export function normalizeCapability(raw: CapBlock): CapBlock {
   }
   if (raw.k === 'worldclock') cap.zone = clockZone(typeof raw.zone === 'string' ? raw.zone : '');
   cap.readingStyle = ['plain','surface'].includes(raw.readingStyle ?? '') ? raw.readingStyle : 'auto';
+  cap.readingBlend=['feather','scrim','halo'].includes(raw.readingBlend??'')?raw.readingBlend:'feather';
   cap.parcelPlace = typeof raw.parcelPlace === 'string' ? raw.parcelPlace.slice(0,80) : '';
   cap.title = typeof raw.title === 'string' ? raw.title.slice(0,160) : '';
   cap.interval = Math.round(bounded(raw.interval ?? 60,30,1440,60));

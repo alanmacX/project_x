@@ -8,7 +8,9 @@ export class AppDesign {
   static background(dark: boolean): string { return dark ? '#101113' : '#FFFFFF'; }
   static surface(dark: boolean): string { return dark ? '#25231F' : '#F6F2E9'; }
   static text(dark: boolean): string { return dark ? '#F4F4F4' : '#262824'; }
-  static control(dark: boolean): string { return AppDesign.background(dark); }
+  static control(dark: boolean): string { return dark ? '#363530' : '#FFFFFF'; }
+  static popup(dark:boolean):string { return dark?'#E62C2B27':'#E6F6F2E9'; }
+  static popupChoice(dark:boolean,active:boolean):string { return active?(dark?'#24FFFFFF':'#FFFFFFFF'):'#00000000'; }
   static muted(dark: boolean): string { return dark ? '#A8ADB5' : '#666B73'; }
   static border(dark: boolean): string { return dark ? '#49443C' : '#E4DED2'; }
   static selected(dark: boolean): string { return dark ? '#EEE8DC' : '#30332E'; }
