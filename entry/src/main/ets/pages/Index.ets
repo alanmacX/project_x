@@ -1,3 +1,4 @@
+import { removeStagedTemplate } from '../model/IncomingTemplate';
 import { workspaceLayout } from '../model/WorkspaceLayout';
 import { cardContainsPoint } from '../model/CardHitTest';
 import { SceneSchedulePanel } from '../views/SceneSchedulePanel';
@@ -1263,7 +1264,7 @@ struct Index {
     finally { this.backgroundBusy = false; }
   }
   private openBackgroundCrop(src: string): void {
-    this.photoCropDialog = new CustomDialogController({ builder: PhotoCrop({ source: src, aspect: this.canvasAspect, appDark: this.appDark,
+    this.photoCropDialog = new CustomDialogController({ builder: PhotoCrop({ source: src, aspect: this.canvasAspect, appDark: this.appDark, viewportWidth:this.screenWidth, viewportHeight:this.screenHeight-this.safeTop-this.safeBottom,
       onApply: (zoom: number, x: number, y: number) => { this.commitBackgroundCrop(src, zoom, x, y); } }), customStyle: true, openAnimation: settingsDialogOpen(), closeAnimation: settingsDialogClose(), autoCancel: false });
     this.photoCropDialog.open();
   }
@@ -1443,11 +1444,11 @@ struct Index {
     if(this.templateReviewOpen)return;
     try{const summary=JSON.parse(await taskpool.execute(new taskpool.Task(inspectTemplate,uri)) as string) as TemplateSummary;
       assertCanvasCapacity(summary.kind==='canvas'?0:this.store.state.cards.length,summary.count);
-      if(!this.alive)return;
+      if(!this.alive){if(this.context)removeStagedTemplate(uri,this.context.cacheDir);return;}
       this.templateReviewOpen=true;
-      const finish=():void=>{this.templateReviewOpen=false;this.incomingTemplateChanged();};
+      const finish=():void=>{if(this.context)removeStagedTemplate(uri,this.context.cacheDir);this.templateReviewOpen=false;this.incomingTemplateChanged();};
       this.getUIContext().showAlertDialog({cancel:finish,title:summary.kind==='card'?'导入卡片':'导入画布',message:summary.count+' 张卡片，'+summary.images+' 个图片资源。'+(summary.kind==='canvas'?'保存为独立画布，保留现有作品。':'添加到当前画布。'),primaryButton:{value:'取消',action:finish},secondaryButton:{value:summary.kind==='canvas'?'保存新画布':'添加到画布',action:()=>{this.importTemplate(uri,summary.kind).finally(finish);}}});
-    }catch(e){this.templateReviewOpen=false;this.templateError('无法导入',e as Error);}
+    }catch(e){if(this.context)removeStagedTemplate(uri,this.context.cacheDir);this.templateReviewOpen=false;this.templateError('无法导入',e as Error);}
   }
   private async importTemplate(uri:string,kind:string):Promise<void>{
     if(this.context===null || this.busy || this.sharing || this.canvasChanging)return;

@@ -493,11 +493,17 @@ function load(name) {
     assert.equal(migrated.cards[0].id,custom.id);
   }
   assert.equal(parseCapabilityAction('{"cardId":"action-calendar","operation":"refreshWeather"}'),null);
-  const {photoFrame}=load('PhotoCropGeometry');
+  const {photoFrame,photoCropWidth}=load('PhotoCropGeometry');
   for(const [sw,sh] of [[4000,3000],[3000,4000],[4000,700]]) for(const aspect of [.73,1,1.5,2]) for(const zoom of [1,2,5]) for(const [x,y] of [[0,0],[10000,-10000],[-10000,10000]]) {
     const fw=280,fh=280/aspect,f=photoFrame(sw,sh,fw,fh,zoom,x,y),scale=f.width/sw;
     assert.ok(f.left<=1e-9&&f.top<=1e-9&&f.left+f.width>=fw-1e-9&&f.top+f.height>=fh-1e-9,'crop always covers widget frame');
     assert.ok(-f.left/scale>=-1e-9&&(-f.left+fw)/scale<=sw+1e-7&&(-f.top+fh)/scale<=sh+1e-7,'native crop stays inside source pixels');
+  }
+  for(const [vw,vh] of [[320,568],[390,700],[740,280],[1000,360],[700,1000]])for(const aspect of [.3,.73,1,1.5,3]) {
+    const width=photoCropWidth(vw,vh,aspect),height=width/aspect;
+    assert.ok(width+40<=vw*.94+1e-9&&height+208<=vh+1e-9,'photo frame leaves room for controls in short and narrow windows');
+    const x=37*width/280,y=-28*width/280,preview=photoFrame(4000,3000,width,height,2,x,y),exported=photoFrame(4000,3000,280,280/aspect,2,x*280/width,y*280/width);
+    assert.ok(Math.abs(preview.left/preview.width-exported.left/exported.width)<1e-9&&Math.abs(preview.top/preview.height-exported.top/exported.height)<1e-9,'adaptive preview and canonical export show the same crop');
   }
   const palette=load('BackgroundPalette');
   for(const hex of ['#FF0000','#00FF00','#0000FF','#D8BE92','#262824']){

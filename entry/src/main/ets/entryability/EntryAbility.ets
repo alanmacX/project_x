@@ -3,7 +3,7 @@ import { UIAbility, AbilityConstant, Want, Configuration, ConfigurationConstant 
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { taskpool } from '@kit.ArkTS';
-import { incomingTemplateUri, stageIncomingTemplate } from '../model/IncomingTemplate';
+import { incomingTemplateUri, stageIncomingTemplate, removeStagedTemplate } from '../model/IncomingTemplate';
 
 const TAG: string = 'EntryAbility';
 
@@ -48,19 +48,25 @@ export default class EntryAbility extends UIAbility {
   }
 
   private incomingGeneration: number = 0;
+  private acceptTemplate(uri:string):void {
+    const previous=AppStorage.get<string>('incomingTemplateUri')??'';
+    if(previous!==uri)removeStagedTemplate(previous,this.context.cacheDir);
+    AppStorage.setOrCreate('incomingTemplateUri',uri);
+  }
   private async routeTemplate(want: Want): Promise<void> {
     const owned = want.parameters?.['incomingTemplatePath'];
     const prefix = 'file://' + this.context.cacheDir + '/';
     if (typeof owned === 'string' && owned.startsWith(prefix) && /^received_[0-9]+_[0-9]+\.fridge$/.test(owned.slice(prefix.length))) {
       this.incomingGeneration++;
-      AppStorage.setOrCreate('incomingTemplateUri',owned); return;
+      this.acceptTemplate(owned); return;
     }
     const uri = incomingTemplateUri(want.uri);
     if (!uri || want.action !== 'ohos.want.action.viewData') return;
     const generation = ++this.incomingGeneration;
     try {
       const local = await taskpool.execute(new taskpool.Task(stageIncomingTemplate,uri,this.context.cacheDir)) as string;
-      if (generation === this.incomingGeneration) AppStorage.setOrCreate('incomingTemplateUri',local);
+      if (generation === this.incomingGeneration) this.acceptTemplate(local);
+      else removeStagedTemplate(local,this.context.cacheDir);
     } catch (_) {
       if (generation === this.incomingGeneration) AppStorage.setOrCreate('incomingTemplateError','作品文件无法读取，请保存到本地后从首页导入');
     }

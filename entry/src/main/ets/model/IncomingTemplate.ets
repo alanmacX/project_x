@@ -39,3 +39,10 @@ export async function stageIncomingTemplate(uri: string, cacheDir: string): Prom
     if (output !== null) fileIo.closeSync(output.fd);
   }
 }
+
+/** Only our receiving copy may be removed; selected/sender files are never owned. */
+export function removeStagedTemplate(uri:string,cacheDir:string):void {
+  const prefix='file://'+cacheDir+'/';
+  if(!uri.startsWith(prefix)||!/^received_[0-9]+_[0-9]+\.fridge$/.test(uri.slice(prefix.length)))return;
+  try{fileIo.unlinkSync(uri.slice(7));}catch(_){}
+}

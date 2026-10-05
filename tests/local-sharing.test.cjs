@@ -11,9 +11,13 @@ const io={OpenMode:{READ_ONLY:0,CREATE:1,READ_WRITE:2,TRUNC:4},
 const kits={'@kit.CoreFileKit':{fileIo:io}};
 function load(name){if(cache.has(name))return cache.get(name);const mod={exports:{}};const js=ts.transpileModule(fs.readFileSync(path.join(root,name+'.ets'),'utf8').replace(/^@Concurrent\s*$/gm,''),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;vm.runInThisContext('(function(require,module,exports){'+js+'})')(s=>kits[s]||load(s.replace('./','')),mod,mod.exports);cache.set(name,mod.exports);return mod.exports;}
 (async()=>{
- const {stageIncomingTemplate,incomingTemplateUri}=load('IncomingTemplate');
+ const {stageIncomingTemplate,incomingTemplateUri,removeStagedTemplate}=load('IncomingTemplate');
  const input=Buffer.alloc(700003);for(let i=0;i<input.length;i++)input[i]=i%251;files.set('/sender/works.fridge',input);
  const local=await stageIncomingTemplate('file:///sender/works.fridge','/cache');assert.deepEqual(files.get(local.slice(7)),input,'all bytes survive partial reads AND partial writes');assert.equal(fds.size,0);
+ removeStagedTemplate('file:///sender/works.fridge','/cache');assert.ok(files.has('/sender/works.fridge'),'sender original survives cleanup');
+ for(const uri of ['file:///cache/works.fridge','file:///cache/../sender/works.fridge','file:///cache/received_1_2.fridge/other','https://example.org/received_1_2.fridge'])removeStagedTemplate(uri,'/cache');
+ assert.ok(files.has(local.slice(7)),'only an owned exact receiving copy can be removed');
+ removeStagedTemplate(local,'/cache');assert.ok(!files.has(local.slice(7)),'cancelled receiving copy is deleted');removeStagedTemplate(local,'/cache');
  const saved=files.size;failRead=true;await assert.rejects(stageIncomingTemplate('file:///sender/works.fridge','/cache'),/未读取完整/);failRead=false;assert.equal(files.size,saved);assert.equal(fds.size,0);
  failWrite=true;await assert.rejects(stageIncomingTemplate('file:///sender/works.fridge','/cache'),/保存失败/);failWrite=false;assert.equal(files.size,saved);assert.equal(fds.size,0);
  oversize=true;await assert.rejects(stageIncomingTemplate('file:///sender/works.fridge','/cache'),/90MB/);oversize=false;assert.equal(files.size,saved);assert.equal(fds.size,0);

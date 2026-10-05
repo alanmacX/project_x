@@ -7,3 +7,9 @@ export function photoFrame(sourceW: number, sourceH: number, frameW: number, fra
   result.top = (frameH - result.height) / 2 + Math.max(-(result.height - frameH) / 2, Math.min((result.height - frameH) / 2, y));
   return result;
 }
+
+/** Keep crop controls visible in a short window; export offsets still use 280 vp. */
+export function photoCropWidth(viewportW:number, viewportH:number, aspect:number):number {
+  const ratio=Number.isFinite(aspect)&&aspect>0?aspect:1;
+  return Math.max(16,Math.min(280,viewportW*.94-40,(viewportH-208)*ratio));
+}
