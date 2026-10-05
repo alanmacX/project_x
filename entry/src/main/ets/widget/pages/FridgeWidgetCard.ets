@@ -6,12 +6,56 @@ import { scenePercent } from '../../model/SceneLayout';
 import { widgetHit, widgetCanvasPoint } from '../../model/WidgetHitTest';
 import { CardFace } from '../../views/CardFace';
 
+interface WidgetScenePacket {cards:string;background:string;canvasId:string;context:string;rev:number;}
+interface WidgetSceneContext {ruleId:string;occurrence:string;baseId:string;focusId:string;}
 @Entry
 @Component
 struct FridgeWidgetCard {
+  @LocalStorageProp('scenePacket') @Watch('syncPacket') packetJson:string='';
+  @State scenePhase:number=0;
+  @State focusId:string='';
+  private displayCanvasId:string='';
+  private appliedPacket:string='';
+  private sceneAnimating:boolean=false;
+  private sceneGeneration:number=0;
+  private alive:boolean=false;
+  private context:WidgetSceneContext|null=null;
+  private syncPacket():void {
+    if(!this.alive||!this.packetJson||this.appliedPacket===this.packetJson)return;
+    let packet:WidgetScenePacket;
+    try{packet=JSON.parse(this.packetJson) as WidgetScenePacket;if(typeof packet.cards!=='string'||typeof packet.background!=='string')return;}catch(_){return;}
+    const cards=this.parse(packet.cards).sort((a,b)=>a.z-b.z);
+    const first=this.appliedPacket.length===0,differentCanvas=!first&&this.displayCanvasId!==packet.canvasId;
+    const generation=++this.sceneGeneration;
+    this.appliedPacket=this.packetJson;
+    const apply=():void=>{
+      this.displayCanvasId=packet.canvasId;
+      try{this.context=packet.context?JSON.parse(packet.context) as WidgetSceneContext:null;}catch(_){this.context=null;}
+      this.focusId=this.context?.focusId??'';
+      const map:Record<string,FridgeCard>={};cards.forEach((c)=>map[c.id]=cardRenderSnapshot(c));this.cardMap=map;this.cardIds=cards.map(c=>c.id);
+      try{this.canvasBackground=normalizeBackground(JSON.parse(packet.background) as CanvasBackground);}catch(_){}
+    };
+    if(first){apply();return;}
+    // Form pages support the global animation API; UIContext.animateTo is app-only.
+    this.sceneAnimating=true;
+    const finish=():void=>{if(!this.alive||generation!==this.sceneGeneration)return;this.sceneAnimating=false;this.syncPacket();};
+    if(differentCanvas) {
+      animateTo({duration:240,curve:Curve.EaseIn,onFinish:()=>{if(!this.alive||generation!==this.sceneGeneration)return;apply();
+        // Commit the new nodes at the offscreen pose before their entrance.
+        // Form renderers do not support JS timers or app UIContext methods.
+        animateTo({duration:16,onFinish:()=>{if(this.alive&&generation===this.sceneGeneration)animateTo({duration:420,curve:Curve.Friction,onFinish:finish},()=>this.scenePhase=0);}},()=>this.scenePhase=1.001);
+      }},()=>this.scenePhase=1);
+    }else animateTo({duration:520,curve:Curve.Friction,onFinish:finish},apply);
+  }
+  private sceneOffset(id:string,horizontal:boolean):number {
+    const rect=scenePercent(this.cardMap[id],this.widthValue()/this.heightValue()),dx=rect.x+rect.w/2-50,dy=rect.y+rect.h/2-50;
+    const axis=Math.abs(dx)>=Math.abs(dy),length=Math.max(this.widthValue(),this.heightValue())*1.5;
+    return (horizontal===axis?(horizontal?(dx<0?-1:1):(dy<0?-1:1))*length:0)*this.scenePhase;
+  }
+  private restoreScene():void {if(this.context&&!this.sceneAnimating)postCardAction(this,{action:'message',params:{operation:'dismissScene',ruleId:this.context.ruleId,occurrence:this.context.occurrence}});}
   @LocalStorageProp('background') @Watch('syncBackground') backgroundJson: string = '{}';
   @State canvasBackground: CanvasBackground = new CanvasBackground();
-  private syncBackground(): void { try { this.canvasBackground = normalizeBackground(JSON.parse(this.backgroundJson) as CanvasBackground); } catch (_) { this.canvasBackground = new CanvasBackground(); } }
+  private syncBackground(): void { if(this.packetJson)return;try { this.canvasBackground = normalizeBackground(JSON.parse(this.backgroundJson) as CanvasBackground); } catch (_) { this.canvasBackground = new CanvasBackground(); } }
   @LocalStorageProp('cards') @Watch('syncCards') cardsJson: string = '';
   @State cardIds: string[] = [];
   @State cardMap: Record<string, FridgeCard> = {};
@@ -27,16 +71,20 @@ struct FridgeWidgetCard {
   private widthValue(): number { return this.measuredWidth > 0 ? this.measuredWidth : this.canvasWidth; }
   private heightValue(): number { return this.measuredHeight > 0 ? this.measuredHeight : this.canvasHeight; }
   private dispatch(x: number, y: number): void {
-    const hit = widgetHit(this.cardIds.map((id: string) => this.cardMap[id]), x, y, this.widthValue(), this.heightValue(),this.rev||Date.now());
+    if(this.sceneAnimating)return;
+    const hit = widgetHit(this.cardIds.map((id: string) => this.cardMap[id]), x, y, this.widthValue(), this.heightValue(),this.rev||Date.now(),this.focusId);
+    if(this.focusId&&hit.id===this.focusId){this.restoreScene();return;}
     if (hit.id.length === 0 || hit.operation === 'disabled') return;
     if (hit.operation.length > 0) this.action(hit.id, hit.operation); else this.open(hit.id);
   }
   private parse(json: string): FridgeCard[] {
     try { return JSON.parse(json) as FridgeCard[]; } catch (_) { return []; }
   }
-  aboutToAppear(): void { this.syncBackground(); this.syncCards(); }
+  aboutToAppear(): void {this.alive=true; this.syncPacket();this.syncBackground(); this.syncCards(); }
+  aboutToDisappear():void {this.alive=false;this.sceneGeneration++;this.sceneAnimating=false;this.appliedPacket='';this.scenePhase=0;}
   private syncLegacyCards(): void { if (this.cardsJson.length === 0) this.syncCards(); }
   private syncCards(): void {
+    if(this.packetJson)return;
     const cards = (this.cardsJson.length > 0 ? this.parse(this.cardsJson) : this.parse(this.faceCardsJson).concat(this.parse(this.doorCardsJson)))
       .sort((a: FridgeCard, b: FridgeCard) => a.z - b.z);
     const map: Record<string, FridgeCard> = {};
@@ -45,7 +93,7 @@ struct FridgeWidgetCard {
   }
   private open(id: string = ''): void {
     postCardAction(this, { action: 'router', abilityName: 'EntryAbility',
-      params: { canvasId: this.canvasId, viewCardId: id, canvasDimension: this.dim, canvasAspect: String(this.widthValue() / this.heightValue()) } });
+      params: { canvasId: this.displayCanvasId||this.canvasId, viewCardId: id, canvasDimension: this.dim, canvasAspect: String(this.widthValue() / this.heightValue()) } });
   }
   private action(id: string, operation: string): void {
     postCardAction(this, { action: 'message', params: { cardId: id, operation: operation } });
@@ -72,9 +120,10 @@ struct FridgeWidgetCard {
         }
           .width(scenePercent(this.cardMap[id], this.widthValue() / this.heightValue()).w + '%').height(scenePercent(this.cardMap[id], this.widthValue() / this.heightValue()).h + '%')
           .position({ x: scenePercent(this.cardMap[id], this.widthValue() / this.heightValue()).x + '%', y: scenePercent(this.cardMap[id], this.widthValue() / this.heightValue()).y + '%' })
-          .rotate({ angle: this.cardMap[id].rot, centerX: 0, centerY: '100%' }).animation({ duration: 180, curve: Curve.EaseOut }).zIndex(this.cardMap[id].z)
+          .rotate({ angle: this.cardMap[id].rot, centerX: 0, centerY: '100%' }).translate({x:this.sceneOffset(id,true),y:this.sceneOffset(id,false)}).zIndex(this.cardMap[id].z)
           .hitTestBehavior(HitTestMode.Transparent)
       }, (id: string) => id)
+      if(this.focusId) {Button('恢复',{type:ButtonType.Capsule}).height(44).padding({left:16,right:16}).fontSize(12).backgroundColor('#EEFFFFFF').fontColor('#303030').position({x:12,y:12}).zIndex(100001).onClick(()=>this.restoreScene())}
       Button('打开', { type: ButtonType.Capsule }).width(56).height(44).padding(0).fontSize(12).borderRadius(10)
         .backgroundColor('#EEFFFFFF').fontColor('#303030').position({ x: '100%', y: '100%' }).translate({ x: -64, y: -52 }).zIndex(100000)
         .accessibilityText('打开卡片画布').onClick(() => this.open())

@@ -1,3 +1,5 @@
+import { resolveScheduledScene, sceneWidgetContext, dismissScene, ScheduledScene } from '../model/SceneSchedule';
+import { pushWidgets } from '../model/WidgetSync';
 import { readCapability } from '../model/CapabilityService';
 import { refreshMinutes } from '../model/WidgetRefreshPolicy';
 import { needsDataRefresh, capabilityRequestKey, mergeCapabilityResult } from '../model/CapabilityData';
@@ -14,7 +16,7 @@ const STORE_NAME: string = 'fridge_store';
 const KEY_STATE: string = 'fridge_state_json';
 const KEY_DIMS: string = 'fridge_form_dims_json';
 
-/** Registered desktop forms refresh after edits; the whiteboard phase has no door scheduler. */
+/** Local schedules are evaluated on refresh/visibility; original documents remain unchanged. */
 export default class FridgeFormAbility extends FormExtensionAbility {
   private registrationQueue: Promise<void> = Promise.resolve();
 
@@ -53,13 +55,22 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     return this.registrationQueue;
   }
 
+  private async displayedScene(formId:string):Promise<ScheduledScene> {
+    const base=await this.loadState(formId);
+    const scene=await resolveScheduledScene(base,Date.now(),async(id:string):Promise<FridgeState|null>=>{
+      const prefs=await preferences.getPreferences(this.context,STORE_NAME);const catalog=readCatalog(await prefs.get('fridge_canvases_json','') as string);if(!catalog.canvases.some(c=>c.id===id))return null;
+      const json=await prefs.get(canvasKey(id),'') as string;return json?normalizeState(JSON.parse(json) as FridgeState):null;
+    });
+    return scene;
+  }
   private async pushForm(formId: string): Promise<void> {
-    const state = await this.loadState(formId);
+    const scene=await this.displayedScene(formId);
+    const state=scene.state;
     const dims = await this.loadDims();
-    await updateWidget(formId, JSON.stringify(state), dims[formId] ?? '4*4');
+    await updateWidget(formId, JSON.stringify(state), dims[formId] ?? '4*4',sceneWidgetContext(scene));
   }
   private async scheduleForm(formId:string):Promise<void> {
-    const minutes=refreshMinutes(await this.loadState(formId));
+    const minutes=Math.min(refreshMinutes(await this.loadState(formId)),refreshMinutes((await this.displayedScene(formId)).state));
     // Baseline 30-minute refresh is declared in the form profile. Only a nearer boundary
     // needs a one-shot request; editing the scene must not consume its daily quota.
     if(minutes<30)await formProvider.setFormNextRefreshTime(formId,minutes).catch(()=>{});
@@ -86,23 +97,33 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     for(const id of Object.keys(status))if(status[id]===formInfo.VisibilityType.FORM_VISIBLE)this.onUpdateForm(id);
   }
   private async refreshDueData(formId:string):Promise<void> {
-    let state=await this.loadState(formId),canvasId=state.canvasId;
+    let state=(await this.displayedScene(formId)).state,canvasId=state.canvasId;
     for(const original of state.cards.slice()) {
       const cap=original.capability;if(!cap||!needsDataRefresh(cap))continue;
       const key=capabilityRequestKey(cap),attempted=cap.attemptedAt??0;
       const next=await readCapability(cap,this.context);
       // Only merge this result after reloading the bound canvas; never replace a newer edit or another canvas.
-      state=await this.loadState(formId);const card=state.cards.find((c)=>c.id===original.id);
+      state=(await this.displayedScene(formId)).state;const card=state.cards.find((c)=>c.id===original.id);
       if(state.canvasId!==canvasId||!card?.capability||capabilityRequestKey(card.capability)!==key||(card.capability.attemptedAt??0)!==attempted)continue;
       if(cap.k==='battery'&&card.capability.percent===next.percent&&card.capability.charging===next.charging&&card.capability.chargeState===next.chargeState&&card.capability.refreshState===next.refreshState)continue;
-      card.capability=mergeCapabilityResult(card.capability,next);await this.saveStateAndWidgets(state);
+      const prefs=await preferences.getPreferences(this.context,STORE_NAME);const raw=await prefs.get(canvasKey(canvasId),'') as string;
+      const originalState=raw?normalizeState(JSON.parse(raw) as FridgeState):await this.loadState(formId);const stored=originalState.cards.find(c=>c.id===original.id);
+      if(!stored?.capability||capabilityRequestKey(stored.capability)!==key||(stored.capability.attemptedAt??0)!==attempted)continue;
+      stored.capability=mergeCapabilityResult(stored.capability,next);await this.saveStateAndWidgets(originalState);
     }
   }
   private actionQueue: Promise<void> = Promise.resolve();
   onFormEvent(formId: string, event: string): void {
     this.actionQueue = this.actionQueue.catch(() => {}).then(async () => {
+      let message:Record<string,string>|null=null;try{message=JSON.parse(event) as Record<string,string>;}catch(_){}
+      if(message?.operation==='dismissScene') {
+        const base=await this.loadState(formId);
+        if(dismissScene(base,message.ruleId??'',message.occurrence??'',Date.now())){await this.saveStateAndWidgets(base);await this.scheduleForm(formId);}return;
+      }
       const action = parseCapabilityAction(event); if (action === null) return;
-      let state = await this.loadState(formId), card = state.cards.find((item) => item.id === action.cardId);
+      const visible=await this.displayedScene(formId),prefs=await preferences.getPreferences(this.context,STORE_NAME);
+      const json=await prefs.get(canvasKey(visible.state.canvasId),'') as string;
+      let state=json?normalizeState(JSON.parse(json) as FridgeState):await this.loadState(formId),card=state.cards.find((item)=>item.id===action.cardId);
       if (card === undefined) return;
       if (!applyCalendarAction(card, action.operation)) return;
       await this.saveStateAndWidgets(state);
@@ -116,9 +137,7 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     const catalogJson = await prefs.get('fridge_canvases_json','') as string;
     if (catalogJson) await prefs.put(canvasKey(state.canvasId),JSON.stringify(state));
     else await prefs.put(KEY_STATE, JSON.stringify(state)); await prefs.flush();
-    const dims = await this.loadDims();
-    const catalog=readCatalog(catalogJson),bindings=JSON.parse(await prefs.get('fridge_form_bindings_json','{}') as string) as Record<string,string>;
-    await Promise.all(Object.keys(dims).filter((id:string)=>!catalogJson||boundCanvas(bindings,id,catalog)===state.canvasId).map((id: string) => updateWidget(id, JSON.stringify(state), dims[id]).catch(() => {})));
+    await pushWidgets(this.context,JSON.stringify(state));
   }
 
   onRemoveForm(formId: string): void {

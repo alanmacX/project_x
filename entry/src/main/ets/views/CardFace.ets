@@ -43,7 +43,7 @@ export struct CardFace {
         .width('100%').height('100%').blur(radius).translate({y:offset+shadowY}).hitTestBehavior(HitTestMode.None)
     } else {
       Column().width('100%').height('100%').backgroundColor(color).borderRadius(shapeRadius(this.card.shape))
-        .translate({y:offset}).shadow({radius:this.getUIContext().vp2px(radius),color:shadowColor,offsetY:this.getUIContext().vp2px(shadowY)}).hitTestBehavior(HitTestMode.None)
+        .translate({y:offset}).shadow({radius:vp2px(radius),color:shadowColor,offsetY:vp2px(shadowY)}).hitTestBehavior(HitTestMode.None)
     }
   }
   build() {

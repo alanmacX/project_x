@@ -1,3 +1,4 @@
+import { SceneRule, SavedSceneLayout, normalizeSceneLayouts, normalizeSceneRules } from './SceneScheduleSchema';
 import { clockZone } from './TimeCapabilities';
 import { validDay, HolidayDate } from './HolidayCalendar';
 /** Pure, versioned schema shared by the app and FormKit renderer. */
@@ -135,6 +136,8 @@ export function normalizeBackground(raw: CanvasBackground | undefined): CanvasBa
   bg.signature = typeof raw.signature === 'string' ? raw.signature : ''; return bg;
 }
 export class FridgeState {
+  sceneLayouts:SavedSceneLayout[]=[];
+  sceneRules:SceneRule[]=[];
   schemaVersion: number = 2;
   canvasId: string = 'canvas_main';
   background: CanvasBackground = new CanvasBackground();
@@ -211,6 +214,7 @@ export function normalizeState(raw: FridgeState): FridgeState {
   const state = new FridgeState(); state.canvasId = typeof raw.canvasId === 'string' && /^[a-zA-Z0-9_-]{1,96}$/.test(raw.canvasId) ? raw.canvasId : 'canvas_main'; state.background = normalizeBackground(raw.background); state.door = raw.door ?? new DoorState();
   state.canvasDimension = ['2*4', '4*4', '6*4'].includes(raw.canvasDimension) ? raw.canvasDimension : '4*4';
   state.canvasAspect = bounded(raw.canvasAspect, .3, 3, 1);
+  state.sceneLayouts=normalizeSceneLayouts(raw.sceneLayouts);state.sceneRules=normalizeSceneRules(raw.sceneRules);
   state.maxZ = bounded(raw.maxZ, 0, Number.MAX_SAFE_INTEGER, 10);
   for (const source of (Array.isArray(raw.cards) ? raw.cards : [])) {
     if (source === null || typeof source.id !== 'string') continue;

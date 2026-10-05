@@ -14,6 +14,7 @@ export function storageSnapshot(state: FridgeState): string {
   const base = new FridgeState();
   base.canvasId = state.canvasId; base.schemaVersion = state.schemaVersion; base.canvasAspect = state.canvasAspect;
   base.canvasDimension = state.canvasDimension; base.fridge = state.fridge;
+  base.sceneLayouts=state.sceneLayouts;base.sceneRules=state.sceneRules;
   base.background = state.background; base.door = state.door; base.maxZ = state.maxZ;
   const json = JSON.stringify(base), marker = '"cards":[]', at = json.lastIndexOf(marker);
   return json.slice(0, at) + '"cards":[' + cards.join(',') + ']' + json.slice(at + marker.length);

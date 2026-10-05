@@ -5,7 +5,7 @@ export interface TemplateAsset { key: string; extension: string; data: string; }
 export interface TemplatePackage { format: string; version: number; kind: string; state: FridgeState; assets: TemplateAsset[]; }
 export function packageScene(json: string, cardId: string): TemplatePackage {
   const state=normalizeState(JSON.parse(json) as FridgeState);
-  if(cardId.length>0){state.cards=state.cards.filter((c:FridgeCard)=>c.id===cardId);if(state.cards.length!==1)throw new Error('卡片不存在');state.cards[0].groupId='';state.background=defaultState().background;}
+  if(cardId.length>0){state.cards=state.cards.filter((c:FridgeCard)=>c.id===cardId);if(state.cards.length!==1)throw new Error('卡片不存在');state.cards[0].groupId='';state.sceneLayouts=[];state.sceneRules=[];state.background=defaultState().background;}
   state.canvasId='canvas_main';
   for(const card of state.cards){const cap=card.capability;if(cap?.k==='battery'){cap.percent=-1;cap.charging=false;cap.chargeState='';cap.updatedAt=0;cap.attemptedAt=0;}if(cap?.k==='agenda'&&cap.agendaSource==='system'){cap.events=[];cap.updatedAt=0;cap.attemptedAt=0;}}
   return {format:'fridgememo-template',version:1,kind:cardId.length>0?'card':'canvas',state:state,assets:[]};
@@ -44,4 +44,12 @@ export function fitImportedCanvas(cards:FridgeCard[],sourceAspect:number,targetA
   const sourceH=BOARD_W/sourceAspect,targetH=BOARD_W/targetAspect;
   const scale=Math.min(1,targetH/sourceH),left=BOARD_W*(1-scale)/2,top=(targetH-sourceH*scale)/2;
   for(const c of cards){c.x=c.x*scale+left;c.y=(c.y/BOARD_H*sourceH*scale+top)/targetH*BOARD_H;c.w*=scale;c.h*=scale;}
+}
+/** Layouts travel with a canvas. Imported schedules are opt-in; external canvas targets cannot travel in a single document. */
+export function remapSceneSchedules(state:FridgeState,cards:FridgeCard[],newId:()=>string,targetAspect:number):void {
+  const cardIds=new Map<string,string>();state.cards.forEach((c,i)=>{if(cards[i])cardIds.set(c.id,cards[i].id);});
+  const layoutIds=new Map<string,string>(),sourceH=BOARD_W/state.canvasAspect,targetH=BOARD_W/targetAspect,scale=Math.min(1,targetH/sourceH),left=BOARD_W*(1-scale)/2,top=(targetH-sourceH*scale)/2;
+  state.sceneLayouts.forEach((layout)=>{const old=layout.id;layout.id=newId();layoutIds.set(old,layout.id);layout.placements=layout.placements.filter(p=>cardIds.has(p.id));layout.placements.forEach(p=>{p.id=cardIds.get(p.id)!;p.x=p.x*scale+left;p.y=(p.y/BOARD_H*sourceH*scale+top)/targetH*BOARD_H;p.w*=scale;p.h*=scale;});});
+  state.sceneRules=state.sceneRules.filter(r=>r.kind!=='canvas'&&(r.kind==='layout'?layoutIds.has(r.targetId):cardIds.has(r.targetId)));
+  state.sceneRules.forEach(r=>{r.id=newId();r.targetId=(r.kind==='layout'?layoutIds:cardIds).get(r.targetId)!;r.enabled=false;r.dismissed='';r.createdAt=Date.now();});
 }

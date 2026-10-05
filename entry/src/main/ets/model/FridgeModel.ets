@@ -52,6 +52,14 @@ export class FridgeStore {
     if (!Array.isArray(raw.cards)) throw new Error('画布数据损坏');
     return normalizeState(raw);
   }
+  /** Merge acknowledgements from FormExtension without overwriting editor geometry or history. */
+  async reloadSceneAcknowledgements():Promise<void> {
+    if(this.prefs===null||this.context===null)return;await this.saveQueue.catch(()=>{});const id=this.state.canvasId;
+    await preferences.removePreferencesFromCache(this.context,'fridge_store');this.prefs=await preferences.getPreferences(this.context,'fridge_store');
+    const json=await this.prefs.get(canvasKey(id),'') as string;if(!json||this.state.canvasId!==id)return;
+    const stored=normalizeState(JSON.parse(json) as FridgeState);
+    for(const rule of this.state.sceneRules){const other=stored.sceneRules.find(r=>r.id===rule.id);if(other&&other.createdAt===rule.createdAt&&other.start===rule.start&&other.end===rule.end&&other.kind===rule.kind&&other.targetId===rule.targetId)rule.dismissed=other.dismissed;}
+  }
   createCanvas(name: string, source?: FridgeState): string {
     assertCanvasCapacity(0, source?.cards.length ?? 0);
     const id = 'canvas_' + Date.now() + '_' + (++this.sequence);
@@ -154,6 +162,6 @@ export class FridgeStore {
     assertCanvasCapacity(this.state.cards.length, cards.length);
     for (const card of cards) { card.z = this.nextZ(); this.state.cards.push(card); }
   }
-  removeCard(id: string): void { this.state.cards = this.state.cards.filter((c: FridgeCard) => c.id !== id); }
+  removeCard(id: string): void {this.state.sceneRules=this.state.sceneRules.filter(r=>r.kind!=='focus'||r.targetId!==id);this.state.sceneLayouts.forEach(l=>l.placements=l.placements.filter(p=>p.id!==id)); this.state.cards = this.state.cards.filter((c: FridgeCard) => c.id !== id); }
   newId(): string { return 'c' + Date.now() + '_' + (++this.sequence); }
 }
