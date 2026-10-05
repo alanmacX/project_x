@@ -14,7 +14,7 @@ import { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
 import { SettingsSelect } from '../views/SettingsSelect';
 import { SettingsSegmented } from '../views/SettingsSegmented';
 import { SettingsCounter } from '../views/SettingsCounter';
-import { settingsReveal, settingsDialogOpen, settingsDialogClose } from '../model/SettingsMotion';
+import { canvasToolsTransition, settingsReveal, settingsDialogOpen, settingsDialogClose } from '../model/SettingsMotion';
 import { CapabilityAppearance } from '../views/CapabilityAppearance';
 import { CapabilityDetails } from '../views/CapabilityDetails';
 import { WeekTimetable } from '../views/WeekTimetable';
@@ -160,7 +160,9 @@ struct Index {
   @State scatter: number = 0;
   @State showBackgroundOptions: boolean = false;
   @State showLayerOptions: boolean = false;
-  @State homeToolsOpen:boolean=false;
+  @State @Watch('homeToolsChanged') homeToolsOpen:boolean=false;
+  @State homeToolsMoving:boolean=false;
+  private homeToolsMotionGeneration:number=0;
   @State capabilityPickerOpen:boolean=false;
   private resizeStart: ElementBox = new ElementBox();
   private rotateStart: number = 0;
@@ -496,9 +498,16 @@ struct Index {
   private widgetFrameChanged(): void {
     if (this.widgetAspect > 0) { this.canvasDimension = this.widgetDimension || this.canvasDimension; this.canvasAspect = this.widgetAspect; this.layoutBoard(); }
   }
+  private homeToolsChanged():void {
+    if(!this.ready||this.editing||this.heroActive){this.homeToolsMotionGeneration++;this.homeToolsMoving=false;return;}
+    const layout=workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect);
+    const target=layout.floating&&this.homeToolsOpen?layout.expandedBoardY:layout.boardY;
+    const generation=++this.homeToolsMotionGeneration;this.homeToolsMoving=true;
+    this.getUIContext().animateTo({onFinish:()=>{if(this.alive&&generation===this.homeToolsMotionGeneration)this.homeToolsMoving=false;},duration:this.homeToolsOpen?280:220,curve:this.homeToolsOpen?Curve.Friction:Curve.EaseOut,expectedFrameRateRange:this.frameRate},()=>{this.boardTop=target;});
+  }
   private layoutBoard(): void {
     const layout=workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect);
-    this.boardScale=layout.boardW/BOARD_W;this.boardHeight=layout.boardH;this.boardLeft=layout.boardX;this.boardTop=layout.boardY;
+    this.boardScale=layout.boardW/BOARD_W;this.boardHeight=layout.boardH;this.boardLeft=layout.boardX;this.boardTop=layout.floating&&this.homeToolsOpen?layout.expandedBoardY:layout.boardY;
     this.panelLeft=layout.panelX;this.panelTop=layout.panelY;this.panelWidth=layout.panelW;this.panelHeight=layout.panelH;
   }
   private scatterOffset(id: string, horizontal: boolean): number {
@@ -547,7 +556,7 @@ struct Index {
   private openEditor(id: string, created: boolean = false): void {
     if(this.scheduledName||this.scheduleTransition){this.getUIContext().getPromptAction().showToast({message:'请先恢复原始画布再编辑'});return;}
     if (this.heroActive || this.arriving) return;
-    this.homeToolsOpen=false;this.heroHideContent = false; this.select(id, true); this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false; this.settingsTab = 0; this.editorTabs = [0];
+    this.heroHideContent = false; this.select(id, true); this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false; this.settingsTab = 0; this.editorTabs = [0];
     this.heroRect = this.boardRect();
     if (created) {
       const rect = new SceneRect(); rect.w = 28; rect.h = 28 * this.preview.h / this.preview.w;
@@ -555,10 +564,10 @@ struct Index {
     }
     this.layerId = this.preview.elements.find((el: CanvasElement) => el.behindCapability)?.id ?? ''; this.syncFields();
     this.creatingTransition = created; this.heroBase = this.editorRect(); this.setHeroPose(this.heroRect); this.setTransitionClip(true);
-    this.editorMounted = true; this.editorReady = true; this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.editorOpacity = 0; this.boardOpacity = 1; this.heroActive = true; this.editing = true;
+    this.editorMounted = true; this.editorReady = true; this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.editorOpacity = 0; this.boardOpacity = 1; this.heroActive = true; this.editing = true;this.homeToolsOpen=false;
     this.prepareEditorMotion(() => {
       if (!this.alive || !this.editing || !this.heroActive) return;
-      this.getUIContext().animateTo({ duration: 380, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: () => { if (this.alive) { this.heroActive = false; this.creatingTransition = false; this.retireChrome(); } } }, () => {
+      this.getUIContext().animateTo({ duration: 380, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: () => { if (this.alive) { this.heroActive = false; this.creatingTransition = false; this.retireChrome();this.layoutBoard(); } } }, () => {
         this.setHeroPose(this.editorRect()); this.setTransitionClip(false); this.scatter = 1; this.boardOpacity = 0; this.editorOpacity = 1;
       });
     });
@@ -962,7 +971,7 @@ struct Index {
           GroupSelection({motion:this.boardMotion,box:this.selectedGroupBox(),minimum:groupMinimumScale(this.selectedGroup()),maximum:this.groupMaximumScale(),
             viewportW:BOARD_W*this.boardScale,viewportH:this.boardHeight,
             onBegin:()=>this.beginGroupTransform(),onFinish:(scale:number,angle:number)=>this.finishGroupTransform(scale,angle),onCancel:()=>this.cancelGroupTransform()})
-            .position({x:this.boardLeft,y:this.boardTop}).zIndex(100003).hitTestBehavior(HitTestMode.Transparent)
+            .position({x:this.boardLeft,y:this.boardTop}).zIndex(100003).hitTestBehavior(this.homeToolsMoving?HitTestMode.None:HitTestMode.Transparent)
         }
         if (this.editorMounted) { this.editor() }
         if (this.chromeSnapshot !== undefined) {
@@ -1013,14 +1022,14 @@ struct Index {
             .position({ x: 0, y: 0 })
             .translate({ x: this.sceneX(id) - 24 - this.creationClipX(id) + this.arrivalX(id) + this.scheduleOffset(id,true),
               y: this.sceneY(id) - 24 - this.creationClipY(id) + this.arrivalY(id) + this.scheduleOffset(id,false) })
-            .hitTestBehavior(this.editing || this.arriving || this.scheduledName.length>0 || this.scheduleTransition ? HitTestMode.None : HitTestMode.Transparent)
+            .hitTestBehavior(this.editing || this.arriving || this.homeToolsMoving || this.scheduledName.length>0 || this.scheduleTransition ? HitTestMode.None : HitTestMode.Transparent)
           }.width(this.creationClip(id) ? this.transitionClipW : this.screenWidth)
             .height(this.creationClip(id) ? this.transitionClipH : this.screenHeight)
             .position({ x: this.creationClipX(id), y: this.creationClipY(id) })
             .borderRadius(this.creationClip(id) ? this.transitionClipRadius : 0).clip(this.creationClip(id))
             .opacity(this.editing && id === this.selectedId ? 1 : this.boardOpacity)
             .zIndex(this.activeBoardId === id || this.boardMotion.ids.includes(id) ? 100000 + this.cardMap[id].z / (1 + this.cardMap[id].z) : this.cardMap[id].z)
-            .hitTestBehavior(this.editing || this.arriving || this.scheduledName.length>0 || this.scheduleTransition ? HitTestMode.None : HitTestMode.Transparent)
+            .hitTestBehavior(this.editing || this.arriving || this.homeToolsMoving || this.scheduledName.length>0 || this.scheduleTransition ? HitTestMode.None : HitTestMode.Transparent)
         }, (id: string) => id)
       }.width(this.screenWidth).height(this.screenHeight)
         .position({ x: 0, y: 0 }).translate({ x: -this.sceneClipX(), y: -this.sceneClipY() }).hitTestBehavior(HitTestMode.Transparent)
@@ -1028,7 +1037,7 @@ struct Index {
       .height(this.creatingTransition ? this.screenHeight : this.editing ? (this.heroActive ? this.transitionClipH : this.screenHeight) : this.boardHeight)
       .position({ x: 0, y: 0 }).translate({ x: this.sceneClipX(), y: this.sceneClipY() })
       .borderRadius(this.creatingTransition ? 0 : this.editing ? (this.heroActive ? this.transitionClipRadius : 0) : 24).clip(true)
-      .hitTestBehavior(this.editing || this.arriving || this.scheduledName.length>0 || this.scheduleTransition ? HitTestMode.None : HitTestMode.Transparent)
+      .hitTestBehavior(this.editing || this.arriving || this.homeToolsMoving || this.scheduledName.length>0 || this.scheduleTransition ? HitTestMode.None : HitTestMode.Transparent)
   }
   @Builder
   board() {
@@ -1040,7 +1049,7 @@ struct Index {
           Text('放一张自己的卡片').fontSize(16).fontColor('#989898').width('100%').height('100%').textAlign(TextAlign.Center).hitTestBehavior(HitTestMode.None)
         }
       }.width(BOARD_W * this.boardScale).height(this.boardHeight).borderRadius(24).clip(true).backgroundColor(Color.White)
-        .border({ width: .5, color: '#E9E9E9' })
+        .border({ width: .5, color: '#E9E9E9' }).id('homeCanvasSurface')
         .position({ x: this.boardLeft, y: this.boardTop })
       if(this.floatingHome()){this.homeDock()}else{this.homeLayers();this.homeBackground()}
     }.width('100%').height('100%').opacity(this.boardOpacity).accessibilityLevel(this.editing || this.viewing ? 'no-hide-descendants' : 'auto').hitTestBehavior(this.editing || this.viewing || this.canvasChanging ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Default)
@@ -1052,7 +1061,7 @@ struct Index {
   @Builder
   phoneTools() {
     Stack({alignContent:Alignment.TopStart}) {this.homeLayers(true);this.homeBackground(true)}
-      .width(this.screenWidth-32).height(this.homeToolsHeight())
+      .width(this.screenWidth-32).height(this.homeToolsHeight()).hitTestBehavior(this.homeToolsMoving?HitTestMode.BLOCK_DESCENDANTS:HitTestMode.Default)
   }
   @Builder
   homeDock() {
@@ -1065,7 +1074,7 @@ struct Index {
         }.width('100%').hitTestBehavior(HitTestMode.None)
       }.height(52).layoutWeight(1).padding({left:16,right:16}).attributeModifier(immersiveChrome(this.appDark))
         .accessibilityText('展开画布工具 '+this.canvasName).onClick(()=>{this.refreshCanvasList();this.homeToolsOpen=!this.homeToolsOpen;})
-        .bindPopup(this.homeToolsOpen,{builder:this.phoneTools,placement:Placement.Top,width:this.screenWidth-32,radius:24,systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:false,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible)this.homeToolsOpen=false;}})
+        .bindPopup(this.homeToolsOpen,{builder:this.phoneTools,placement:Placement.Top,width:this.screenWidth-32,radius:24,transition:canvasToolsTransition(),systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:false,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible)this.homeToolsOpen=false;}})
       Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
         SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
       }.width(52).height(52).attributeModifier(immersiveChrome(this.appDark)).accessibilityText('添加卡片').enabled(!this.scheduledName&&!this.scheduleTransition).onClick(()=>this.addCard())

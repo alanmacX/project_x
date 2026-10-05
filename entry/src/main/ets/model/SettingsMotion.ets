@@ -9,3 +9,10 @@ export function settingsReveal():TransitionEffect {
 }
 export function settingsDialogOpen():AnimateParam {return {duration:200,curve:Curve.EaseOut,expectedFrameRateRange:settingsRate};}
 export function settingsDialogClose():AnimateParam {return {duration:140,curve:Curve.EaseIn,expectedFrameRateRange:settingsRate};}
+
+/** Paired with the canvas lift; all motion stays in the native compositor. */
+export function canvasToolsTransition():TransitionEffect {
+  const effect=TransitionEffect.OPACITY.combine(TransitionEffect.translate({y:24})).combine(TransitionEffect.scale({x:.98,y:.98}));
+  return TransitionEffect.asymmetric(effect.animation({duration:280,curve:Curve.Friction,expectedFrameRateRange:settingsRate}),
+    TransitionEffect.OPACITY.combine(TransitionEffect.translate({y:16})).animation({duration:220,curve:Curve.EaseOut,expectedFrameRateRange:settingsRate}));
+}

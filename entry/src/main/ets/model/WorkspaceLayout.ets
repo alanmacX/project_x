@@ -1,6 +1,7 @@
 /** Available-space layout, independent of phone/tablet names and orientation flags. */
 export class WorkspaceLayout {
   margin:number=16; wide:boolean=false; floating:boolean=false;
+  expandedBoardY:number=16;
   boardX:number=16;boardY:number=16;boardW:number=320;boardH:number=320;
   panelX:number=16;panelY:number=352;panelW:number=320;panelH:number=300;
   previewW:number=320;previewH:number=200;layersH:number=64;inspectorW:number=320;
@@ -16,7 +17,7 @@ export function workspaceLayout(width:number,height:number,top:number,bottom:num
   const stageW=homeWide?Math.max(120,width-out.panelW-3*m):usableW;
   const reserve=out.floating?88:homeWide?0:Math.min(320,Math.max(248,usableH*.28));
   out.boardW=Math.min(stageW,Math.max(96,usableH-reserve-12)*ratio);out.boardH=out.boardW/ratio;
-  out.boardX=m+(stageW-out.boardW)/2;out.boardY=top+m;
+  out.boardX=m+(stageW-out.boardW)/2;out.boardY=top+m;out.expandedBoardY=out.boardY;
   if(out.floating){out.boardW=Math.min(usableW,Math.max(96,usableH-88)*ratio);out.boardH=out.boardW/ratio;out.boardX=m+(usableW-out.boardW)/2;out.boardY=top+m+Math.max(0,(usableH-88-out.boardH)/2);}
   out.panelX=homeWide?width-m-out.panelW:m;out.panelY=homeWide?out.boardY:out.boardY+out.boardH+12;
   out.panelH=Math.max(128,height-bottom-m-out.panelY);
