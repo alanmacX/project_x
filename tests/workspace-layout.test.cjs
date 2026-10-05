@@ -29,4 +29,6 @@ for(const [w,h] of [[768,1024],[834,1194],[1024,1366],[640,960]]) {
  assert.ok(l.previewH>300,'tablet preview is not capped at phone height');
 }
 assert.equal(workspaceLayout(520,800,28,24,1).wide,false,'narrow tablet split window uses compact layout');
+for(const [w,h] of [[390,844],[844,390],[520,800]]){const l=workspaceLayout(w,h,28,24,1);assert.equal(l.floating,true);assert.equal(l.panelH,52);}
+for(const [w,h] of [[768,1024],[1024,768]])assert.equal(workspaceLayout(w,h,28,24,1).floating,false);
 console.log('PASS responsive workspace: 16 phone/tablet/split-window sizes, four canvas ratios, safe areas, portrait artwork priority and settings budget');
