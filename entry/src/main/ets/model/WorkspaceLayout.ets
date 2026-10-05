@@ -10,7 +10,7 @@ export function workspaceLayout(width:number,height:number,top:number,bottom:num
   const out=new WorkspaceLayout();out.margin=width<360?12:width>=720?24:16;
   const m=out.margin,usableW=Math.max(160,width-2*m),usableH=Math.max(180,height-top-bottom-2*m),ratio=Math.max(.3,Math.min(3,aspect));
   // Side-by-side needs horizontal space AND a wide window. Portrait tablets stay stacked.
-  out.wide=width>=640&&usableH>=220&&usableW>=usableH*1.1;
+  out.wide=width>=640&&height-top-bottom-2*m>=160&&usableW>=usableH*1.1;
   out.floating=Math.min(width,height)<600;
   const homeWide=out.wide;
   out.panelW=homeWide?Math.min(420,Math.max(300,width*.34)):usableW;

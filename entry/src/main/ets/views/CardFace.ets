@@ -70,7 +70,7 @@ export struct CardFace {
       this.backing(this.edge(),2*this.depthScale(),1.4*this.depthScale(),'#48000000',1.2*this.depthScale())
       this.backing(this.edge(),2*this.depthScale(),0,'#00000000',0)
       this.backing(this.card.shape==='subject'&&this.card.subjectPhoto?'#FFFFFF':this.paper(),0,0,'#00000000',0)
-      }.width('100%').height('100%').renderGroup(true)
+      }.width('100%').height('100%')
       CardCanvas({ layerMotion:this.layerMotion, card: this.card, scaleFactor: this.scaleFactor, tick: this.tick, widget: this.widget, hideContent: this.hideContent,
         movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
         .width((subjectSurfaceFactor(this.card) * 100) + '%').height((subjectSurfaceFactor(this.card) * 100) + '%')
@@ -80,6 +80,8 @@ export struct CardFace {
           .border({width:.6,color:{top:'#88FFFFFF',left:'#48FFFFFF',right:'#14000000',bottom:'#20000000'}})
           .hitTestBehavior(HitTestMode.None)
       }
-    }.width('100%').height('100%').renderGroup(this.movingLayerId.length===0 && this.card.elements.every(el=>!el.animated))
+    // BoardCard caches the face together with its shadow fringe. A cache at
+    // the face's own bounds truncates the native shadow at rounded corners.
+    }.width('100%').height('100%')
   }
 }

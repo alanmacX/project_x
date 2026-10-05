@@ -5,6 +5,9 @@ export struct ColorSelector {
   controller?: CustomDialogController;
   initialColor: string = '#FFFFFF';
   onPick: (color: string) => void = () => {};
+  @StorageLink('workspaceHeight') viewportHeight: number = 780;
+  @StorageLink('safeTop') safeTop: number = 36;
+  @StorageLink('safeBottom') safeBottom: number = 24;
   @StorageLink('appDark') appDark: boolean = false;
   @State chosen: string = '#FFFFFF';
   @State red: number = 255;
@@ -23,16 +26,18 @@ export struct ColorSelector {
         Text('选择颜色').fontColor(AppDesign.text(this.appDark)).fontSize(18).fontWeight(FontWeight.Medium); Blank()
         Button('取消', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).backgroundColor(Color.Transparent).fontColor(AppDesign.muted(this.appDark)).onClick(() => this.controller?.close())
       }.width('100%')
+      Scroll() {
         Column({ space: 12 }) {
           Column().width('100%').height(64).borderRadius(12).backgroundColor(this.chosen)
           Text('红').fontSize(13).fontColor(AppDesign.text(this.appDark)).width('100%'); Slider({ value: this.red, min: 0, max: 255, step: 1 }).selectedColor('#D85E55').onChange((v: number) => { this.red = v; this.update(); })
           Text('绿').fontSize(13).fontColor(AppDesign.text(this.appDark)).width('100%'); Slider({ value: this.green, min: 0, max: 255, step: 1 }).selectedColor('#68876B').onChange((v: number) => { this.green = v; this.update(); })
           Text('蓝').fontSize(13).fontColor(AppDesign.text(this.appDark)).width('100%'); Slider({ value: this.blue, min: 0, max: 255, step: 1 }).selectedColor('#6E85A5').onChange((v: number) => { this.blue = v; this.update(); })
         }.width('100%')
+      }.layoutWeight(1).width('100%').scrollBar(BarState.Off)
       Row({ space: 12 }) {
         Button('恢复默认', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).layoutWeight(1).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(() => { this.onPick(''); this.controller?.close(); })
         Button('完成', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.EMPHASIZED, role:ButtonRole.NORMAL }).height(44).layoutWeight(1).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).onClick(() => { this.onPick(this.chosen); this.controller?.close(); })
       }.width('100%')
-    }.padding(20).width('92%').constraintSize({ maxWidth: 520 }).borderRadius(24).backgroundColor(AppDesign.surface(this.appDark))
+    }.height(Math.min(440,Math.max(160,this.viewportHeight-this.safeTop-this.safeBottom-32))).padding(20).width('92%').constraintSize({ maxWidth: 520 }).borderRadius(24).backgroundColor(AppDesign.surface(this.appDark))
   }
 }

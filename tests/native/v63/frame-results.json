@@ -1,0 +1,50 @@
+[
+  {
+    "kind": "entry",
+    "sample": 0,
+    "frames": 27,
+    "fps": 70.9,
+    "maxIntervalMs": 25.07,
+    "intervalsOver12_5ms": 16
+  },
+  {
+    "kind": "exit",
+    "sample": 0,
+    "frames": 24,
+    "fps": 69.0,
+    "maxIntervalMs": 25.01,
+    "intervalsOver12_5ms": 16
+  },
+  {
+    "kind": "entry",
+    "sample": 1,
+    "frames": 25,
+    "fps": 72.0,
+    "maxIntervalMs": 25.0,
+    "intervalsOver12_5ms": 15
+  },
+  {
+    "kind": "exit",
+    "sample": 1,
+    "frames": 24,
+    "fps": 69.0,
+    "maxIntervalMs": 16.71,
+    "intervalsOver12_5ms": 17
+  },
+  {
+    "kind": "entry",
+    "sample": 2,
+    "frames": 26,
+    "fps": 73.1,
+    "maxIntervalMs": 25.01,
+    "intervalsOver12_5ms": 15
+  },
+  {
+    "kind": "exit",
+    "sample": 2,
+    "frames": 23,
+    "fps": 66.0,
+    "maxIntervalMs": 25.08,
+    "intervalsOver12_5ms": 17
+  }
+]

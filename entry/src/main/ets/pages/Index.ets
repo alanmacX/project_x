@@ -136,8 +136,8 @@ struct Index {
   private gestureGroup: string = '';
   @State undoAvailable: boolean = false;
   @State redoAvailable: boolean = false;
-  @StorageLink('safeTop') safeTop: number = 36;
-  @StorageLink('safeBottom') safeBottom: number = 24;
+  @StorageLink('safeTop') @Watch('layoutBoard') safeTop: number = 36;
+  @StorageLink('safeBottom') @Watch('layoutBoard') safeBottom: number = 24;
   @StorageLink('editCardId') @Watch('routeChanged') routedId: string = '';
   @StorageLink('viewCardId') @Watch('viewRouteChanged') viewRouteId: string = '';
   @StorageLink('incomingTemplateUri') @Watch('incomingTemplateChanged') incomingUri: string = '';
@@ -988,7 +988,7 @@ struct Index {
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_: Area, area: Area) => {
         const width = Number(area.width), height = Number(area.height);
-        if (width > 0 && height > 0) { this.screenWidth = width; this.screenHeight = height; this.layoutBoard(); }
+        if (width > 0 && height > 0) { this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height); this.layoutBoard(); }
       })
   }
   private sceneCard(id: string): FridgeCard { return this.editing && id === this.selectedId ? this.preview : this.cardMap[id]; }
@@ -1141,10 +1141,12 @@ struct Index {
                   }.width('100%')
                 }.layoutWeight(1).height(48).padding(0).backgroundColor(Color.Transparent)
                   .accessibilityText('选择卡片 '+layerLabel(this.cardMap[id])).onClick(()=>this.selectLayerCard(id))
-                Button('编辑',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(AppDesign.controlHeight).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.groupSelecting&&!this.scheduledName).onClick(()=>this.openEditor(id))
-                Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL,role:ButtonRole.ERROR}) {
-                  SymbolGlyph($r('sys.symbol.trash')).fontSize(18).fontColor(['#C43A35']).hitTestBehavior(HitTestMode.None)
-                }.width(44).height(44).backgroundColor(this.appControl()).enabled(!this.groupSelecting&&!this.scheduledName).accessibilityText('删除 '+layerLabel(this.cardMap[id])).onClick(()=>this.deleteCard(id))
+                if (!this.groupSelecting) {
+                  Button('编辑',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(AppDesign.controlHeight).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.groupSelecting&&!this.scheduledName).onClick(()=>this.openEditor(id))
+                  Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL,role:ButtonRole.ERROR}) {
+                    SymbolGlyph($r('sys.symbol.trash')).fontSize(18).fontColor(['#C43A35']).hitTestBehavior(HitTestMode.None)
+                  }.width(44).height(44).backgroundColor(this.appControl()).enabled(!this.groupSelecting&&!this.scheduledName).accessibilityText('删除 '+layerLabel(this.cardMap[id])).onClick(()=>this.deleteCard(id))
+                }
               }.width('100%').padding(8).borderRadius(12).backgroundColor(this.appSurface()).border({width:!this.groupSelecting&&this.selectedId===id?1.5:0,color:this.appMuted()})
   }
   @Builder
