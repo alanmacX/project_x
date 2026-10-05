@@ -14,6 +14,7 @@ export async function createSmartBackground(json:string,filesDir:string):Promise
     const samples:WeightedColor[]=[],paper=materialColors(card.material,card.paper)[0];
     const cutout=card.shape==='subject'&&card.subjectPhoto?card.cutout:'';
     if(cutout.startsWith('file://')){try{const palette=cache.get(cutout)??await imagePalette(cutout);cache.set(cutout,palette);palette.forEach((color: string, i: number) => samples.push({color:color,weight:1/(i+1)}));}catch(_){}}
+    if(card.capability?.k==='album'&&card.capability.albumCover?.startsWith('file://')) {try{const palette=await imagePalette(card.capability.albumCover);palette.forEach((color:string,i:number)=>samples.push({color:color,weight:1/(i+1)}));}catch(_){}}
     let filled=0;
     for(const el of card.elements.filter((el)=>el.kind==='image'||el.kind==='shape').sort((a,b)=>b.w*b.h-a.w*a.h).slice(0,4)){
       const weight=Math.max(0,Math.min(1,el.w*el.h*el.opacity));filled+=weight;

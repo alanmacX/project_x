@@ -241,7 +241,7 @@ function load(name) {
   kits['@kit.FormKit'].formProvider.getFormRect=previousRect;
   assert.equal(contrastingInk('#FFFFFF'),'#262824'); assert.equal(contrastingInk('#262824'),'#FFFFFF');
   assert.equal(defaultState().cards.length, 0);
-  assert.deepEqual(CAPABILITIES,['clock','date','calendar','countdown','anniversary','weather','dayprogress','yearprogress','battery','agenda','parcel','fetch','timetable','worldclock','lunar']);
+  assert.deepEqual(CAPABILITIES,['clock','date','calendar','countdown','anniversary','weather','dayprogress','yearprogress','battery','agenda','parcel','fetch','timetable','worldclock','lunar','album']);
   assert.ok(!CAPABILITIES.includes('np'));
   const legacy = {id:'legacy',w:999,h:-1,x:800,y:-20,z:42,caps:[
     {k:'text',text:'自己的文字 ☕',fs:22}, {k:'clock'}, {k:'countdown',title:'生日',date:'2027-01-01'},
@@ -550,5 +550,10 @@ function load(name) {
   const bgTransfer=JSON.parse(updates.at(-1).data.background);assert.ok(bgTransfer.src.startsWith('memory://canvas_background'),'background uses FormKit image transfer');
   assert.equal(bgState.background.src,'file:///private/canvas.jpg','form transfer does not overwrite source path');
   const rotatedState=normalizeState({schemaVersion:2,cards:[{...bird,rot:145,subjectBorder:false}]});assert.equal(rotatedState.cards[0].rot,145,'preview rotation survives reload outside the old 15 degree clamp');assert.equal(rotatedState.cards[0].subjectBorder,true);
+  const albumCard=new FridgeCard();albumCard.id='album';albumCard.capability={k:'album',albumCover:'file:///private/album.jpg',albumBackground:'file:///private/album-fluid.png'};
+  const closedBeforeAlbum=closed.length;
+  await updateWidget('123',JSON.stringify({schemaVersion:2,cards:[albumCard]}),'4*4');
+  const albumTransfer=JSON.parse(updates.at(-1).data.faceCards)[0].capability;
+  assert.equal(albumTransfer.albumCover,'memory://'+widgetImageKey('album_albumCover',albumCard.capability.albumCover));assert.equal(albumTransfer.albumBackground,'memory://'+widgetImageKey('album_albumBackground',albumCard.capability.albumBackground));assert.equal(closed.length,closedBeforeAlbum+2,'album descriptors released');
   console.log('PASS: compact/full capability layouts and substantially smaller subject weather minimum; isolated noise/spur cleanup with preserved interior/thin subject; subject white-edge safe bounds; serialized FormExtension calendar actions and weather refresh success/failure preserving concurrent edits; one widget size; app/widget geometry parity across four viewports, preserved card aspect and off-canvas positions, actual FormKit dimensions; TaskPool dispatch and failure cleanup, 1024px decode limit, optimized/reference Gaussian equality; smoothing alpha, tight crop, coordinate preservation, 32 capability minima, thin-shape refusal; safe layout, non-overlap, cropped bounds, resize projection, full-foreground overlay; v2 zero/one capability, legacy migration, canvas content/captions, box constraints, save queue/retry/reload, corrupt-data preservation, image+subject form transfer/cleanup, mask contours/holes/disconnected parts, native segmentation cleanup/failures');
 })().catch(error => { console.error(error); process.exitCode=1; });

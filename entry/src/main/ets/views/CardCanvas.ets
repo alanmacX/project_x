@@ -1,3 +1,4 @@
+import { AlbumCapability } from './AlbumCapability';
 import { readingSurface, readingVeilColor } from '../model/CapabilityPresentation';
 import { capabilityInset } from '../model/CanvasLayout';
 import { AnimatedPhoto } from './AnimatedPhoto';
@@ -44,6 +45,9 @@ export struct CardCanvas {
   @Prop moveY: number = 0;
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
+      if(this.card.capability?.k==='album') {
+        AlbumCapability({cap:this.card.capability!,cardWidth:this.card.w,cardHeight:this.card.h,scaleFactor:this.scaleFactor})
+      } else {
       Column().width('100%').height('100%').backgroundColor(materialColors(this.card.material, this.card.paper, this.card.ink)[0])
       if (this.card.shape === 'subject' && this.card.subjectPhoto && this.card.cutout.length > 0) {
         Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
@@ -55,6 +59,7 @@ export struct CardCanvas {
       if (this.card.shape === 'subject' && this.card.cutout.length > 0) {
         Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
           .blendMode(BlendMode.DST_IN, BlendApplyType.OFFSCREEN)
+      }
       }
     }.width('100%').height('100%').borderRadius(shapeRadius(this.card.shape)).clip(true)
       .blendMode(BlendMode.SRC_OVER, this.card.shape === 'subject' ? BlendApplyType.OFFSCREEN : BlendApplyType.FAST)

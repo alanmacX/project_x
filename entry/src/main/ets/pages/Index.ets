@@ -693,12 +693,13 @@ struct Index {
       if(k==='timetable'){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));cap.semester=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);cap.courses=[];}
       if (k === 'worldclock') cap.zone = 'Asia/Shanghai';
       if (k === 'weather') { cap.city = ''; cap.temp = '--°'; cap.desc = '未更新'; }
+      if(k==='album') {card.shape='rect';card.frame=false;this.editorTabs=[1];this.settingsTab=1;}
       card.capability = cap; card.capBox = capabilityPreset(card,'center'); this.layerId = 'capability';
     }
     this.syncFields(); this.change(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.refreshCapabilities();
   }
   private addElement(kind: string): void {
-    const card = this.current(); if (card === null) return;
+    const card = this.current(); if (card === null || card.capability?.k==='album') return;
     const el = new CanvasElement(); el.id = this.store.newId(); el.kind = kind;
     el.y = 0.12 + (card.elements.length % 5) * 0.12; el.h = kind === 'text' ? 0.25 : 0.35;
     el.w = kind === 'shape' ? 0.3 : 0.7; el.color = kind === 'shape' ? '#D6DCE3' : '';
@@ -1404,7 +1405,7 @@ struct Index {
             backIcon: { label: '撤销', type: TextStyleMode.NORMAL, isEnabled: this.undoAvailable && !this.heroActive, action: () => this.restoreHistory(false) },
             menu: { maxCount: 4, value: [
               { content: { icon: new SymbolGlyphModifier($r('sys.symbol.rectangle_and_arrowshape_turn_up_right')).fontColor([this.appText()]), label: '分享卡片', type: IconStyleMode.NORMAL, componentId: 'shareCard', isEnabled: !this.sharing && !this.heroActive, action: () => this.shareMenu(true) } },
-              { content: { label: '添加', type: TextStyleMode.NORMAL, isEnabled: !this.heroActive, action: () => this.showAddMenu() } },
+              { content: { label: '添加', type: TextStyleMode.NORMAL, isEnabled: !this.heroActive && this.preview.capability?.k!=='album', action: () => this.showAddMenu() } },
               { content: { label: '重做', type: TextStyleMode.NORMAL, isEnabled: this.redoAvailable && !this.heroActive, action: () => this.restoreHistory(true) } },
               { content: { label: '完成', type: TextStyleMode.NORMAL, isEnabled: !this.heroActive, action: () => this.closeEditor() } }
             ] }
@@ -1438,8 +1439,12 @@ struct Index {
   }
   @Builder
   editorControls() {
+    if(this.preview.capability?.k==='album') {
+      Text('专辑封面与背景').fontSize(14).fontColor(this.appMuted()).width(this.editorControlsWidth()).margin({top:4,bottom:12})
+    } else {
     SettingsSegmented({labels:['背景创作','上层内容'],selectedIndex:this.settingsTab,appDark:this.appDark,onSelect:(index:number)=>{this.editorTabs=[index];}})
       .width(this.editorControlsWidth()).margin({top:4,bottom:12})
+  }
   }
   @Builder
   editorLayers() {
@@ -1455,6 +1460,10 @@ struct Index {
         Column() {
         ForEach([this.settingsTab+':'+this.layerId+':'+(this.preview.capability?.k??'none')],(_key:string)=>{
         Column({ space: 12 }) {
+          if(this.preview.capability?.k==='album') {
+            Column({space:16}) {this.capabilityPanel();this.capabilityDataPanel()}
+              .width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
+          } else {
           if (this.layerId.length > 0 && this.layerId !== 'capability') {
             this.elementFields()
           }
@@ -1481,6 +1490,7 @@ struct Index {
           }
 
           if (this.settingsTab === 1 && this.preview.capability !== null && capabilityBox(this.preview).w === 0) { Text('内容空间不足，请调整文字大小或位置').fontSize(12).fontColor('#846339').width('100%') }
+          }
           Row({ space: 12 }) {
             Button('复制卡片', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).layoutWeight(1).fontSize(14).fontColor(this.appText()).backgroundColor(this.appSurface()).onClick(() => this.duplicate())
           }.width('100%').margin({ top: 4 })
@@ -1501,14 +1511,14 @@ struct Index {
     Stack({ alignContent: Alignment.TopStart }) {
       Column().width('100%').height('100%').backgroundColor(Color.Transparent).onClick(() => { this.layerId = ''; this.syncFields(); })
       Stack({ alignContent: Alignment.TopStart }) {
-        ForEach(this.preview.elements.filter((el: CanvasElement) => el.behindCapability && this.settingsTab === 0), (el: CanvasElement) => { this.layerTouch(el.id) }, (el: CanvasElement) => el.id)
-        if (this.settingsTab === 1 && this.preview.capability !== null) { this.layerTouch('capability') }
-        ForEach(this.preview.elements.filter((el: CanvasElement) => !el.behindCapability && this.settingsTab === 1), (el: CanvasElement) => { this.layerTouch(el.id) }, (el: CanvasElement) => el.id)
+        ForEach(this.preview.elements.filter((el: CanvasElement) => this.preview.capability?.k!=='album' && el.behindCapability && this.settingsTab === 0), (el: CanvasElement) => { this.layerTouch(el.id) }, (el: CanvasElement) => el.id)
+        if (this.settingsTab === 1 && this.preview.capability !== null && this.preview.capability.k!=='album') { this.layerTouch('capability') }
+        ForEach(this.preview.elements.filter((el: CanvasElement) => this.preview.capability?.k!=='album' && !el.behindCapability && this.settingsTab === 1), (el: CanvasElement) => { this.layerTouch(el.id) }, (el: CanvasElement) => el.id)
       }.width(this.preview.w * this.editorScale()).height(this.preview.h * this.editorScale())
         .rotate({ angle: this.editingAngle(), centerX: 0, centerY: '100%' })
         .position({ x: this.previewViewport().left, y: this.previewViewport().top })
       
-      if (this.layerId.length > 0 && (this.layerId!=='capability'||this.preview.capability!==null) && this.layerDrag.length === 0) {
+      if (this.preview.capability?.k!=='album' && this.layerId.length > 0 && (this.layerId!=='capability'||this.preview.capability!==null) && this.layerDrag.length === 0) {
         Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right')).fontSize(20).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(18).backgroundColor(this.appSurface()).fontColor(this.appText()).shadow({ radius: 6, color: '#18000000', offsetY: 2 })
           .border({ width: 1, color: '#B8B8B8' }).position({ x: this.editorHandle(true).x - 22, y: this.editorHandle(true).y - 22 })
           .accessibilityText('缩放选中元素')
@@ -1657,6 +1667,8 @@ struct Index {
         if(this.preview.shape==='subject' && this.preview.subjectPhoto && this.preview.cutout) {
           Image(this.preview.cutout).width(32).height(32).objectFit(ImageFit.Contain).draggable(false)
         } else {Column().width(26).height(26).borderRadius(6).backgroundColor(materialColors(this.preview.material,this.preview.paper,this.preview.ink)[0]).border({width:.5,color:AppDesign.border(this.appDark)})}
+      } else if(id==='capability' && this.preview.capability?.k==='album' && this.preview.capability.albumCover) {
+        Image(this.preview.capability.albumCover).width(32).height(32).objectFit(ImageFit.Contain).borderRadius(4).draggable(false)
       } else if(this.layerElement(id)?.kind==='image') {
         Image(this.layerElement(id)?.src??'').width(32).height(32).objectFit(ImageFit.Contain).draggable(false)
       } else if(this.layerElement(id)?.kind==='shape') {
@@ -1684,12 +1696,14 @@ struct Index {
   }
   @Builder
   layerEntries() {
-    ForEach(this.preview.elements.filter((el: CanvasElement) => el.behindCapability === (this.settingsTab === 0)).slice().reverse(), (el: CanvasElement) => {
+    if(this.preview.capability?.k==='album') {this.layerEntry('capability')} else {
+    ForEach(this.preview.elements.filter((el: CanvasElement) => this.preview.capability?.k!=='album' && el.behindCapability === (this.settingsTab === 0)).slice().reverse(), (el: CanvasElement) => {
       this.layerEntry(el.id)
     }, (el: CanvasElement) => el.id)
     if (this.settingsTab === 1 && this.preview.capability !== null) { this.layerEntry('capability') }
-    if(this.settingsTab===0) {this.layerEntry('')}
+    if(this.settingsTab===0 && this.preview.capability?.k!=='album') {this.layerEntry('')}
     else if(this.preview.capability===null) {this.layerEntry('')}
+    }
   }
   @Builder
   layersPanel() {
@@ -1809,7 +1823,7 @@ struct Index {
         Button(this.weatherBusy ? '更新中' : '更新天气', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.weatherBusy).onClick(() => this.refreshWeather())
         Text(this.preview.capability?.refreshState === 'failed' ? '暂时无法获取天气，稍后自动重试' : '天气自动更新；打开 App 时会补刷过期数据').fontSize(12).fontColor(this.appMuted()).width('100%')
       }
-      if(this.preview.capability!==null && ['battery','agenda','parcel','fetch','timetable'].includes(this.preview.capability!.k)) {
+      if(this.preview.capability!==null && ['album','battery','agenda','parcel','fetch','timetable'].includes(this.preview.capability!.k)) {
         CapabilitySettings({cap:this.preview.capability!,cardId:this.preview.id,appDark:this.appDark,onUpdate:(id:string,next:CapBlock)=>this.updateExtraCapability(id,next)})
       }
     }.width('100%')

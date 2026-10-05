@@ -16,6 +16,7 @@ export async function imagePalette(src: string): Promise<string[]> {
 }
 export async function imageColor(src: string): Promise<string> { return (await imagePalette(src))[0]; }
 export function cardSource(card:FridgeCard):string {
+  if(card.capability?.k==='album')return card.capability.albumCover??'';
   if(card.shape==='subject'&&card.subjectPhoto&&card.cutout.startsWith('file://'))return card.cutout;
   const images=card.elements.filter((el)=>el.kind==='image'&&el.src.startsWith('file://')).sort((a,b)=>b.w*b.h-a.w*a.h);
   return images[0]?.src??'';

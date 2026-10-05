@@ -1,3 +1,4 @@
+import { AlbumSettings } from './AlbumSettings';
 import { SettingsAction } from './SettingsAction';
 import { applyTimetableImport } from '../model/TimetableImport';
 import { ParcelImportDialog } from './ParcelImportDialog';
@@ -138,6 +139,7 @@ export struct CapabilitySettings {
   }
   build() {
     Column({space:12}) {
+      if(this.cap.k==='album') {AlbumSettings({cap:this.cap,cardId:this.cardId,appDark:this.appDark,onUpdate:this.onUpdate})}
       if(this.cap.k==='battery') {
         Text('本机电量与充电状态，前台响应系统变化；桌面由系统周期刷新。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
         SettingsAction({label:this.busy?'更新中':'更新电量',onPress:()=>this.refresh(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})

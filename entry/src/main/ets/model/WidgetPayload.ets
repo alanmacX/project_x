@@ -14,6 +14,16 @@ export async function prepareWidgetPayload(json: string): Promise<WidgetPayload>
   try {
     for (const card of state.cards) {
       card.outline = compactContours(card.outline);
+      const cap=card.capability;
+      if(cap?.k==='album') {
+        for(const field of ['albumCover','albumBackground']) {
+          const src=field==='albumCover'?cap.albumCover??'':cap.albumBackground??'';
+          if(!src.startsWith('file://'))continue;
+          const key=widgetImageKey(card.id+'_'+field,src);let mapped='';
+          try {const file=await fileIo.open(src.slice(7),fileIo.OpenMode.READ_ONLY);payload.descriptors.push(file.fd);payload.images[key]=file.fd;mapped='memory://'+key;}catch(_){}
+          if(field==='albumCover')cap.albumCover=mapped;else cap.albumBackground=mapped;
+        }
+      }
       if (card.cutout.startsWith('file://')) {
         const key = widgetImageKey(card.id + '_subject', card.cutout);
         try {

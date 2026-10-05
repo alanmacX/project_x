@@ -160,6 +160,7 @@ export function capabilityObstructed(card:FridgeCard):boolean {
   return card.elements.some((el)=>!el.behindCapability && (el.kind==='text'||el.kind==='image') && card.capBox.x<el.x+el.w && card.capBox.x+card.capBox.w>el.x && card.capBox.y<el.y+el.h && card.capBox.y+card.capBox.h>el.y);
 }
 export function capabilityBox(card: FridgeCard): ElementBox {
+  if(card.capability?.k==='album') {const box=new ElementBox();box.x=0;box.y=0;box.w=1;box.h=1;return box;}
   const minimum=cardCapabilityMinimum(card,true,card.w*card.capBox.w);
   const key=minimum.w+':'+minimum.h+':'+card.shape+':'+outlineIdentity(card)+':'+card.subjectBorder+':'+card.w+':'+card.h+':'+JSON.stringify(card.capBox);
   const cached=layoutCache.get(key);if(cached!==undefined)return cached;
@@ -196,7 +197,7 @@ function readableSlot(card: FridgeCard, safe: ElementBox): ElementBox {
 }
 export function minimumCardSize(card: FridgeCard): CapabilitySize {
   const size = new CapabilitySize(); size.w = card.shape === 'subject' ? 16 : 80; size.h = card.shape === 'subject' ? 16 : 80;
-  if (card.capability === null) return size;
+  if (card.capability === null || card.capability.k==='album') return size;
   const safe = safeContentBox(card), min = cardCapabilityMinimum(card, true, card.w*safe.w);
   size.w = Math.max(card.shape === 'subject' ? 16 : 80, min.w / Math.max(.0001, safe.w)); size.h = Math.max(card.shape === 'subject' ? 16 : 80, min.h / Math.max(.0001, safe.h));
   return size;

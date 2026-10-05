@@ -13,9 +13,13 @@ export class CapType {
   static readonly DAY_PROGRESS: string = 'dayprogress';
   static readonly YEAR_PROGRESS: string = 'yearprogress';
 }
-export const CAPABILITIES: string[] = ['clock', 'date', 'calendar', 'countdown', 'anniversary', 'weather', 'dayprogress', 'yearprogress', 'battery', 'agenda', 'parcel', 'fetch', 'timetable', 'worldclock', 'lunar'];
+export const CAPABILITIES: string[] = ['clock', 'date', 'calendar', 'countdown', 'anniversary', 'weather', 'dayprogress', 'yearprogress', 'battery', 'agenda', 'parcel', 'fetch', 'timetable', 'worldclock', 'lunar', 'album'];
 export interface CapBlock {
   k: string;
+  albumId?: string;
+  albumCover?: string;
+  albumBackground?: string;
+  albumSource?: string;
   readingStyle?: string; // auto | plain | surface; photo subjects receive a readable backing
   parcelPlace?: string; // user's default local pickup location
   title?: string;
@@ -140,7 +144,7 @@ export class FridgeState {
 }
 export function typeLabel(k: string): string {
   const index = CAPABILITIES.indexOf(k);
-  const names: string[] = ['时间', '日期', '台历', '倒计时', '纪念日', '天气', '今日进度', '年度进度', '本机电量', '日程', '取件码', 'URL 内容', '课程表', '世界时钟', '农历'];
+  const names: string[] = ['时间', '日期', '台历', '倒计时', '纪念日', '天气', '今日进度', '年度进度', '本机电量', '日程', '取件码', 'URL 内容', '课程表', '世界时钟', '农历', '音乐专辑'];
   return index >= 0 ? names[index] : '自定义';
 }
 export function materialColors(material: string, paper: string = '', ink: string = ''): string[] {
@@ -243,6 +247,7 @@ export function normalizeState(raw: FridgeState): FridgeState {
         }
       }
     }
+    if (card.capability?.k === 'album') { card.shape='rect'; card.frame=false; }
     if (card.shape === 'subject' && card.cutout.length === 0) card.shape = 'rect';
   }
   return state;
@@ -258,6 +263,12 @@ export function contrastingInk(color: string): string {
 
 export function normalizeCapability(raw: CapBlock): CapBlock {
   const cap = JSON.parse(JSON.stringify(raw)) as CapBlock;
+  if(raw.k==='album') {
+    const local=(v:string|undefined):string=>typeof v==='string'&&(v.startsWith('file://')||v.startsWith('memory://'))?v:'';
+    cap.albumCover=local(raw.albumCover);cap.albumBackground=local(raw.albumBackground);
+    cap.albumId=typeof raw.albumId==='string'?raw.albumId.slice(0,96):'';cap.albumSource=raw.albumSource==='musicbrainz'?'musicbrainz':'';
+    cap.artist=typeof raw.artist==='string'?raw.artist.slice(0,160):'';
+  }
   if (raw.k === 'worldclock') cap.zone = clockZone(typeof raw.zone === 'string' ? raw.zone : '');
   cap.readingStyle = ['plain','surface'].includes(raw.readingStyle ?? '') ? raw.readingStyle : 'auto';
   cap.parcelPlace = typeof raw.parcelPlace === 'string' ? raw.parcelPlace.slice(0,80) : '';
