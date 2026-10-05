@@ -1,6 +1,6 @@
 import { EditorLayerMotion } from '../model/EditorLayerMotion';
 import { AlbumCapability } from './AlbumCapability';
-import { readingSurface, readingVeilColor } from '../model/CapabilityPresentation';
+import { readingSurface, readingSurfaceColor } from '../model/CapabilityPresentation';
 import { capabilityInset } from '../model/CanvasLayout';
 import { AnimatedPhoto } from './AnimatedPhoto';
 import { FridgeCard, CanvasElement, ElementBox, materialColors, shapeRadius } from '../model/CardSchema';
@@ -89,18 +89,19 @@ export struct CardCanvas {
   }
   private capabilityInk():string { return this.card.shape==='subject'&&this.card.subjectPhoto&&this.card.ink.length===0?this.card.subjectInk:materialColors(this.card.material,this.card.paper,this.card.ink)[1]; }
   private hasReadingSurface():boolean { return readingSurface(this.card.capability,this.card.shape==='subject'&&this.card.subjectPhoto,capabilityObstructed(this.card)); }
+  private readingTexture():Resource {
+    const color=readingSurfaceColor(this.capabilityInk()),scrim=this.card.capability?.readingBlend==='scrim';
+    if(color==='#252824')return scrim?$r('app.media.reading_scrim_dark'):$r('app.media.reading_feather_dark');
+    if(color==='#FFFFFF')return scrim?$r('app.media.reading_scrim_white'):$r('app.media.reading_feather_white');
+    if(color==='#000000')return scrim?$r('app.media.reading_scrim_black'):$r('app.media.reading_feather_black');
+    return scrim?$r('app.media.reading_scrim_warm'):$r('app.media.reading_feather_warm');
+  }
   @Builder
   capabilityContent() {
     Stack() {
       if(this.hasReadingSurface() && this.card.capability?.readingBlend!=='halo') {
-        // Feather the entire field to zero before its perimeter. No border,
-        // backdrop blur or additional offscreen material pass per capability.
-        Column().width('100%').height('100%')
-          .radialGradient({center:['50%','50%'],radius:'50%',colors:[
-            [readingVeilColor(this.capabilityInk(), this.card.capability?.readingBlend==='scrim'?.70:.42,this.card.capability?.readingBlend), 0],
-            [readingVeilColor(this.capabilityInk(), this.card.capability?.readingBlend==='scrim'?.62:.30,this.card.capability?.readingBlend), .38],
-            [readingVeilColor(this.capabilityInk(), this.card.capability?.readingBlend==='scrim'?.22:.12,this.card.capability?.readingBlend), .72],
-            [readingVeilColor(this.capabilityInk(), 0), 1]]})
+        // One precomputed alpha field: native gradient bounds differ across Form hosts.
+        Image(this.readingTexture()).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
           .scale({x:1.45,y:1.45})
           .hitTestBehavior(HitTestMode.None)
       }
