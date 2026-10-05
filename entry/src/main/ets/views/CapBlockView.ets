@@ -125,7 +125,7 @@ export struct CapabilityView {
       } else if(this.cap.k==='timetable') {
         TimetableCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
       } else if(this.cap.k==='agenda') {
-        SummaryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
+        SummaryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
       } else {
         Text(typeLabel(this.cap.k)).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(0.65)
         Text(Math.floor(progressOf(this.cap.k, this.now()) * 100) + '%').fontSize(((this.compact() ? 24 : 38) * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled))

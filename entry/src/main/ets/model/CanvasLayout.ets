@@ -1,7 +1,7 @@
 import { readingSurface } from './CapabilityPresentation';
 import { cardOutline } from './RenderContours';
 import { FridgeCard, ElementBox, ShapePoint, BOARD_W, BOARD_H } from './CardSchema';
-import { capabilityMinimum, CapabilitySize } from './CapabilityMetrics';
+import { capabilityMinimum, capabilityReadableMinimum, CapabilitySize } from './CapabilityMetrics';
 
 function outlineIntervals(y: number, loops: ShapePoint[][]): number[] {
   const xs: number[] = [];
@@ -180,13 +180,14 @@ export function capabilityPlacement(card: FridgeCard): ElementBox {
   return overlay;
 }
 /** Permit cropped compositions, while keeping a recoverable portion inside the canvas. */
-export function clampCardGeometry(card: FridgeCard, width: number = BOARD_W, height: number = BOARD_H): void {
+export function clampCardGeometry(card: FridgeCard, width: number = BOARD_W, height: number = BOARD_H, renderedHeight: number = height): void {
   const a = card.rot * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
   const xs: number[] = [0, card.h * s, card.w * c + card.h * s, card.w * c];
   const ys: number[] = [0, -card.h * c, card.w * s - card.h * c, card.w * s];
   const visibleX = Math.min(32, card.w * .2), visibleY = Math.min(32, card.h * .2);
   card.x = Math.max(visibleX - Math.max(...xs), Math.min(width - visibleX - Math.min(...xs), card.x));
-  card.y = Math.max(visibleY - card.h - Math.max(...ys), Math.min(height - visibleY - card.h - Math.min(...ys), card.y));
+  card.y = Math.max((visibleY - card.h - Math.max(...ys))*height/renderedHeight,
+    Math.min((renderedHeight - visibleY - card.h - Math.min(...ys))*height/renderedHeight, card.y));
 }
 
 function readableSlot(card: FridgeCard, safe: ElementBox): ElementBox {
@@ -199,6 +200,14 @@ export function minimumCardSize(card: FridgeCard): CapabilitySize {
   const size = new CapabilitySize(); size.w = card.shape === 'subject' ? 16 : 80; size.h = card.shape === 'subject' ? 16 : 80;
   if (card.capability === null || card.capability.k==='album') return size;
   const safe = safeContentBox(card), min = cardCapabilityMinimum(card, true, card.w*safe.w);
+  if (card.shape === 'subject' && cardOutline(card).length > 0) {
+    const surface=subjectSurfaceFactor(card), interiorW=safe.w/surface, interiorH=safe.h/surface;
+    // Solve the fixed 6-unit white edge at the target size, not today's size.
+    // Both dimensions share a scale: a thin silhouette must retain its aspect.
+    const edge=card.subjectBorder?6/Math.min(card.w,card.h):0;
+    size.w=Math.max(16,min.w/Math.max(.0001,interiorW)+card.w*edge);
+    size.h=Math.max(16,min.h/Math.max(.0001,interiorH)+card.h*edge);return size;
+  }
   size.w = Math.max(card.shape === 'subject' ? 16 : 80, min.w / Math.max(.0001, safe.w)); size.h = Math.max(card.shape === 'subject' ? 16 : 80, min.h / Math.max(.0001, safe.h));
   return size;
 }
@@ -207,7 +216,7 @@ export function ensureCapabilitySize(card: FridgeCard): boolean {
   const min = minimumCardSize(card), factor = Math.max(1, min.w / card.w, min.h / card.h);
   const w = card.w * factor, h = card.h * factor;
   if (w > 320 + .01 || h > 420 + .01) return false;
-  card.w = w; card.h = h; clampCardGeometry(card); return true;
+  card.w = w; card.h = h; return true;
 }
 
 /** Attach subject controls to the actual silhouette near each corner, including concave shapes. */
@@ -224,10 +233,12 @@ export function cardHandlePoint(card: FridgeCard, right: boolean, bottom: boolea
 
 /** Backing and inset belong to layout, so a photo subject never silently loses readable space. */
 export function capabilityInset(card: FridgeCard): number {
-  return readingSurface(card.capability, card.shape === 'subject' && card.subjectPhoto, capabilityObstructed(card)) ? 8 : 0;
+  // Feathered reading fields have no hard perimeter requiring a panel-sized gutter.
+  return readingSurface(card.capability, card.shape === 'subject' && card.subjectPhoto, capabilityObstructed(card)) ? 4 : 0;
 }
 export function cardCapabilityMinimum(card: FridgeCard, compact: boolean = true, width: number = 0): CapabilitySize {
-  const inset = capabilityInset(card), size = capabilityMinimum(card.capability, compact, Math.max(0,width - inset*2));
+  const inset = capabilityInset(card), available=Math.max(0,width - inset*2);
+  const size = compact ? capabilityReadableMinimum(card.capability,available) : capabilityMinimum(card.capability,false,available);
   if(card.capability!==null) { size.w += inset*2; size.h += inset*2; } return size;
 }
 /** Presets choose a readable island inside the actual silhouette; artwork geometry stays intact. */

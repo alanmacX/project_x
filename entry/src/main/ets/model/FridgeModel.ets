@@ -1,14 +1,13 @@
 import { CanvasCatalog, CanvasDocument, canvasKey, readCatalog, cloneCanvas } from './CanvasLibrary';
 import { assertCanvasCapacity } from './CanvasCapacity';
-import { cleanGroups } from './CardGroups';
+import { clampCanvasGroups, cleanGroups } from './CardGroups';
 import { LatestWidgetQueue } from './LatestWidgetQueue';
 import { primeRenderContours } from './RenderContours';
 import { storageSnapshot } from './StorageSnapshot';
 import preferences from '@ohos.data.preferences';
 import { formProvider } from '@kit.FormKit';
-import { clampCardGeometry } from './CanvasLayout';
 import { pushWidgets } from './WidgetSync';
-import { FridgeState, FridgeCard, defaultState, normalizeState } from './CardSchema';
+import { FridgeState, FridgeCard, defaultState, normalizeState, BOARD_W } from './CardSchema';
 export { FridgeState, FridgeCard, CapBlock, CapType, CanvasElement, ElementBox, ShapePoint, BOARD_W, BOARD_H,
   CAPABILITIES, materialColors, shapeRadius, typeLabel, defaultState, normalizeState, serializeFaceCards, serializeDoorCards } from './CardSchema';
 
@@ -39,7 +38,7 @@ export class FridgeStore {
     const json=await this.prefs.get(canvasKey(id),'') as string;if(!json)throw new Error('画布记录缺失，已保留目录');
     const raw=JSON.parse(json) as FridgeState;if(!Array.isArray(raw.cards))throw new Error('画布数据损坏');
     const doc=new CanvasDocument();doc.id=id;doc.name=entry.name;doc.state=normalizeState(raw);doc.state.canvasId=id;
-    cleanGroups(doc.state.cards);doc.state.cards.forEach((c)=>clampCardGeometry(c));this.documents=this.documents.filter((c)=>c.id!==id);this.documents.push(doc);this.savedScenes[id]=json;return this.switchCanvas(id);
+    cleanGroups(doc.state.cards);clampCanvasGroups(doc.state.cards,BOARD_W/doc.state.canvasAspect);this.documents=this.documents.filter((c)=>c.id!==id);this.documents.push(doc);this.savedScenes[id]=json;return this.switchCanvas(id);
   }
   /** Export a detached snapshot; sharing an inactive canvas never changes widget bindings. */
   async canvasSnapshot(id: string): Promise<FridgeState> {
@@ -93,7 +92,7 @@ export class FridgeStore {
         const parsed = json ? JSON.parse(json) as FridgeState : defaultState();
         if (!Array.isArray(parsed.cards)) throw new Error('Invalid cards');
         const doc = new CanvasDocument(); doc.id = entry.id; doc.name = entry.name; doc.state = normalizeState(parsed); doc.state.canvasId = entry.id;
-        cleanGroups(doc.state.cards); doc.state.cards.forEach((card: FridgeCard) => clampCardGeometry(card)); this.documents.push(doc);
+        cleanGroups(doc.state.cards); clampCanvasGroups(doc.state.cards,BOARD_W/doc.state.canvasAspect); this.documents.push(doc);
         this.savedScenes[entry.id] = catalogJson ? json : '';
       }
       this.switchCanvas(this.catalog.activeId);

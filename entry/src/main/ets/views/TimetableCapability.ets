@@ -3,6 +3,7 @@ import { readingHalo } from '../model/CapabilityPresentation';
 import { CapBlock, AgendaItem } from '../model/CardSchema';
 import { timetableDisplay, TimetableDisplay, timeText } from '../model/CapabilityData';
 import { briefColumns, briefHeight, LESSON_CELL_HEIGHT, BRIEF_HEADER_HEIGHT } from '../model/TimetableLayout';
+import { capabilityFits, capabilityContentScale } from '../model/CapabilityMetrics';
 @Component
 export struct TimetableCapability {
   @Prop @Watch('update') cap: CapBlock = {k:'timetable'};
@@ -15,11 +16,12 @@ export struct TimetableCapability {
   @State display: TimetableDisplay = new TimetableDisplay();
   aboutToAppear(): void { this.update(); }
   private update(): void { this.display = timetableDisplay(this.cap, this.tick > 0 ? this.tick : Date.now()); }
-  private s(): number { return this.scaleFactor; }
+  private contentScale(): number { return capabilityContentScale(this.cap,this.contentWidth,this.contentHeight); }
+  private s(): number { return this.scaleFactor*this.contentScale(); }
   private calendarPending():boolean {const date=new Date(this.display.date),key=dateKey(date);return this.cap.skipHolidays!==false&&!holidayKnown(date.getFullYear())&&!(this.cap.teachingDays??[]).some((d)=>d.date===key)&&!(this.cap.holidayDates??[]).some((d)=>d.date===key);}
   private dateLabel(): string { const d = new Date(this.display.date); return (d.getMonth()+1)+'.'+d.getDate(); }
-  private columns(): number { return briefColumns(this.contentWidth); }
-  private fits(): boolean { return this.cap.timetableMode === 'day' ? this.contentHeight + .1 >= briefHeight(this.display.lessons.length, this.columns()) : this.contentWidth >=127.9 && this.contentHeight >=115.9; }
+  private columns(): number { return briefColumns(this.contentWidth/Math.max(.001,this.contentScale())+.01); }
+  private fits(): boolean { return capabilityFits(this.cap,this.contentWidth,this.contentHeight); }
   @Builder
   heading() {
     Row({space:4*this.s()}) {

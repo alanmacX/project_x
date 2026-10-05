@@ -38,7 +38,7 @@ assert.equal(m.capabilityMinimum(dense,true).h,258);
 assert.equal(l.briefColumns(191),1);assert.equal(l.briefColumns(192),2);assert.equal(l.briefColumns(264),3);
 const card=new s.FridgeCard();card.id='day';card.w=150;card.h=160;card.capability=dense;card.shape='rect';
 assert.ok(g.ensureCapabilitySize(card));const box=g.capabilityPlacement(card);
-assert.ok(box.w*card.w>=192-.1);assert.ok(box.h*card.h>=258-.1);
+assert.ok(box.w*card.w>=192*m.MIN_CAPABILITY_SCALE-.1);assert.ok(box.h*card.h>=258*m.MIN_CAPABILITY_SCALE-.1);assert.ok(m.capabilityFits(dense,box.w*card.w,box.h*card.h),'all eight lessons fit at the supported typography floor');
 const first=g.capabilityPlacement(card);card.capability={...base};const next=g.capabilityPlacement(card);assert.ok(next.h<first.h,'mode switch invalidates cached layout');
 const thin=new s.FridgeCard();thin.shape='subject';thin.outline=[[{x:.4,y:0},{x:.6,y:0},{x:.6,y:1},{x:.4,y:1}]];thin.capability=dense;assert.equal(g.ensureCapabilitySize(thin),false,'do not crush content into narrow cutout');
 assert.equal(d.nextDataBoundary(base,at('2026-09-07T09:49:00')),at('2026-09-07T09:50:00'));
@@ -54,7 +54,7 @@ const oldMinimum=l.timetableCapacity(twelve);twelve.courses=twelve.courses.slice
 const begin=performance.now();for(let i=0;i<10000;i++){m.capabilityMinimum(dense,true);g.capabilityPlacement(card);}const elapsed=performance.now()-begin;
 console.log(JSON.stringify({scenario:'10,000 warm timetable minimum + card placement lookups (model CPU only, not device FPS)',milliseconds:Number(elapsed.toFixed(2))}));
 
-assert.equal(m.capabilityFits(dense,300,210),true,'wide brief uses three columns, not a fixed tall minimum');assert.equal(m.capabilityFits(dense,192,210),false,'two-column layout still reserves all eight lessons');
+assert.equal(m.capabilityFits(dense,300,210),true,'wide brief uses three columns, not a fixed tall minimum');assert.equal(m.capabilityFits(dense,192,205),false,'two-column layout still reserves all eight lessons at the readable floor');
 
 const changingHolidays={...daily,courses:[course('original',1),course('first',2),course('second',2)],holidayDates:[{date:'2026-09-08',name:'校假'}],courseChanges:[{...change,courseId:'original',targetDate:'2026-09-08'}]};assert.equal(l.timetableCapacity(changingHolidays),2);changingHolidays.holidayDates=[];assert.equal(l.timetableCapacity(changingHolidays),3,'holiday changes invalidate transferred-day capacity');
 console.log('PASS timetable: 10-minute handoff, evening/holiday gating, whole-day brief, tomorrow empty, short classes, transfers, dense adaptive sizing/cache, narrow cutout rejection, update boundaries, week overlaps/parity and migration');

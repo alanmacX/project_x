@@ -76,3 +76,52 @@ const stable=snap.cardRenderSnapshot(mutable);assert.equal(snap.cardRenderSnapsh
 mutable.capability.temp='19';mutable.elements[0].text='after';mutable.rot=23;mutable.capBox.x=.3;
 const changed=snap.cardRenderSnapshot(mutable);assert.notEqual(changed,stable);assert.equal(stable.capability.temp,'18');assert.equal(stable.elements[0].text,'before');assert.equal(changed.rot,23);assert.equal(changed.capBox.x,.3);
 console.log('PASS render-cache reuse and isolated nested content/geometry updates');
+
+// Bounds and commit must use the same display-space displacement on phone/tablet hosts.
+const dg=load('DragGeometry');
+for(const height of [280,s.BOARD_H,740]) {
+ const members=[{...new s.FridgeCard(),id:'pan-a',groupId:'pan',x:35,y:100,w:92,h:130,rot:27},
+  {...new s.FridgeCard(),id:'pan-b',groupId:'pan',x:170,y:180,w:100,h:78,rot:-31}];
+ const anchor=members[0],bounds=grouping.groupDragBounds(members,anchor,height);
+ for(const target of [{x:bounds.minX,y:bounds.minY},{x:bounds.maxX,y:bounds.maxY}]) {
+  const dx=target.x-anchor.x,dy=target.y-anchor.y;
+  for(const member of members) {
+   const b=dg.dragBounds(member,height),x=member.x+dx,y=member.y+dy;
+   assert.ok(x>=b.minX-1e-8&&x<=b.maxX+1e-8&&y>=b.minY-1e-8&&y<=b.maxY+1e-8,'every member stays recoverable at shared bounds '+height);
+  }
+ }
+ const boxBefore=gg.groupBox(members,height),dx=17,dy=-11;
+ members.forEach(c=>{c.x+=dx;c.y+=dy;});
+ const boxAfter=gg.groupBox(members,height);
+ assert.ok(Math.abs(boxAfter.x-boxBefore.x-dx)<1e-8);
+ assert.ok(Math.abs(boxAfter.y-boxBefore.y-dy*height/s.BOARD_H)<1e-8);
+ assert.ok(Math.abs(boxAfter.w-boxBefore.w)<1e-8&&Math.abs(boxAfter.h-boxBefore.h)<1e-8,'pan preserves group box and member relationship');
+}
+for(const k of s.CAPABILITIES) {
+ const cap={k},floor=m.capabilityReadableMinimum(cap);
+ assert.equal(m.capabilityFits(cap,floor.w,floor.h),true,'readable floor '+k);
+ assert.ok(m.capabilityContentScale(cap,floor.w,floor.h)>=.8-1e-8,'typography cannot become microscopic '+k);
+ assert.equal(m.capabilityFits(cap,floor.w-1,floor.h),false,'hard floor '+k);
+}
+const photo=new s.FridgeCard();photo.shape='subject';photo.w=300;photo.h=360;photo.subjectPhoto=true;photo.capability={k:'battery'};
+photo.outline=[[{x:.3,y:.15},{x:.7,y:.15},{x:.7,y:.85},{x:.3,y:.85}]];
+const compactMin=g.minimumCardSize(photo),shrink=Math.max(compactMin.w/photo.w,compactMin.h/photo.h);
+photo.w*=shrink;photo.h*=shrink;
+const slot=g.capabilityPlacement(photo),pad=g.capabilityInset(photo);
+assert.equal(m.capabilityFits(photo.capability,slot.w*photo.w-2*pad,slot.h*photo.h-2*pad),true,'fixed sticker edge and transparent reading gutter stay readable after proportional shrink');
+assert.ok(photo.w<230,'battery on a narrow photo no longer locks the card near the maximum');
+console.log('PASS host-aware group bounds, rigid pan geometry and responsive typography floors including subject border');
+
+for(const height of [280,470,740]) {
+ const members=[{...new s.FridgeCard(),id:'persist-a',groupId:'persist',x:450,y:360,w:90,h:120,rot:40},
+  {...new s.FridgeCard(),id:'persist-b',groupId:'persist',x:360,y:310,w:110,h:90,rot:-20}];
+ const dx=members[1].x-members[0].x,dy=members[1].y-members[0].y;
+ const state=s.normalizeState({schemaVersion:2,cards:members});
+ assert.equal(state.cards[0].x,450,'normalization retains valid rotated/group positions until host recovery');
+ grouping.clampCanvasGroups(state.cards,height);
+ assert.ok(Math.abs(state.cards[1].x-state.cards[0].x-dx)<1e-8);
+ assert.ok(Math.abs(state.cards[1].y-state.cards[0].y-dy)<1e-8,'reload preserves rigid group relationship');
+ const copy=state.cards.map(c=>({...c}));grouping.clampCanvasGroups(state.cards,height);
+ state.cards.forEach((c,i)=>{assert.equal(c.x,copy[i].x);assert.equal(c.y,copy[i].y);});
+}
+console.log('PASS group recovery preserves composition and is idempotent across host aspects');

@@ -212,7 +212,13 @@ export function normalizeState(raw: FridgeState): FridgeState {
     if (source === null || typeof source.id !== 'string') continue;
     const card = new FridgeCard(); card.id = source.id; card.groupId = typeof source.groupId === 'string' ? source.groupId.slice(0, 96) : '';
     card.w = bounded(source.w, source.shape === 'subject' ? 16 : 80, 320, 180); card.h = bounded(source.h, source.shape === 'subject' ? 16 : 80, 420, 180);
-    card.x = bounded(source.x, -card.w + Math.min(32, card.w * .2), BOARD_W - Math.min(32, card.w * .2), 24); card.y = bounded(source.y, -card.h + Math.min(32, card.h * .2), BOARD_H - Math.min(32, card.h * .2), 32);
+    // Validate finite coordinates here. Rotated/host-aware recovery belongs to
+    // the whole canvas, where grouping and the actual aspect are available.
+    card.x = bounded(source.x, -840, BOARD_W + 840, 24); card.y = bounded(source.y, -840, BOARD_H + 840, 32);
+    if(raw.schemaVersion!==2) {
+      card.x=bounded(source.x,-card.w+Math.min(32,card.w*.2),BOARD_W-Math.min(32,card.w*.2),24);
+      card.y=bounded(source.y,-card.h+Math.min(32,card.h*.2),BOARD_H-Math.min(32,card.h*.2),32);
+    }
     card.rot = bounded(source.rot, -180, 180, 0); card.z = bounded(source.z, 0, Number.MAX_SAFE_INTEGER, 1);
     card.shape = source.shape ?? 'rect'; card.frame = source.frame ?? false;
     card.material = source.material ?? 'white'; card.paper = source.paper ?? ''; card.ink = source.ink ?? '';

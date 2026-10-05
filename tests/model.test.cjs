@@ -434,7 +434,7 @@ function load(name) {
     const card=new FridgeCard();card.shape=shape;card.capability={k};card.w=80;card.h=80;
     assert.equal(ensureCapabilitySize(card),true,shape+':'+k);
     const min=minimumCardSize(card);assert.ok(card.w>=min.w-.01 && card.h>=min.h-.01);
-    const slot=capabilityPlacement(card), required=load('CapabilityMetrics').capabilityMinimum(card.capability,true);
+    const slot=capabilityPlacement(card), required=load('CapabilityMetrics').capabilityReadableMinimum(card.capability);
     assert.ok(slot.w*card.w>=required.w-.01 && slot.h*card.h>=required.h-.01,'slot remains legible '+shape+':'+k);
   }
   const handleCard=new FridgeCard();handleCard.shape='subject';handleCard.outline=[[{x:.5,y:0},{x:1,y:.5},{x:.5,y:1},{x:0,y:.5}]];
@@ -460,7 +460,7 @@ function load(name) {
   bird.outline=[[{x:.25,y:.2},{x:.75,y:.2},{x:.75,y:.8},{x:.25,y:.8}]];
   const birdMin=minimumCardSize(bird);assert.ok(birdMin.w<170 && birdMin.h<120,'date on a half-width silhouette no longer requires a near-maximum card');
   bird.w=birdMin.w;bird.h=birdMin.h;assert.equal(ensureCapabilitySize(bird),true);
-  const slot=capabilityPlacement(bird);assert.ok(slot.w*bird.w>=64-.01 && slot.h*bird.h>=48-.01);
+  const slot=capabilityPlacement(bird);assert.ok(slot.w*bird.w>=51.2-.01 && slot.h*bird.h>=38.4-.01);
   bird.subjectBorder=true;const bordered=safeContentBox(bird);assert.ok(bordered.w<safeContentBox({...bird,subjectBorder:false}).w,'white edge remains within measured box and reserves content space');
   assert.equal(normalizeState({schemaVersion:2,cards:[bird]}).cards[0].subjectBorder,true);
   assert.equal(new FridgeCard().subjectBorder,true,'new cutouts default to sticker border');

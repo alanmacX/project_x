@@ -39,5 +39,17 @@ export function compactCapability(cap: CapBlock, width: number, height: number):
 }
 
 export function capabilityFits(cap: CapBlock, width: number, height: number): boolean {
-  const min=capabilityMinimum(cap,true,width);return width+.1>=min.w && height+.1>=min.h;
+  const min=capabilityReadableMinimum(cap,width);return width+.1>=min.w && height+.1>=min.h;
+}
+
+// Compact typography may adapt by 20%, but never shrink without a readable floor.
+// Keep the nominal metrics for rendering; layout constraints use the same floor.
+export const MIN_CAPABILITY_SCALE: number = .8;
+export function capabilityReadableMinimum(cap: CapBlock | null, width: number = 0): CapabilitySize {
+  const min=capabilityMinimum(cap,true,width>0?width/MIN_CAPABILITY_SCALE:0);
+  min.w*=MIN_CAPABILITY_SCALE; min.h*=MIN_CAPABILITY_SCALE; return min;
+}
+export function capabilityContentScale(cap: CapBlock, width: number, height: number): number {
+  const min=capabilityMinimum(cap,true,width/MIN_CAPABILITY_SCALE);
+  return Math.min(1,width/min.w,height/min.h);
 }

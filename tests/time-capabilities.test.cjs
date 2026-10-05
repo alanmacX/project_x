@@ -22,6 +22,6 @@ assert.ok(time.lunarReading(new Date('2026-02-17T12:00:00').getTime()).date.incl
 assert.ok(time.lunarReading(new Date('2026-09-25T12:00:00').getTime()).date.includes('十五'));
 assert.ok(time.lunarReading(new Date('2025-07-25T12:00:00').getTime()).date.includes('闰六月'),'keep leap-month identity');
 assert.equal(time.lunarReading(new Date('2026-02-17T12:00:00').getTime()).year,'丙午年');
-const min=metrics.capabilityMinimum({k:'lunar'},true);assert.equal(metrics.capabilityFits({k:'lunar'},min.w,min.h),true);assert.equal(metrics.capabilityFits({k:'lunar'},min.w-1,min.h),false);
+const min=metrics.capabilityReadableMinimum({k:'lunar'});assert.equal(metrics.capabilityFits({k:'lunar'},min.w,min.h),true);assert.equal(metrics.capabilityFits({k:'lunar'},min.w-1,min.h),false);
 for(const k of ['worldclock','lunar']) {const state=schema.normalizeState({...schema.defaultState(),cards:[{...new schema.FridgeCard(),id:k,capability:{k,zone:'America/New_York'}}]});assert.equal(state.cards[0].capability.k,k);}
 console.log('PASS native time capabilities: DST changes and midnight scheduling, half/quarter-hour zones, civil-day rollover, lunar new year/full moon/leap month and readable minimum sizes');

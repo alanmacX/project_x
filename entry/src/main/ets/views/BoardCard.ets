@@ -2,7 +2,7 @@ import { BoardMotion } from '../model/BoardMotion';
 import { dragBounds, DragBounds } from '../model/DragGeometry';
 import { cardOutline } from '../model/RenderContours';
 import { motionFrameRate } from '../model/MotionPolicy';
-import { FridgeCard, ShapePoint, shapeRadius } from '../model/CardSchema';
+import { FridgeCard, ShapePoint, shapeRadius, BOARD_W, BOARD_H } from '../model/CardSchema';
 import { resizeFactor, clampCardGeometry, minimumCardSize, cardHandlePoint } from '../model/CanvasLayout';
 import { CardFace } from './CardFace';
 import { cardContainsPoint } from '../model/CardHitTest';
@@ -212,7 +212,9 @@ export struct BoardCard {
     this.animateLift(false); const next = this.copyCard();
     next.x = this.originX + this.dragX / this.scaleFactor; next.y = this.originY + this.dragY / this.yScaleFactor;
     // Synchronous handoff: update the prop and clear the offset in the same frame.
-    clampCardGeometry(next); this.onCommit(next); this.dx = 0; this.dy = 0; this.moving = false; this.tilt = 0; this.onInteraction(false);
+    // The pan already applies host-aware group bounds. A second per-card clamp
+    // would break the common displacement at release on non-default host aspects.
+    this.onCommit(next); this.dx = 0; this.dy = 0; this.moving = false; this.tilt = 0; this.onInteraction(false);
   }
   private startResize(): void {
     this.originW = this.card.w; this.originH = this.card.h; this.originY = this.card.y;
@@ -234,7 +236,7 @@ export struct BoardCard {
     if (!this.resizing) return;
     const next = this.copyCard();
     next.w = this.liveW; next.h = this.liveH; next.y = this.liveY;
-    clampCardGeometry(next); this.onCommit(next); this.resizing = false; this.onInteraction(false);
+    clampCardGeometry(next,BOARD_W,BOARD_H,this.controlViewportHeight/this.scaleFactor); this.onCommit(next); this.resizing = false; this.onInteraction(false);
     if (this.atMinimum) this.getUIContext().getPromptAction().showToast({ message: this.card.capability === null ? '已到最小尺寸' : '已到最小可读尺寸；移除能力后可继续缩小' });
     this.atMinimum = false;
   }
@@ -250,7 +252,7 @@ export struct BoardCard {
           CardFace({ card: this.faceCard(), scaleFactor: this.scaleFactor, tick: this.tick, lifted: this.moving || this.motion.ids.includes(this.card.id), hideContent: this.hideContent, movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
             .width(this.w()).height(this.h()).position({ x: 24, y: 24 }).hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS)
         }.width(this.w() + 48).height(this.h() + 48).position({ x: -24, y: -24 })
-          .renderGroup(this.moving || (this.movingLayerId.length === 0 && this.card.elements.every(el => !el.animated))).hitTestBehavior(HitTestMode.None)
+          .renderGroup(this.moving || this.motion.ids.includes(this.card.id) || (this.movingLayerId.length === 0 && this.card.elements.every(el => !el.animated))).hitTestBehavior(HitTestMode.None)
       }.scale({ x: this.motion.ids.includes(this.card.id) ? 1 : this.liftScale, y: this.motion.ids.includes(this.card.id) ? 1 : this.liftScale })
         .rotate({ angle: this.motion.ids.includes(this.card.id) ? 0 : this.tilt })
         .width(this.w()).height(this.h()).position({ x: 24, y: 24 })
@@ -298,8 +300,8 @@ export struct BoardCard {
         .position(this.controlPosition(true, true)).hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('编辑卡片内容').onClick(() => this.onEdit(this.card.id))
     }.width(this.w() + 48).height(this.h() + 48).opacity(this.heroHidden ? 0 : 1).hitTestBehavior(this.heroHidden ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Transparent)
-      .translate({ x: this.scatterX + (this.motion.ids.includes(this.card.id) ? this.motion.offset.x : this.dx) + this.rotationShift().x, y: this.scatterY + (this.motion.ids.includes(this.card.id) ? this.motion.offset.y : this.dy) + this.rotationShift().y })
       .rotate({ angle: this.editingSurface ? this.displayAngle : (this.rotating ? this.liveAngle : this.card.rot) + this.scatterAngle, centerX: 24, centerY: this.h() + 24 })
+      .translate({ x: this.scatterX + (this.motion.ids.includes(this.card.id) ? this.motion.offset.x : this.dx) + this.rotationShift().x, y: this.scatterY + (this.motion.ids.includes(this.card.id) ? this.motion.offset.y : this.dy) + this.rotationShift().y })
       .position({ x: (this.localCoordinates ? 0 : this.boardLeft + this.card.x * this.scaleFactor - 24),
         y: (this.localCoordinates ? (this.resizing ? this.liveY - this.card.y : 0) * this.yScaleFactor : this.boardTop + (this.resizing ? this.liveY : this.card.y) * this.yScaleFactor - 24) })
       .zIndex(this.moving ? 100002 : (this.resizing ? 100001 : this.card.z))

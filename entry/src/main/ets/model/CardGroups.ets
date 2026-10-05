@@ -9,10 +9,25 @@ export function combineCards(cards: FridgeCard[], ids: string[], groupId: string
 export function ungroupCards(cards: FridgeCard[], groupId: string): void { if (groupId.length > 0) cards.forEach((c: FridgeCard) => { if (c.groupId === groupId) c.groupId = ''; }); }
 export function cleanGroups(cards: FridgeCard[]): void { cards.forEach((c: FridgeCard) => { if (c.groupId.length > 0 && cards.filter((p: FridgeCard) => p.groupId === c.groupId).length < 2) c.groupId = ''; }); }
 /** Intersect every member's recoverable limits; one common delta preserves overlaps and spacing. */
-export function groupDragBounds(cards: FridgeCard[], card: FridgeCard): DragBounds {
-  const result = dragBounds(card);
-  for (const member of groupMembers(cards, card)) { const b = dragBounds(member); result.minX = Math.max(result.minX, card.x + b.minX - member.x); result.maxX = Math.min(result.maxX, card.x + b.maxX - member.x); result.minY = Math.max(result.minY, card.y + b.minY - member.y); result.maxY = Math.min(result.maxY, card.y + b.maxY - member.y); }
+export function groupDragBounds(cards: FridgeCard[], card: FridgeCard, renderedHeight?: number): DragBounds {
+  const result = dragBounds(card,renderedHeight);
+  for (const member of groupMembers(cards, card)) { const b = dragBounds(member,renderedHeight); result.minX = Math.max(result.minX, card.x + b.minX - member.x); result.maxX = Math.min(result.maxX, card.x + b.maxX - member.x); result.minY = Math.max(result.minY, card.y + b.minY - member.y); result.maxY = Math.min(result.maxY, card.y + b.maxY - member.y); }
   return result;
+}
+
+/** Recover saved groups as rigid compositions, never reposition members separately. */
+export function clampCanvasGroups(cards: FridgeCard[], renderedHeight?: number): void {
+  const seen: string[] = [];
+  for(const card of cards) {
+    const key=card.groupId ? 'group:'+card.groupId : 'card:'+card.id;if(seen.includes(key))continue;seen.push(key);
+    const bounds=groupDragBounds(cards,card,renderedHeight);
+    // A group wider than the canvas cannot keep every member visible at once.
+    // Preserve its composition rather than collapsing it with independent clamps.
+    const x=bounds.minX<=bounds.maxX?Math.max(bounds.minX,Math.min(bounds.maxX,card.x)):card.x;
+    const y=bounds.minY<=bounds.maxY?Math.max(bounds.minY,Math.min(bounds.maxY,card.y)):card.y;
+    const dx=x-card.x,dy=y-card.y;
+    for(const member of groupMembers(cards,card)){member.x+=dx;member.y+=dy;}
+  }
 }
 
 export class LayerSection { id: string = ''; title: string = ''; ids: string[] = []; }

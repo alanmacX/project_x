@@ -16,6 +16,15 @@ export struct GroupSelection {
   onCancel:()=>void=()=>{};
   private startX:number=0;private startY:number=0;private lastAngle:number=0;private turn:number=0;
   private vectorX:number=1;private vectorY:number=1;
+  private handleHit: HitTestMode = HitTestMode.None;
+  private intercept(e:TouchEvent):HitTestMode {
+    if(e.type===TouchType.Down) {
+      const p=e.touches[0]??e.changedTouches[0],resize=this.handle(true),rotate=this.handle(false);
+      const inside=(h:ShapePoint):boolean=>p!==undefined&&p.x>=h.x&&p.x<=h.x+44&&p.y>=h.y&&p.y<=h.y+44;
+      this.handleHit=inside(resize)||inside(rotate)?HitTestMode.Transparent:HitTestMode.None;
+    }
+    return this.handleHit;
+  }
   private begin(e:GestureEvent,rotation:boolean):void {
     const p=e.fingerList[0];this.startX=(p?.displayX??0)-e.offsetX;this.startY=(p?.displayY??0)-e.offsetY;
     const handle=this.handle(!rotation);this.vectorX=handle.x+22-this.box.x-this.box.w/2;this.vectorY=handle.y+22-this.box.y-this.box.h/2;
@@ -47,6 +56,12 @@ export struct GroupSelection {
       Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}){SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(22).fontColor(['#303030']).hitTestBehavior(HitTestMode.None)}
         .width(44).height(44).backgroundColor('#F6F2E9').attributeModifier(immersiveChrome()).position(this.handle(false)).accessibilityText('旋转整个组合')
         .gesture(PanGesture({distance:2}).onActionStart((e:GestureEvent)=>this.begin(e,true)).onActionUpdate((e:GestureEvent)=>this.update(e,true)).onActionEnd(()=>this.finish()).onActionCancel(()=>this.onCancel()))
-    }.width(this.viewportW).height(this.viewportH).borderRadius(24).clip(true).hitTestBehavior(HitTestMode.Transparent)
+    }.width(this.viewportW).height(this.viewportH).borderRadius(24).clip(true)
+      // Transparent alone still lets this full-size custom component enter the
+      // hit-test chain. Only handles own touches; cards and empty space pass through.
+      .responseRegion([{x:this.handle(true).x,y:this.handle(true).y,width:44,height:44},
+        {x:this.handle(false).x,y:this.handle(false).y,width:44,height:44}])
+      .onTouchIntercept((e:TouchEvent):HitTestMode=>this.intercept(e))
+      .hitTestBehavior(HitTestMode.Transparent)
   }
 }

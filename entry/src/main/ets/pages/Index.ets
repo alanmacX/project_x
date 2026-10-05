@@ -23,7 +23,7 @@ import { CanvasEntry } from '../model/CanvasLibrary';
 import { GroupSelection } from '../views/GroupSelection';
 import { GroupBox, groupBox, groupMinimumScale, transformGroup } from '../model/GroupGeometry';
 import { BoardMotion, GroupPose } from '../model/BoardMotion';
-import { layerSections, LayerSection, combineCards, ungroupCards, groupMembers, groupDragBounds, cleanGroups } from '../model/CardGroups';
+import { clampCanvasGroups, layerSections, LayerSection, combineCards, ungroupCards, groupMembers, groupDragBounds, cleanGroups } from '../model/CardGroups';
 import { PhotoCrop } from '../views/PhotoCrop';
 import { CanvasBackdrop } from '../views/CanvasBackdrop';
 import { CanvasBackground, FridgeState, normalizeState, normalizeBackground } from '../model/CardSchema';
@@ -226,10 +226,10 @@ struct Index {
       if (!this.alive) return;
       for (const card of this.store.state.cards) {
         if (!ensureCapabilitySize(card)) this.error = '部分卡片内部空间不足，请放大、更换形状或移除能力';
-        this.clamp(card);
       }
       this.canvasDimension = this.widgetDimension || '4*4';
       this.canvasAspect = this.widgetAspect > 0 ? this.widgetAspect : (this.store.canvasSpecs[this.canvasDimension] ?? (this.canvasDimension === '6*4' ? 2 / 3 : (this.canvasDimension === '2*4' ? 2 : 1)));
+      clampCanvasGroups(this.store.state.cards,BOARD_W/this.canvasAspect);
       const routedLaunch = this.routedId.length > 0 || this.viewRouteId.length > 0;
       this.canvasBackground = this.store.state.background; this.layoutBoard(); this.ready = true; this.render(); this.scheduleBackground(); this.routeChanged(); this.viewRouteChanged(); this.incomingTemplateChanged();
       if (!routedLaunch) this.startArrival();
@@ -670,7 +670,7 @@ struct Index {
     this.store.save(syncWidgets).catch((e: Error) => { this.error = e.message === '桌面组件同步未完成' ? '桌面同步暂未完成，点此重试' : '保存失败，点此重试'; });
   }
   private clamp(card: FridgeCard): void {
-    clampCardGeometry(card);
+    clampCardGeometry(card,BOARD_W,BOARD_H,BOARD_W/this.canvasAspect);
   }
   private canAddCards(count: number): boolean {
     try { assertCanvasCapacity(this.store.state.cards.length, count); return true; }
@@ -750,10 +750,12 @@ struct Index {
   private commitGeometry(updated: FridgeCard): void {
     const card = this.store.findCard(updated.id); if (card === null) return;
     const dx = updated.x - card.x, dy = updated.y - card.y;
-    if (updated.w === card.w && updated.h === card.h && updated.rot === card.rot) { for (const peer of groupMembers(this.store.state.cards, card)) if (peer.id !== card.id) { peer.x += dx; peer.y += dy; } }
+    const translating=updated.w === card.w && updated.h === card.h && updated.rot === card.rot;
+    if (translating) { for (const peer of groupMembers(this.store.state.cards, card)) if (peer.id !== card.id) { peer.x += dx; peer.y += dy; } }
     this.boardMotion.offset = { x: 0, y: 0 };
     card.x = updated.x; card.y = updated.y; card.w = updated.w; card.h = updated.h; card.rot = updated.rot;
-    this.clamp(card); groupMembers(this.store.state.cards, card).sort((a: FridgeCard, b: FridgeCard) => a.z - b.z).forEach((member: FridgeCard) => this.store.bringToFront(member));
+    if(!translating)this.clamp(card);
+    groupMembers(this.store.state.cards, card).sort((a: FridgeCard, b: FridgeCard) => a.z - b.z).forEach((member: FridgeCard) => this.store.bringToFront(member));
     // Geometry handoff only updates the visible board; hydrate inspector on entry.
     if (this.editing || this.viewing) this.render(); else this.renderBoard();
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer);
@@ -850,7 +852,7 @@ struct Index {
           GroupSelection({motion:this.boardMotion,box:this.selectedGroupBox(),minimum:groupMinimumScale(this.selectedGroup()),maximum:this.groupMaximumScale(),
             viewportW:BOARD_W*this.boardScale,viewportH:this.boardHeight,
             onBegin:()=>this.beginGroupTransform(),onFinish:(scale:number,angle:number)=>this.finishGroupTransform(scale,angle),onCancel:()=>this.cancelGroupTransform()})
-            .position({x:this.boardLeft,y:this.boardTop}).zIndex(100003)
+            .position({x:this.boardLeft,y:this.boardTop}).zIndex(100003).hitTestBehavior(HitTestMode.Transparent)
         }
         if (this.editorMounted) { this.editor() }
         if (this.chromeSnapshot !== undefined) {
@@ -890,7 +892,7 @@ struct Index {
               hideContent: this.editing && id === this.selectedId && (this.heroActive ? this.heroHideContent : this.settingsTab === 0),
               movingLayerId: id === this.selectedId ? this.layerDrag : '',
               moveX: id === this.selectedId && this.editing ? this.layerDX * this.boardScale / this.editorScale() : 0, moveY: id === this.selectedId && this.editing ? this.layerDY * this.boardScale / this.editorScale() : 0, tick: this.tick,
-              getMoveBounds: (card: FridgeCard) => groupDragBounds(this.store.state.cards, card),
+              getMoveBounds: (card: FridgeCard) => groupDragBounds(this.store.state.cards, card, this.boardHeight/this.boardScale),
               onMove: (x: number, y: number) => { if (this.movingGroupIds.length > 0) { this.boardMotion.offset = { x: x, y: y }; } },
               onSelect: (id: string) => this.selectLayerCard(id), onDelete: (id: string) => this.deleteCard(id),
               onEdit: (id: string) => this.openEditor(id), onInteraction: (active: boolean) => this.boardInteraction(id, active), onCommit: (updated: FridgeCard) => this.commitGeometry(updated) })
@@ -905,7 +907,8 @@ struct Index {
             .height(this.creationClip(id) ? this.transitionClipH : this.screenHeight)
             .position({ x: this.creationClipX(id), y: this.creationClipY(id) })
             .borderRadius(this.creationClip(id) ? this.transitionClipRadius : 0).clip(this.creationClip(id))
-            .opacity(this.editing && id === this.selectedId ? 1 : this.boardOpacity).zIndex(this.activeBoardId === id ? 100002 : this.cardMap[id].z)
+            .opacity(this.editing && id === this.selectedId ? 1 : this.boardOpacity)
+            .zIndex(this.activeBoardId === id || this.boardMotion.ids.includes(id) ? 100000 + this.cardMap[id].z / (1 + this.cardMap[id].z) : this.cardMap[id].z)
             .hitTestBehavior(this.editing || this.arriving ? HitTestMode.None : HitTestMode.Transparent)
         }, (id: string) => id)
       }.width(this.screenWidth).height(this.screenHeight)
