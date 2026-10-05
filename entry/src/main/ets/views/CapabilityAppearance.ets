@@ -1,3 +1,4 @@
+import { settingsDialogOpen, settingsReveal } from '../model/SettingsMotion';
 import { FridgeCard, materialColors } from '../model/CardSchema';
 import { readingWarning } from '../model/CapabilityPresentation';
 import { capabilityDescriptor } from '../model/CapabilityCatalog';
@@ -23,17 +24,18 @@ export struct CapabilityAppearance {
     Column({space:12}) {
       Row({space:12}) {
         Column({space:4}) {
-          Text(capabilityDescriptor(this.card.capability?.k??'none').name).fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
-          Text(capabilityDescriptor(this.card.capability?.k??'none').summary).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+          Text(capabilityDescriptor(this.card.capability?.k??'none').name).fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%').maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
+          Text(capabilityDescriptor(this.card.capability?.k??'none').summary).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%').maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis})
         }.layoutWeight(1)
         Button('更换',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontSize(13).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.onChoose())
       }.width('100%')
       ColorSetting({label:'内容颜色',color:this.ink(),automatic:!this.card.ink,sourceKey:this.card.id+':ink:',appDark:this.appDark,
         onPick:(color:string,key:string)=>this.onColorPick(color,key),onFallback:()=>this.onColor()})
       Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
-        Row(){Text('排版与可读性').fontSize(14).fontColor(AppDesign.text(this.appDark));Blank();SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([AppDesign.muted(this.appDark)]).rotate({angle:this.readingExpanded?180:0})}.width('100%')
-      }.width('100%').height(44).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.getUIContext().animateTo({duration:180,curve:Curve.EaseOut},()=>this.readingExpanded=!this.readingExpanded))
+        Row(){Text('排版与可读性').fontSize(14).maxLines(1).layoutWeight(1).fontColor(AppDesign.text(this.appDark));Blank();SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([AppDesign.muted(this.appDark)]).rotate({angle:this.readingExpanded?180:0})}.width('100%').padding({left:12,right:12})
+      }.width('100%').height(44).padding(0).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.getUIContext().animateTo(settingsDialogOpen(),()=>this.readingExpanded=!this.readingExpanded))
       if(this.readingExpanded) {
+      Column({space:12}) {
       Button('位置预设',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).width('100%').fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>{
         this.getUIContext().getPromptAction().showActionMenu({systemMaterial:chromeMaterial(),title:'内容位置',buttons:[{text:'靠上',color:AppDesign.text(this.appDark)},{text:'居中',color:AppDesign.text(this.appDark)},{text:'靠下',color:AppDesign.text(this.appDark)}]})
           .then((result)=>this.onArrange(['top','center','bottom'][result.index])).catch(()=>{});
@@ -44,6 +46,7 @@ export struct CapabilityAppearance {
       SettingsSegmented({labels:['柔光','衬光','描光'],selectedIndex:Math.max(0,['feather','scrim','halo'].indexOf(this.card.capability?.readingBlend??'feather')),appDark:this.appDark,
         onSelect:(index:number)=>this.onBlend(['feather','scrim','halo'][index])})
       Button('对比融合方案',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).width('100%').fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.onCompare())
+      }.width('100%').transition(settingsReveal())
       }
       if(readingWarning(this.card)) {Text(readingWarning(this.card)).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
     }.width('100%').padding(16).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(AppDesign.sectionRadius)

@@ -55,7 +55,7 @@ export struct ColorSetting {
             Column().width(28).height(28).borderRadius(8).backgroundColor(this.color)
               .border({ width: .5, color: AppDesign.border(this.appDark) }).hitTestBehavior(HitTestMode.None)
           }.width('100%')
-        }.height(48).layoutWeight(1).backgroundColor(Color.Transparent)
+        }.height(48).padding({left:0,right:0}).layoutWeight(1).backgroundColor(Color.Transparent)
           .accessibilityText('选择' + this.label).onClick(() => this.onFallback())
       }
       if (this.canReset) {
@@ -66,6 +66,6 @@ export struct ColorSetting {
           .accessibilityText(this.label + '恢复默认').onClick(() => { if (this.alive) this.onPick('', this.sourceKey); })
       }
     }.width('100%').constraintSize({ minHeight: 52 }).padding({ left: 12, right: 8, top: 4, bottom: 4 })
-      .backgroundColor(AppDesign.control(this.appDark)).borderRadius(AppDesign.controlRadius)
+      .backgroundColor(AppDesign.control(this.appDark)).borderRadius(AppDesign.controlRadius).clip(true)
   }
 }

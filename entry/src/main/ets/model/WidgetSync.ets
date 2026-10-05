@@ -43,11 +43,14 @@ export async function pushWidgets(context: Context, json: string): Promise<void>
     const sceneJson=scene.ruleId?JSON.stringify(scene.state):baseId===canvasId?json:JSON.stringify(base);
     const deadline=nextSceneBoundary(base,Date.now());
     const minutes=Math.min(refreshMinutes(base),refreshMinutes(scene.state));
-    if(Number.isFinite(deadline)&&minutes<30&&deadlines[id]!==deadline) {
-      try {await formProvider.setFormNextRefreshTime(id,minutes);deadlines[id]=deadline;deadlineChanged=true;}catch(_){}
-    }else if(!Number.isFinite(deadline)&&deadlines[id]>0){deadlines[id]=0;deadlineChanged=true;}
     for (let attempt = 0; attempt < 3; attempt++) {
-      try { await updateWidget(id, sceneJson, dims[id],sceneWidgetContext(scene)); return; }
+      try {
+        await updateWidget(id, sceneJson, dims[id],sceneWidgetContext(scene));
+        if(Number.isFinite(deadline)&&minutes<30&&deadlines[id]!==deadline) {
+          try {await formProvider.setFormNextRefreshTime(id,minutes);deadlines[id]=deadline;deadlineChanged=true;}catch(_){}
+        }else if(!Number.isFinite(deadline)&&deadlines[id]>0){deadlines[id]=0;deadlineChanged=true;}
+        return;
+      }
       catch (e) {
         if((e as Error).message==='FORM_REMOVED'){removed.push(id);return;}
         if (attempt === 2) { failures.push(id); hilog.warn(0x0000, 'WidgetSync', 'update %{public}s: %{public}s', id, (e as Error).message); }

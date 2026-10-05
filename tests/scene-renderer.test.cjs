@@ -15,5 +15,10 @@ jobs.shift().onFinish();assert.equal(scene.cardIds[0],'c1');assert.equal(scene.c
 jobs.shift().onFinish();jobs.shift().onFinish();assert.equal(scene.scenePhase,0);assert.equal(scene.sceneAnimating,false);
 scene.packetJson=packet('d','d1','white',4);scene.syncPacket();const hidden=jobs.shift();scene.aboutToDisappear();assert.equal(scene.scenePhase,0);assert.equal(scene.appliedPacket,'');hidden.onFinish();assert.equal(scene.cardIds[0],'c1');
 scene.alive=true;scene.syncPacket();assert.equal(scene.cardIds[0],'d1','a resumed renderer starts directly at the latest packet');assert.equal(scene.sceneAnimating,false);
-scene.packetJson=packet('d','d2','cream',5);scene.syncPacket();assert.equal(scene.cardIds[0],'d2');assert.equal(scene.canvasBackground.color,'cream');assert.equal(jobs.shift().duration,520);
+scene.packetJson=packet('d','d2','cream',5);scene.syncPacket();assert.equal(scene.cardIds[0],'d2');assert.equal(scene.canvasBackground.color,'cream');const edited=jobs.shift();assert.equal(edited.duration,180);edited.onFinish();
+scene.packetJson=packet('d','d2','cream',6);scene.syncPacket();assert.equal(jobs.length,0,'unchanged visibility/tick refresh does not rebuild or animate artwork');
+// A newer packet returning to the outgoing canvas must cancel an in-flight switch.
+scene.sceneAnimating=false;scene.packetJson=packet('e','e1','pink',7);scene.syncPacket();const pending=jobs.shift();
+scene.packetJson=packet('d','d2','cream',8);scene.syncPacket();pending.onFinish();assert.equal(scene.displayCanvasId,'d','stale target cannot survive a return to the visible scene');
+jobs.shift().onFinish();assert.equal(scene.sceneAnimating,false);
 console.log('PASS Form transition controller: atomic scene/background, newer packet interruption, stale callbacks, hidden/reappearing host and same-canvas animation.');

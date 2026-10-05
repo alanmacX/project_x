@@ -1,16 +1,15 @@
 import { compactContours } from './ContourGeometry';
 import { fileIo } from '@kit.CoreFileKit';
-import { FridgeState, normalizeState, serializeFaceCards, serializeDoorCards } from './CardSchema';
+import { FridgeState, normalizeState } from './CardSchema';
 import { widgetImageKey } from './WidgetImageKey';
 export interface WidgetPayload {
-  background: string; cards: string; faceCards: string; doorCards: string;
-  reveal: string; open: boolean;
+  background: string; cards: string;
   images: Record<string, Object>; descriptors: number[];
 }
 /** Parse/normalize/serialize large masks and prepare file descriptors away from the UI thread. */
 @Concurrent
 export async function prepareWidgetPayload(json: string): Promise<WidgetPayload> {
-  const state: FridgeState = normalizeState(JSON.parse(json) as FridgeState), payload: WidgetPayload = { background: '{}', cards: '[]', faceCards: '[]', doorCards: '[]', reveal: '', open: false, images: {}, descriptors: [] };
+  const state: FridgeState = normalizeState(JSON.parse(json) as FridgeState), payload: WidgetPayload = { background: '{}', cards: '[]', images: {}, descriptors: [] };
   try {
     for (const card of state.cards) {
       card.outline = compactContours(card.outline);
@@ -48,8 +47,7 @@ export async function prepareWidgetPayload(json: string): Promise<WidgetPayload>
       } catch (_) { state.background.src = ''; }
     }
     payload.background = JSON.stringify(state.background);
-    payload.cards = JSON.stringify(state.cards); payload.faceCards = serializeFaceCards(state);
-    payload.doorCards = serializeDoorCards(state); payload.reveal = state.door.reveal; payload.open = state.door.open;
+    payload.cards = JSON.stringify(state.cards);
     return payload;
   } catch (e) {
     for (const fd of payload.descriptors) { try { fileIo.closeSync(fd); } catch (_) {} }

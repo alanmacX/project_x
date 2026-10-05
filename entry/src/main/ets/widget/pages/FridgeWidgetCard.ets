@@ -16,6 +16,9 @@ struct FridgeWidgetCard {
   @State focusId:string='';
   private displayCanvasId:string='';
   private appliedPacket:string='';
+  private appliedCards:string='';
+  private appliedBackground:string='';
+  private appliedContext:string='';
   private sceneAnimating:boolean=false;
   private sceneGeneration:number=0;
   private alive:boolean=false;
@@ -24,12 +27,14 @@ struct FridgeWidgetCard {
     if(!this.alive||!this.packetJson||this.appliedPacket===this.packetJson)return;
     let packet:WidgetScenePacket;
     try{packet=JSON.parse(this.packetJson) as WidgetScenePacket;if(typeof packet.cards!=='string'||typeof packet.background!=='string')return;}catch(_){return;}
+    // Visibility/time refreshes still update rev, but identical artwork needs no rebuild.
+    if(!this.sceneAnimating && this.appliedPacket && this.displayCanvasId===packet.canvasId && this.appliedCards===packet.cards && this.appliedBackground===packet.background && this.appliedContext===packet.context) {this.appliedPacket=this.packetJson;return;}
     const cards=this.parse(packet.cards).sort((a,b)=>a.z-b.z);
     const first=this.appliedPacket.length===0,differentCanvas=!first&&this.displayCanvasId!==packet.canvasId;
     const generation=++this.sceneGeneration;
     this.appliedPacket=this.packetJson;
     const apply=():void=>{
-      this.displayCanvasId=packet.canvasId;
+      this.displayCanvasId=packet.canvasId;this.appliedCards=packet.cards;this.appliedBackground=packet.background;this.appliedContext=packet.context;
       try{this.context=packet.context?JSON.parse(packet.context) as WidgetSceneContext:null;}catch(_){this.context=null;}
       this.focusId=this.context?.focusId??'';
       const map:Record<string,FridgeCard>={};cards.forEach((c)=>map[c.id]=cardRenderSnapshot(c));this.cardMap=map;this.cardIds=cards.map(c=>c.id);
@@ -45,7 +50,7 @@ struct FridgeWidgetCard {
         // Form renderers do not support JS timers or app UIContext methods.
         animateTo({duration:16,onFinish:()=>{if(this.alive&&generation===this.sceneGeneration)animateTo({duration:420,curve:Curve.Friction,onFinish:finish},()=>this.scenePhase=0);}},()=>this.scenePhase=1.001);
       }},()=>this.scenePhase=1);
-    }else animateTo({duration:520,curve:Curve.Friction,onFinish:finish},apply);
+    }else animateTo({duration:180,curve:Curve.EaseOut,onFinish:finish},apply);
   }
   private sceneOffset(id:string,horizontal:boolean):number {
     const rect=scenePercent(this.cardMap[id],this.widthValue()/this.heightValue()),dx=rect.x+rect.w/2-50,dy=rect.y+rect.h/2-50;

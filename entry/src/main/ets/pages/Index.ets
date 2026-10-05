@@ -14,7 +14,7 @@ import { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
 import { SettingsSelect } from '../views/SettingsSelect';
 import { SettingsSegmented } from '../views/SettingsSegmented';
 import { SettingsCounter } from '../views/SettingsCounter';
-import { canvasToolsTransition, settingsReveal, settingsDialogOpen, settingsDialogClose } from '../model/SettingsMotion';
+import { canvasToolsMotion, canvasToolsTransition, settingsReveal, settingsDialogOpen, settingsDialogClose } from '../model/SettingsMotion';
 import { CapabilityAppearance } from '../views/CapabilityAppearance';
 import { CapabilityDetails } from '../views/CapabilityDetails';
 import { WeekTimetable } from '../views/WeekTimetable';
@@ -503,7 +503,9 @@ struct Index {
     const layout=workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect);
     const target=layout.floating&&this.homeToolsOpen?layout.expandedBoardY:layout.boardY;
     const generation=++this.homeToolsMotionGeneration;this.homeToolsMoving=true;
-    this.getUIContext().animateTo({onFinish:()=>{if(this.alive&&generation===this.homeToolsMotionGeneration)this.homeToolsMoving=false;},duration:this.homeToolsOpen?280:220,curve:this.homeToolsOpen?Curve.Friction:Curve.EaseOut,expectedFrameRateRange:this.frameRate},()=>{this.boardTop=target;});
+    const motion=canvasToolsMotion(this.homeToolsOpen);
+    motion.onFinish=()=>{if(this.alive&&generation===this.homeToolsMotionGeneration)this.homeToolsMoving=false;};
+    this.getUIContext().animateTo(motion,()=>{this.boardTop=target;});
   }
   private layoutBoard(): void {
     const layout=workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect);
@@ -1191,8 +1193,8 @@ struct Index {
         }
         if (!this.groupSelecting && this.selectedId.length > 0) {
           Row({ space: 12 }) {
-            Button('上移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(() => this.moveCardLayer(this.selectedId, true))
-            Button('下移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(() => this.moveCardLayer(this.selectedId, false))
+            Button('上移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).padding({left:6,right:6}).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(() => this.moveCardLayer(this.selectedId, true))
+            Button('下移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).padding({left:6,right:6}).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(() => this.moveCardLayer(this.selectedId, false))
             if((this.cardMap[this.selectedId]?.groupId??'').length>0) { Button('取消组合',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(()=>this.releaseGroup()) }
             Blank()
           }.width('100%')
@@ -1598,9 +1600,13 @@ struct Index {
     return (this.editorLandscape() ? this.screenWidth - this.editorViewportWidth() : this.screenWidth) - 32;
   }
   private editorTabChanged(): void {
-    this.settingsTab = this.editorTabs[0] ?? 0;
-    this.layerId = this.settingsTab === 0 ? (this.preview.elements.find((el: CanvasElement) => el.behindCapability)?.id ?? '') : (this.preview.capability!==null?'capability':''); this.showLayerOptions = false; this.syncFields();
+    const apply=():void=>{
+      this.settingsTab = this.editorTabs[0] ?? 0;
+      this.layerId = this.settingsTab === 0 ? (this.preview.elements.find((el: CanvasElement) => el.behindCapability)?.id ?? '') : (this.preview.capability!==null?'capability':'');
+      this.showLayerOptions = false; this.showBackgroundOptions=false; this.syncFields();
+    };
     this.scroller.scrollTo({ xOffset: 0, yOffset: 0 });
+    if(this.editing&&!this.heroActive)this.getUIContext().animateTo(settingsDialogOpen(),apply);else apply();
   }
   @Builder
   editorControls() {
@@ -1642,7 +1648,7 @@ struct Index {
             this.colorRow('底色', 'paper')
             Row({ space: 8 }) {
               Button(this.showBackgroundOptions ? '收起底板设置' : '底板形状与边缘', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).height(AppDesign.controlHeight).fontSize(14).fontColor(this.appText()).backgroundColor(this.appControl())
-                .onClick(() => { this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut, expectedFrameRateRange: this.frameRate }, () => { this.showBackgroundOptions = !this.showBackgroundOptions; }); })
+                .onClick(() => { this.getUIContext().animateTo(settingsDialogOpen(), () => { this.showBackgroundOptions = !this.showBackgroundOptions; }); })
             }.width('100%')
             if (this.showBackgroundOptions) {Column(){this.appearancePanel()}.width('100%').transition(settingsReveal())}
             }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
@@ -1803,8 +1809,11 @@ struct Index {
   }
 
   private chooseLayer(id: string): void {
-    this.layerId = id; this.showLayerOptions = false; this.showBackgroundOptions = id.length === 0;
-    this.syncFields(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 });
+    if(this.layerId===id)return;
+    this.scroller.scrollTo({ xOffset: 0, yOffset: 0 });
+    this.getUIContext().animateTo(settingsDialogOpen(),()=>{
+      this.layerId=id;this.showLayerOptions=false;this.showBackgroundOptions=false;this.syncFields();
+    });
   }
   private layerElement(id: string): CanvasElement | null { return this.preview.elements.find((el: CanvasElement) => el.id === id) ?? null; }
   private layerTitle(id:string):string {
@@ -1880,8 +1889,8 @@ struct Index {
     if (this.layerId.length > 0) {
       Column({ space: 12 }) {
         Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
-          Row(){Text('布局与图层').fontSize(14).fontColor(this.appText());Blank();SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appMuted()]).rotate({angle:this.showLayerOptions?180:0})}.width('100%')
-        }.width('100%').height(44).backgroundColor(this.appControl()).onClick(()=>this.getUIContext().animateTo({duration:180,curve:Curve.EaseOut,expectedFrameRateRange:this.frameRate},()=>this.showLayerOptions=!this.showLayerOptions))
+          Row(){Text('布局与图层').fontSize(14).maxLines(1).layoutWeight(1).fontColor(this.appText());Blank();SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appMuted()]).rotate({angle:this.showLayerOptions?180:0})}.width('100%').padding({left:12,right:12})
+        }.width('100%').height(44).padding(0).backgroundColor(this.appControl()).onClick(()=>this.getUIContext().animateTo(settingsDialogOpen(),()=>this.showLayerOptions=!this.showLayerOptions))
         if(this.showLayerOptions) {
         Column({space:12}) {
         if (this.layerId !== 'capability') {
@@ -1902,9 +1911,9 @@ struct Index {
         }.width('100%').alignItems(HorizontalAlign.Start)
         if (this.layerId !== 'capability') {
           Row({ space: 8 }) {
-            Button('复制元素', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => this.duplicateElement())
-            Button('上移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => this.moveElementOrder(true))
-            Button('下移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => this.moveElementOrder(false))
+            Button('复制元素', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).padding({left:6,right:6}).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => this.duplicateElement())
+            Button('上移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).padding({left:6,right:6}).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => this.moveElementOrder(true))
+            Button('下移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).padding({left:6,right:6}).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => this.moveElementOrder(false))
         }.width('100%')
 
         }

@@ -1,6 +1,5 @@
 import { resolveScheduledScene, sceneWidgetContext, dismissScene, ScheduledScene } from '../model/SceneSchedule';
 import { pushWidgets } from '../model/WidgetSync';
-import { readCapability } from '../model/CapabilityService';
 import { refreshMinutes } from '../model/WidgetRefreshPolicy';
 import { needsDataRefresh, capabilityRequestKey, mergeCapabilityResult } from '../model/CapabilityData';
 import { readCatalog, canvasKey, boundCanvas } from '../model/CanvasLibrary';
@@ -8,7 +7,7 @@ import { FormExtensionAbility, formBindingData, formInfo, formProvider } from '@
 import { Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import preferences from '@ohos.data.preferences';
-import { FridgeState, defaultState, normalizeState } from '../model/FridgeModel';
+import { FridgeState, defaultState, normalizeState } from '../model/CardSchema';
 import { parseCapabilityAction, applyCalendarAction } from '../model/CapabilityActions';
 import { updateWidget } from '../model/WidgetSync';
 
@@ -70,7 +69,12 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     await updateWidget(formId, JSON.stringify(state), dims[formId] ?? '4*4',sceneWidgetContext(scene));
   }
   private async scheduleForm(formId:string):Promise<void> {
-    const minutes=Math.min(refreshMinutes(await this.loadState(formId)),refreshMinutes((await this.displayedScene(formId)).state));
+    const base=await this.loadState(formId);
+    const scene=await resolveScheduledScene(base,Date.now(),async(id:string):Promise<FridgeState|null>=>{
+      const prefs=await preferences.getPreferences(this.context,STORE_NAME);
+      const json=await prefs.get(canvasKey(id),'') as string;return json?normalizeState(JSON.parse(json) as FridgeState):null;
+    });
+    const minutes=Math.min(refreshMinutes(base),refreshMinutes(scene.state));
     // Baseline 30-minute refresh is declared in the form profile. Only a nearer boundary
     // needs a one-shot request; editing the scene must not consume its daily quota.
     if(minutes<30)await formProvider.setFormNextRefreshTime(formId,minutes).catch(()=>{});
@@ -81,7 +85,14 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     const value = want.parameters?.['ohos.extra.param.key.form_dimension'];
     const dim: string = value === 3 || value === '3' ? '2*4' : (value === 7 || value === '7' ? '6*4' : '4*4');
     const width = Number(want.parameters?.['ohos.extra.param.key.form_width'] ?? 0), height = Number(want.parameters?.['ohos.extra.param.key.form_height'] ?? 0);
-    this.register(id, dim, false, width, height).then(async () => {await this.pushForm(id);await this.refreshDueData(id);await this.scheduleForm(id);}).catch((e: Error) => {
+    this.displayedScene(id).then(async (scene:ScheduledScene) => {
+      // Register on disk in parallel; it must not delay the first artwork delivery.
+      const registered=this.register(id,dim,false,width,height);
+      registered.catch(()=>{}); // Observe disk failures while native delivery is in flight.
+      try {await updateWidget(id,JSON.stringify(scene.state),dim,sceneWidgetContext(scene));}
+      finally {await registered;}
+      await this.refreshDueData(id);await this.scheduleForm(id);
+    }).catch((e: Error) => {
       hilog.error(0x0000, 'FridgeForm', 'add %{public}s', e.message);
     });
     return formBindingData.createFormBindingData({ 'faceCards': '[]', 'doorCards': '[]', 'dim': dim, 'rev': 0, 'canvasWidth': width > 0 ? width : 344, 'canvasHeight': height > 0 ? height : (dim === '2*4' ? 172 : (dim === '6*4' ? 516 : 344)) });
@@ -101,7 +112,8 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     for(const original of state.cards.slice()) {
       const cap=original.capability;if(!cap||!needsDataRefresh(cap))continue;
       const key=capabilityRequestKey(cap),attempted=cap.attemptedAt??0;
-      const next=await readCapability(cap,this.context);
+      const service=await import('../model/CapabilityService');
+      const next=await service.readCapability(cap,this.context);
       // Only merge this result after reloading the bound canvas; never replace a newer edit or another canvas.
       state=(await this.displayedScene(formId)).state;const card=state.cards.find((c)=>c.id===original.id);
       if(state.canvasId!==canvasId||!card?.capability||capabilityRequestKey(card.capability)!==key||(card.capability.attemptedAt??0)!==attempted)continue;
