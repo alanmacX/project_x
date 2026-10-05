@@ -1,8 +1,9 @@
+import { startupMark } from './StartupTrace';
 import { CanvasCatalog, CanvasDocument, canvasKey, readCatalog, cloneCanvas } from './CanvasLibrary';
 import { assertCanvasCapacity } from './CanvasCapacity';
 import { clampCanvasGroups, cleanGroups } from './CardGroups';
 import { LatestWidgetQueue } from './LatestWidgetQueue';
-import { primeRenderContours } from './RenderContours';
+import { primeRenderContours, restoreContourCache, serializeContourCache } from './RenderContours';
 import { storageSnapshot } from './StorageSnapshot';
 import preferences from '@ohos.data.preferences';
 import { formProvider } from '@kit.FormKit';
@@ -38,7 +39,7 @@ export class FridgeStore {
     const json=await this.prefs.get(canvasKey(id),'') as string;if(!json)throw new Error('画布记录缺失，已保留目录');
     const raw=JSON.parse(json) as FridgeState;if(!Array.isArray(raw.cards))throw new Error('画布数据损坏');
     const doc=new CanvasDocument();doc.id=id;doc.name=entry.name;doc.state=normalizeState(raw);doc.state.canvasId=id;
-    cleanGroups(doc.state.cards);clampCanvasGroups(doc.state.cards,BOARD_W/doc.state.canvasAspect);this.documents=this.documents.filter((c)=>c.id!==id);this.documents.push(doc);this.savedScenes[id]=json;return this.switchCanvas(id);
+    cleanGroups(doc.state.cards);clampCanvasGroups(doc.state.cards,BOARD_W/doc.state.canvasAspect);this.documents=this.documents.filter((c)=>c.id!==id);this.documents.push(doc);this.savedScenes[id]=json;await this.restoreContours(doc.state);return this.switchCanvas(id);
   }
   /** Export a detached snapshot; sharing an inactive canvas never changes widget bindings. */
   async canvasSnapshot(id: string): Promise<FridgeState> {
@@ -72,7 +73,7 @@ export class FridgeStore {
       const bindings = JSON.parse(await this.prefs.get('fridge_form_bindings_json','{}') as string) as Record<string,string>;
       for (const key of Object.keys(bindings)) if (bindings[key] === id) bindings[key] = this.catalog.activeId;
       await this.prefs.put('fridge_form_bindings_json',JSON.stringify(bindings));
-      await this.save(false); await this.prefs.delete(canvasKey(id)); await this.prefs.flush();
+      await this.save(false); await this.prefs.delete(canvasKey(id)); await this.prefs.delete('fridge_render_contours_v1_'+id); await this.prefs.flush();
     }
   }
   canvasSpecs: Record<string, number> = {};
@@ -95,9 +96,26 @@ export class FridgeStore {
         cleanGroups(doc.state.cards); clampCanvasGroups(doc.state.cards,BOARD_W/doc.state.canvasAspect); this.documents.push(doc);
         this.savedScenes[entry.id] = catalogJson ? json : '';
       }
-      this.switchCanvas(this.catalog.activeId);
-      await primeRenderContours(this.state.cards, storageSnapshot(this.state));
+      this.switchCanvas(this.catalog.activeId); startupMark('storage-read');
+      await this.restoreContours(this.state);
+      await primeRenderContours(this.state.cards, storageSnapshot(this.state)); startupMark('contours-ready');
+      this.cacheContours().catch(()=>{});
     } catch (e) { throw new Error('本地卡片数据无法读取，已保留原始记录'); }
+  }
+  private contourCache: Record<string,string> = {};
+  private async restoreContours(state:FridgeState):Promise<void> {
+    if(this.prefs===null)return;
+    // A disposable derived cache must never make the original canvas unreadable.
+    try {
+      const json=await this.prefs.get('fridge_render_contours_v1_'+state.canvasId,'') as string;
+      restoreContourCache(state.cards,json);this.contourCache[state.canvasId]=json;
+    } catch (_) { /* Rebuild from the immutable master outline on a cache miss. */ }
+  }
+  private async cacheContours(): Promise<void> {
+    if(this.prefs===null)return;
+    const id=this.state.canvasId,json=serializeContourCache(this.state.cards);
+    if(!json || json===this.contourCache[id])return;
+    await this.prefs.put('fridge_render_contours_v1_'+id,json);await this.prefs.flush();this.contourCache[id]=json;
   }
   async refreshCanvasSpecs(): Promise<void> {
     if (this.prefs === null) return;
@@ -122,6 +140,7 @@ export class FridgeStore {
       if (catalogJson !== this.lastCatalog) await this.prefs.put('fridge_canvases_json',catalogJson);
       if (snapshot !== this.savedScenes[id] || catalogJson !== this.lastCatalog) await this.prefs.flush();
       this.savedScenes[id] = snapshot; this.lastCatalog = catalogJson;
+      await this.cacheContours().catch(()=>{});
     });
     this.saveQueue = pending;
     return pending.then(() => syncWidgets ? this.queueFor(id).submit(snapshot) : Promise.resolve());

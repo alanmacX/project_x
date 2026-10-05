@@ -282,7 +282,7 @@ function load(name) {
   const ids = Array.from({length:1000}, () => store.newId()); assert.equal(new Set(ids).size,1000);
   store.addCard(custom); const first = store.save(); element.text = 'second'; const second = store.save();
   await Promise.all([first,second]);
-  assert.equal(JSON.parse(writes[0][1]).cards[0].elements[0].text, 'first');
+  assert.equal(JSON.parse(writes.find(([key])=>key==='fridge_state_json')[1]).cards[0].elements[0].text, 'first');
   assert.equal(JSON.parse(disk.get('fridge_state_json')).cards[0].elements[0].text, 'second');
   const {cardViewSnapshot}=load('CardViewSnapshot');
   custom.outline=[[{x:.1,y:.2},{x:.8,y:.9}]];

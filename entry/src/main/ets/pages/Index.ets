@@ -1,7 +1,8 @@
+import { startupMark } from '../model/StartupTrace';
 import { image } from '@kit.ImageKit';
 import { assertCanvasCapacity, CANVAS_CARD_TARGET, CANVAS_CARD_LIMIT, canvasCapacityHint } from '../model/CanvasCapacity';
 import { SymbolGlyphModifier, FrameCallback } from '@kit.ArkUI';
-import { immersiveChrome, prepareChromeMaterial } from '../model/ChromeMaterial';
+import { chromeMaterial, immersiveChrome, prepareChromeMaterial } from '../model/ChromeMaterial';
 import { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
 import { SettingsSelect } from '../views/SettingsSelect';
 import { SettingsSegmented } from '../views/SettingsSegmented';
@@ -218,11 +219,12 @@ struct Index {
     if (this.context === null) return;
     const materialReady=prepareChromeMaterial();
     this.store.init(this.context).then(async () => {
-      await materialReady;
+      await materialReady; startupMark('material-ready');
       if (this.routeCanvasId) await this.store.openCanvas(this.routeCanvasId);
       this.refreshCanvasList();
-      // Resolve FormKit geometry before revealing the scene; a late aspect update jumps after arrival.
-      await this.store.refreshCanvasSpecs().catch(() => {});
+      // Refresh host geometry for the next launch without changing the visible arrival aspect.
+      // Cached host geometry is enough for first paint. System IPC must not hold the screen blank.
+      this.store.refreshCanvasSpecs().catch(() => {});
       if (!this.alive) return;
       for (const card of this.store.state.cards) {
         if (!ensureCapabilitySize(card)) this.error = '部分卡片内部空间不足，请放大、更换形状或移除能力';
@@ -231,7 +233,9 @@ struct Index {
       this.canvasAspect = this.widgetAspect > 0 ? this.widgetAspect : (this.store.canvasSpecs[this.canvasDimension] ?? (this.canvasDimension === '6*4' ? 2 / 3 : (this.canvasDimension === '2*4' ? 2 : 1)));
       clampCanvasGroups(this.store.state.cards,BOARD_W/this.canvasAspect);
       const routedLaunch = this.routedId.length > 0 || this.viewRouteId.length > 0;
-      this.canvasBackground = this.store.state.background; this.layoutBoard(); this.ready = true; this.render(); this.scheduleBackground(); this.routeChanged(); this.viewRouteChanged(); this.incomingTemplateChanged();
+      this.canvasBackground = this.store.state.background; this.layoutBoard(); this.ready = true; this.render(); startupMark('scene-ready');
+      this.getUIContext().postFrameCallback(new PreparedTransition(()=>startupMark('scene-idle')));
+      this.scheduleBackground(); this.routeChanged(); this.viewRouteChanged(); this.incomingTemplateChanged();
       if (!routedLaunch) this.startArrival();
       this.maintenanceTimer = setTimeout(() => { if (this.alive) { this.warmEditor(); this.persist(); this.repairStoredSubjects();  this.refreshCapabilities(); } }, 750);
 
@@ -321,7 +325,7 @@ struct Index {
                 .accessibilityText('切换到 '+this.canvasTitle(id)).onClick(()=>this.chooseCanvas(id))
                 Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
                   SymbolGlyph($r('sys.symbol.rectangle_and_arrowshape_turn_up_right')).fontSize(20).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
-                }.id('shareCanvas_'+id).width(44).height(44).backgroundColor(Color.Transparent).attributeModifier(immersiveChrome()).enabled(!this.sharing)
+                }.id('shareCanvas_'+id).width(44).height(44).backgroundColor(Color.Transparent).attributeModifier(immersiveChrome(this.appDark)).enabled(!this.sharing)
                   .accessibilityText('分享 '+this.canvasTitle(id)).onClick(()=>this.shareCanvasFromPicker(id))
               }.width('100%')
             }
@@ -1010,8 +1014,8 @@ struct Index {
               SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
             }.width('100%')
           }.id('shareCanvas').padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).width(Math.min(130,Math.max(64,this.panelWidth-220))).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).margin({right:8}).onClick(()=>{if(this.canvasChanging)return;this.refreshCanvasList();this.canvasCreating=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
-            .bindPopup(this.canvasPickerOpen,{builder:this.canvasPicker,placement:Placement.Top,width:this.canvasPopupWidth(),radius:20,
-              popupColor:this.appSurface(),backgroundBlurStyle:BlurStyle.NONE,enableArrow:true,autoCancel:true,focusable:true,keyboardAvoidMode:KeyboardAvoidMode.DEFAULT,
+            .bindPopup(this.canvasPickerOpen,{builder:this.canvasPicker,placement:Placement.Top,width:this.canvasPopupWidth(),radius:20,systemMaterial:chromeMaterial(),
+              popupColor:chromeMaterial()!==undefined?(this.appDark?'#CC25231F':'#CCF6F2E9'):this.appSurface(),backgroundBlurStyle:BlurStyle.NONE,enableArrow:true,autoCancel:true,focusable:true,keyboardAvoidMode:KeyboardAvoidMode.DEFAULT,
               mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible){this.canvasPickerOpen=false;this.canvasCreating=false;}}})
           Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).margin({ right: 8 }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
           Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([Color.White]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(24).backgroundColor('#262626').fontColor(Color.White).accessibilityText('添加卡片').onClick(() => this.addCard())
@@ -1039,16 +1043,16 @@ struct Index {
         if (this.groupSelecting) {
           Row() {
             Button('组合 ' + this.groupSelection.length + ' 张卡片', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.EMPHASIZED, role:ButtonRole.NORMAL })
-              .height(44).fontSize(14).padding({left:20,right:20}).backgroundColor(this.groupSelection.length>1?AppDesign.selected(this.appDark):this.appControl()).fontColor(this.groupSelection.length>1?AppDesign.onSelected(this.appDark):this.appMuted()).opacity(1).attributeModifier(immersiveChrome())
+              .height(44).fontSize(14).padding({left:20,right:20}).backgroundColor(this.groupSelection.length>1?AppDesign.selected(this.appDark):this.appControl()).fontColor(this.groupSelection.length>1?AppDesign.onSelected(this.appDark):this.appMuted()).opacity(1).attributeModifier(immersiveChrome(this.appDark,this.groupSelection.length>1))
               .accessibilityText('组合选中的 '+this.groupSelection.length+' 张卡片').accessibilityDescription(this.groupSelection.length<2?'至少选择两张卡片才能组合':'组合所选卡片').onClick(() => this.confirmGroup())
             Blank()
           }.width('100%')
         }
         if (!this.groupSelecting && this.selectedId.length > 0) {
           Row({ space: 12 }) {
-            Button('上移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome()).onClick(() => this.moveCardLayer(this.selectedId, true))
-            Button('下移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome()).onClick(() => this.moveCardLayer(this.selectedId, false))
-            if((this.cardMap[this.selectedId]?.groupId??'').length>0) { Button('取消组合',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome()).onClick(()=>this.releaseGroup()) }
+            Button('上移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(() => this.moveCardLayer(this.selectedId, true))
+            Button('下移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(() => this.moveCardLayer(this.selectedId, false))
+            if((this.cardMap[this.selectedId]?.groupId??'').length>0) { Button('取消组合',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(()=>this.releaseGroup()) }
             Blank()
           }.width('100%')
         }
@@ -1258,7 +1262,7 @@ struct Index {
     this.sharing=true;
     try { const source=await this.store.canvasSnapshot(canvasId||this.store.state.canvasId);
       if(single && !source.cards.some((card:FridgeCard)=>card.id===id))return;
-      const result=await this.getUIContext().getPromptAction().showActionMenu({title:single?'卡片作品':'画布作品',buttons:[
+      const result=await this.getUIContext().getPromptAction().showActionMenu({systemMaterial:chromeMaterial(),title:single?'卡片作品':'画布作品',buttons:[
       {text:single?'分享可编辑卡片':'分享可编辑画布',color:this.appText()}, {text:single?'分享卡片图片':'分享到社媒 · 画布展示图',color:this.appText()}]});
       if(result.index===1){await this.shareArtwork(single,source,id);return;}
       const path=await taskpool.execute(new taskpool.Task(exportTemplate,JSON.stringify(source),id,this.context.filesDir,this.context.cacheDir)) as string;
@@ -1318,7 +1322,7 @@ struct Index {
   private async shareArtwork(single: boolean, source: FridgeState, cardId: string): Promise<void> {
     if (this.context === null || this.heroActive || this.arriving) return;
     try {
-      const formatIndex = single ? (await this.getUIContext().getPromptAction().showActionMenu({ title: '分享卡片图片', buttons: [
+      const formatIndex = single ? (await this.getUIContext().getPromptAction().showActionMenu({ systemMaterial:chromeMaterial(), title: '分享卡片图片', buttons: [
         { text: '透明 PNG', color: this.appText() }, { text: '实色底 JPG', color: this.appText() }
       ] })).index : 0;
       this.sharing = true; this.shareSingle = single; this.shareOpaque = !single || formatIndex === 1; this.shareTick = Date.now(); this.shareBackground = normalizeBackground(JSON.parse(JSON.stringify(source.background)) as CanvasBackground);
@@ -1381,9 +1385,11 @@ struct Index {
           style: {
             blurStrategy: BlurStrategy.ADAPTIVE, thermoCtrl: true,
             scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-            scrollEffectStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } },
+            scrollEffectStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 },
+              contentStyle: { menuStyle: {textColor:this.appText(),iconColor:this.appText()}, backIconStyle: {textColor:this.appText(),iconColor:this.appText()} } },
             systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
-            originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } }
+            originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 },
+              contentStyle: { menuStyle: {textColor:this.appText(),iconColor:this.appText()}, backIconStyle: {textColor:this.appText(),iconColor:this.appText()} } }
           }
         })
         .bindToScrollable([this.detailScroller]).hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).width('100%').height('100%').backgroundColor(Color.Transparent)
@@ -1425,9 +1431,11 @@ struct Index {
           style: {
             blurStrategy: BlurStrategy.ADAPTIVE, thermoCtrl: true,
             scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-            scrollEffectStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } },
+            scrollEffectStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 },
+              contentStyle: { menuStyle: {textColor:this.appText(),iconColor:this.appText()}, backIconStyle: {textColor:this.appText(),iconColor:this.appText()} } },
             systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
-            originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 } }
+            originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 16 },
+              contentStyle: { menuStyle: {textColor:this.appText(),iconColor:this.appText()}, backIconStyle: {textColor:this.appText(),iconColor:this.appText()} } }
           }
         })
         .id('editorMotionChrome').bindToScrollable([this.scroller]).hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).width('100%').height('100%').backgroundColor(Color.Transparent)
@@ -1437,7 +1445,7 @@ struct Index {
       .accessibilityLevel(this.editing ? 'yes' : 'no-hide-descendants')
   }
   private showAddMenu(): void {
-    this.getUIContext().getPromptAction().showActionMenu({ title: '添加到当前图层', buttons: [
+    this.getUIContext().getPromptAction().showActionMenu({ systemMaterial:chromeMaterial(), title: '添加到当前图层', buttons: [
       { text: '文字', color: this.appText() }, { text: '本地图片 / GIF', color: this.appText() }, { text: '形状', color: this.appText() }
     ] }).then((result) => { if (this.alive && this.editing) this.addElement(['text', 'image', 'shape'][result.index]); }).catch(() => {});
   }
@@ -1531,13 +1539,13 @@ struct Index {
         .position({ x: this.previewViewport().left, y: this.previewViewport().top })
 
       if (this.preview.capability?.k!=='album' && this.layerId.length > 0 && (this.layerId!=='capability'||this.preview.capability!==null) && this.layerDrag.length === 0) {
-        Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right')).fontSize(20).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(18).backgroundColor(this.appSurface()).fontColor(this.appText()).shadow({ radius: 6, color: '#18000000', offsetY: 2 })
+        Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right')).fontSize(20).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(18).backgroundColor(this.appSurface()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark))
           .border({ width: 1, color: '#B8B8B8' }).position({ x: this.editorHandle(true).x - 22, y: this.editorHandle(true).y - 22 })
           .accessibilityText('缩放选中元素')
           .gesture(PanGesture({ distance: 2 }).onActionStart((e: GestureEvent) => this.startTransform(this.layerId, e)).onActionUpdate((e: GestureEvent) => this.resizeElement(e))
             .onActionEnd((e: GestureEvent) => { this.resizeElement(e); this.flushPreview(); }).onActionCancel(() => this.cancelTransform()))
         if (this.layerId !== 'capability') {
-          Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(20).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(18).backgroundColor(this.appSurface()).fontColor(this.appText()).shadow({ radius: 6, color: '#18000000', offsetY: 2 })
+          Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(20).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(18).backgroundColor(this.appSurface()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark))
             .border({ width: 1, color: '#B8B8B8' }).position({ x: this.editorHandle(false).x - 22, y: this.editorHandle(false).y - 22 })
             .accessibilityText('旋转选中元素')
             .gesture(PanGesture({ distance: 2 }).onActionStart((e: GestureEvent) => this.startTransform(this.layerId, e)).onActionUpdate((e: GestureEvent) => this.rotateElement(e))

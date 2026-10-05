@@ -1,3 +1,4 @@
+import { startStartupTrace, startupMark } from '../model/StartupTrace';
 import { UIAbility, AbilityConstant, Want, Configuration, ConfigurationConstant } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
@@ -9,6 +10,7 @@ const TAG: string = 'EntryAbility';
 export default class EntryAbility extends UIAbility {
   private launchPage: string = 'pages/Index';
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    startStartupTrace(); startupMark('ability');
     hilog.info(0x0000, TAG, 'onCreate');
     AppStorage.setOrCreate('appBackgrounded', false); this.updateAppearance(this.context.config.colorMode);
     this.routeCard(want);
@@ -95,6 +97,7 @@ export default class EntryAbility extends UIAbility {
         updateInsets();
         mainWindow.on('avoidAreaChange', () => updateInsets());
       } catch (e) { hilog.error(0x0000, TAG, 'immersive %{public}s', (e as Error).message); }
+      startupMark('content-loaded');
       hilog.info(0x0000, TAG, 'loadContent ok');
     });
   }

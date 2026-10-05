@@ -84,6 +84,17 @@ function load(name) {
  await reloaded.openCanvas(second);await reloaded.deleteCanvas(second);await reloaded.save();assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).second,'canvas_main','deleted source is explicitly rebound');assert.ok(!disk.has(canvasKey(second)));
  assert.equal(boundCanvas({a:'canvas_main'},'a',reloaded.catalog),'canvas_main');assert.throws(()=>readCatalog('{"version":1,"canvases":[]}'));
  const corrupt=JSON.stringify({version:1,activeId:'missing',canvases:[{id:'missing',name:'Missing'}]});disk.set('fridge_canvases_json',corrupt);await assert.rejects(new FridgeStore().init({}),/已保留原始记录/);assert.equal(disk.get('fridge_canvases_json'),corrupt);disk.clear();
+ // Each canvas retains its own disposable geometry cache across cold starts.
+ const contours=load('RenderContours'),outline=[[{x:.1,y:.1},{x:.9,y:.1},{x:.9,y:.9},{x:.1,y:.9}]];
+ const cachedStore=new FridgeStore();await cachedStore.init({});
+ const subject=new FridgeCard();subject.id='cached-subject';subject.shape='subject';subject.cutout='file://cache-test.png';subject.outline=outline;cachedStore.addCard(subject);
+ await contours.primeRenderContours(cachedStore.state.cards,JSON.stringify(cachedStore.state));await cachedStore.save(false);
+ const cacheMain='fridge_render_contours_v1_'+cachedStore.state.canvasId;assert.ok(disk.get(cacheMain));const mainCache=disk.get(cacheMain);
+ const cachedSecond=cachedStore.createCanvas('Cache second',cachedStore.state);await contours.primeRenderContours(cachedStore.state.cards,JSON.stringify(cachedStore.state));await cachedStore.save(false);
+ assert.equal(disk.get(cacheMain),mainCache,'saving another canvas preserves the first geometry cache');assert.ok(disk.get('fridge_render_contours_v1_'+cachedSecond));
+ const jobsBefore=jobs.length,cold=new FridgeStore();await cold.init({});await cold.openCanvas('canvas_main');await contours.primeRenderContours(cold.state.cards,JSON.stringify(cold.state));assert.equal(jobs.length,jobsBefore,'both cold load and switching reuse derived geometry');
+ const getPrefs=prefs.get;prefs.get=async(key,fallback)=>{if(key.startsWith('fridge_render_contours_v1_'))throw Error('cache unavailable');return getPrefs(key,fallback);};await new FridgeStore().init({});prefs.get=getPrefs;
+ await cold.deleteCanvas(cachedSecond);assert.ok(!disk.has('fridge_render_contours_v1_'+cachedSecond),'canvas deletion removes its derived cache');disk.clear();
  const bg=defaultState();bg.background.mode='blend';bg.cards=[card];const before=backgroundSignature(bg);card.x+=90;card.y-=80;card.w+=10;card.rot+=15;card.z+=10;assert.equal(backgroundSignature(bg),before,'drag/resize/rotate/layer order never triggers palette extraction');card.paper='#FF4422';assert.notEqual(backgroundSignature(bg),before,'artwork colour triggers re-extraction');
  const ctx={applicationInfo:{accessTokenId:1}},battery=await readCapability({k:'battery'},ctx);assert.equal(battery.percent,72);assert.equal(battery.charging,true);
  assert.equal(data.needsDataRefresh({k:'fetch',url:'https://example.org',sourceConfigured:true},Date.now()),false,'retired URL capabilities never schedule a request');

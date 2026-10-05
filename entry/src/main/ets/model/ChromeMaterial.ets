@@ -15,7 +15,7 @@ async function loadMaterial():Promise<void> {
     if(!module.default.isImmersiveMaterialSupported())return;
     factory=(tint:string,interactive:boolean):uiMaterial.ImmersiveMaterial=>new module.default.ImmersiveMaterial({
       style:interactive?module.default.ImmersiveStyle.REGULAR:module.default.ImmersiveStyle.THIN,
-      materialColor:tint||Color.Transparent,interactive:interactive,applyShadow:interactive,colorInvert:false});
+      materialColor:tint||Color.Transparent,interactive:interactive,applyShadow:interactive,colorInvert:false,lightEffect:interactive?{color:undefined}:null});
     chrome=factory('',true);
   } catch (_) { /* Native styling and the contrast tint remain usable without material support. */ }
 }
@@ -27,7 +27,13 @@ export function readingMaterial(tint:string):uiMaterial.ImmersiveMaterial|undefi
   if(material===undefined){material=factory(tint,false);if(readingMaterials.size>32)readingMaterials.clear();readingMaterials.set(tint,material);}return material;
 }
 class ChromeModifier implements AttributeModifier<ButtonAttribute> {
+  private dark:boolean;private emphasized:boolean;
+  constructor(dark:boolean=false,emphasized:boolean=false){this.dark=dark;this.emphasized=emphasized;}
   applyNormalAttribute(instance:ButtonAttribute):void {
+    // Native system material is scoped to navigation/tab bars and popup hosts.
+    // Floating canvas tools still need a native blur/tint fallback in ordinary content.
+    if(!this.emphasized)instance.backgroundColor(this.dark?'#D925231F':'#D9F6F2E9').backgroundBlurStyle(BlurStyle.COMPONENT_THIN);
+    instance.border({width:.6,color:this.dark?'#38FFFFFF':'#90FFFFFF'}).shadow({radius:10,color:'#18000000',offsetY:3});
     if(deviceInfo.sdkApiVersion>=26)instance.systemMaterial(chromeMaterial());
   }
 }
@@ -38,9 +44,9 @@ class ReadingModifier implements AttributeModifier<ColumnAttribute> {
     if(deviceInfo.sdkApiVersion>=26)instance.systemMaterial(readingMaterial(this.tint));
   }
 }
-const chromeModifier=new ChromeModifier();
+const chromeModifiers:ChromeModifier[]=[new ChromeModifier(false,false),new ChromeModifier(true,false),new ChromeModifier(false,true),new ChromeModifier(true,true)];
 const modifiers=new Map<string,ReadingModifier>();
-export function immersiveChrome():AttributeModifier<ButtonAttribute> {return chromeModifier;}
+export function immersiveChrome(dark:boolean=false,emphasized:boolean=false):AttributeModifier<ButtonAttribute> {return chromeModifiers[(dark?1:0)+(emphasized?2:0)];}
 export function immersiveReading(tint:string):AttributeModifier<ColumnAttribute> {
   let modifier=modifiers.get(tint);if(modifier===undefined){modifier=new ReadingModifier(tint);if(modifiers.size>32)modifiers.clear();modifiers.set(tint,modifier);}return modifier;
 }

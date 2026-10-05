@@ -1,3 +1,4 @@
+import { immersiveChrome } from '../model/ChromeMaterial';
 import { BoardMotion } from '../model/BoardMotion';
 import { dragBounds, DragBounds } from '../model/DragGeometry';
 import { cardOutline } from '../model/RenderContours';
@@ -269,12 +270,12 @@ export struct BoardCard {
             .onActionEnd((e: GestureEvent) => { this.move(e); this.finishMove(); }).onActionCancel(() => this.cancelMove()),
           TapGesture().onAction(() => { if (!this.moving) this.onSelect(this.card.id); })))
       Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.ERROR }) {SymbolGlyph($r('sys.symbol.xmark')).fontSize(20).fontColor(['#D3423C']).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(24).fontColor('#D3423C').backgroundColor(Color.White)
-        .shadow({ radius: 8, color: '#20000000', offsetY: 2 })
+        .attributeModifier(immersiveChrome())
         .opacity(this.controlsOpacity).scale({ x: this.controlsScale, y: this.controlsScale })
         .position(this.controlPosition(false, false)).hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('删除卡片').onClick(() => this.onDelete(this.card.id))
       Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right')).fontSize(22).fontColor(['#303030']).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(22).fontColor('#303030').backgroundColor(Color.White)
-        .shadow({ radius: 8, color: '#20000000', offsetY: 2 })
+        .attributeModifier(immersiveChrome())
         .opacity(this.controlsOpacity).scale({ x: this.resizeControlScale, y: this.resizeControlScale })
         .position(this.controlPosition(true, false)).hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('调整卡片大小').onClick(() => this.getUIContext().getPromptAction().showToast({ message: '向外拖动放大，向内拖动缩小' }))
@@ -285,7 +286,7 @@ export struct BoardCard {
           .position({ x: 24, y: this.h() + 26 }).hitTestBehavior(HitTestMode.None)
       }
       Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(22).fontColor(['#303030']).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(22).fontColor('#303030').backgroundColor(Color.White)
-        .shadow({ radius: 8, color: '#20000000', offsetY: 2 }).opacity(this.controlsOpacity).scale({ x: this.controlsScale, y: this.controlsScale })
+        .attributeModifier(immersiveChrome()).opacity(this.controlsOpacity).scale({ x: this.controlsScale, y: this.controlsScale })
         .position(this.controlPosition(false, true))
         .hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('旋转整张卡片')
@@ -295,7 +296,7 @@ export struct BoardCard {
           .onActionEnd((e: GestureEvent) => { this.updateRotation(e); this.finishRotation(); })
           .onActionCancel(() => { this.rotating = false; this.onInteraction(false); }))
       Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(20).fontColor(['#303030']).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(11).fontColor('#303030').backgroundColor(Color.White)
-        .shadow({ radius: 8, color: '#20000000', offsetY: 2 })
+        .attributeModifier(immersiveChrome())
         .opacity(this.controlsOpacity).scale({ x: this.controlsScale, y: this.controlsScale })
         .position(this.controlPosition(true, true)).hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('编辑卡片内容').onClick(() => this.onEdit(this.card.id))

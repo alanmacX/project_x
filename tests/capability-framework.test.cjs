@@ -52,8 +52,9 @@ const hollow={...shape,cutout:'',outline:[[{x:0,y:0},{x:1,y:0},{x:1,y:1},{x:0,y:
 const holeFit=g.capabilityPlacement(hollow);assert.ok(holeFit.x+holeFit.w<=.4 || holeFit.x>=.6 || holeFit.y+holeFit.h<=.4 || holeFit.y>=.6,'capability never covers a transparent hole');
 let travel={...placed};const started=performance.now();for(let i=0;i<5000;i++){travel=g.constrainCapabilityDrag(shape,{...travel,x:.08+(i%10)*.002,y:.7+(i%7)*.002},travel);}console.log('5000 cached capability drag queries: '+(performance.now()-started).toFixed(2)+' ms (model CPU, not device FPS)');
 
+global.BlurStyle={COMPONENT_THIN:0};
 const material=load('ChromeMaterial');
-material.prepareChromeMaterial().then(()=>{const old={systemMaterial:()=>{throw Error('API26 method called on API24');}};material.immersiveChrome().applyNormalAttribute(old);material.immersiveReading('#E0FFFFFF').applyNormalAttribute(old);assert.equal(material.chromeMaterial(),undefined);console.log('PASS API24 material module and method guards');}).catch(e=>{console.error(e);process.exitCode=1;});
+material.prepareChromeMaterial().then(()=>{const old={backgroundColor(){return this;},backgroundBlurStyle(){return this;},border(){return this;},shadow(){return this;},systemMaterial:()=>{throw Error('API26 method called on API24');}};material.immersiveChrome().applyNormalAttribute(old);material.immersiveReading('#E0FFFFFF').applyNormalAttribute(old);assert.equal(material.chromeMaterial(),undefined);console.log('PASS API24 material module and method guards');}).catch(e=>{console.error(e);process.exitCode=1;});
 
 const gg=load('GroupGeometry');
 for(const height of [s.BOARD_H,280,740]) {
