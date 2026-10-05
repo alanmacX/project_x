@@ -73,10 +73,9 @@ export function smartTone(colors: WeightedColor[]): string {
   for(const p of colors){const lab=colorLab(p.color),c=Math.hypot(lab.a,lab.b),w=p.weight*(.25+Math.min(c,50)/50);a+=lab.a*w;b+=lab.b*w;total+=w;}
   return backgroundTone(labColor({l:65,a:a/Math.max(total,.001),b:b/Math.max(total,.001)}));
 }
-/** A subdued foundation lets the blurred colour cores create visible depth even with one hue. */
+/** The historical renderer uses the dominant source colour as its foundation. */
 export function fluidBase(colors: WeightedColor[]): string {
-  const lab=colorLab(combineColors(colors));
-  return labColor({l:Math.max(35,Math.min(62,lab.l*.72)),a:lab.a*.55,b:lab.b*.55});
+  return colors.slice().sort((a:WeightedColor,b:WeightedColor)=>b.weight-a.weight)[0]?.color??'#C5C1B8';
 }
 /** FluidGradient port: solid radial cores, source-over base, Overlay light folds, final blur.
  * Adapted from Cindori/FluidGradient (MIT); see THIRD_PARTY_NOTICES.md. A deterministic pose is
@@ -85,7 +84,7 @@ export function fluidBase(colors: WeightedColor[]): string {
 export function blendPixels(anchors: BackgroundAnchor[], base: string, width: number, height: number): Uint8Array {
   const bytes=new Uint8Array(width*height*4);
   const rgb=(hex:string):number[]=>[parseInt(hex.slice(1,3),16)/255,parseInt(hex.slice(3,5),16)/255,parseInt(hex.slice(5,7),16)/255];
-  const fields=anchors.slice().sort((a:BackgroundAnchor,b:BackgroundAnchor)=>a.weight-b.weight);
+  const fields=anchors.slice().sort((a:BackgroundAnchor,b:BackgroundAnchor)=>b.weight-a.weight);
   const neutral=rgb(fields.length>0?fluidBase(fields):base),maxWeight=Math.max(.001,...fields.map((p:BackgroundAnchor)=>p.weight));
   const colors=fields.map((p:BackgroundAnchor)=>rgb(p.color));
   const core=(r:number):number=>r<=.9?1:r>=1?0:1-(r-.9)/.1;
@@ -98,7 +97,7 @@ export function blendPixels(anchors: BackgroundAnchor[], base: string, width: nu
     for(let k=0;k<fields.length;k++){
       const p=fields[k],radius=.3+.45*((k*7+3)%11)/10;
       const ry=radius*Math.max(width/height,1)*(.65+.9*((k*5+1)%7)/6);
-      const opacity=.8*Math.sqrt(p.weight/maxWeight);
+      const opacity=.95*Math.pow(p.weight/maxWeight,.75);
       const a=core(Math.hypot((nx-p.x)/radius,(ny-p.y)/ry))*opacity;
       for(let c=0;c<3;c++)out[c]=colors[k][c]*a+out[c]*(1-a);
       const hx=Math.max(0,Math.min(1,p.x+.28*Math.sin(k*2.4+1))),hy=Math.max(0,Math.min(1,p.y+.24*Math.cos(k*1.7+1)));
@@ -107,7 +106,7 @@ export function blendPixels(anchors: BackgroundAnchor[], base: string, width: nu
       alpha=ha+alpha*(1-ha);
     }
     const i=(y*width+x)*4;
-    for(let c=0;c<3;c++)bytes[i+c]=Math.round(255*(alpha>0?out[c]*(1-alpha*.65)+overlay(out[c],high[c]/alpha)*alpha*.65:out[c]));
+    for(let c=0;c<3;c++)bytes[i+c]=Math.round(255*(alpha>0?out[c]*(1-alpha)+overlay(out[c],high[c]/alpha)*alpha:out[c]));
     bytes[i+3]=255;
   }
   // Separable blur on the generated colour field, not on card artwork. O(pixels), off UI thread.

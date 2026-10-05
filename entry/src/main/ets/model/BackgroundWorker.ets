@@ -33,13 +33,13 @@ export async function createSmartBackground(json:string,filesDir:string):Promise
     influences.forEach((p:WeightedColor,i:number)=>anchors.push({x:Math.max(0,Math.min(1,x+(i===1?-.2:i===2?.2:0))),y:Math.max(0,Math.min(1,y+(i===1?.16:i===2?-.16:0))),color:p.color,weight:weight*p.weight/Math.max(total,.001)}));
   }
   bg.color=smartTone(colors);bg.signature=backgroundSignature(state);bg.palette=Array.from(new Set(colors.map((c:WeightedColor)=>c.color))).slice(0,6);
-  // Keep the twelve most visible influences; bitmap generation stays off the UI thread.
+  // Keep at most six spatial influences; bitmap generation stays off the UI thread.
   // Repeated yellow cards must not create twelve opaque copies of one colour.
-  // Merge nearby perceptual tones spatially; retain the actual strongest colour.
+  // Merge only nearby clouds of the same tone. Distant artwork keeps its own light fold.
   const fields:BackgroundAnchor[]=[];
   for(const candidate of anchors.sort((a:BackgroundAnchor,b:BackgroundAnchor)=>b.weight-a.weight)){
     const lab=colorLab(candidate.color);
-    const existing=fields.find((p:BackgroundAnchor)=>{const other=colorLab(p.color);return Math.hypot(lab.l-other.l,lab.a-other.a,lab.b-other.b)<20;});
+    const existing=fields.find((p:BackgroundAnchor)=>{const other=colorLab(p.color);return Math.hypot(lab.l-other.l,lab.a-other.a,lab.b-other.b)<12&&Math.hypot(candidate.x-p.x,candidate.y-p.y)<.2;});
     if(existing!==undefined){const total=existing.weight+candidate.weight;existing.x=(existing.x*existing.weight+candidate.x*candidate.weight)/total;existing.y=(existing.y*existing.weight+candidate.y*candidate.weight)/total;existing.weight=total;}
     else fields.push({x:candidate.x,y:candidate.y,color:candidate.color,weight:candidate.weight});
   }

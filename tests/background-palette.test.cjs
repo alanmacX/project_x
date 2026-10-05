@@ -18,12 +18,21 @@ function pixels(main,accent,fraction){const out=new Uint8Array(48*48*4);for(let 
  const single=p.blendPixels([{x:.4,y:.35,color:'#F5CD32',weight:1}],'#F2F1EE',96,128);
  let low=100,high=0;
  for(let i=0;i<single.length;i+=4){const hex='#'+Array.from(single.slice(i,i+3)).map(v=>v.toString(16).padStart(2,'0')).join('');const light=p.colorLab(hex).l;low=Math.min(low,light);high=Math.max(high,light);}
- assert.ok(high-low>8,'one dominant hue still produces blurred light and shade instead of a flat fill');
+ assert.ok(high-low>2,'single-hue Overlay retains light folds without an artificial dark foundation');
+ assert.equal(p.fluidBase([{color:'#F5CD32',weight:.9},{color:'#D22328',weight:.1}]),'#F5CD32','foundation retains the dominant source colour');
  images.set('/yellow.png',mixed);images.set('/red.png',pixels([210,35,40],[210,35,40],1));
  const state=new FridgeState();state.background.mode='blend';state.canvasAspect=1;
  const yellowCard=new FridgeCard();Object.assign(yellowCard,{id:'yellow',shape:'subject',subjectPhoto:true,cutout:'file:///yellow.png',x:0,y:0,w:300,h:300});
  const redCard=new FridgeCard();Object.assign(redCard,{id:'red',shape:'subject',subjectPhoto:true,cutout:'file:///red.png',x:210,y:0,w:30,h:30});state.cards=[yellowCard,redCard];
  const bg=JSON.parse(await createSmartBackground(JSON.stringify(state),'/cache'));assert.ok(bg.anchors[0].color.startsWith('#'));let predominant=0;for(let i=0;i<packed.length;i+=4)if(packed[i+1]>packed[i]*.65&&packed[i+2]<packed[i+1]*.65)predominant++;assert.ok(predominant/(packed.length/4)>.85,'large yellow artwork outweighs small red artwork in actual worker output');
+ const spatial=new FridgeState();spatial.background.mode='blend';spatial.canvasAspect=1;
+ const left=new FridgeCard(),right=new FridgeCard();
+ Object.assign(left,{id:'left',shape:'subject',subjectPhoto:true,cutout:'file:///yellow.png',x:10,y:20,w:70,h:70});
+ Object.assign(right,{id:'right',shape:'subject',subjectPhoto:true,cutout:'file:///yellow.png',x:250,y:20,w:70,h:70});spatial.cards=[left,right];
+ const separated=JSON.parse(await createSmartBackground(JSON.stringify(spatial),'/cache'));
+ const clouds=separated.anchors.filter(a=>a.color===swatches[0].color);
+ assert.equal(clouds.length,2,'same-colour artwork far apart retains distinct spatial clouds');
+ assert.ok(Math.abs(clouds[0].x-clouds[1].x)>.5);
  const signature=backgroundSignature(state);yellowCard.x+=20;yellowCard.rot=10;assert.equal(backgroundSignature(state),signature,'drag and rotation do not invoke palette extraction');const moved=JSON.parse(await createSmartBackground(JSON.stringify(state),'/cache'));assert.notEqual(moved.src,bg.src,'manual re-extraction uses a new pose bitmap instead of returning stale pixels');yellowCard.subjectVersion++;assert.notEqual(backgroundSignature(state),signature,'updated cutout invalidates cache even at the same path');
  const element=load('CardSchema').CanvasElement;yellowCard.elements=[new element()];yellowCard.elements[0].kind='shape';const sig2=backgroundSignature(state);yellowCard.elements[0].w=.5;assert.notEqual(backgroundSignature(state),sig2,'layer coverage changes invalidate extraction');
  console.log('PASS background: measured cluster proportions, transparent pixels, minority accents, Overlay hue preservation, single-hue light/shade depth, actual weighted worker output and movement-stable/versioned cache');

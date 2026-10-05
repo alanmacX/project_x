@@ -26,6 +26,6 @@ interface BackgroundSignatureCard { id:string; src:string; paper:string; layers:
 interface BackgroundSignature { mode:string; aspect:number; cards:BackgroundSignatureCard[]; }
 export function backgroundSignature(state:FridgeState):string {
   const signature:BackgroundSignature = {mode:state.background.mode,aspect:state.canvasAspect,cards:state.cards.map((card:FridgeCard):BackgroundSignatureCard=>({id:card.id,src:cardSource(card),paper:materialColors(card.material,card.paper)[0],layers:[String(card.subjectVersion),String(card.subjectPhoto),card.shape,...card.elements.filter((el)=>el.kind==='image'||el.kind==='shape').map((el)=>[el.kind,el.src,el.color,String(el.opacity),String(el.w),String(el.h)].join('|'))]}))};
-  return 'fluid-v9|'  + JSON.stringify(signature);
+  return 'fluid-v10|'  + JSON.stringify(signature);
 }
 export function hash(value:string):string {let n=2166136261;for(let i=0;i<value.length;i++){n^=value.charCodeAt(i);n=Math.imul(n,16777619);}return(n>>>0).toString(16);}

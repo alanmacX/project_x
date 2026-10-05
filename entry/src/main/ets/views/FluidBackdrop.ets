@@ -29,7 +29,7 @@ export struct FluidBackdrop {
       Column().width('100%').height('100%').radialGradient({center:['50%','50%'],radius:'50%',
         colors:[[p.color,0],[p.color,.9],['#00'+p.color.slice(1),1]]}).renderGroup(true)
     }.width(this.radius(k)*2).height(this.radius(k)*2)
-      .opacity(.8*Math.sqrt(p.weight/Math.max(.001,...this.anchors.map((a:BackgroundAnchor)=>a.weight))))
+      .opacity(.95*Math.pow(p.weight/Math.max(.001,...this.anchors.map((a:BackgroundAnchor)=>a.weight)),.75))
       .position({ x:(highlight?Math.max(0,Math.min(1,p.x+.28*Math.sin(k*2.4+1))):p.x)*this.viewW-this.radius(k),
         y:(highlight?Math.max(0,Math.min(1,p.y+.24*Math.cos(k*1.7+1))):p.y)*this.viewH-this.radius(k) })
       .scale({ x:(highlight?.85:1)*(1+this.phase*.12*Math.sin(k+1)),
@@ -40,11 +40,11 @@ export struct FluidBackdrop {
   build() {
     Stack({alignContent:Alignment.TopStart}) {
       Stack({alignContent:Alignment.TopStart}) {
-        ForEach(this.anchors.slice().sort((a:BackgroundAnchor,b:BackgroundAnchor)=>a.weight-b.weight),(p:BackgroundAnchor,k:number)=>{this.blob(p,k,false);},(p:BackgroundAnchor,k:number)=>p.color+':'+k)
+        ForEach(this.anchors.slice().sort((a:BackgroundAnchor,b:BackgroundAnchor)=>b.weight-a.weight),(p:BackgroundAnchor,k:number)=>{this.blob(p,k,false);},(p:BackgroundAnchor,k:number)=>p.color+':'+k)
       }.width('100%').height('100%').backgroundColor(fluidBase(this.anchors))
       Stack({alignContent:Alignment.TopStart}) {
-        ForEach(this.anchors.slice().sort((a:BackgroundAnchor,b:BackgroundAnchor)=>a.weight-b.weight),(p:BackgroundAnchor,k:number)=>{this.blob(p,k,true);},(p:BackgroundAnchor,k:number)=>p.color+':'+k)
-      }.width('100%').height('100%').opacity(.65).blendMode(BlendMode.OVERLAY)
+        ForEach(this.anchors.slice().sort((a:BackgroundAnchor,b:BackgroundAnchor)=>b.weight-a.weight),(p:BackgroundAnchor,k:number)=>{this.blob(p,k,true);},(p:BackgroundAnchor,k:number)=>p.color+':'+k)
+      }.width('100%').height('100%').blendMode(BlendMode.OVERLAY,BlendApplyType.OFFSCREEN)
     }.width('100%').height('100%').blur(Math.pow(Math.min(this.viewW,this.viewH),.75))
       .onAreaChange((_old:Area,area:Area)=>{const w=Number(area.width),h=Number(area.height);if(w>0&&h>0){this.viewW=w;this.viewH=h;}})
       .hitTestBehavior(HitTestMode.None)
