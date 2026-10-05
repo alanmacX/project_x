@@ -1,7 +1,3 @@
-# Share signature font
-
-The bundled `FridgeSignature.ttf` is a glyph subset of LXGW WenKai TC Regular, containing only `created by 冰箱贴`. Copyright 2024 The LXGW WenKai Project Authors. Licensed under SIL Open Font License 1.1. The complete license is bundled in `entry/src/main/resources/rawfile/fonts/LXGWWenKaiTC-OFL.txt`. Source: https://github.com/google/fonts/tree/main/ofl/lxgwwenkaitc and https://github.com/lxgw/LxgwWenkaiTC.
-
 # FluidGradient
 
 The background renderer in `BackgroundPalette.ets` adapts the radial core, layered compositing and blur design of [Cindori/FluidGradient](https://github.com/Cindori/FluidGradient). The ArkUI compositor implementation in `FluidBackdrop.ets` animates radial layers. The bitmap renderer produces a deterministic pose for FormKit and export. Neither implementation uses Apple CoreAnimation.
