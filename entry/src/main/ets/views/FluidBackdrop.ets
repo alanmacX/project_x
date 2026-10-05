@@ -1,5 +1,5 @@
 import { BackgroundAnchor } from '../model/CardSchema';
-import { combineColors } from '../model/BackgroundPalette';
+import { fluidBase } from '../model/BackgroundPalette';
 import { motionFrameRate } from '../model/MotionPolicy';
 /** ArkUI compositor port of FluidGradient's two animated radial layers (MIT).
  * One state transaction starts an infinite native animation. No per-frame timer,
@@ -41,10 +41,10 @@ export struct FluidBackdrop {
     Stack({alignContent:Alignment.TopStart}) {
       Stack({alignContent:Alignment.TopStart}) {
         ForEach(this.anchors.slice().sort((a:BackgroundAnchor,b:BackgroundAnchor)=>a.weight-b.weight),(p:BackgroundAnchor,k:number)=>{this.blob(p,k,false);},(p:BackgroundAnchor,k:number)=>p.color+':'+k)
-      }.width('100%').height('100%').backgroundColor(combineColors(this.anchors))
+      }.width('100%').height('100%').backgroundColor(fluidBase(this.anchors))
       Stack({alignContent:Alignment.TopStart}) {
         ForEach(this.anchors.slice().sort((a:BackgroundAnchor,b:BackgroundAnchor)=>a.weight-b.weight),(p:BackgroundAnchor,k:number)=>{this.blob(p,k,true);},(p:BackgroundAnchor,k:number)=>p.color+':'+k)
-      }.width('100%').height('100%').opacity(.18)
+      }.width('100%').height('100%').opacity(.65).blendMode(BlendMode.OVERLAY)
     }.width('100%').height('100%').blur(Math.pow(Math.min(this.viewW,this.viewH),.75))
       .onAreaChange((_old:Area,area:Area)=>{const w=Number(area.width),h=Number(area.height);if(w>0&&h>0){this.viewW=w;this.viewH=h;}})
       .hitTestBehavior(HitTestMode.None)

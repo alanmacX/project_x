@@ -73,7 +73,12 @@ export function smartTone(colors: WeightedColor[]): string {
   for(const p of colors){const lab=colorLab(p.color),c=Math.hypot(lab.a,lab.b),w=p.weight*(.25+Math.min(c,50)/50);a+=lab.a*w;b+=lab.b*w;total+=w;}
   return backgroundTone(labColor({l:65,a:a/Math.max(total,.001),b:b/Math.max(total,.001)}));
 }
-/** FluidGradient port: solid radial cores, source-over base, restrained colour folds, final blur.
+/** A subdued foundation lets the blurred colour cores create visible depth even with one hue. */
+export function fluidBase(colors: WeightedColor[]): string {
+  const lab=colorLab(combineColors(colors));
+  return labColor({l:Math.max(35,Math.min(62,lab.l*.72)),a:lab.a*.55,b:lab.b*.55});
+}
+/** FluidGradient port: solid radial cores, source-over base, Overlay light folds, final blur.
  * Adapted from Cindori/FluidGradient (MIT); see THIRD_PARTY_NOTICES.md. A deterministic pose is
  * rendered off-thread so FormKit, preview and exported artwork share identical pixels.
  */
@@ -81,9 +86,10 @@ export function blendPixels(anchors: BackgroundAnchor[], base: string, width: nu
   const bytes=new Uint8Array(width*height*4);
   const rgb=(hex:string):number[]=>[parseInt(hex.slice(1,3),16)/255,parseInt(hex.slice(3,5),16)/255,parseInt(hex.slice(5,7),16)/255];
   const fields=anchors.slice().sort((a:BackgroundAnchor,b:BackgroundAnchor)=>a.weight-b.weight);
-  const neutral=rgb(fields.length>0?combineColors(fields):base),maxWeight=Math.max(.001,...fields.map((p:BackgroundAnchor)=>p.weight));
+  const neutral=rgb(fields.length>0?fluidBase(fields):base),maxWeight=Math.max(.001,...fields.map((p:BackgroundAnchor)=>p.weight));
   const colors=fields.map((p:BackgroundAnchor)=>rgb(p.color));
   const core=(r:number):number=>r<=.9?1:r>=1?0:1-(r-.9)/.1;
+  const overlay=(b:number,h:number):number=>b<.5?2*b*h:1-2*(1-b)*(1-h);
   // Spatial influences remain attached to card centres. Sizes match the source's
   // .15–.75 range; a second independently displaced layer supplies luminous folds.
   for(let y=0;y<height;y++)for(let x=0;x<width;x++){
@@ -101,7 +107,7 @@ export function blendPixels(anchors: BackgroundAnchor[], base: string, width: nu
       alpha=ha+alpha*(1-ha);
     }
     const i=(y*width+x)*4;
-    for(let c=0;c<3;c++)bytes[i+c]=Math.round(255*(alpha>0?out[c]*(1-alpha*.18)+(high[c]/alpha)*alpha*.18:out[c]));
+    for(let c=0;c<3;c++)bytes[i+c]=Math.round(255*(alpha>0?out[c]*(1-alpha*.65)+overlay(out[c],high[c]/alpha)*alpha*.65:out[c]));
     bytes[i+3]=255;
   }
   // Separable blur on the generated colour field, not on card artwork. O(pixels), off UI thread.
