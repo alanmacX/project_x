@@ -1217,6 +1217,7 @@ struct Index {
   private shareTick: number = 0;
   private shareBackground: CanvasBackground = new CanvasBackground();
   private shareCanvasHeight: number = 344;
+  private signatureFontReady: boolean = false;
   @Builder
   shareScene() {
     Column() {
@@ -1231,7 +1232,7 @@ struct Index {
       }.width(this.shareWidth).height(this.shareCanvasHeight).backgroundColor(this.shareOpaque ? Color.White : Color.Transparent).clip(true)
       if (!this.shareSingle) {
         Row() {
-          Text('created by 冰箱贴').fontSize(11).fontColor('#6C685F').fontWeight(FontWeight.Medium)
+          Text('created by 冰箱贴').fontFamily('FridgeSignature').fontSize(15).fontColor('#6C685F').fontWeight(FontWeight.Normal)
         }.width('100%').height(36).justifyContent(FlexAlign.Center).backgroundColor('#F7F5EF')
       }
     }.width(this.shareWidth).height(this.shareHeight)
@@ -1312,6 +1313,10 @@ struct Index {
   private async shareArtwork(single: boolean, source: FridgeState, cardId: string): Promise<void> {
     if (this.context === null || this.heroActive || this.arriving) return;
     try {
+      if (!single && !this.signatureFontReady) {
+        this.getUIContext().getFont().registerFont({familyName:'FridgeSignature',familySrc:$rawfile('fonts/FridgeSignature.ttf')});
+        this.signatureFontReady = true;
+      }
       const formatIndex = single ? (await this.getUIContext().getPromptAction().showActionMenu({ title: '分享卡片图片', buttons: [
         { text: '透明 PNG', color: this.appText() }, { text: '实色底 JPG', color: this.appText() }
       ] })).index : 0;
