@@ -4,7 +4,7 @@ const moduleObject={exports:{}};
 const src=fs.readFileSync(__dirname+'/../entry/src/main/ets/model/WorkspaceLayout.ets','utf8');
 vm.runInNewContext(ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,{exports:moduleObject.exports,module:moduleObject});
 const {workspaceLayout}=moduleObject.exports;
-for(const [w,h] of [[320,568],[360,640],[390,844],[424,900],[600,960],[768,1024],[1024,768],[844,390],[720,360]]) {
+for(const [w,h] of [[320,568],[360,640],[390,844],[424,900],[600,960],[768,1024],[1024,768],[844,390],[720,360],[834,1194],[1024,1366],[1366,1024],[960,540],[640,960],[600,720],[520,800]]) {
  for(const ratio of [.6,1,1.5,2]) {
   const l=workspaceLayout(w,h,28,24,ratio);
   assert.ok(Math.abs(l.boardW/l.boardH-ratio)<.001);
@@ -21,4 +21,12 @@ for(const [w,h] of [[320,568],[360,640],[390,844],[424,900],[600,960],[768,1024]
 }
 assert.equal(workspaceLayout(600,960,28,24,1).wide,false);
 assert.equal(workspaceLayout(844,390,28,24,1).wide,true);
-console.log('PASS workspace layout: nine phone/tablet sizes, four canvas ratios, safe areas, independent content panes and compact settings budget');
+for(const [w,h] of [[768,1024],[834,1194],[1024,1366],[640,960]]) {
+ const l=workspaceLayout(w,h,28,24,1);
+ assert.equal(l.wide,false,'portrait tablet and tall split window must stack');
+ assert.equal(l.previewW,w);
+ assert.ok(l.boardW>=(w-2*l.margin)*.85,'portrait widget keeps at least 85% of available width');
+ assert.ok(l.previewH>300,'tablet preview is not capped at phone height');
+}
+assert.equal(workspaceLayout(520,800,28,24,1).wide,false,'narrow tablet split window uses compact layout');
+console.log('PASS responsive workspace: 16 phone/tablet/split-window sizes, four canvas ratios, safe areas, portrait artwork priority and settings budget');

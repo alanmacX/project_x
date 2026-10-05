@@ -8,17 +8,20 @@ export class WorkspaceLayout {
 export function workspaceLayout(width:number,height:number,top:number,bottom:number,aspect:number):WorkspaceLayout {
   const out=new WorkspaceLayout();out.margin=width<360?12:width>=720?24:16;
   const m=out.margin,usableW=Math.max(160,width-2*m),usableH=Math.max(180,height-top-bottom-2*m),ratio=Math.max(.3,Math.min(3,aspect));
-  out.wide=width>=640&&usableH>=220;
+  // Side-by-side needs horizontal space AND a wide window. Portrait tablets stay stacked.
+  out.wide=width>=640&&usableH>=220&&usableW>=usableH*1.1;
   const homeWide=out.wide;
   out.panelW=homeWide?Math.min(420,Math.max(300,width*.34)):usableW;
   const stageW=homeWide?Math.max(120,width-out.panelW-3*m):usableW;
-  const reserve=homeWide?0:Math.min(360,Math.max(248,usableH*.42));
+  const reserve=homeWide?0:Math.min(320,Math.max(248,usableH*.28));
   out.boardW=Math.min(stageW,Math.max(96,usableH-reserve-12)*ratio);out.boardH=out.boardW/ratio;
   out.boardX=m+(stageW-out.boardW)/2;out.boardY=top+m;
   out.panelX=homeWide?width-m-out.panelW:m;out.panelY=homeWide?out.boardY:out.boardY+out.boardH+12;
   out.panelH=Math.max(128,height-bottom-m-out.panelY);
   const body=Math.max(120,height-top-bottom-76);
   out.previewW=out.wide?width-Math.min(400,Math.max(300,width*.4)):width;
-  out.layersH=64;out.previewH=out.wide?Math.max(80,body-96):Math.min(220,Math.max(100,body*.27));
+  out.layersH=64;
+  const stackedPreview=width>=600?Math.min(520,body*.42,width*.72):Math.min(220,body*.27);
+  out.previewH=out.wide?Math.max(80,body-96):Math.max(100,Math.min(stackedPreview,body-64-12-56-180));
   out.inspectorW=out.wide?width-out.previewW:width;return out;
 }
