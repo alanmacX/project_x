@@ -1,7 +1,7 @@
 import { CapBlock } from '../model/CardSchema';
-import { AlbumResult } from '../model/AlbumCatalog';
-import { searchAlbums, saveAlbum } from '../model/AlbumWorker';
+import { importAlbumCover } from '../model/AlbumWorker';
 import { taskpool } from '@kit.ArkTS';
+import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { AppDesign } from '../model/AppDesign';
 import { SettingsAction } from './SettingsAction';
 @Component
@@ -10,50 +10,43 @@ export struct AlbumSettings {
   @Prop @Watch('cardChanged') cardId:string='';
   @Prop appDark:boolean=false;
   onUpdate:(id:string,cap:CapBlock)=>void=()=>{};
-  @State query:string='';
-  @State results:AlbumResult[]=[];
   @State busy:boolean=false;
   @State message:string='';
+  @State sources:boolean=false;
   private alive:boolean=true;
   private generation:number=0;
-  private lastSearch:number=0;
-  private cardChanged():void {this.generation++;this.busy=false;this.message='';this.results=[];this.query='';}
+  private cardChanged():void {this.generation++;this.busy=false;this.message='';this.sources=false;}
   aboutToDisappear():void {this.alive=false;this.generation++;}
   aboutToAppear():void {this.alive=true;}
-  private async search():Promise<void> {
-    if(this.busy||!this.query.trim())return;
-    if(Date.now()-this.lastSearch<1100)return;this.lastSearch=Date.now();
-    const token=++this.generation;this.busy=true;this.message='';this.results=[];
-    try{const found=JSON.parse(await taskpool.execute(new taskpool.Task(searchAlbums,this.query)) as string) as AlbumResult[];if(!this.alive||token!==this.generation)return;this.results=found;if(found.length===0)this.message='没有找到专辑，试试专辑原名或歌手名';}
-    catch(e){if(this.alive&&token===this.generation)this.message=(e as Error).message;}
-    finally{if(token===this.generation)this.busy=false;}
-  }
-  private async choose(album:AlbumResult):Promise<void> {
+  private async choose():Promise<void> {
     const context=this.getUIContext().getHostContext();if(!context||this.busy)return;
-    const token=++this.generation,id=this.cardId;this.busy=true;this.message='正在保存封面与背景';
-    try{const next=JSON.parse(await taskpool.execute(new taskpool.Task(saveAlbum,JSON.stringify(album),context.filesDir)) as string) as CapBlock;
-      if(this.alive&&token===this.generation&&id===this.cardId){this.onUpdate(id,next);this.results=[];this.message='';}
+    const token=++this.generation,id=this.cardId,next=JSON.parse(JSON.stringify(this.cap)) as CapBlock;this.busy=true;this.message='';
+    try {
+      const options=new photoAccessHelper.PhotoSelectOptions();options.maxSelectNumber=1;options.MIMEType=photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
+      const selection=await new photoAccessHelper.PhotoViewPicker().select(options);
+      if(!selection.photoUris.length||!this.alive||token!==this.generation)return;
+      this.message='正在生成融合背景';
+      const saved=JSON.parse(await taskpool.execute(new taskpool.Task(importAlbumCover,selection.photoUris[0],JSON.stringify(next),context.filesDir)) as string) as CapBlock;
+      if(this.alive&&token===this.generation&&id===this.cardId){this.onUpdate(id,saved);this.message='';}
     }catch(e){if(this.alive&&token===this.generation)this.message=(e as Error).message;}
     finally{if(token===this.generation)this.busy=false;}
   }
+  private text(value:string,artist:boolean):void {
+    const next=JSON.parse(JSON.stringify(this.cap)) as CapBlock;
+    if(artist)next.artist=value.slice(0,160);else next.title=value.slice(0,160);this.onUpdate(this.cardId,next);
+  }
   build() {
     Column({space:12}) {
-      if(this.cap.albumCover) {
-        Row({space:12}) {
-          Image(this.cap.albumCover).width(52).height(52).borderRadius(6).objectFit(ImageFit.Contain).draggable(false)
-          Column({space:4}) {Text(this.cap.title??'').fontSize(15).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).maxLines(2);Text(this.cap.artist??'').fontSize(12).fontColor(AppDesign.muted(this.appDark)).maxLines(1)}.layoutWeight(1).alignItems(HorizontalAlign.Start)
-        }.width('100%')
+      if(this.cap.albumCover) {Image(this.cap.albumCover).width(64).height(64).borderRadius(6).objectFit(ImageFit.Contain).draggable(false)}
+      SettingsAction({label:this.busy?'处理中':this.cap.albumCover?'更换本地封面':'选择本地封面',appDark:this.appDark,fillWidth:true,isEnabled:!this.busy,onPress:()=>this.choose()})
+      TextInput({text:this.cap.title??'',placeholder:'专辑名（可选）'}).height(44).maxLength(160).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(14).enabled(!this.busy).onChange((v:string)=>this.text(v,false))
+      TextInput({text:this.cap.artist??'',placeholder:'歌手（可选）'}).height(44).maxLength(160).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(14).enabled(!this.busy).onChange((v:string)=>this.text(v,true))
+      Text('封面居中，背景在本机自动生成，无需联网。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+      SettingsAction({label:this.sources?'收起封面来源建议':'封面来源建议',appDark:this.appDark,fillWidth:true,onPress:()=>this.sources=!this.sources})
+      if(this.sources) {
+        Text('MusicBrainz / Cover Art Archive：musicbrainz.org\nDiscogs：discogs.com\n也可使用艺术家或唱片公司官网的封面。\n\n自行在浏览器保存图片，再从相册导入。这里仅提供名称，可长按复制；App 不访问这些网站。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%').copyOption(CopyOptions.LocalDevice)
       }
-      TextInput({text:this.query,placeholder:'搜索专辑名或歌手'}).height(44).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(14).enterKeyType(EnterKeyType.Search).enabled(!this.busy)
-        .onChange((v:string)=>this.query=v).onSubmit(()=>this.search())
-      SettingsAction({label:this.busy?'处理中':'搜索专辑',appDark:this.appDark,fillWidth:true,isEnabled:!this.busy&&this.query.trim().length>0,onPress:()=>this.search()})
-      ForEach(this.results,(album:AlbumResult)=>{
-        Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL,role:ButtonRole.NORMAL}) {
-          Column({space:4}) {Text(album.title).fontSize(15).fontColor(AppDesign.text(this.appDark)).maxLines(2).width('100%');Text(album.artist+(album.year?' · '+album.year:'')).fontSize(12).fontColor(AppDesign.muted(this.appDark)).maxLines(2).width('100%')}.padding(14).alignItems(HorizontalAlign.Start)
-        }.width('100%').backgroundColor(AppDesign.control(this.appDark)).enabled(!this.busy).onClick(()=>this.choose(album))
-      },(album:AlbumResult)=>album.id)
       if(this.message) {Text(this.message).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
-      Text('MusicBrainz · Cover Art Archive\n封面居中，背景由封面自动生成。保存后离线显示。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
     }.width('100%')
   }
 }

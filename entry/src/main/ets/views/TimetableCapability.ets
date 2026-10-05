@@ -1,3 +1,4 @@
+import { holidayKnown, dateKey } from '../model/HolidayCalendar';
 import { readingHalo } from '../model/CapabilityPresentation';
 import { CapBlock, AgendaItem } from '../model/CardSchema';
 import { timetableDisplay, TimetableDisplay, timeText } from '../model/CapabilityData';
@@ -15,13 +16,14 @@ export struct TimetableCapability {
   aboutToAppear(): void { this.update(); }
   private update(): void { this.display = timetableDisplay(this.cap, this.tick > 0 ? this.tick : Date.now()); }
   private s(): number { return this.scaleFactor; }
+  private calendarPending():boolean {const date=new Date(this.display.date),key=dateKey(date);return this.cap.skipHolidays!==false&&!holidayKnown(date.getFullYear())&&!(this.cap.teachingDays??[]).some((d)=>d.date===key)&&!(this.cap.holidayDates??[]).some((d)=>d.date===key);}
   private dateLabel(): string { const d = new Date(this.display.date); return (d.getMonth()+1)+'.'+d.getDate(); }
   private columns(): number { return briefColumns(this.contentWidth); }
   private fits(): boolean { return this.cap.timetableMode === 'day' ? this.contentHeight + .1 >= briefHeight(this.display.lessons.length, this.columns()) : this.contentWidth >=127.9 && this.contentHeight >=115.9; }
   @Builder
   heading() {
     Row({space:4*this.s()}) {
-      Text(this.display.heading).fontSize(11*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled)).opacity(.65).layoutWeight(1).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
+      Text(this.calendarPending()?'假期待确认':this.display.heading).fontSize(11*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled)).opacity(.65).layoutWeight(1).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
       Text(this.dateLabel()).fontSize(10*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled)).opacity(.5)
     }.width('100%').height(BRIEF_HEADER_HEIGHT*this.s()).alignItems(VerticalAlign.Top)
   }

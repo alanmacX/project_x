@@ -1,6 +1,6 @@
 import { SettingsAction } from './SettingsAction';
 import { CapBlock, TeachingDay, CourseChange } from '../model/CardSchema';
-import { dateKey, daysBetween, holidayKnown, HolidayDate } from '../model/HolidayCalendar';
+import { dateKey, daysBetween, missingHolidayYears, holidayDataLabel, HolidayDate } from '../model/HolidayCalendar';
 import { importHolidayFile } from '../model/HolidayFiles';
 import { AppDesign } from '../model/AppDesign';
 import { taskpool } from '@kit.ArkTS';
@@ -19,6 +19,7 @@ export struct CalendarRulesDialog {
   private lessonDialog:CustomDialogController|null=null;
   aboutToAppear():void {this.draft=JSON.parse(JSON.stringify(this.cap)) as CapBlock;}
   aboutToDisappear():void {this.alive=false;this.lessonDialog?.close();}
+  private missingYears():number[] {return missingHolidayYears(this.draft.semester??'',Math.max(1,...(this.draft.courses??[]).map((c)=>c.lastWeek)));}
   private update():void {this.draft=JSON.parse(JSON.stringify(this.draft)) as CapBlock;}
   private day(run:(date:string)=>void,initial:string=dateKey(new Date())):void {
     this.getUIContext().showDatePickerDialog({selected:new Date(initial+'T12:00:00'),onAccept:(value:DatePickerResult)=>{
@@ -62,9 +63,9 @@ export struct CalendarRulesDialog {
       Scroll() {Column({space:20}) {
         Column({space:12}) {
           Row() {Text('国内假期停课').fontSize(15).fontColor(AppDesign.text(this.appDark));Blank();Toggle({type:ToggleType.Switch,isOn:this.draft.skipHolidays!==false}).onChange((value:boolean)=>{this.draft.skipHolidays=value;this.update();})}.width('100%').height(44)
-          Text('内置 2025–2026 年官方放假日期，离线可用。补班日只做标记，补哪天的课按学校安排设置。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
-          if(!holidayKnown(Number((this.draft.semester??'').slice(0,4)))||Number((this.draft.semester??'').slice(0,4))>=2026){Text('2027 年及以后尚无预置放假安排，可导入校历或手动设置。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
-          SettingsAction({label:this.busy?'读取中':'导入假期日历 .ics',onPress:()=>this.importDays(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
+          Text(holidayDataLabel()+'。无需每年导入；全国补班不等于学校调课，按学校校历设置。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+          if(this.missingYears().length>0){Text('本学期缺少 '+this.missingYears().join('、')+' 年官方安排。请在新安排发布后更新 App；对应年份暂按原课表展示，假期需核对校历。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
+          SettingsAction({label:this.busy?'读取中':'导入学校假期日历 .ics（可选）',onPress:()=>this.importDays(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
           if((this.draft.holidayDates??[]).length) {
             Text('已导入 '+this.draft.holidayDates!.length+' 个假期日期；保存后生效。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
             SettingsAction({label:'移除导入的假期',onPress:()=>{this.draft.holidayDates=[];this.update();},appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})

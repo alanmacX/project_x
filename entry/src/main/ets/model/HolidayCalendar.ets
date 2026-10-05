@@ -23,7 +23,16 @@ export function validDay(value: string): boolean {
   if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
   const date=new Date(value+'T12:00:00');return Number.isFinite(date.getTime())&&dateKey(date)===value;
 }
-export function holidayKnown(year: number): boolean { return year===2025||year===2026; }
+export const HOLIDAY_YEARS: number[] = Array.from(new Set(HOLIDAY_PERIODS.map((p:HolidayPeriod)=>Number(p.start.slice(0,4))))).sort((a:number,b:number)=>a-b);
+export const HOLIDAY_DATA_REVISION: string = 'CN-2026-official-r1';
+export function holidayKnown(year: number): boolean { return HOLIDAY_YEARS.includes(year); }
+export function holidayDataLabel(): string { return HOLIDAY_YEARS.join('、')+' 年官方安排 · 随应用版本更新'; }
+/** Validate the whole semester, including its next calendar year. Never extrapolate. */
+export function missingHolidayYears(semester:string,weeks:number):number[] {
+  if(!validDay(semester))return holidayKnown(new Date().getFullYear())?[]:[new Date().getFullYear()];
+  const start=new Date(semester+'T12:00:00'),end=new Date(start.getTime());end.setDate(end.getDate()+Math.max(1,Math.min(60,Number.isFinite(weeks)?Math.round(weeks):1))*7-1);
+  const missing:number[]=[];for(let year=start.getFullYear();year<=end.getFullYear();year++)if(!holidayKnown(year))missing.push(year);return missing;
+}
 export function holidayName(date: Date): string {
   const key=dateKey(date),period=HOLIDAY_PERIODS.find((p:HolidayPeriod)=>key>=p.start&&key<=p.end);return period?.name??'';
 }

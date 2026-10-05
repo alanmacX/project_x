@@ -2,7 +2,6 @@ import { SettingsSegmented } from './SettingsSegmented';
 import { SettingsAction } from './SettingsAction';
 import { WeekTimetable } from './WeekTimetable';
 import { CapBlock } from '../model/CardSchema';
-import { SchoolImportDialog } from './SchoolImportDialog';
 import { AppDesign } from '../model/AppDesign';
 import { CourseItem } from '../model/CardSchema';
 import { WakeImport, WakeSlot, WakeCourse, resolveWakeUp, mondayDate } from '../model/WakeUpImport';
@@ -16,7 +15,6 @@ export struct WakeUpImportDialog {
   existingCount:number=0;
   onImport:(semester:string,courses:CourseItem[],replace:boolean,keepCalendar:boolean)=>void=()=>{};
   @State text:string='';
-  @State other:boolean=false;
   @State parsed:WakeImport=new WakeImport();
   @State slots:WakeSlot[]=[];
   @State semester:string='';
@@ -29,9 +27,7 @@ export struct WakeUpImportDialog {
   @State busy:boolean=false;
   @State error:string='';
   private alive:boolean=true;
-  private schoolDialog:CustomDialogController|undefined=undefined;
-  private school():void {this.schoolDialog=new CustomDialogController({builder:SchoolImportDialog({appDark:this.appDark,onRead:(json:string)=>this.accept(json)}),customStyle:true,autoCancel:false,alignment:DialogAlignment.Center});this.schoolDialog.open();}
-  aboutToDisappear():void {this.alive=false;this.schoolDialog?.close();}
+  aboutToDisappear():void {this.alive=false;}
   private accept(json:string):void {
     if(!this.alive)return;this.parsed=JSON.parse(json) as WakeImport;this.slots=this.parsed.slots;this.semester=this.parsed.semester;this.stage=true;this.periods=this.slots.some((s)=>!s.start||!s.end);this.error='';this.refreshPreview();
   }
@@ -71,15 +67,11 @@ export struct WakeUpImportDialog {
     Column({space:14}) {
       Text(this.stage?'确认课程表':'导入课程表').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
       if(!this.stage) {
-        SettingsAction({label:'从学校教务导入',onPress:()=>this.school(),appDark:this.appDark,isEnabled:!this.busy,emphasis:true})
-        Text('在 App 内选学校、登录教务并读取个人课表；也可导入已有的课表备份。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
-        SettingsAction({label:this.other?'收起其他方式':'导入已有课表备份',onPress:()=>this.other=!this.other,appDark:this.appDark,isEnabled:!this.busy})
-        if(this.other) {
-        SettingsAction({label:'选择 WakeUp 文件',onPress:()=>this.file(),appDark:this.appDark,isEnabled:!this.busy})
-        TextArea({text:this.text,placeholder:'长按粘贴导出文本'}).height(160).maxLength(262144).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(16).onChange((v:string)=>this.text=v)
-        SettingsAction({label:this.busy?'读取中':'预览粘贴的课表',onPress:()=>this.parseText(),appDark:this.appDark,isEnabled:!this.busy})
-        Text('支持 WakeUp 备份作为可选迁移方式，无需安装其他课程表 App。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
-        }
+        Text('先在 WakeUp 中完成教务导入，再导出本地课表文件；这里仅在本机读取，不登录学校网站。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
+        SettingsAction({label:'选择 WakeUp 课表文件',onPress:()=>this.file(),appDark:this.appDark,isEnabled:!this.busy,emphasis:true})
+        TextArea({text:this.text,placeholder:'也可以粘贴 WakeUp 导出的课表文本（不是分享口令）'}).height(160).maxLength(262144).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(16).onChange((v:string)=>this.text=v)
+        SettingsAction({label:this.busy?'读取中':'预览粘贴的课表',onPress:()=>this.parseText(),appDark:this.appDark,isEnabled:!this.busy&&this.text.trim().length>0})
+        Text('支持 .wakeup_schedule、JSON 或导出文本。节次作息、单双周与不连续周次会在导入预览中核对。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       } else {
         Text(this.parsed.name+' · '+this.parsed.courses.length+' 条上课安排').fontSize(13).fontColor(AppDesign.muted(this.appDark)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
         SettingsAction({label:'第一周周一  '+(this.semester||'选择开学日期'),onPress:()=>this.date(),appDark:this.appDark,isEnabled:!this.busy})

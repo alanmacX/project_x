@@ -266,7 +266,7 @@ export function normalizeCapability(raw: CapBlock): CapBlock {
   if(raw.k==='album') {
     const local=(v:string|undefined):string=>typeof v==='string'&&(v.startsWith('file://')||v.startsWith('memory://'))?v:'';
     cap.albumCover=local(raw.albumCover);cap.albumBackground=local(raw.albumBackground);
-    cap.albumId=typeof raw.albumId==='string'?raw.albumId.slice(0,96):'';cap.albumSource=raw.albumSource==='musicbrainz'?'musicbrainz':'';
+    cap.albumId=typeof raw.albumId==='string'?raw.albumId.slice(0,96):'';cap.albumSource=['local','musicbrainz'].includes(raw.albumSource??'')?raw.albumSource:'';
     cap.artist=typeof raw.artist==='string'?raw.artist.slice(0,160):'';
   }
   if (raw.k === 'worldclock') cap.zone = clockZone(typeof raw.zone === 'string' ? raw.zone : '');

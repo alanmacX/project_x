@@ -11,10 +11,10 @@ export const CAPABILITY_CATALOG: CapabilityDescriptor[] = [
   {key:'anniversary',name:'纪念日',group:'时间',summary:'记录已经走过的日子',source:'本机计算',detail:'纪念日期'},
   {key:'dayprogress',name:'今日进度',group:'时间',summary:'一天的时间进度',source:'系统时间',detail:'今日进度'},
   {key:'yearprogress',name:'年度进度',group:'时间',summary:'一年的时间进度',source:'系统时间',detail:'年度进度'},
-  {key:'timetable',name:'课程表',group:'生活',summary:'下一课或每日概览',source:'本地课表 · 可从教务导入',detail:'课程安排'},
+  {key:'timetable',name:'课程表',group:'生活',summary:'下一课或每日概览',source:'本地课表 · WakeUp 文件导入',detail:'课程安排'},
   {key:'agenda',name:'日程',group:'生活',summary:'接下来要做的安排',source:'本地日历文件',detail:'日程列表'},
   {key:'parcel',name:'取件码',group:'生活',summary:'待取包裹和取件地点',source:'本机识别 · 主动导入',detail:'待取包裹'},
-  {key:'album',name:'音乐专辑',group:'生活',summary:'居中封面与静态融合背景',source:'联网搜索 · 选中后本地保存',detail:'专辑'},
+  {key:'album',name:'音乐专辑',group:'生活',summary:'居中封面与静态融合背景',source:'本地封面 · 离线融合背景',detail:'专辑'},
   {key:'battery',name:'电量',group:'生活',summary:'本机电量和充电状态',source:'系统电量',detail:'电量状态'},
   {key:'weather',name:'天气',group:'生活',summary:'城市温度与天气',source:'联网获取',detail:'城市天气'},
   {key:'fetch',name:'URL 内容',group:'自定义',summary:'把接口中的一个值放上卡片',source:'联网获取 · JSON / 纯文本',detail:'所选内容'}
