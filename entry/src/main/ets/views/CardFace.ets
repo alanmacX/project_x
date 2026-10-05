@@ -36,11 +36,26 @@ export struct CardFace {
   @Builder
   backing(color: string, offset: number, radius: number, shadowColor: string, shadowY: number) {
     if(this.card.shape==='subject' && this.commands().length>0) {
-      // Draw the silhouette itself. Clipping a rectangle's shadow erased the
-      // relief on photo cutouts; the extrusion must follow their real perimeter.
-      Path().commands(this.commands()).fill(radius>0?shadowColor:color).stroke(radius>0?shadowColor:color)
-        .strokeWidth(this.card.subjectBorder?6*this.scaleFactor:0).strokeLineJoin(LineJoinStyle.Round).antiAlias(true)
-        .width('100%').height('100%').blur(radius).translate({y:offset+shadowY}).hitTestBehavior(HitTestMode.None)
+      // Explicit alpha contour bands avoid host-dependent blur compositing in
+      // FormKit. Both hosts draw the same cached paths, without a blur filter.
+      if (radius > 0) {
+        Path().commands(this.commands()).fill(shadowColor).stroke(shadowColor)
+          .strokeWidth((this.card.subjectBorder?6*this.scaleFactor:0)+radius*2)
+          .strokeLineJoin(LineJoinStyle.Round).antiAlias(true).opacity(.15)
+          .width('100%').height('100%').translate({y:offset+shadowY}).hitTestBehavior(HitTestMode.None)
+        Path().commands(this.commands()).fill(shadowColor).stroke(shadowColor)
+          .strokeWidth((this.card.subjectBorder?6*this.scaleFactor:0)+radius)
+          .strokeLineJoin(LineJoinStyle.Round).antiAlias(true).opacity(.25)
+          .width('100%').height('100%').translate({y:offset+shadowY}).hitTestBehavior(HitTestMode.None)
+        Path().commands(this.commands()).fill(shadowColor).stroke(shadowColor)
+          .strokeWidth(this.card.subjectBorder?6*this.scaleFactor:0)
+          .strokeLineJoin(LineJoinStyle.Round).antiAlias(true).opacity(.6)
+          .width('100%').height('100%').translate({y:offset+shadowY}).hitTestBehavior(HitTestMode.None)
+      } else {
+        Path().commands(this.commands()).fill(color).stroke(color)
+          .strokeWidth(this.card.subjectBorder?6*this.scaleFactor:0).strokeLineJoin(LineJoinStyle.Round).antiAlias(true)
+          .width('100%').height('100%').translate({y:offset}).hitTestBehavior(HitTestMode.None)
+      }
     } else {
       Column().width('100%').height('100%').backgroundColor(color).borderRadius(shapeRadius(this.card.shape,this.scaleFactor))
         .translate({y:offset}).shadow({radius:vp2px(radius),color:shadowColor,offsetY:vp2px(shadowY)}).hitTestBehavior(HitTestMode.None)
