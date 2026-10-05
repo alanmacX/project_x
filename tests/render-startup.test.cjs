@@ -2,7 +2,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
 const root=path.resolve(__dirname,'../entry/src/main/ets/model'),cache=new Map();let jobs=0;
 const pool={Task:class{constructor(fn,...args){this.fn=fn;this.args=args;}},execute:async task=>{jobs++;return task.fn(...task.args);}};
-function load(name){const file=path.resolve(root,name+'.ets');if(cache.has(file))return cache.get(file).exports;const mod={exports:{}};cache.set(file,mod);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;vm.runInThisContext('(function(require,module,exports){'+code+'\n})',{filename:file})(s=>s==='@kit.ArkTS'?{taskpool:pool}:load(path.relative(root,path.resolve(path.dirname(file),s))),mod,mod.exports);return mod.exports;}
+function load(name){const file=path.resolve(root,name+'.ets');if(cache.has(file))return cache.get(file).exports;const mod={exports:{}};cache.set(file,mod);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;vm.runInThisContext('(function(require,module,exports){'+code+'\n})',{filename:file})(s=>s==='@kit.ArkTS'?{taskpool:pool}:s==='@kit.CoreFileKit'?{fileIo:{OpenMode:{READ_ONLY:0},open:async()=>{throw Error('no test files');},closeSync:()=>{}}}:load(path.relative(root,path.resolve(path.dirname(file),s))),mod,mod.exports);return mod.exports;}
 (async()=>{
 const r=load('RenderContours'),s=load('CardSchema');
 const source=new s.FridgeCard();source.id='photo';source.cutout='file://local.png';source.subjectVersion=2;source.shape='subject';source.outline=[[{x:.1,y:.1},{x:.9,y:.1},{x:.9,y:.9},{x:.1,y:.9}]];
@@ -17,5 +17,22 @@ const newVersion=fresh();newVersion.subjectVersion++;assert.equal(r.restoreConto
 for(const raw of ['broken','{}',JSON.stringify({...JSON.parse(encoded),version:99})])assert.equal(r.restoreContourCache([fresh()],raw),0,'disposable cache cannot prevent local scene loading');
 const corrupt=JSON.parse(encoded);Object.values(corrupt.entries)[0].outline[0][0].x=null;assert.equal(r.restoreContourCache([fresh()],JSON.stringify(corrupt)),0);
 state.cards=[changed];await r.primeRenderContours([changed],JSON.stringify(state));assert.equal(jobs,2,'changed artwork is reprocessed off the UI thread');
+const geometry=load('ContourGeometry');const originalCompact=geometry.compactContours;let compactions=0;
+geometry.compactContours=(...args)=>{compactions++;return originalCompact(...args);};
+const widget=fresh();widget.id='widget-prepared';r.registerRenderContour(widget,true);
+assert.equal(compactions,0,'provider-prepared geometry is never recomputed in Form rendering');
+assert.equal(r.cardOutline({...widget,outline:[],renderContourKey:r.registerRenderContour(widget,true)}),widget.outline);
+const app=fresh();app.id='app-unprepared';r.registerRenderContour(app);
+assert.equal(compactions,1,'unprepared app outlines retain topology validation');
+const payload=load('WidgetPayload');const beforePayload=compactions;
+const prepared=await payload.prepareWidgetPayload(JSON.stringify(state),r.serializeContourCache(state.cards));
+assert.equal(compactions,beforePayload,'exact cached master skips provider recompression');
+assert.equal(JSON.parse(prepared.cards)[0].outline.length,changed.outline.length);
+await payload.prepareWidgetPayload(JSON.stringify(state),'{invalid');
+assert.equal(compactions,beforePayload+1,'broken cache rebuilds safely');
+const stale=JSON.parse(r.serializeContourCache(state.cards));Object.values(stale.entries)[0].source='stale';
+await payload.prepareWidgetPayload(JSON.stringify(state),JSON.stringify(stale));
+assert.equal(compactions,beforePayload+2,'stale geometry cannot be reused');
+geometry.compactContours=originalCompact;
 console.log('PASS cold contour cache: exact-source/asset matching, worker avoidance, geometry reuse, corruption/version fallback and edit invalidation');
 })().catch(e=>{console.error(e);process.exitCode=1;});

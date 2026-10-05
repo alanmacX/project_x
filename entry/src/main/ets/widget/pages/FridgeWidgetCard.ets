@@ -37,7 +37,7 @@ struct FridgeWidgetCard {
       this.displayCanvasId=packet.canvasId;this.appliedCards=packet.cards;this.appliedBackground=packet.background;this.appliedContext=packet.context;
       try{this.context=packet.context?JSON.parse(packet.context) as WidgetSceneContext:null;}catch(_){this.context=null;}
       this.focusId=this.context?.focusId??'';
-      const map:Record<string,FridgeCard>={};cards.forEach((c)=>map[c.id]=cardRenderSnapshot(c));this.cardMap=map;this.cardIds=cards.map(c=>c.id);
+      const map:Record<string,FridgeCard>={};cards.forEach((c)=>map[c.id]=cardRenderSnapshot(c,true));this.cardMap=map;this.cardIds=cards.map(c=>c.id);
       try{this.canvasBackground=normalizeBackground(JSON.parse(packet.background) as CanvasBackground);}catch(_){}
     };
     if(first){apply();return;}

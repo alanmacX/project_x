@@ -75,6 +75,8 @@ export class FridgeStore {
   async deleteCanvas(id: string): Promise<void> {
     if (this.catalog.canvases.length <= 1 || !this.catalog.canvases.some((c)=>c.id===id)) return;
     await this.saveQueue.catch(()=>{});
+    // A publisher already resolving the deleted binding must finish before rebinding.
+    await Promise.all(Object.values(this.widgetQueues).map((queue)=>queue.waitForIdle().catch(()=>{})));
     if (this.catalog.activeId === id) await this.openCanvas(this.catalog.canvases.find((c)=>c.id!==id)!.id);
     this.catalog.canvases = this.catalog.canvases.filter((c) => c.id !== id); this.documents = this.documents.filter((c) => c.id !== id);
     if (this.prefs !== null) {
@@ -82,6 +84,11 @@ export class FridgeStore {
       for (const key of Object.keys(bindings)) if (bindings[key] === id) bindings[key] = this.catalog.activeId;
       await this.prefs.put('fridge_form_bindings_json',JSON.stringify(bindings));
       await this.save(false); await this.prefs.delete(canvasKey(id)); await this.prefs.delete('fridge_render_contours_v1_'+id); await this.prefs.flush();
+      for (const queue of Object.values(this.widgetQueues)) queue.invalidate();
+      const retained: Record<string,LatestWidgetQueue> = {};
+      for (const key of Object.keys(this.widgetQueues)) if (key !== id) retained[key] = this.widgetQueues[key];
+      this.widgetQueues = retained;
+      await this.save(true);
     }
   }
   canvasSpecs: Record<string, number> = {};

@@ -13,8 +13,8 @@ import { deliverWidget } from './WidgetDelivery';
 export { widgetImageKey } from './WidgetImageKey';
 
 /** Deliver the scene, including native binding serialization, without blocking app gestures. */
-export async function updateWidget(formId: string, json: string, dim: string, sceneContext:string=''): Promise<void> {
-  await taskpool.execute(new taskpool.Task(deliverWidget, formId, json, dim, sceneContext));
+export async function updateWidget(formId: string, json: string, dim: string, sceneContext:string='', contourCache:string=''): Promise<void> {
+  await taskpool.execute(new taskpool.Task(deliverWidget, formId, json, dim, sceneContext, contourCache));
 }
 
 export async function pushWidgets(context: Context, json: string): Promise<void> {
@@ -45,7 +45,7 @@ export async function pushWidgets(context: Context, json: string): Promise<void>
     const minutes=Math.min(refreshMinutes(base),refreshMinutes(scene.state));
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        await updateWidget(id, sceneJson, dims[id],sceneWidgetContext(scene));
+        await updateWidget(id, sceneJson, dims[id],sceneWidgetContext(scene),await prefs.get('fridge_render_contours_v1_'+scene.state.canvasId,'') as string);
         if(Number.isFinite(deadline)&&minutes<30&&deadlines[id]!==deadline) {
           try {await formProvider.setFormNextRefreshTime(id,minutes);deadlines[id]=deadline;deadlineChanged=true;}catch(_){}
         }else if(!Number.isFinite(deadline)&&deadlines[id]>0){deadlines[id]=0;deadlineChanged=true;}

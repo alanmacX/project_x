@@ -35,8 +35,8 @@ const renderSnapshots = new Map<string, FridgeCard>();
 const renderSignatures = new Map<string, string>();
 
 /** A lightweight render parameter. Storage and undo snapshots retain their original contours. */
-export function cardRenderSnapshot(source: FridgeCard): FridgeCard {
-  const contourKey = registerRenderContour(source);
+export function cardRenderSnapshot(source: FridgeCard, prepared: boolean = false): FridgeCard {
+  const contourKey = registerRenderContour(source, prepared);
   // Compare mutable values before cloning. Reopening/committing one card should
   // not deep-copy every unchanged capability, course list and background layer.
   const signature = JSON.stringify([source.id, source.groupId, source.x, source.y, source.w, source.h, source.rot, source.z,

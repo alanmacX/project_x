@@ -1,6 +1,6 @@
 import { compactContours } from './ContourGeometry';
 import { fileIo } from '@kit.CoreFileKit';
-import { FridgeState, normalizeState } from './CardSchema';
+import { FridgeState, ShapePoint, normalizeState } from './CardSchema';
 import { widgetImageKey } from './WidgetImageKey';
 export interface WidgetPayload {
   background: string; cards: string;
@@ -8,11 +8,18 @@ export interface WidgetPayload {
 }
 /** Parse/normalize/serialize large masks and prepare file descriptors away from the UI thread. */
 @Concurrent
-export async function prepareWidgetPayload(json: string): Promise<WidgetPayload> {
+export async function prepareWidgetPayload(json: string, contourCache: string = ''): Promise<WidgetPayload> {
   const state: FridgeState = normalizeState(JSON.parse(json) as FridgeState), payload: WidgetPayload = { background: '{}', cards: '[]', images: {}, descriptors: [] };
+  let cache: Record<string, Object> = {};
+  try {const parsed=JSON.parse(contourCache) as Record<string,Object>;if(parsed.version===1 && parsed.entries)cache=parsed.entries as Record<string,Object>;}catch(_){}
   try {
     for (const card of state.cards) {
-      card.outline = compactContours(card.outline);
+      const key=card.cutout?card.cutout+':'+card.subjectVersion:card.id;
+      const entry=cache[key] as Record<string,Object>;
+      const cached=entry?.outline as ShapePoint[][];
+      // The exact immutable master must match; a disposable cache never changes shape.
+      const valid=entry?.source===JSON.stringify(card.outline) && Array.isArray(cached) && cached.length===card.outline.length && cached.every(loop=>Array.isArray(loop)&&loop.length>=3&&loop.every(p=>p!==null&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1));
+      card.outline = valid ? cached : compactContours(card.outline);
       const cap=card.capability;
       if(cap?.k==='album') {
         for(const field of ['albumCover','albumBackground']) {

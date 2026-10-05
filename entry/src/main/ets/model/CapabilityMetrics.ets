@@ -54,3 +54,8 @@ export function capabilityContentScale(cap: CapBlock, width: number, height: num
   const min=capabilityMinimum(cap,true,width/MIN_CAPABILITY_SCALE);
   return Math.min(1,width/min.w,height/min.h);
 }
+
+/** Fit a fixed-format readout before native layout; TextClock has no single-line adaptive sizing. */
+export function boundedReadoutFont(nominal: number, width: number, emWidth: number): number {
+  return Math.max(0, Math.min(nominal, width / Math.max(1, emWidth)));
+}

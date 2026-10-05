@@ -25,3 +25,15 @@ assert.equal(time.lunarReading(new Date('2026-02-17T12:00:00').getTime()).year,'
 const min=metrics.capabilityReadableMinimum({k:'lunar'});assert.equal(metrics.capabilityFits({k:'lunar'},min.w,min.h),true);assert.equal(metrics.capabilityFits({k:'lunar'},min.w-1,min.h),false);
 for(const k of ['worldclock','lunar']) {const state=schema.normalizeState({...schema.defaultState(),cards:[{...new schema.FridgeCard(),id:k,capability:{k,zone:'America/New_York'}}]});assert.equal(state.cards[0].capability.k,k);}
 console.log('PASS native time capabilities: DST changes and midnight scheduling, half/quarter-hour zones, civil-day rollover, lunar new year/full moon/leap month and readable minimum sizes');
+
+// The default full clock used 42vp in 112vp: its five native glyphs wrapped.
+// Check both compact and full layouts at minimum widths and every host scale.
+for (const width of [54.4,68,80,104,112,144,240]) {
+ for (const host of [.45,1,1.75,3]) {
+  const font=metrics.boundedReadoutFont(42*host,width*host,3.2);
+  assert.ok(font*3.2<=width*host+.001,'HH:mm remains one native line');
+  assert.ok(font<=42*host);
+ }
+}
+assert.equal(metrics.boundedReadoutFont(42,112,3.2),35);
+console.log('PASS fixed-format clock sizing at native glyph budget across compact/full host sizes');

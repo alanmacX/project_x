@@ -3,7 +3,7 @@ import { pushWidgets } from '../model/WidgetSync';
 import { refreshMinutes } from '../model/WidgetRefreshPolicy';
 import { needsDataRefresh, capabilityRequestKey, mergeCapabilityResult } from '../model/CapabilityData';
 import { readCatalog, canvasKey, boundCanvas } from '../model/CanvasLibrary';
-import { FormExtensionAbility, formBindingData, formInfo, formProvider } from '@kit.FormKit';
+import { FormExtensionAbility, formBindingData, formProvider } from '@kit.FormKit';
 import { Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import preferences from '@ohos.data.preferences';
@@ -15,7 +15,7 @@ const STORE_NAME: string = 'fridge_store';
 const KEY_STATE: string = 'fridge_state_json';
 const KEY_DIMS: string = 'fridge_form_dims_json';
 
-/** Local schedules are evaluated on refresh/visibility; original documents remain unchanged. */
+/** Local schedules are evaluated on system refresh; original documents remain unchanged. */
 export default class FridgeFormAbility extends FormExtensionAbility {
   private registrationQueue: Promise<void> = Promise.resolve();
 
@@ -62,11 +62,15 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     });
     return scene;
   }
+  private async contourCache(canvasId:string):Promise<string> {
+    const prefs=await preferences.getPreferences(this.context,STORE_NAME);
+    return await prefs.get('fridge_render_contours_v1_'+canvasId,'') as string;
+  }
   private async pushForm(formId: string): Promise<void> {
     const scene=await this.displayedScene(formId);
     const state=scene.state;
     const dims = await this.loadDims();
-    await updateWidget(formId, JSON.stringify(state), dims[formId] ?? '4*4',sceneWidgetContext(scene));
+    await updateWidget(formId, JSON.stringify(state), dims[formId] ?? '4*4',sceneWidgetContext(scene),await this.contourCache(state.canvasId));
   }
   private async scheduleForm(formId:string):Promise<void> {
     const base=await this.loadState(formId);
@@ -89,7 +93,7 @@ export default class FridgeFormAbility extends FormExtensionAbility {
       // Register on disk in parallel; it must not delay the first artwork delivery.
       const registered=this.register(id,dim,false,width,height);
       registered.catch(()=>{}); // Observe disk failures while native delivery is in flight.
-      try {await updateWidget(id,JSON.stringify(scene.state),dim,sceneWidgetContext(scene));}
+      try {await updateWidget(id,JSON.stringify(scene.state),dim,sceneWidgetContext(scene),await this.contourCache(scene.state.canvasId));}
       finally {await registered;}
       await this.refreshDueData(id);await this.scheduleForm(id);
     }).catch((e: Error) => {
@@ -104,9 +108,6 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     }).catch((e: Error) => hilog.error(0x0000, 'FridgeForm', 'update %{public}s', e.message));
   }
 
-  onChangeFormVisibility(status:Record<string,number>):void {
-    for(const id of Object.keys(status))if(status[id]===formInfo.VisibilityType.FORM_VISIBLE)this.onUpdateForm(id);
-  }
   private async refreshDueData(formId:string):Promise<void> {
     let state=(await this.displayedScene(formId)).state,canvasId=state.canvasId;
     for(const original of state.cards.slice()) {

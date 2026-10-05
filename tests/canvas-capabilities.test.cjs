@@ -81,7 +81,12 @@ function load(name) {
  reloaded.renameCanvas('旧画布');await reloaded.save(false);assert.equal(readCatalog(disk.get('fridge_canvases_json')).canvases[0].name,'旧画布');
  const external=JSON.parse(disk.get(canvasKey('canvas_main')));external.cards[0].capability.title='Widget-side change';disk.set(canvasKey('canvas_main'),JSON.stringify(external));await reloaded.openCanvas('canvas_main');assert.equal(reloaded.state.cards[0].capability.title,'Widget-side change','switching reloads cached artwork after a FormExtension update');
  const duplicate=reloaded.createCanvas('副本',reloaded.state);reloaded.state.cards[0].x=145;await reloaded.save();await reloaded.openCanvas('canvas_main');assert.notEqual(reloaded.state.cards[0].x,145,'duplicate is independently editable');
- await reloaded.openCanvas(second);await reloaded.deleteCanvas(second);await reloaded.save();assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).second,'canvas_main','deleted source is explicitly rebound');assert.ok(!disk.has(canvasKey(second)));
+ // The fallback canvas has already been delivered: unchanged scene bytes must
+ // still be republished when another form is rebound to it after deletion.
+ await reloaded.save();const beforeRebind=updates.length;
+ await reloaded.openCanvas(second);await reloaded.deleteCanvas(second);
+ assert.ok(updates.slice(beforeRebind).some(u=>u.id==='second'&&u.data.canvasId==='canvas_main'),'deletion immediately delivers the fallback to its newly rebound form');
+ await reloaded.save();assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).second,'canvas_main','deleted source is explicitly rebound');assert.ok(!disk.has(canvasKey(second)));
  assert.equal(boundCanvas({a:'canvas_main'},'a',reloaded.catalog),'canvas_main');assert.throws(()=>readCatalog('{"version":1,"canvases":[]}'));
  const corrupt=JSON.stringify({version:1,activeId:'missing',canvases:[{id:'missing',name:'Missing'}]});disk.set('fridge_canvases_json',corrupt);await assert.rejects(new FridgeStore().init({}),/已保留原始记录/);assert.equal(disk.get('fridge_canvases_json'),corrupt);disk.clear();
  // Each canvas retains its own disposable geometry cache across cold starts.

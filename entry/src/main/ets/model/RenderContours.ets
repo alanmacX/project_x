@@ -7,11 +7,11 @@ import { FridgeCard, ShapePoint } from './CardSchema';
 // Keeping one entry per card avoids @Prop cloning thousands of points at every transition.
 const contours = new Map<string, ShapePoint[][]>();
 const compacted = new WeakMap<ShapePoint[][], ShapePoint[][]>();
-export function registerRenderContour(card: FridgeCard): string {
+export function registerRenderContour(card: FridgeCard, prepared: boolean = false): string {
   if (card.outline.length === 0) return card.renderContourKey;
   const key = card.id + ':' + card.cutout + ':' + card.subjectVersion;
   let outline = compacted.get(card.outline);
-  if (outline === undefined) { outline = compactContours(card.outline); compacted.set(card.outline, outline); }
+  if (outline === undefined) { outline = prepared ? card.outline : compactContours(card.outline); compacted.set(card.outline, outline); }
   contours.set(key, outline);
   return key;
 }

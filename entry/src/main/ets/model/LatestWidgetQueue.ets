@@ -11,6 +11,9 @@ export class LatestWidgetQueue {
     if (this.running === null) this.running = this.drain().finally(() => { this.running = null; if (this.pending.length > 0) return this.submit(this.pending); return Promise.resolve(); });
     return this.running;
   }
+  /** Binding changes invalidate byte-level acknowledgement after in-flight work settles. */
+  waitForIdle(): Promise<void> { return this.running ?? Promise.resolve(); }
+  invalidate(): void { this.delivered = ''; }
   private async drain(): Promise<void> {
     while (this.pending.length > 0) {
       const json = this.pending; this.pending = '';
