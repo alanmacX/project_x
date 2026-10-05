@@ -1,10 +1,7 @@
 import { batteryInfo } from '@kit.BasicServicesKit';
-import { taskpool } from '@kit.ArkTS';
-import { readURLValue } from './URLWorker';
 import { calendarManager } from '@kit.CalendarKit';
 import { abilityAccessCtrl } from '@kit.AbilityKit';
 import { CapBlock, AgendaItem } from './CardSchema';
-import { validSourceURL, selectValue } from './CapabilityData';
 export async function hasWholeCalendarAccess(context:Context):Promise<boolean> {
   return await abilityAccessCtrl.createAtManager().checkAccessToken(context.applicationInfo.accessTokenId,'ohos.permission.READ_WHOLE_CALENDAR')===abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED;
 }
@@ -23,7 +20,6 @@ export async function readCapability(cap: CapBlock,context: Context): Promise<Ca
   const next=JSON.parse(JSON.stringify(cap)) as CapBlock; next.attemptedAt=Date.now();
   try {
     if(cap.k==='battery') { const level=batteryInfo.batterySOC;if(level<0||level>100)throw new Error('设备暂未提供电量');next.percent=level;next.charging=batteryInfo.chargingStatus===batteryInfo.BatteryChargeState.ENABLE;next.chargeState=batteryInfo.chargingStatus===batteryInfo.BatteryChargeState.FULL?'full':next.charging?'charging':'idle'; }
-    if(cap.k==='fetch')next.value=await taskpool.execute(new taskpool.Task(readURLValue,cap.url??'',cap.field??'')) as string;
     if(cap.k==='agenda'&&cap.agendaSource==='system')next.events=await systemAgenda(context);
     next.updatedAt=Date.now();next.refreshState='done';next.desc='';
   } catch(e) {next.refreshState='failed';next.desc=(e as Error).message;}

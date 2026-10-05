@@ -1,6 +1,6 @@
 /** The contract for a capability: one purpose, an honest source, one detail destination. */
 export interface CapabilityDescriptor { key: string; name: string; group: string; summary: string; source: string; detail: string; }
-export const CAPABILITY_GROUPS: string[] = ['时间', '生活', '自定义'];
+export const CAPABILITY_GROUPS: string[] = ['时间', '生活'];
 export const CAPABILITY_CATALOG: CapabilityDescriptor[] = [
   {key:'clock',name:'时钟',group:'时间',summary:'当前时间',source:'系统时间',detail:'时间'},
   {key:'worldclock',name:'世界时钟',group:'时间',summary:'另一座城市的时间、日期与时差',source:'系统时区规则 · 自动适配夏令时',detail:'城市时间'},
@@ -14,8 +14,7 @@ export const CAPABILITY_CATALOG: CapabilityDescriptor[] = [
   {key:'timetable',name:'课程表',group:'生活',summary:'下一课或每日概览',source:'本地课表 · WakeUp 文件导入',detail:'课程安排'},
   {key:'agenda',name:'日程',group:'生活',summary:'接下来要做的安排',source:'本地日历文件',detail:'日程列表'},
   {key:'album',name:'音乐专辑',group:'生活',summary:'居中封面与静态融合背景',source:'本地封面 · 离线融合背景',detail:'专辑'},
-  {key:'battery',name:'电量',group:'生活',summary:'本机电量和充电状态',source:'系统电量',detail:'电量状态'},
-  {key:'fetch',name:'URL 内容',group:'自定义',summary:'把接口中的一个值放上卡片',source:'联网获取 · JSON / 纯文本',detail:'所选内容'}
+  {key:'battery',name:'电量',group:'生活',summary:'本机电量和充电状态',source:'系统电量',detail:'电量状态'}
 ];
 export function capabilityDescriptor(key: string): CapabilityDescriptor {
   return CAPABILITY_CATALOG.find((item) => item.key === key) ?? {key:'none',name:'纯创作',group:'自定义',summary:'只展示背景、图片与文字',source:'本地作品',detail:'卡片'};

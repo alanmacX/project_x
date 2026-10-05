@@ -1,6 +1,4 @@
 import { WakeImport, WakeCourse, WakeSlot, mondayDate, wakeTime } from './WakeUpImport';
-export interface SchoolAdapter {id:string;name:string;url:string;script:string;category:string;description:string;}
-export interface ImportSchool {id:string;name:string;initial:string;adapters:SchoolAdapter[];}
 export interface SchoolCourse {name:string;position?:string;day:number;weeks:number[];startSection?:number;endSection?:number;isCustomTime?:boolean;customStartTime?:string;customEndTime?:string;}
 interface SchoolSlot {number:number;startTime:string;endTime:string;}
 interface SchoolConfig {semesterStartDate?:string;}
@@ -10,11 +8,6 @@ export interface SchoolSnapshot {token:string;courses:SchoolCourse[];slots:Schoo
 export function webString(value:string):string {
   if(value.length>1048576)throw new Error('课表数据超过 1 MB');
   if(value.startsWith('"'))return JSON.parse(value) as string;return value;
-}
-export function schoolUrl(value:string):string {
-  const raw=value.trim(),url=/^https?:\/\//i.test(raw)?raw:'https://'+raw;
-  if(url.length>2048||/[\s<>"\\]/.test(url)||!/^https?:\/\/[^/]+/i.test(url)||/^[^/]+:\/\/[^/]*@/.test(url))throw new Error('请输入完整的教务网址');
-  if(!/^https?:\/\/[a-z0-9.-]+(?::\d{1,5})?(?:[/?#]|$)/i.test(url))throw new Error('教务网址格式不正确');return url;
 }
 export function schoolSnapshot(value:string):SchoolSnapshot {
   const data=JSON.parse(webString(value)) as SchoolSnapshot;

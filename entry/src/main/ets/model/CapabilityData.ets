@@ -2,38 +2,12 @@ import { nextCityBoundary } from './TimeCapabilities';
 import { parsePickupNotice } from './ParcelIntake';
 import { dateKey, holidayName } from './HolidayCalendar';
 import { CapBlock, CourseItem, AgendaItem, ParcelItem } from './CardSchema';
-export interface ValueField { path: string; value: string; }
-/** Only scalar values, bounded depth/count and own properties. Never execute remote code. */
-export function valueFields(body: string): ValueField[] {
-  if (body.length > 262144) throw new Error('内容过大，请使用轻量 JSON 接口');
-  const trimmed = body.trim();
-  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
-    if (/<(?:html|script|!doctype)/i.test(trimmed)) throw new Error('网页需要 JavaScript 或 HTML 解析，请使用 JSON / 纯文本接口');
-    return [{path:'',value:trimmed.slice(0,256)}];
-  }
-  const out: ValueField[] = []; walkValues(JSON.parse(trimmed) as Object,'',0,out);
-  if (!out.length) throw new Error('接口没有可显示的内容'); return out;
-}
-function walkValues(value: Object | null, path: string, depth: number, out: ValueField[]): void {
-  if(out.length>=64 || depth>8 || value===null) return;
-  if(typeof value==='string'||typeof value==='number'||typeof value==='boolean') { out.push({path:path,value:String(value).slice(0,256)}); return; }
-  const record = value as Record<string,Object>;
-  for(const key of Object.keys(record).slice(0,64)) {
-    if(['__proto__','prototype','constructor'].includes(key) || key.includes('.')) continue;
-    walkValues(record[key],path?path+'.'+key:key,depth+1,out);
-  }
-}
-export function selectValue(body: string, path: string): string {
-  const list=valueFields(body), found=list.find((v)=>v.path===path);
-  if(!found) throw new Error('选中的内容已不存在'); return found.value;
-}
-export function validSourceURL(url: string): boolean { return /^https?:\/\/[^\s/?#]+(?:[/?#][^\s]*)?$/.test(url) && url.length<=2048 && !/^https?:\/\/[^/]*@/.test(url); }
-export function capabilityRequestKey(cap: CapBlock): string { return [cap.k,cap.url??'',cap.field??'',cap.agendaSource??''].join('|'); }
+export function capabilityRequestKey(cap: CapBlock): string { return [cap.k,cap.agendaSource??''].join('|'); }
 export function needsDataRefresh(cap: CapBlock | null, now: number = Date.now()): boolean {
   if(cap===null) return false;
   if(cap.k==='battery') return true;
   if(cap.k==='agenda') return cap.agendaSource==='system' && now-(cap.attemptedAt??0)>=15*60000;
-  return cap.k==='fetch' && cap.sourceConfigured===true && validSourceURL(cap.url??'') && now-(cap.attemptedAt??0)>=Math.max(30,cap.interval??60)*60000;
+  return false;
 }
 export function agendaItems(cap: CapBlock, now: number): AgendaItem[] { return (cap.events??[]).filter((e)=>e.end>now).sort((a,b)=>a.start-b.start).slice(0,3); }
 export function timeText(time: number): string { const d=new Date(time); return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
@@ -138,7 +112,6 @@ export function nextDataBoundary(cap: CapBlock, now:number):number {
     if(evening.getTime()>now)boundaries.push(evening.getTime());
     if(cap.timetableMode!=='day')for(const e of events)if(e.end-NEXT_LESSON_LEAD>now)boundaries.push(e.end-NEXT_LESSON_LEAD);
   }
-  if(cap.k==='fetch')boundaries.push(Math.max(now+5*60000,(cap.attemptedAt??0)+Math.max(30,cap.interval??60)*60000));
   return boundaries.length?Math.min(...boundaries):now+30*60000;
 }
 
@@ -147,6 +120,5 @@ export function mergeCapabilityResult(current:CapBlock,result:CapBlock):CapBlock
   next.attemptedAt=result.attemptedAt;next.updatedAt=result.updatedAt;next.refreshState=result.refreshState;next.desc=result.desc;
   if(current.k==='battery'){next.percent=result.percent;next.charging=result.charging;next.chargeState=result.chargeState;}
   if(current.k==='agenda')next.events=result.events;
-  if(current.k==='fetch')next.value=result.value;
   return next;
 }

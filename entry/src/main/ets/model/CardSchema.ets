@@ -12,7 +12,7 @@ export class CapType {
   static readonly DAY_PROGRESS: string = 'dayprogress';
   static readonly YEAR_PROGRESS: string = 'yearprogress';
 }
-export const CAPABILITIES: string[] = ['clock', 'date', 'calendar', 'countdown', 'anniversary', 'dayprogress', 'yearprogress', 'battery', 'agenda', 'fetch', 'timetable', 'worldclock', 'lunar', 'album'];
+export const CAPABILITIES: string[] = ['clock', 'date', 'calendar', 'countdown', 'anniversary', 'dayprogress', 'yearprogress', 'battery', 'agenda', 'timetable', 'worldclock', 'lunar', 'album'];
 export interface CapBlock {
   k: string;
   albumId?: string;
@@ -143,7 +143,7 @@ export class FridgeState {
 }
 export function typeLabel(k: string): string {
   const index = CAPABILITIES.indexOf(k);
-  const names: string[] = ['时间', '日期', '台历', '倒计时', '纪念日', '天气', '今日进度', '年度进度', '本机电量', '日程', '取件码', 'URL 内容', '课程表', '世界时钟', '农历', '音乐专辑'];
+  const names: string[] = ['时间', '日期', '台历', '倒计时', '纪念日', '今日进度', '年度进度', '本机电量', '日程', '课程表', '世界时钟', '农历', '音乐专辑'];
   return index >= 0 ? names[index] : '自定义';
 }
 export function materialColors(material: string, paper: string = '', ink: string = ''): string[] {
@@ -173,6 +173,10 @@ export function normalizeBox(raw: ElementBox): ElementBox {
   box.rot = bounded(raw?.rot, -180, 180, 0); box.opacity = bounded(raw?.opacity, 0.1, 1, 1);
   return box;
 }
+/** Runtime images must never trigger HTTP requests, including migrated artwork. */
+export function localImageSource(value: string | undefined): string {
+  return typeof value === 'string' && (value.startsWith('file://') || value.startsWith('memory://')) ? value : '';
+}
 export function normalizeElement(raw: CanvasElement, clippedSubject: boolean = false): CanvasElement {
   const box = normalizeBox(raw);
   const el = new CanvasElement();
@@ -181,7 +185,7 @@ export function normalizeElement(raw: CanvasElement, clippedSubject: boolean = f
   el.y = clippedSubject ? bounded(raw.y, -8, 8, box.y) : box.y;
   el.w = clippedSubject ? bounded(raw.w, .01, 16, box.w) : box.w;
   el.h = clippedSubject ? bounded(raw.h, .01, 16, box.h) : box.h; el.rot = box.rot; el.opacity = box.opacity;
-  el.text = raw.text ?? ''; el.src = raw.src ?? ''; el.animated = raw.animated === true;
+  el.text = raw.text ?? ''; el.src = localImageSource(raw.src); el.animated = raw.animated === true;
   el.fs = bounded(raw.fs, 10, 64, 18); el.color = raw.color ?? '';
   el.behindCapability = raw.behindCapability ?? false;
   el.bold = raw.bold ?? false; el.align = raw.align ?? 'left'; el.primitive = raw.primitive ?? 'rect';
@@ -191,7 +195,7 @@ function legacyElement(cap: CapBlock, id: string, index: number, count: number):
   const el = new CanvasElement(); el.id = id + '_element_' + index;
   el.y = index / count; el.h = 1 / count; el.x = 0.08; el.w = 0.84;
   if (cap.k === 'photo') {
-    el.kind = 'image'; el.src = (cap.seed ?? '').startsWith('file://') || (cap.seed ?? '').startsWith('https://') ? cap.seed! : '';
+    el.kind = 'image'; el.src = localImageSource(cap.seed);
     el.x = 0; el.w = 1;
   } else {
     el.text = cap.k === 'np' ? [cap.title ?? '', cap.artist ?? ''].filter((v: string) => v.length > 0).join('\n') : (cap.text ?? '');
@@ -225,6 +229,17 @@ export function normalizeState(raw: FridgeState): FridgeState {
       const cap = caps[i]; if (cap === null || typeof cap.k !== 'string') continue;
       // Retired capabilities leave the user's card artwork intact.
       if (cap.k === 'weather' || cap.k === 'parcel') continue;
+      if (cap.k === 'fetch') {
+        // Keep the last visible result as artwork, without retaining a network source.
+        if (typeof cap.value === 'string' && cap.value.length > 0) {
+          const cached = legacyElement({k:'text',text:[cap.title ?? '',cap.value + (cap.unit ?? '')].filter((v:string)=>v.length>0).join('\n')},card.id,i,caps.length);
+          if (raw.schemaVersion === 2) { const box=normalizeBox(source.capBox); cached.x=box.x;cached.y=box.y;cached.w=box.w;cached.h=box.h; }
+          cached.id=card.id+'_cached_value_'+i;
+          while(card.elements.some((el:CanvasElement)=>el.id===cached.id))cached.id+='_';
+          card.elements.push(cached);
+        }
+        continue;
+      }
       if (CAPABILITIES.includes(cap.k)) {
         if (card.capability === null) {
           card.capability = normalizeCapability(cap);
@@ -264,6 +279,7 @@ export function contrastingInk(color: string): string {
 
 export function normalizeCapability(raw: CapBlock): CapBlock {
   const cap = JSON.parse(JSON.stringify(raw)) as CapBlock;
+  cap.url=undefined; cap.field=undefined; cap.sourceConfigured=undefined;
   if(raw.k==='album') {
     const local=(v:string|undefined):string=>typeof v==='string'&&(v.startsWith('file://')||v.startsWith('memory://'))?v:'';
     cap.albumCover=local(raw.albumCover);cap.albumBackground=local(raw.albumBackground);
@@ -276,7 +292,6 @@ export function normalizeCapability(raw: CapBlock): CapBlock {
   cap.title = typeof raw.title === 'string' ? raw.title.slice(0,160) : '';
   cap.interval = Math.round(bounded(raw.interval ?? 60,30,1440,60));
   if (raw.k === 'battery') cap.percent = bounded(raw.percent ?? -1,-1,100,-1);
-  if (raw.k === 'fetch') { cap.url = typeof raw.url === 'string' ? raw.url.slice(0,2048) : ''; cap.field = typeof raw.field === 'string' ? raw.field.slice(0,256) : ''; cap.value = typeof raw.value === 'string' ? raw.value.slice(0,256) : ''; cap.unit = typeof raw.unit === 'string' ? raw.unit.slice(0,24) : ''; }
   cap.events = (Array.isArray(raw.events) ? raw.events : []).filter((e:AgendaItem)=> e && typeof e.title==='string' && Number.isFinite(e.start) && Number.isFinite(e.end) && e.end>=e.start).slice(0,256).map((e:AgendaItem):AgendaItem=>({id:String(e.id).slice(0,96),title:e.title.slice(0,160),start:e.start,end:e.end,location:typeof e.location==='string'?e.location.slice(0,160):'',allDay:e.allDay===true}));
   cap.parcels = (Array.isArray(raw.parcels) ? raw.parcels : []).filter((e:ParcelItem)=> e && typeof e.code==='string' && e.code.length>0).slice(0,64).map((e:ParcelItem):ParcelItem=>({id:String(e.id).slice(0,96),code:e.code.slice(0,24),place:typeof e.place==='string'?e.place.slice(0,80):'',picked:e.picked===true}));
   cap.courses = (Array.isArray(raw.courses) ? raw.courses : []).filter((c:CourseItem)=> c && typeof c.name==='string' && c.name.trim().length>0 && /^([01]\d|2[0-3]):[0-5]\d$/.test(c.start) && /^([01]\d|2[0-3]):[0-5]\d$/.test(c.end) && c.end>c.start).slice(0,128).map((c:CourseItem):CourseItem=>({id:String(c.id).slice(0,96),name:c.name.slice(0,80),room:typeof c.room==='string'?c.room.slice(0,80):'',day:Math.round(bounded(c.day,1,7,1)),start:c.start,end:c.end,firstWeek:Math.round(bounded(c.firstWeek,1,60,1)),lastWeek:Math.round(bounded(c.lastWeek,c.firstWeek||1,60,16)),parity:[0,1,2].includes(c.parity)?c.parity:0}));

@@ -1,0 +1,11 @@
+{
+  "UniformDataTypeDeclarations": [
+    {
+      "TypeId": "com.fridgememo.template",
+      "BelongingToTypes": ["general.file"],
+      "FilenameExtensions": [".fridge"],
+      "MIMETypes": ["application/x-fridgememo"],
+      "Description": "冰箱贴可编辑作品"
+    }
+  ]
+}

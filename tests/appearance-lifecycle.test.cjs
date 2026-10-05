@@ -16,6 +16,8 @@ const moduleMock = {exports:{}};
 const source = fs.readFileSync('entry/src/main/ets/entryability/EntryAbility.ets','utf8');
 const code = ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
 const kits = {
+ '../model/IncomingTemplate':{incomingTemplateUri:()=>'',stageIncomingTemplate:async()=>''},
+ '@kit.ArkTS':{},
  '@kit.AbilityKit': {UIAbility, ConfigurationConstant:{ColorMode:{COLOR_MODE_DARK:0,COLOR_MODE_LIGHT:1}}},
  '@kit.ArkUI': {window:{Orientation:{AUTO_ROTATION_UNSPECIFIED:0},AvoidAreaType:{TYPE_SYSTEM:0,TYPE_NAVIGATION_INDICATOR:1}}},
  '@kit.PerformanceAnalysisKit': {hilog:{info(){},warn(){},error(){}}},

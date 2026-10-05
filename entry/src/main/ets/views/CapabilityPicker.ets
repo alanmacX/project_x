@@ -31,7 +31,7 @@ export struct CapabilityPicker {
                   Text(item.summary).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%').maxLines(2)
                   if(this.selected===item.key) {Text(item.source).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%').maxLines(2)}
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-                Text(this.selected===item.key?'已选':item.source.includes('联网')?'联网':'本地').fontSize(12).fontColor(AppDesign.muted(this.appDark))
+                Text(this.selected===item.key?'已选':'本地').fontSize(12).fontColor(AppDesign.muted(this.appDark))
               }.width('100%').padding(14)
             }.width('100%').backgroundColor(AppDesign.control(this.appDark)).border({width:this.selected===item.key?1.5:0,color:AppDesign.text(this.appDark)}).onClick(()=>this.choose(item.key)).transition(this.query.trim().length===0?settingsReveal():TransitionEffect.IDENTITY)
           },(item:CapabilityDescriptor)=>item.key)

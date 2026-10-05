@@ -122,9 +122,6 @@ export struct CapabilityView {
         if (!this.compact()) { Text(this.cap.date ?? '').fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(0.6) }
       } else if(this.cap.k==='battery') {
         BatteryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,unit:this.unit(),compact:this.compact()})
-      } else if(this.cap.k==='fetch') {
-        Text((this.cap.title||'URL 内容')+(this.cap.refreshState==='failed'?' · 上次结果':'')).fontSize((12*this.unit())+'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).opacity(.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
-        Text((this.cap.value||'待配置')+(this.cap.value?this.cap.unit??'':'')).fontSize((24*this.unit())+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled)).minFontSize(16*this.unit()).maxFontSize(24*this.unit()).heightAdaptivePolicy(TextHeightAdaptivePolicy.LAYOUT_CONSTRAINT_FIRST).maxLines(this.compact()?2:3).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').height(Math.max(1,this.contentHeight*this.scaleFactor-20*this.unit())).textAlign(TextAlign.Center)
       } else if(this.cap.k==='timetable') {
         TimetableCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
       } else if(this.cap.k==='agenda') {

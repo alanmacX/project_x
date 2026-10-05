@@ -1,6 +1,8 @@
 import { UIAbility, AbilityConstant, Want, Configuration, ConfigurationConstant } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
+import { taskpool } from '@kit.ArkTS';
+import { incomingTemplateUri, stageIncomingTemplate } from '../model/IncomingTemplate';
 
 const TAG: string = 'EntryAbility';
 
@@ -10,6 +12,7 @@ export default class EntryAbility extends UIAbility {
     hilog.info(0x0000, TAG, 'onCreate');
     AppStorage.setOrCreate('appBackgrounded', false); this.updateAppearance(this.context.config.colorMode);
     this.routeCard(want);
+    this.routeTemplate(want);
     if (want.parameters?.['demo'] === 'sketch') this.launchPage = 'pages/SketchLab';
   }
 
@@ -42,8 +45,28 @@ export default class EntryAbility extends UIAbility {
     AppStorage.setOrCreate('editCardId', typeof id === 'string' ? id : '');
   }
 
+  private incomingGeneration: number = 0;
+  private async routeTemplate(want: Want): Promise<void> {
+    const owned = want.parameters?.['incomingTemplatePath'];
+    const prefix = 'file://' + this.context.cacheDir + '/';
+    if (typeof owned === 'string' && owned.startsWith(prefix) && /^received_[0-9]+_[0-9]+\.fridge$/.test(owned.slice(prefix.length))) {
+      this.incomingGeneration++;
+      AppStorage.setOrCreate('incomingTemplateUri',owned); return;
+    }
+    const uri = incomingTemplateUri(want.uri);
+    if (!uri || want.action !== 'ohos.want.action.viewData') return;
+    const generation = ++this.incomingGeneration;
+    try {
+      const local = await taskpool.execute(new taskpool.Task(stageIncomingTemplate,uri,this.context.cacheDir)) as string;
+      if (generation === this.incomingGeneration) AppStorage.setOrCreate('incomingTemplateUri',local);
+    } catch (_) {
+      if (generation === this.incomingGeneration) AppStorage.setOrCreate('incomingTemplateError','作品文件无法读取，请保存到本地后从首页导入');
+    }
+  }
+
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.routeCard(want);
+    this.routeTemplate(want);
   }
 
   onDestroy(): void {

@@ -4,15 +4,13 @@ import { applyTimetableImport } from '../model/TimetableImport';
 import { TimetableDialog } from './TimetableDialog';
 import { mondayDate } from '../model/WakeUpImport';
 import { CalendarRulesDialog } from './CalendarRulesDialog';
-import { ValuePicker } from './ValuePicker';
 import { CapBlock, CourseItem, AgendaItem } from '../model/CardSchema';
-import { ValueField, eventWhen } from '../model/CapabilityData';
-import { fetchValueFields } from '../model/CapabilityWorker';
+import { eventWhen } from '../model/CapabilityData';
 import { readCapability, hasWholeCalendarAccess } from '../model/CapabilityService';
 import { importScheduleFile } from '../model/ScheduleFiles';
 import { AppDesign } from '../model/AppDesign';
 import { SettingsSegmented } from './SettingsSegmented';
-import { settingsReveal, settingsDialogOpen, settingsDialogClose } from '../model/SettingsMotion';
+import { settingsDialogOpen, settingsDialogClose } from '../model/SettingsMotion';
 import { taskpool } from '@kit.ArkTS';
 import { picker } from '@kit.CoreFileKit';
 import { CourseEditor } from './CourseEditor';
@@ -31,7 +29,7 @@ export struct CapabilitySettings {
   private generation:number=0;
   private inputKey:string='';
   private inputChanged():void {
-    const key=this.cardId+'|'+this.cap.k+'|'+(this.cap.url??'');
+    const key=this.cardId+'|'+this.cap.k;
     if(key===this.inputKey)return;this.inputKey=key;this.generation++;this.busy=false;this.message='';
   }
   aboutToAppear():void {
@@ -55,20 +53,6 @@ export struct CapabilitySettings {
       if(result.refreshState==='failed')this.message=result.desc??'系统日历尚未授权';else this.onUpdate(id,result);
     }finally{if(token===this.generation)this.busy=false;}
   }
-  private async chooseURLField():Promise<void> {
-    if(this.busy)return;const token=++this.generation,cap=this.copy(),id=this.cardId;this.busy=true;
-    try{
-      const fields=JSON.parse(await taskpool.execute(new taskpool.Task(fetchValueFields,cap.url??'')) as string) as ValueField[];
-      if(!this.alive||token!==this.generation)return;
-      this.dialog=new CustomDialogController({builder:ValuePicker({choices:fields,title:'选择要显示的内容',appDark:this.appDark,onChoose:(chosen:ValueField)=>{
-        if(!this.alive||token!==this.generation)return;
-        cap.field=chosen.path;cap.sourceConfigured=true;cap.value=chosen.value;cap.updatedAt=Date.now();cap.attemptedAt=Date.now();cap.refreshState='done';this.onUpdate(id,cap);
-      }}),customStyle:true,openAnimation:settingsDialogOpen(),closeAnimation:settingsDialogClose(),alignment:DialogAlignment.Center,autoCancel:true});this.dialog.open();
-    }catch(e){if(this.alive)this.message=(e as Error).message;}finally{if(token===this.generation)this.busy=false;}
-  }
-
-
-
   private editCourse(course?:CourseItem):void {
     const id=this.cardId;
     this.dialog=new CustomDialogController({builder:CourseEditor({course:course??{id:'',name:'',room:'',day:1,start:'08:00',end:'09:40',firstWeek:1,lastWeek:16,parity:0},appDark:this.appDark,onDelete:()=>{if(!this.alive||this.cardId!==id||!course)return;const next=this.copy();next.courses=(next.courses??[]).filter((c)=>c.id!==course.id);next.courseChanges=(next.courseChanges??[]).filter((c)=>c.courseId!==course.id);this.change(next);},onSave:(value:CourseItem)=>{
@@ -119,18 +103,6 @@ export struct CapabilitySettings {
         Text('本机电量与充电状态，前台响应系统变化；桌面由系统周期刷新。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
         SettingsAction({label:this.busy?'更新中':'更新电量',onPress:()=>this.refresh(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
       }
-      if(this.cap.k==='fetch') {
-        TextInput({text:this.cap.title??'',placeholder:'名称，例如空气质量 / 剩余配额'}).height(44).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>{const next=this.copy();next.title=v;this.change(next);})
-        TextInput({text:this.cap.url??'',placeholder:'https://… JSON 或纯文本接口'}).height(44).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>{const next=this.copy();next.url=v.trim();next.value='';next.attemptedAt=0;next.field='';next.sourceConfigured=false;this.change(next);})
-        SettingsAction({label:this.busy?'读取中':this.cap.value?'重新选择内容':'读取并选择内容',onPress:()=>this.chooseURLField(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
-        if(this.cap.value) {Text('内容：'+(this.cap.field||'正文')).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%'); SettingsAction({label:'立即刷新',onPress:()=>this.refresh(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})}
-        TextInput({text:this.cap.unit??'',placeholder:'单位（可留空）'}).height(44).fontColor(this.text()).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(this.control()).borderRadius(14).onChange((v:string)=>{const next=this.copy();next.unit=v;this.change(next);})
-        Text('刷新间隔').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
-        SettingsSegmented({labels:['30 分钟','60 分钟','180 分钟'],selectedIndex:Math.max(0,[30,60,180].indexOf(this.cap.interval??60)),appDark:this.appDark,
-          onSelect:(index:number)=>{const next=this.copy();next.interval=[30,60,180][index];this.change(next);}})
-        Text('只读取所选内容，失败时保留上次结果。桌面更新受系统调度限制。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
-      }
-
       if(this.cap.k==='agenda') {
         if(this.wholeCalendarAccess) {SettingsAction({label:'读取系统日历',onPress:()=>this.readSystemAgenda(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})}
         SettingsAction({label:'导入日历文件 .ics',onPress:()=>this.importSchedule(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})

@@ -1,4 +1,5 @@
 import { AnimatedDrawableDescriptor } from '@kit.ArkUI';
+import { localImageSource } from '../model/CardSchema';
 
 @Component
 export struct AnimatedPhoto {
@@ -10,7 +11,7 @@ export struct AnimatedPhoto {
   private drawable(): AnimatedDrawableDescriptor {
     if (this.animatedDrawable === undefined || this.animationSource !== this.src) {
       this.animatedDrawable?.getAnimationController()?.stop();
-      this.animationSource = this.src; this.animatedDrawable = new AnimatedDrawableDescriptor(this.src, { iterations: -1 });
+      this.animationSource = this.src; this.animatedDrawable = new AnimatedDrawableDescriptor(localImageSource(this.src), { iterations: -1 });
     }
     return this.animatedDrawable;
   }
@@ -22,7 +23,7 @@ export struct AnimatedPhoto {
           const controller = this.animatedDrawable?.getAnimationController(); if (visible) controller?.start(); else controller?.stop();
         })
     } else {
-      Image(this.src).width('100%').height('100%').objectFit(ImageFit.Cover).draggable(false)
+      Image(localImageSource(this.src)).width('100%').height('100%').objectFit(ImageFit.Cover).draggable(false)
     }
   }
 }
