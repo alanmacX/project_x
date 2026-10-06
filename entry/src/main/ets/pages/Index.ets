@@ -229,6 +229,11 @@ struct Index {
   @State canvasBackground: CanvasBackground = new CanvasBackground();
   @State backgroundOpen: boolean = false;
   @State backgroundBusy: boolean = false;
+  @State backgroundPreviewReady: boolean = false;
+  @State backgroundPreviewCount: number = 0;
+  @State backgroundSettingsStage: number = 0;
+  private backgroundPreviewGeneration: number = 0;
+  private backgroundPreviewTimer: number = -1;
   @State sharing: boolean = false;
   private backgroundGeneration: number = 0;
   private backgroundTimer: number = -1;
@@ -544,7 +549,7 @@ struct Index {
       }
     } finally { this.repairingSubjects = false; }
   }
-  aboutToDisappear(): void { if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
+  aboutToDisappear(): void { this.backgroundPreviewGeneration++;if(this.backgroundPreviewTimer>=0)clearTimeout(this.backgroundPreviewTimer); if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
     if(this.homeToolsOpen){this.homeToolsOpen=false;return true;}
     if(this.capabilityPickerOpen){this.capabilityPickerOpen=false;return true;}
@@ -1033,7 +1038,7 @@ struct Index {
         if (this.viewing) { this.detail() }
       }
     }.width('100%').height('100%').backgroundColor(this.appBackground())
-      .bindSheet(this.backgroundOpen||this.scheduleOpen,this.homeTaskSheet,{height:SheetSize.LARGE,showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>{this.backgroundOpen=false;this.scheduleOpen=false;this.updateScheduledScene(true);}})
+      .bindSheet(this.backgroundOpen||this.scheduleOpen,this.homeTaskSheet,{height:SheetSize.LARGE,showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>{this.backgroundOpen=false;this.backgroundPreviewReady=false;this.backgroundPreviewGeneration++;this.scheduleOpen=false;this.updateScheduledScene(true);}})
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_: Area, area: Area) => {
         const width = Number(area.width), height = Number(area.height);
@@ -1358,11 +1363,38 @@ struct Index {
           Blank()
           SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([this.appMuted()]).hitTestBehavior(HitTestMode.None)
         }.width('100%')
-      }.height(56).layoutWeight(1).backgroundColor(Color.Transparent).padding(8).accessibilityText('调整画布背景，'+this.backgroundLabel()).enabled(!this.scheduledName&&!this.scheduleTransition).onClick(() => { this.homeToolsOpen=false;this.canvasPickerOpen=false;this.backgroundOpen = true; })
+      }.height(56).layoutWeight(1).backgroundColor(Color.Transparent).padding(8).accessibilityText('调整画布背景，'+this.backgroundLabel()).enabled(!this.scheduledName&&!this.scheduleTransition).onClick(() => { this.openBackgroundEditor(); })
       Button(this.sharing ? '生成中' : '导入', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).id('importTemplate').height(44).fontSize(13).padding({ left: 12, right: 12 })
         .backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.sharing && !this.backgroundBusy).onClick(() => this.pickTemplate())
     }.width(floating?this.screenWidth-32:this.panelWidth).height(64).padding(4).borderRadius(AppDesign.sectionRadius).border({width:floating?0:1,color:AppDesign.border(this.appDark)}).backgroundColor(floating?Color.Transparent:this.appSurface())
       .position({x:floating?0:this.panelLeft,y:floating?this.homeToolsHeight()-64:this.panelTop+this.panelHeight-64})
+  }
+  private openBackgroundEditor():void {
+    if(!this.context)return;
+    const generation=++this.backgroundPreviewGeneration;
+    this.backgroundPreviewReady=false;this.backgroundPreviewCount=0;this.backgroundSettingsStage=0;this.homeToolsOpen=false;this.canvasPickerOpen=false;this.backgroundOpen=true;
+    // Sheet entrance must not rebuild every full-resolution silhouette shadow.
+    // Bake thumbnail relief off-thread; mount the miniature only after native sheet entrance.
+    this.getUIContext().postFrameCallback(new PreparedTransition(()=>this.mountBackgroundSettings(generation)));
+    if(this.backgroundPreviewTimer>=0)clearTimeout(this.backgroundPreviewTimer);
+    this.backgroundPreviewTimer=setTimeout(()=>{
+      this.backgroundPreviewTimer=-1;
+      if(!this.alive||!this.backgroundOpen||generation!==this.backgroundPreviewGeneration||!this.context)return;
+      prepareSubjectDepth(this.cards,240/BOARD_W,this.context.cacheDir,this.getUIContext().vp2px(1)).then(()=>{this.mountBackgroundPreview(generation);})
+        .catch(()=>{this.mountBackgroundPreview(generation);});
+    },420);
+  }
+  private mountBackgroundSettings(generation:number):void {
+    if(!this.alive||!this.backgroundOpen||generation!==this.backgroundPreviewGeneration||this.backgroundSettingsStage>=3)return;
+    this.backgroundSettingsStage++;
+    this.getUIContext().postFrameCallback(new PreparedTransition(()=>this.mountBackgroundSettings(generation)));
+  }
+  private mountBackgroundPreview(generation:number):void {
+    if(!this.alive||!this.backgroundOpen||generation!==this.backgroundPreviewGeneration)return;
+    if(this.backgroundPreviewCount<this.cards.length){
+      this.backgroundPreviewCount++;
+      this.getUIContext().postFrameCallback(new PreparedTransition(()=>this.mountBackgroundPreview(generation)));
+    }else{this.getUIContext().animateTo({duration:160,curve:Curve.EaseOut},()=>this.backgroundPreviewReady=true);}
   }
   @Builder
   backgroundEditor() {
@@ -1371,16 +1403,21 @@ struct Index {
         Text('画布背景').fontSize(22).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
         Stack({ alignContent: Alignment.TopStart }) {
           CanvasBackdrop({ sceneBackground: this.canvasBackground }).width('100%').height('100%')
-          ForEach(this.cards, (card: FridgeCard) => {
+          Stack({alignContent:Alignment.TopStart}) {
+          ForEach(this.cards.slice(0,this.backgroundPreviewCount), (card: FridgeCard) => {
             CardFace({ card: card, scaleFactor: 240 / BOARD_W, tick: this.tick })
               .width(card.w * 240 / BOARD_W).height(card.h * 240 / BOARD_W)
               .position({ x: card.x * 240 / BOARD_W, y: card.y * (240 / this.canvasAspect) / BOARD_H })
               .rotate({ angle: card.rot, centerX: 0, centerY: '100%' }).zIndex(card.z)
           }, (card: FridgeCard) => card.id)
+          }.width('100%').height('100%').opacity(this.backgroundPreviewReady?1:0)
         }.width(240).height(240 / this.canvasAspect).borderRadius(20).clip(true)
         Column({ space: 16 }) {
+          if(this.backgroundSettingsStage>=1){
           SettingsSegmented({labels:['纯色','智能取色','智能多色','照片'],selectedIndex:this.canvasBackground.mode==='preset'?2:Math.max(0,['solid','smart','blend','photo'].indexOf(this.canvasBackground.mode)),appDark:this.appDark,
             onSelect:(index:number)=>{if(!this.backgroundBusy)this.chooseBackgroundMode(['solid','smart','blend','photo'][index]);}}).enabled(!this.backgroundBusy)
+          }
+          if(this.backgroundSettingsStage>=2){
           ForEach([this.canvasBackground.mode],(_mode:string)=>{
           Column({space:16}) {
           if (this.canvasBackground.mode === 'solid') {
@@ -1405,7 +1442,9 @@ struct Index {
           }
           }.width('100%').transition(settingsReveal())
           },(mode:string)=>mode)
+          }
         }.width('100%').padding(16).borderRadius(20).backgroundColor(this.appSurface()).border({ width: 1, color: AppDesign.border(this.appDark) })
+        if(this.backgroundSettingsStage>=3){
         Column({ space: 16 }) {
           Text('柔色预设').fontSize(16).fontColor(this.appText()).width('100%')
           Flex({ wrap: FlexWrap.Wrap }) {
@@ -1414,6 +1453,7 @@ struct Index {
             }, (name: string) => name)
           }.width('100%')
         }.width('100%').padding(16).borderRadius(20).backgroundColor(this.appSurface()).border({ width: 1, color: AppDesign.border(this.appDark) })
+        }
       }.width('100%').constraintSize({ maxWidth: 640 }).padding({ top: 24, left: 20, right: 20, bottom: this.safeBottom + 24 })
     }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
   }
@@ -1678,7 +1718,7 @@ struct Index {
   }
   private hasEditorLayers():boolean {
     if(this.preview.capability?.k==='album')return false;
-    return this.preview.elements.filter((el:CanvasElement)=>el.behindCapability===(this.settingsTab===0)).length>0;
+    return this.preview.elements.filter((el:CanvasElement)=>el.behindCapability===(this.settingsTab===0)).length>0 || this.settingsTab===1&&this.preview.capability!==null;
   }
   @Builder
   editorLayers() {
@@ -1900,14 +1940,21 @@ struct Index {
   }
   @Builder
   layerEntry(id:string) {
-    Button({type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
-      Row({space:6}) {
-        this.layerThumbnail(id)
-        Text(this.layerTitle(id)).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
-      }.width('100%').padding({left:6,right:10})
-    }.width(112).height(48)
+    Row({space:2}) {
+      Button({type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
+        Row({space:6}) {
+          this.layerThumbnail(id)
+          Text(this.layerTitle(id)).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
+        }.width('100%').padding({left:6,right:6})
+      }.layoutWeight(1).height(48).backgroundColor(Color.Transparent)
+        .accessibilityText('选择图层 '+this.layerTitle(id)).onClick(()=>this.chooseLayer(id))
+      if(id.length>0 && this.layerId===id) {
+        Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL,role:ButtonRole.ERROR}) {
+          SymbolGlyph($r('sys.symbol.trash')).fontSize(17).fontColor(['#C43A35']).hitTestBehavior(HitTestMode.None)
+        }.width(44).height(44).backgroundColor(Color.Transparent).accessibilityText('删除图层 '+this.layerTitle(id)).onClick(()=>{if(this.layerId===id)this.removeElement();})
+      }
+    }.width(this.layerId===id&&id.length>0?160:112).height(48).borderRadius(16)
       .backgroundColor(this.layerId===id?this.appControl():Color.Transparent)
-      .accessibilityText('选择图层 '+this.layerTitle(id)).onClick(()=>this.chooseLayer(id))
   }
   @Builder
   layerEntries() {
@@ -1985,7 +2032,6 @@ struct Index {
               el.behindCapability = true; this.settingsTab = 0; this.editorTabs = [0]; card.elements = [el].concat(card.elements.filter((e: CanvasElement) => e.id !== el.id)); this.change();
             } })
           }
-          Button('移除此元素', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.ERROR }).height(AppDesign.controlHeight).fontSize(13).fontColor('#C43A35').backgroundColor(Color.Transparent).onClick(() => this.removeElement())
         }
         }.width('100%').transition(settingsReveal())
         }

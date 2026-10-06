@@ -1,0 +1,21 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript'),root=path.resolve(__dirname,'../entry/src/main/ets/model'),cache=new Map();
+function load(name){const file=path.resolve(root,name+'.ets');if(cache.has(file))return cache.get(file).exports;const mod={exports:{}};cache.set(file,mod);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;vm.runInThisContext('(function(require,module,exports){'+code+'\n})',{filename:file})(s=>load(path.relative(root,path.resolve(path.dirname(file),s))),mod,mod.exports);return mod.exports;}
+const {importCourseCalendar}=load('ScheduleImport'),{coursesOnDay}=load('CapabilityData');
+const event=(start,end,extra='')=>`BEGIN:VEVENT\r\nDTSTART;TZID=Asia/Shanghai:${start}\r\nDTEND;TZID=Asia/Shanghai:${end}\r\nSUMMARY:数学\\, A\r\nLOCATION:教室一\r\n${extra}END:VEVENT\r\n`;
+const ics=body=>'BEGIN:VCALENDAR\r\nBEGIN:VTIMEZONE\r\nDTSTART:19700101T000000\r\nEND:VTIMEZONE\r\n'+body+'END:VCALENDAR',offset=()=>8*3600000;
+const parsed=importCourseCalendar(ics(event('20260907T080000','20260907T094000','RRULE:FREQ=WEEKLY;COUNT=18\r\nEXDATE;TZID=Asia/Shanghai:20261005T080000\r\n')),offset);
+assert.equal(parsed.semester,'2026-09-07');assert.equal(parsed.courses.length,2);assert.equal(parsed.courses[0].lastWeek,4);assert.equal(parsed.courses[1].firstWeek,6);assert.equal(parsed.courses[1].lastWeek,18);
+const cap={k:'timetable',...parsed,skipHolidays:false};const at=s=>new Date(s+'T12:00:00').getTime();
+assert.equal(coursesOnDay(cap,at('2026-10-05')).length,0);assert.equal(coursesOnDay(cap,at('2027-01-04')).length,1,'semester extends beyond original 90-day agenda limit');assert.equal(parsed.courses[0].name,'数学, A');
+const gaps=importCourseCalendar(ics(event('20260907T080000','20260907T094000')+event('20260921T080000','20260921T094000')+event('20260928T080000','20260928T094000')),offset);
+assert.deepEqual(gaps.courses.map(c=>[c.firstWeek,c.lastWeek]),[[1,1],[3,4]]);
+assert.throws(()=>importCourseCalendar(ics(event('20260907T230000','20260908T010000')),offset),/跨天/);
+assert.throws(()=>importCourseCalendar('BEGIN:VCALENDAR\nBEGIN:VEVENT\nDTSTART;VALUE=DATE:20260907\nEND:VEVENT\nEND:VCALENDAR'),/全天/);
+assert.throws(()=>importCourseCalendar(ics(event('20260907T080000','20260907T094000','RECURRENCE-ID:20260907T000000Z\r\n')),offset),/单次重复/);
+assert.throws(()=>importCourseCalendar(ics(event('20260907T080000','20260907T094000','RRULE:FREQ=MONTHLY\r\n')),offset),/复杂重复/);
+console.log('PASS offline ICS timetable: semester recurrence, named timezone, excluded weeks, exact dates, VTIMEZONE isolation and unsupported data rejection');
+const {mergeCourseCalendars}=load('ScheduleImport');
+const second=importCourseCalendar(ics(event('20260922T140000','20260922T150000')),offset),merged=mergeCourseCalendars([gaps,second,gaps]);
+assert.equal(merged.semester,'2026-09-07');assert.equal(merged.courses.length,3);assert.equal(merged.courses.at(-1).firstWeek,3);assert.equal(merged.courses.at(-1).day,2);
+console.log('PASS multi-file calendar merge: civil-week rebasing and exact duplicate removal');

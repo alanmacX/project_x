@@ -5,7 +5,7 @@ import { CapBlock } from '../model/CardSchema';
 import { AppDesign } from '../model/AppDesign';
 import { CourseItem } from '../model/CardSchema';
 import { WakeImport, WakeSlot, WakeCourse, resolveWakeUp, mondayDate } from '../model/WakeUpImport';
-import { importScheduleFile, parseWakeUpText } from '../model/ScheduleFiles';
+import { importScheduleFile, parseWakeUpText, importCalendarFiles } from '../model/ScheduleFiles';
 import { taskpool } from '@kit.ArkTS';
 import { picker } from '@kit.CoreFileKit';
 @CustomDialog
@@ -15,6 +15,7 @@ export struct WakeUpImportDialog {
   existingCount:number=0;
   onImport:(semester:string,courses:CourseItem[],replace:boolean,keepCalendar:boolean)=>void=()=>{};
   @State text:string='';
+  @State calendarFile:boolean=false;
   @State parsed:WakeImport=new WakeImport();
   @State slots:WakeSlot[]=[];
   @State semester:string='';
@@ -33,12 +34,12 @@ export struct WakeUpImportDialog {
   }
   private async parseText():Promise<void> {
     if(this.busy)return;this.busy=true;this.error='';
-    try {this.accept(await taskpool.execute(new taskpool.Task(parseWakeUpText,this.text)) as string);}catch(e){if(this.alive)this.error=(e as Error).message.replace(/^Error:\s*/,'');}finally{if(this.alive)this.busy=false;}
+    try {this.calendarFile=false;this.accept(await taskpool.execute(new taskpool.Task(parseWakeUpText,this.text)) as string);}catch(e){if(this.alive)this.error=(e as Error).message.replace(/^Error:\s*/,'');}finally{if(this.alive)this.busy=false;}
   }
-  private async file():Promise<void> {
+  private async file(ics:boolean=true):Promise<void> {
     const context=this.getUIContext().getHostContext();if(!context||this.busy)return;this.busy=true;this.error='';
-    try {const options=new picker.DocumentSelectOptions();options.maxSelectNumber=1;options.fileSuffixFilters=['WakeUp 课表|.wakeup_schedule,.json,.txt'];const files=await new picker.DocumentViewPicker(context).select(options);if(!files.length)return;
-      this.accept(await taskpool.execute(new taskpool.Task(importScheduleFile,files[0],'timetable')) as string);
+    try {const options=new picker.DocumentSelectOptions();options.maxSelectNumber=ics?32:1;options.fileSuffixFilters=ics?['课程日历|.ics']:['WakeUp 课表|.wakeup_schedule,.json,.txt'];const files=await new picker.DocumentViewPicker(context).select(options);if(!files.length)return;
+      const json=await taskpool.execute(ics?new taskpool.Task(importCalendarFiles,files):new taskpool.Task(importScheduleFile,files[0],'timetable')) as string;this.calendarFile=ics;this.accept(json);
     }catch(e){if(this.alive)this.error=(e as Error).message.replace(/^Error:\s*/,'');}finally{if(this.alive)this.busy=false;}
   }
   private date():void {
@@ -67,14 +68,21 @@ export struct WakeUpImportDialog {
     Column({space:14}) {
       Text(this.stage?'确认课程表':'导入课程表').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
       if(!this.stage) {
-        Text('先在 WakeUp 中完成教务导入，再导出本地课表文件；这里仅在本机读取，不登录学校网站。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
-        SettingsAction({label:'选择 WakeUp 课表文件',onPress:()=>this.file(),appDark:this.appDark,isEnabled:!this.busy,emphasis:true})
+        Text('导入本地 ICS 课程日历，无需登录、联网或读取你的其他日程。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
+        SettingsAction({label:'选择课程日历 .ics',onPress:()=>this.file(),appDark:this.appDark,isEnabled:!this.busy,emphasis:true})
+        Column({space:8}) {
+          Text('如何从 WakeUp 导入').fontSize(15).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark))
+          Text('1  在鸿蒙 WakeUp 中选学校、登录教务并核对课表，再点分享 → 导出到日历。\n2  系统日历 → 查看全部日程，长按一门课程选“多选”，勾选本学期的课程后点分享。\n3  将格式改为日历日程（.ics），另存为；回到这里选择文件，核对周课表后确认。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
+          Text('已在鸿蒙 WakeUp 6.1.90 与系统日历核对批量分享路径。仅勾选课程，避免混入私人日程或全天节日；分开导出的文件也可一次多选（最多 32 个）。离线副本不会自动同步调课，更新后请重新导入。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+        }.padding(16).width('100%').borderRadius(AppDesign.sectionRadius).backgroundColor(AppDesign.control(this.appDark))
+        SettingsAction({label:'已有 WakeUp 备份文件',onPress:()=>this.file(false),appDark:this.appDark,isEnabled:!this.busy})
         TextArea({text:this.text,placeholder:'也可以粘贴 WakeUp 导出的课表文本（不是分享口令）'}).height(160).maxLength(262144).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(16).onChange((v:string)=>this.text=v)
         SettingsAction({label:this.busy?'读取中':'预览粘贴的课表',onPress:()=>this.parseText(),appDark:this.appDark,isEnabled:!this.busy&&this.text.trim().length>0})
         Text('支持 .wakeup_schedule、JSON 或导出文本。节次作息、单双周与不连续周次会在导入预览中核对。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       } else {
         Text(this.parsed.name+' · '+this.parsed.courses.length+' 条上课安排').fontSize(13).fontColor(AppDesign.muted(this.appDark)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
-        SettingsAction({label:'第一周周一  '+(this.semester||'选择开学日期'),onPress:()=>this.date(),appDark:this.appDark,isEnabled:!this.busy})
+        SettingsAction({label:(this.calendarFile?'日历首周  ':'第一周周一  ')+(this.semester||'选择开学日期'),onPress:()=>this.date(),appDark:this.appDark,isEnabled:!this.busy&&!this.calendarFile})
+        if(this.calendarFile){Text('按导出的实际日期排课，不会猜测节次或补齐空周。日历有变更时请重新导入。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
         SettingsSegmented({labels:['课程',this.slots.some((s)=>!s.start||!s.end)?'作息 · 待补全':'作息'],selectedIndex:this.periods?1:0,appDark:this.appDark,onSelect:(index:number)=>this.periods=index===1})
         Scroll() {
           Column({space:10}) {

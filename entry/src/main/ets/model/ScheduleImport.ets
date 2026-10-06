@@ -17,10 +17,10 @@ function instant(date:IcsDate,offset:((zone:string,time:number)=>number)|undefin
 }
 function unescapeText(value:string):string {return value.replace(/\\n/gi,' ').replace(/\\([,;\\])/g,'$1');}
 /** Expand supported recurrence on a worker, including exceptions and DST-aware named time zones. */
-export function importAgenda(text:string,now:number=Date.now(),offset?:((zone:string,time:number)=>number)):AgendaItem[] {
+export function importAgenda(text:string,now:number=Date.now(),offset?:((zone:string,time:number)=>number),horizonDays:number=90,limit:number=256):AgendaItem[] {
   if(text.length>1048576||!text.includes('BEGIN:VCALENDAR'))throw new Error('请选择有效的 .ics 日历文件');
-  const blocks=text.replace(/\r\n[ \t]/g,'').replace(/\n[ \t]/g,'').split('BEGIN:VEVENT').slice(1),out:AgendaItem[]=[],windowEnd=now+90*86400000;
-  if(blocks.length>256)throw new Error('日历超过 256 项，请导出需要的日程');
+  const blocks=text.replace(/\r\n[ \t]/g,'').replace(/\n[ \t]/g,'').split('BEGIN:VEVENT').slice(1),out:AgendaItem[]=[],windowEnd=now+horizonDays*86400000;
+  if(blocks.length>4096)throw new Error('日历超过 4096 项，请导出需要的日程');
   for(const block of blocks) {
     const lines=block.split(/\r?\n/),startLine=lines.find((l)=>l.startsWith('DTSTART'))??'',endLine=lines.find((l)=>l.startsWith('DTEND'))??'';
     if(!startLine||lines.includes('STATUS:CANCELLED'))continue;
@@ -54,7 +54,7 @@ export function importAgenda(text:string,now:number=Date.now(),offset?:((zone:st
     }
     for(const time of extra)if(!exceptions.includes(time)&&time+duration>now&&time<windowEnd)out.push({id:uid+'_'+time,title:unescapeText(title.slice(8)).slice(0,160),start:time,end:time+duration,location:unescapeText(location.slice(9)).slice(0,160),allDay:start.allDay});
   }
-  return out.sort((a,b)=>a.start-b.start).filter((e:AgendaItem,i:number,list:AgendaItem[])=>list.findIndex((v)=>v.id===e.id)===i).slice(0,256);
+  return out.sort((a,b)=>a.start-b.start).filter((e:AgendaItem,i:number,list:AgendaItem[])=>list.findIndex((v)=>v.id===e.id)===i).slice(0,limit);
 }
 export function importCourses(text:string):CourseItem[] {
   if(text.length>1048576)throw new Error('课程文件过大');
@@ -66,4 +66,49 @@ export function importCourses(text:string):CourseItem[] {
   const cap:CapBlock={k:'timetable',courses:input},clean=normalizeCapability(cap).courses??[];
   if(clean.length!==input.length)throw new Error('部分课程缺少名称、星期或有效起止时间，请校对后重试');
   return clean;
+}
+
+export interface CourseCalendar {semester:string;courses:CourseItem[];}
+/** Preserve actual exported occurrences: gaps and changed locations become distinct week runs. */
+export function importCourseCalendar(text:string,offset?:((zone:string,time:number)=>number)):CourseCalendar {
+  const unfolded=text.replace(/\r\n[ \t]/g,'').replace(/\n[ \t]/g,'');
+  const starts=unfolded.split('BEGIN:VEVENT').slice(1).map((block:string)=>block.split('END:VEVENT')[0].split(/\r?\n/).find((l:string)=>l.startsWith('DTSTART'))??'').filter((l:string)=>l.length>0);
+  if(!starts.length)throw new Error('日历中没有课程');
+  if(text.length>1048576||starts.length>4096)throw new Error('课程日历过大，请只导出本学期');
+  const first=Math.min(...starts.map((l:string)=>instant(dateParts(l),offset)));
+  if(starts.some((l:string)=>instant(dateParts(l),offset)>first+419*86400000))throw new Error('课程跨度超过 60 周，请只导出本学期');
+  const day=new Date(first);day.setHours(0,0,0,0);
+  const events=importAgenda(text,day.getTime()-1,offset,420,4097);
+  if(events.length>4096)throw new Error('课程次数超过 4096，请只导出本学期');
+  if(!events.length||events.some((e:AgendaItem)=>e.allDay))throw new Error('请选择包含上课起止时间的课程日历，不是全天日程');
+  const origin=new Date(events[0].start);origin.setHours(12,0,0,0);origin.setDate(origin.getDate()-((origin.getDay()+6)%7));
+  const semester=origin.getFullYear()+'-'+('0'+(origin.getMonth()+1)).slice(-2)+'-'+('0'+origin.getDate()).slice(-2);
+  const base=Date.UTC(origin.getFullYear(),origin.getMonth(),origin.getDate()),out:CourseItem[]=[];
+  for(const e of events) {
+    const start=new Date(e.start),end=new Date(e.end);
+    if(start.toDateString()!==end.toDateString()||e.end<=e.start)throw new Error('课程不能跨天，请检查日历');
+    const week=Math.floor((Date.UTC(start.getFullYear(),start.getMonth(),start.getDate())-base)/604800000)+1;
+    if(week>60)throw new Error('课程跨度超过 60 周，请只导出本学期');
+    const a=('0'+start.getHours()).slice(-2)+':'+('0'+start.getMinutes()).slice(-2),b=('0'+end.getHours()).slice(-2)+':'+('0'+end.getMinutes()).slice(-2),weekday=start.getDay()||7;
+    const same=out.find((c:CourseItem)=>c.name===e.title&&c.room===e.location&&c.day===weekday&&c.start===a&&c.end===b&&week>=c.firstWeek&&week<=c.lastWeek+1);
+    if(same)same.lastWeek=Math.max(same.lastWeek,week);
+    else out.push({id:'ics_'+out.length,name:e.title.slice(0,80),room:e.location.slice(0,80),day:weekday,start:a,end:b,firstWeek:week,lastWeek:week,parity:0});
+  }
+  if(out.length>128)throw new Error('转换后超过 128 条安排，请按学期或课程分开导入');
+  return {semester:semester,courses:out};
+}
+
+export function mergeCourseCalendars(calendars:CourseCalendar[]):CourseCalendar {
+  if(!calendars.length)throw new Error('请选择课程日历');
+  const semester=calendars.map((c:CourseCalendar)=>c.semester).sort()[0],base=new Date(semester+'T12:00:00'),baseDay=Date.UTC(base.getFullYear(),base.getMonth(),base.getDate()),courses:CourseItem[]=[];
+  for(const calendar of calendars) {
+    const start=new Date(calendar.semester+'T12:00:00'),shift=Math.round((Date.UTC(start.getFullYear(),start.getMonth(),start.getDate())-baseDay)/604800000);
+    for(const c of calendar.courses) {
+      const item:CourseItem={id:'ics_'+courses.length,name:c.name,room:c.room,day:c.day,start:c.start,end:c.end,firstWeek:c.firstWeek+shift,lastWeek:c.lastWeek+shift,parity:0};
+      if(item.lastWeek>60)throw new Error('课程跨越不同学期，请分开导入');
+      if(!courses.some((v:CourseItem)=>v.name===item.name&&v.room===item.room&&v.day===item.day&&v.start===item.start&&v.end===item.end&&v.firstWeek===item.firstWeek&&v.lastWeek===item.lastWeek))courses.push(item);
+    }
+  }
+  if(courses.length>128)throw new Error('合并后超过 128 条安排，请分开导入');
+  return {semester:semester,courses:courses};
 }
