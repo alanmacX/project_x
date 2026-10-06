@@ -261,7 +261,7 @@ struct Index {
     this.alive = true;
     this.context = this.getUIContext().getHostContext() ?? null;
     this.initialize();
-    this.clockTimer = setInterval(() => { if(this.readingComparisonOpen || this.gestureGroup || this.activeBoardId || this.heroActive || this.arriving)return;this.tick = Math.floor(Date.now()/60000)*60000;this.refreshCapabilities();this.updateScheduledScene(true); }, 60000);
+    this.clockTimer = setInterval(() => { if(this.deletionId || this.readingComparisonOpen || this.gestureGroup || this.activeBoardId || this.heroActive || this.arriving)return;this.tick = Math.floor(Date.now()/60000)*60000;this.refreshCapabilities();this.updateScheduledScene(true); }, 60000);
     this.batteryObserver.start(()=>this.refreshCapabilities());
   }
   private initialize(): void {
@@ -321,7 +321,7 @@ struct Index {
     if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer);
     this.foregroundRefreshTimer=setTimeout(()=>{
       this.foregroundRefreshTimer=-1;if(!this.alive||this.appBackgrounded)return;
-      if(this.arriving||this.heroActive||this.activeBoardId||this.gestureGroup){this.scheduleForegroundRefresh();return;}
+      if(this.deletionId||this.arriving||this.heroActive||this.activeBoardId||this.gestureGroup){this.scheduleForegroundRefresh();return;}
       // Resume/PageShow arrive together. Reconcile once after the system's
       // window entrance, instead of invalidating the entire scene twice in it.
       this.tick=Math.floor(Date.now()/60000)*60000;this.foregroundSchedules();
@@ -341,7 +341,7 @@ struct Index {
     if(!this.scheduleOverride && !this.timedScene && !this.store.state.sceneRules.some(r=>r.enabled)) {
       if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer);this.scheduleTimer=-1;return;
     }
-    if(this.scheduling||this.scheduleTransition||this.arriving||this.editing||this.viewing||this.heroActive||this.activeBoardId||this.gestureGroup||this.scheduleOpen||this.backgroundOpen||this.templateReviewOpen||this.incomingReview||this.sharing||this.busy) {
+    if(this.deletionId||this.scheduling||this.scheduleTransition||this.arriving||this.editing||this.viewing||this.heroActive||this.activeBoardId||this.gestureGroup||this.scheduleOpen||this.backgroundOpen||this.templateReviewOpen||this.incomingReview||this.sharing||this.busy) {
       if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer);this.scheduleTimer=setTimeout(()=>this.updateScheduledScene(force),1000);return;
     }
     this.scheduling=true;const generation=this.scheduleGeneration,baseId=this.store.state.canvasId;
@@ -924,7 +924,7 @@ struct Index {
       if(!this.alive||this.deletionId!==id||this.store.state.canvasId!==canvas){bitmap.release();return;}
       clearTimeout(this.deletionTimer);
       this.deletionBitmap=bitmap;
-      this.deletionTimer=setTimeout(()=>this.finishCardDeletion(),1000);
+      this.deletionTimer=setTimeout(()=>this.finishCardDeletion(),1400);
     }catch(_){this.finishCardDeletion();}
   }
   private finishCardDeletion():void {
@@ -1364,7 +1364,7 @@ struct Index {
   }
   private async refreshBackground(force: boolean = false): Promise<void> {
     if (this.timedScene||this.scheduleTransition||this.context === null || !['smart','blend'].includes(this.canvasBackground.mode)) return;
-    if(this.activeBoardId||this.gestureGroup||this.heroActive||this.arriving){this.scheduleBackground();return;}
+    if(this.deletionId||this.activeBoardId||this.gestureGroup||this.heroActive||this.arriving){this.scheduleBackground();return;}
     this.store.state.background = this.canvasBackground; this.store.state.canvasAspect = this.canvasAspect;
     const signature = backgroundSignature(this.store.state);
     if (!force && signature === this.canvasBackground.signature) return;
@@ -1374,7 +1374,7 @@ struct Index {
     try {
       const json = await taskpool.execute(new taskpool.Task(createSmartBackground, JSON.stringify(state), this.context.filesDir)) as string;
       if (!this.alive || generation !== this.backgroundGeneration) return;
-      if(signature!==backgroundSignature(this.store.state)){this.scheduleBackground();return;}
+      if(this.deletionId||signature!==backgroundSignature(this.store.state)){this.scheduleBackground();return;}
       const next = normalizeBackground(JSON.parse(json) as CanvasBackground); this.applyBackground(next);
     } catch (_) { if (this.alive && generation === this.backgroundGeneration) this.getUIContext().getPromptAction().showToast({ message: '取色未完成，保留原背景，请重试' }); }
     finally { if (generation === this.backgroundGeneration) this.backgroundBusy = false; }
