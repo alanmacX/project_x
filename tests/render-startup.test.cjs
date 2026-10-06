@@ -45,5 +45,17 @@ const stale=JSON.parse(r.serializeContourCache(state.cards));Object.values(stale
 await payload.prepareWidgetPayload(JSON.stringify(state),JSON.stringify(stale));
 assert.equal(compactions,beforePayload+2,'stale geometry cannot be reused');
 geometry.compactContours=originalCompact;
+const layout=load('CanvasLayout'),photo=new s.FridgeCard();
+photo.id='layout-photo';photo.shape='subject';photo.cutout='file://layout-photo.png';photo.subjectVersion=4;photo.w=240;photo.h=300;photo.capability={k:'clock'};
+photo.outline=[Array.from({length:512},(_,i)=>({x:.5+.48*Math.cos(i*Math.PI/256),y:.5+.48*Math.sin(i*Math.PI/256)}))];
+const geometryBefore=JSON.stringify([photo.w,photo.h,photo.capBox]);
+const layoutJson=layout.warmStartupLayouts([photo]),expected=layout.capabilityPlacement(photo);
+assert.equal(JSON.stringify([photo.w,photo.h,photo.capBox]),geometryBefore,'prewarming must not mutate stored user geometry');
+cache.delete(path.resolve(root,'CanvasLayout.ets'));const restoredLayout=load('CanvasLayout');restoredLayout.restoreStartupLayouts(layoutJson);
+photo.outline=photo.outline.map(loop=>loop.map(point=>({get x(){throw Error('outline rescanned');},get y(){throw Error('outline rescanned');}})));
+assert.deepEqual(JSON.parse(JSON.stringify(restoredLayout.capabilityPlacement(photo))),JSON.parse(JSON.stringify(expected)),'restored worker geometry matches placement without rescanning any silhouette point');
+assert.doesNotThrow(()=>restoredLayout.minimumCardSize(photo));
+photo.subjectVersion++;assert.throws(()=>restoredLayout.minimumCardSize(photo),/outline rescanned/,'new asset version must invalidate worker geometry');
+console.log('PASS startup layout handoff: immutable geometry, exact placement, no UI contour scanning and asset-version invalidation');
 console.log('PASS cold contour cache: exact-source/asset matching, worker avoidance, geometry reuse, corruption/version fallback and edit invalidation');
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,0 +1,204 @@
+{
+  "pid": "27095",
+  "UI_frames": [
+    {
+      "start": 546340.161529,
+      "ms": 5.66
+    },
+    {
+      "start": 546340.168389,
+      "ms": 0.13
+    },
+    {
+      "start": 546340.468914,
+      "ms": 34.54
+    },
+    {
+      "start": 546340.504059,
+      "ms": 0.66
+    },
+    {
+      "start": 546340.510382,
+      "ms": 11.48
+    },
+    {
+      "start": 546340.522274,
+      "ms": 0.3
+    },
+    {
+      "start": 546340.527003,
+      "ms": 15.08
+    },
+    {
+      "start": 546340.542468,
+      "ms": 0.35
+    },
+    {
+      "start": 546340.543647,
+      "ms": 8.67
+    },
+    {
+      "start": 546340.552664,
+      "ms": 0.4
+    },
+    {
+      "start": 546340.560298,
+      "ms": 11.43
+    },
+    {
+      "start": 546340.571948,
+      "ms": 0.26
+    },
+    {
+      "start": 546340.577023,
+      "ms": 10.51
+    },
+    {
+      "start": 546340.587799,
+      "ms": 0.27
+    },
+    {
+      "start": 546340.593705,
+      "ms": 2.08
+    },
+    {
+      "start": 546340.602037,
+      "ms": 0.37
+    },
+    {
+      "start": 546340.618671,
+      "ms": 0.52
+    },
+    {
+      "start": 546341.127385,
+      "ms": 2.43
+    },
+    {
+      "start": 546341.135691,
+      "ms": 0.09
+    }
+  ],
+  "slow_tasks": [
+    {
+      "start": 546340.038163,
+      "ms": 76.81,
+      "task": "H:Cancelable Event callback:handleId:1|I39"
+    },
+    {
+      "start": 546340.038758,
+      "ms": 70.92,
+      "task": "H:UI Initialize:app0|M0539"
+    },
+    {
+      "start": 546340.118933,
+      "ms": 40.5,
+      "task": "H:PageRouterManager::RunPage|I39"
+    },
+    {
+      "start": 546340.118939,
+      "ms": 40.49,
+      "task": "H:load page: pages/Index(id:1)|M0539"
+    },
+    {
+      "start": 546340.468822,
+      "ms": 34.72,
+      "task": "H:ReceiveVsync name:WM_27095 dataCount: 24bytes now:224943864446040 expectedEnd: 224943872784972 vsyncId:6538426, fd:38|M0538"
+    },
+    {
+      "start": 546340.468914,
+      "ms": 34.54,
+      "task": "H:UIVsyncTask[timestamp:224943864446040][vsyncID:6538426][instanceID:100000]|M0539"
+    },
+    {
+      "start": 546340.46891,
+      "ms": 34.54,
+      "task": "H:OnVsyncEvent now:224943864446040|I39"
+    },
+    {
+      "start": 546340.118953,
+      "ms": 34.32,
+      "task": "H:PageRouterManager::CreatePage|I39"
+    },
+    {
+      "start": 546340.119092,
+      "ms": 31.71,
+      "task": "H:JsiDeclarativeEngine::LoadPageSource|I39"
+    },
+    {
+      "start": 546340.119097,
+      "ms": 31.7,
+      "task": "H:JsiDeclarativeEngine::LoadJsWithModule Execute Page code : pages/Index.abc|I39"
+    },
+    {
+      "start": 546340.161388,
+      "ms": 28.23,
+      "task": "H:Native async work execute callback, name:PreferencesGetValue#393452740736, traceid:0x0|I39"
+    },
+    {
+      "start": 546340.399196,
+      "ms": 28.07,
+      "task": "H:Native async work complete callback, name:PreferencesGetValue#393511857024, traceid:0x0|I39"
+    },
+    {
+      "start": 546340.504269,
+      "ms": 27.61,
+      "task": "H:CreateImagePixelMap file:///data/storage/el2/base/haps/entry/files/subject_1791289234991.png, sourceSize: [ 770, 1003 ], targetSize: [ 0, "
+    },
+    {
+      "start": 546339.957848,
+      "ms": 25.02,
+      "task": "H:void OHOS::AppExecFwk::MainThread::HandleLaunchAbility(const std::shared_ptr<AbilityLocalRecord> &, std::shared_ptr<AppUpdateInfo>)##com.f"
+    },
+    {
+      "start": 546340.586579,
+      "ms": 23.46,
+      "task": "H:CreateImagePixelMap file:///data/storage/el2/base/haps/entry/files/subject_1791289234991.png, sourceSize: [ 770, 1003 ], targetSize: [ 0, "
+    },
+    {
+      "start": 546339.844512,
+      "ms": 21.3,
+      "task": "H:AppSpawnExecuteSpawningHook|M62"
+    },
+    {
+      "start": 546340.481196,
+      "ms": 20.97,
+      "task": "H:UITaskScheduler::FlushTask|I39"
+    },
+    {
+      "start": 546340.551881,
+      "ms": 20.84,
+      "task": "H:CreateImagePixelMap file:///data/storage/el2/base/haps/entry/files/subject_smooth_1791006856409_926375.png, sourceSize: [ 698, 961 ], targ"
+    },
+    {
+      "start": 546340.525648,
+      "ms": 20.33,
+      "task": "H:CreateImagePixelMap file:///data/storage/el2/base/haps/entry/files/subject_smooth_1791006856409_926375.png, sourceSize: [ 698, 961 ], targ"
+    },
+    {
+      "start": 546340.481198,
+      "ms": 18.32,
+      "task": "H:FlushLayoutTask|M0539"
+    }
+  ],
+  "startup_marks": [
+    "10-06 22:22:18.526 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: ability +0ms",
+    "10-06 22:22:18.649 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: content-loaded +123ms",
+    "10-06 22:22:18.726 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: canvas-input +200ms",
+    "10-06 22:22:18.925 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: canvas-normalized +399ms",
+    "10-06 22:22:18.933 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: storage-read +407ms",
+    "10-06 22:22:18.945 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: contours-ready +419ms",
+    "10-06 22:22:18.947 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: material-ready +421ms",
+    "10-06 22:22:18.948 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: geometry-ready +422ms",
+    "10-06 22:22:18.999 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: scene-ready +473ms",
+    "10-06 22:22:19.060 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: scene-idle +534ms",
+    "10-06 22:22:19.123 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: surfaces-ready +597ms",
+    "10-06 22:22:19.131 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: arrival-start +605ms",
+    "10-06 22:22:19.656 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: arrival-end +1130ms"
+  ],
+  "arrival": {
+    "frames": 60,
+    "fps": 120.0,
+    "max_ms": 8.4,
+    "UI_max_ms": 0.52
+  }
+}

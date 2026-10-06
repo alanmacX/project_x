@@ -249,3 +249,26 @@ export function capabilityPreset(card: FridgeCard, anchor: string): ElementBox {
   box.y = safe.y + (safe.h-box.h)*(anchor==='top'?0:anchor==='bottom'?1:.5);
   box.opacity=1; return box;
 }
+
+class StartupLayoutCache {
+  interiors: Record<string, ElementBox> = {};
+  masks: Record<string, InteriorMask> = {};
+  placements: Record<string, ElementBox> = {};
+}
+/** Only immutable photo assets can retain the same identity across worker boundaries. */
+export function warmStartupLayouts(cards: FridgeCard[]): string {
+  for(const card of cards) {minimumCardSize(card);if(card.capability!==null)capabilityPlacement(card);}
+  const assets=cards.filter((card:FridgeCard)=>card.shape==='subject'&&card.cutout.length>0).map(outlineIdentity);
+  const cache=new StartupLayoutCache();
+  for(const entry of subjectCache)if(assets.some((asset:string)=>entry[0].endsWith(':'+asset)))cache.interiors[entry[0]]=entry[1];
+  for(const entry of maskCache)if(assets.includes(entry[0]))cache.masks[entry[0]]=entry[1];
+  for(const entry of layoutCache)if(assets.some((asset:string)=>entry[0].includes(':'+asset+':')))cache.placements[entry[0]]=entry[1];
+  return JSON.stringify(cache);
+}
+/** The payload is produced by our validation worker, never accepted from a share package. */
+export function restoreStartupLayouts(json: string): void {
+  const cache=JSON.parse(json) as StartupLayoutCache;
+  for(const key of Object.keys(cache.interiors))subjectCache.set(key,cache.interiors[key]);
+  for(const key of Object.keys(cache.masks))maskCache.set(key,cache.masks[key]);
+  for(const key of Object.keys(cache.placements))layoutCache.set(key,cache.placements[key]);
+}

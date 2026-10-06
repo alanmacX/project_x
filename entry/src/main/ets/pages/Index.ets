@@ -1,46 +1,48 @@
+import { prepareSubjectDepth } from '../model/SubjectDepthCache';
+import { revealStartup } from '../model/StartupPresentation';
 import { removeStagedTemplate } from '../model/IncomingTemplate';
 import { workspaceLayout } from '../model/WorkspaceLayout';
 import { cardContainsPoint } from '../model/CardHitTest';
-import { SceneSchedulePanel } from '../views/SceneSchedulePanel';
+import lazy { SceneSchedulePanel } from '../views/SceneSchedulePanel';
 import { SceneRule, SavedSceneLayout, normalizeSceneRules } from '../model/SceneScheduleSchema';
 import { ScheduledScene, SceneOccurrence, activeSceneRule, nextSceneBoundary, projectScheduledScene, resolveScheduledScene, captureSceneLayout, dismissScene } from '../model/SceneSchedule';
 import { EditorLayerMotion } from '../model/EditorLayerMotion';
-import { EditorLayerTarget, EditorLayerHandles } from '../views/EditorLayerControls';
+import lazy { EditorLayerTarget, EditorLayerHandles } from '../views/EditorLayerControls';
 import { startupMark } from '../model/StartupTrace';
 import { image } from '@kit.ImageKit';
 import { assertCanvasCapacity, CANVAS_CARD_TARGET, CANVAS_CARD_LIMIT, canvasCapacityHint } from '../model/CanvasCapacity';
 import { SymbolGlyphModifier, FrameCallback } from '@kit.ArkUI';
 import { chromeMaterial, popupMaterial, immersiveChrome, prepareChromeMaterial } from '../model/ChromeMaterial';
-import { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
-import { SettingsSelect } from '../views/SettingsSelect';
-import { SettingsSegmented } from '../views/SettingsSegmented';
-import { SettingsCounter } from '../views/SettingsCounter';
+import lazy { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
+import lazy { SettingsSelect } from '../views/SettingsSelect';
+import lazy { SettingsSegmented } from '../views/SettingsSegmented';
+import lazy { SettingsCounter } from '../views/SettingsCounter';
 import { canvasToolsMotion, canvasToolsTransition, settingsReveal, settingsDialogOpen, settingsDialogClose } from '../model/SettingsMotion';
-import { CapabilityAppearance } from '../views/CapabilityAppearance';
-import { CapabilityDetails } from '../views/CapabilityDetails';
-import { WeekTimetable } from '../views/WeekTimetable';
-import { CapabilityPicker } from '../views/CapabilityPicker';
+import lazy { CapabilityAppearance } from '../views/CapabilityAppearance';
+import lazy { CapabilityDetails } from '../views/CapabilityDetails';
+import lazy { WeekTimetable } from '../views/WeekTimetable';
+import lazy { CapabilityPicker } from '../views/CapabilityPicker';
 import { capabilityDescriptor } from '../model/CapabilityCatalog';
 import { capabilityPreset } from '../model/CanvasLayout';
 import { BatteryObserver } from '../model/BatteryObserver';
 import { needsDataRefresh, capabilityRequestKey } from '../model/CapabilityData';
 import { readCapability } from '../model/CapabilityService';
-import { CapabilitySettings } from '../views/CapabilitySettings';
+import lazy { CapabilitySettings } from '../views/CapabilitySettings';
 import { primeRenderContours } from '../model/RenderContours';
 import { storageSnapshot } from '../model/StorageSnapshot';
 import { CanvasEntry } from '../model/CanvasLibrary';
-import { GroupSelection } from '../views/GroupSelection';
+import lazy { GroupSelection } from '../views/GroupSelection';
 import { GroupBox, groupBox, groupMinimumScale, transformGroup } from '../model/GroupGeometry';
 import { BoardMotion, GroupPose } from '../model/BoardMotion';
 import { clampCanvasGroups, layerSections, LayerSection, combineCards, ungroupCards, groupMembers, groupDragBounds, cleanGroups } from '../model/CardGroups';
-import { PhotoCrop } from '../views/PhotoCrop';
+import lazy { PhotoCrop } from '../views/PhotoCrop';
 import { CanvasBackdrop } from '../views/CanvasBackdrop';
 import { CanvasBackground, FridgeState, normalizeState, normalizeBackground } from '../model/CardSchema';
 import { backgroundSignature, createSmartBackground, importBackgroundPhoto, cropBackgroundPhoto } from '../model/BackgroundWorker';
-import { exportTemplate, inspectTemplate, materializeTemplateUri } from '../model/TemplateFiles';
-import { TemplateSummary, importedCards, fitImportedCanvas, remapSceneSchedules } from '../model/TemplatePackage';
+import lazy { exportTemplate, inspectTemplate, materializeTemplateUri } from '../model/TemplateFiles';
+import lazy { TemplateSummary, importedCards, fitImportedCanvas, remapSceneSchedules } from '../model/TemplatePackage';
 import { picker } from '@kit.CoreFileKit';
-import { sharePixelMap, shareTemplateFile } from '../model/ImageShare';
+import lazy { sharePixelMap, shareTemplateFile } from '../model/ImageShare';
 import { taskpool } from '@kit.ArkTS';
 import { common } from '@kit.AbilityKit';
 import { AppDesign } from '../model/AppDesign';
@@ -50,14 +52,14 @@ import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode, TextStyleMode, Sc
 import { EditorViewport, editorViewport } from '../model/EditorViewport';
 import { SelectionHandles, selectionHandles } from '../model/SelectionHandles';
 import { CardEditHistory } from '../model/CardEditHistory';
-import { ColorSetting } from '../views/ColorSetting';
-import { ColorSelector } from '../views/ColorSelector';
+import lazy { ColorSetting } from '../views/ColorSetting';
+import lazy { ColorSelector } from '../views/ColorSelector';
 import { FridgeStore, FridgeCard, CanvasElement, ElementBox, ShapePoint, CapBlock, BOARD_W, BOARD_H, materialColors, shapeRadius, typeLabel } from '../model/FridgeModel';
 import { CardCanvas } from '../views/CardCanvas';
 import { cardViewSnapshot, cardRenderSnapshot } from '../model/CardViewSnapshot';
 import { CardFace } from '../views/CardFace';
 import { sceneRect, SceneRect, layerLabel } from '../model/SceneLayout';
-import { extractSubject, repairSubject } from '../model/SubjectShape';
+import lazy { extractSubject, repairSubject } from '../model/SubjectShape';
 import { BoardCard } from '../views/BoardCard';
 import { constrainCapabilityDrag, cardCapabilityMinimum, capabilityBox, capabilityPlacement, safeContentBox, clampCardGeometry, ensureCapabilitySize, subjectSurfaceFactor, cardHandlePoint } from '../model/CanvasLayout';
 import { fileIo } from '@kit.CoreFileKit';
@@ -262,13 +264,18 @@ struct Index {
       this.canvasAspect = this.widgetAspect > 0 ? this.widgetAspect : (this.store.canvasSpecs[this.canvasDimension] ?? (this.canvasDimension === '6*4' ? 2 / 3 : (this.canvasDimension === '2*4' ? 2 : 1)));
       clampCanvasGroups(this.store.state.cards,BOARD_W/this.canvasAspect);
       const routedLaunch = this.routedId.length > 0 || this.viewRouteId.length > 0;
-      this.canvasBackground = this.store.state.background; this.layoutBoard(); this.ready = true; this.render(); startupMark('scene-ready');
+      this.canvasBackground = this.store.state.background; this.layoutBoard();
+      startupMark('geometry-ready');
+      await prepareSubjectDepth(this.store.state.cards,this.boardScale,this.context!.cacheDir,this.getUIContext().vp2px(1));
+      if(!this.alive)return;
+      this.ready = true; this.render(); startupMark('scene-ready');
       this.getUIContext().postFrameCallback(new PreparedTransition(()=>startupMark('scene-idle'),true));
       this.scheduleBackground(); this.routeChanged(); this.viewRouteChanged(); this.incomingTemplateChanged();
-      if (!routedLaunch) this.startArrival();
+      if (!routedLaunch && this.cardIds.length > 0) this.startArrival();
+      else this.getUIContext().postFrameCallback(new PreparedTransition(() => { revealStartup(); }));
       this.scheduleMaintenance();
 
-    }).catch((e: Error) => { this.error = e.message; });
+    }).catch((e: Error) => { this.error = e.message; this.getUIContext().postFrameCallback(new PreparedTransition(() => { revealStartup(); })); });
   }
   private scheduleMaintenance(): void {
     this.maintenanceTimer = setTimeout(() => {
@@ -277,7 +284,9 @@ struct Index {
       if (this.arriving || this.heroActive || this.activeBoardId || this.gestureGroup || this.editing || this.busy) {
         this.scheduleMaintenance(); return;
       }
-      this.syncSchedules(); this.updateScheduledScene(true); this.persist();
+      // Opening an unchanged canvas is not an edit: do not reserialize it or
+      // trigger a desktop delivery immediately after the entrance.
+      this.syncSchedules(); this.updateScheduledScene(true);
       this.repairStoredSubjects(); this.refreshCapabilities();
     }, 1200);
   }
@@ -311,6 +320,9 @@ struct Index {
   }
   private async updateScheduledScene(force:boolean=false):Promise<void> {
     if(!this.alive||!this.ready||this.appBackgrounded)return;
+    if(!this.scheduleOverride && !this.timedScene && !this.store.state.sceneRules.some(r=>r.enabled)) {
+      if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer);this.scheduleTimer=-1;return;
+    }
     if(this.scheduling||this.scheduleTransition||this.arriving||this.editing||this.viewing||this.heroActive||this.activeBoardId||this.gestureGroup||this.scheduleOpen||this.backgroundOpen||this.templateReviewOpen||this.incomingReview||this.sharing||this.busy) {
       if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer);this.scheduleTimer=setTimeout(()=>this.updateScheduledScene(force),1000);return;
     }
@@ -498,7 +510,8 @@ struct Index {
       }
       this.startupCardCount=-1;
       startupMark('surfaces-ready');this.arrival=1;this.boardOpacity=0;
-      this.getUIContext().postFrameCallback(new PreparedTransition(()=>{
+      this.getUIContext().postFrameCallback(new PreparedTransition(async ()=>{
+        await revealStartup();
         if(!this.alive||!this.arriving)return;
         startupMark('arrival-start');
         this.getUIContext().animateTo({duration:520,curve:Curve.Friction,expectedFrameRateRange:this.frameRate,
@@ -1091,7 +1104,7 @@ struct Index {
         .border({ width: .5, color: '#E9E9E9' }).id('homeCanvasSurface')
         .position({ x: this.boardLeft, y: this.boardTop })
       if(this.floatingHome()){this.homeDock()}else{this.homeLayers();this.homeBackground()}
-    }.width('100%').height('100%').opacity(this.boardOpacity).accessibilityLevel(this.editing || this.viewing ? 'no-hide-descendants' : 'auto').hitTestBehavior(this.editing || this.viewing || this.canvasChanging ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Default)
+    }.width('100%').height('100%').opacity(this.arriving ? 1 : this.boardOpacity).accessibilityLevel(this.editing || this.viewing ? 'no-hide-descendants' : 'auto').hitTestBehavior(this.editing || this.viewing || this.canvasChanging ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Default)
   }
   @Builder
   homeTaskSheet() {if(this.backgroundOpen){this.backgroundEditor()}else{this.scheduleEditor()}}

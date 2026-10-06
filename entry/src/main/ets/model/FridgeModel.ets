@@ -1,3 +1,6 @@
+import { restoreStartupLayouts } from './CanvasLayout';
+import { taskpool } from '@kit.ArkTS';
+import { hydrateCanvas, CanvasLoadResult } from './CanvasLoadWorker';
 import { startupMark } from './StartupTrace';
 import { CanvasCatalog, CanvasDocument, canvasKey, readCatalog, cloneCanvas } from './CanvasLibrary';
 import { assertCanvasCapacity } from './CanvasCapacity';
@@ -105,10 +108,11 @@ export class FridgeStore {
         let json = await this.prefs.get(canvasKey(entry.id), '') as string;
         if (!catalogJson) json = await this.prefs.get('fridge_state_json', '') as string;
         if(catalogJson && !json)throw new Error('画布记录缺失');
-        const parsed = json ? JSON.parse(json) as FridgeState : defaultState();
-        if (!Array.isArray(parsed.cards)) throw new Error('Invalid cards');
-        const doc = new CanvasDocument(); doc.id = entry.id; doc.name = entry.name; doc.state = normalizeState(parsed); doc.state.canvasId = entry.id;
-        cleanGroups(doc.state.cards); clampCanvasGroups(doc.state.cards,BOARD_W/doc.state.canvasAspect); this.documents.push(doc);
+        startupMark('canvas-input');
+        const hydrated=await taskpool.execute(new taskpool.Task(hydrateCanvas,json,entry.id)) as string;
+        startupMark('canvas-normalized');
+        const doc = new CanvasDocument(); doc.id = entry.id; doc.name = entry.name; const result=JSON.parse(hydrated) as CanvasLoadResult;doc.state=result.state;restoreStartupLayouts(result.layout);
+        this.documents.push(doc);
         this.savedScenes[entry.id] = catalogJson ? json : '';
       }
       this.switchCanvas(this.catalog.activeId); startupMark('storage-read');

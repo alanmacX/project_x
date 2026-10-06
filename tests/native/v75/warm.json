@@ -1,0 +1,54 @@
+{
+  "pid": "27095",
+  "UI_frames": [
+    {
+      "start": 546473.937191,
+      "ms": 16.88
+    },
+    {
+      "start": 546473.954641,
+      "ms": 9.45
+    },
+    {
+      "start": 546473.964244,
+      "ms": 3.29
+    }
+  ],
+  "slow_tasks": [
+    {
+      "start": 546474.281687,
+      "ms": 24.81,
+      "task": "H:Native async work execute callback, name:PreferencesGetValue#393730061696, traceid:0x0|I39"
+    },
+    {
+      "start": 546473.937154,
+      "ms": 17.0,
+      "task": "H:ReceiveVsync name:WM_27095 dataCount: 24bytes now:225077325453891 expectedEnd: 225077333794168 vsyncId:6539708, fd:38|M0538"
+    },
+    {
+      "start": 546473.937188,
+      "ms": 16.89,
+      "task": "H:OnVsyncEvent now:225077325453891|I39"
+    },
+    {
+      "start": 546473.937191,
+      "ms": 16.88,
+      "task": "H:UIVsyncTask[timestamp:225077325453891][vsyncID:6539708][instanceID:100000]|M0539"
+    }
+  ],
+  "startup_marks": [
+    "10-06 22:22:18.526 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: ability +0ms",
+    "10-06 22:22:18.649 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: content-loaded +123ms",
+    "10-06 22:22:18.726 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: canvas-input +200ms",
+    "10-06 22:22:18.925 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: canvas-normalized +399ms",
+    "10-06 22:22:18.933 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: storage-read +407ms",
+    "10-06 22:22:18.945 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: contours-ready +419ms",
+    "10-06 22:22:18.947 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: material-ready +421ms",
+    "10-06 22:22:18.948 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: geometry-ready +422ms",
+    "10-06 22:22:18.999 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: scene-ready +473ms",
+    "10-06 22:22:19.060 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: scene-idle +534ms",
+    "10-06 22:22:19.123 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: surfaces-ready +597ms",
+    "10-06 22:22:19.131 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: arrival-start +605ms",
+    "10-06 22:22:19.656 27095 27095 I A00000/com.fridgewidget.app/FridgeStartup: arrival-end +1130ms"
+  ]
+}

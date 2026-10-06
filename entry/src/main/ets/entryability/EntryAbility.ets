@@ -1,3 +1,4 @@
+import { deferStartupReveal, revealStartup, cancelStartupReveal } from '../model/StartupPresentation';
 import { startStartupTrace, startupMark } from '../model/StartupTrace';
 import { UIAbility, AbilityConstant, Want, Configuration, ConfigurationConstant } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -83,8 +84,10 @@ export default class EntryAbility extends UIAbility {
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
     const mainWindow = windowStage.getMainWindowSync(); this.mainWindow = mainWindow;
+    deferStartupReveal(() => windowStage.removeStartingWindow());
     windowStage.loadContent(this.launchPage, (err) => {
       if (err.code) {
+        revealStartup();
         hilog.error(0x0000, TAG, 'loadContent failed %{public}s', JSON.stringify(err));
         return;
       }
@@ -104,11 +107,12 @@ export default class EntryAbility extends UIAbility {
         mainWindow.on('avoidAreaChange', () => updateInsets());
       } catch (e) { hilog.error(0x0000, TAG, 'immersive %{public}s', (e as Error).message); }
       startupMark('content-loaded');
+      if (this.launchPage !== 'pages/Index') revealStartup();
       hilog.info(0x0000, TAG, 'loadContent ok');
     });
   }
 
-  onWindowStageDestroy(): void { this.windowReady = false; this.mainWindow = null; }
+  onWindowStageDestroy(): void { cancelStartupReveal(); this.windowReady = false; this.mainWindow = null; }
 
   onForeground(): void { AppStorage.setOrCreate('appBackgrounded', false); this.updateAppearance(this.context.config.colorMode); }
 

@@ -1,3 +1,4 @@
+import { subjectDepthImage } from '../model/SubjectDepthCache';
 import { EditorLayerMotion } from '../model/EditorLayerMotion';
 import { contourPath } from '../model/ContourPath';
 import { cardOutline } from '../model/RenderContours';
@@ -65,12 +66,17 @@ export struct CardFace {
     Stack() {
       // Soft cast shadow + tight contact shadow + a solid, slightly warm sidewall.
       // The cached face owns these layers; pan/rotation only transform its texture.
+      if(!this.widget && !this.lifted && subjectDepthImage(this.card,this.scaleFactor).length>0) {
+        Image(subjectDepthImage(this.card,this.scaleFactor)).width(this.card.w*this.scaleFactor+48).height(this.card.h*this.scaleFactor+48)
+          .position({x:-24,y:-24}).objectFit(ImageFit.Fill).draggable(false).hitTestBehavior(HitTestMode.None)
+      } else {
       Stack() {
       this.backing(this.edge(),2*this.depthScale(),(this.lifted?9:5.5)*this.depthScale(),this.lifted?'#38000000':'#30000000',(this.lifted?7:4)*this.depthScale())
       this.backing(this.edge(),2*this.depthScale(),1.4*this.depthScale(),'#48000000',1.2*this.depthScale())
       this.backing(this.edge(),2*this.depthScale(),0,'#00000000',0)
       this.backing(this.card.shape==='subject'&&this.card.subjectPhoto?'#FFFFFF':this.paper(),0,0,'#00000000',0)
       }.width('100%').height('100%')
+      }
       CardCanvas({ layerMotion:this.layerMotion, card: this.card, scaleFactor: this.scaleFactor, tick: this.tick, widget: this.widget, hideContent: this.hideContent,
         movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
         .width((subjectSurfaceFactor(this.card) * 100) + '%').height((subjectSurfaceFactor(this.card) * 100) + '%')

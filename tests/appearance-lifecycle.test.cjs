@@ -17,6 +17,7 @@ const moduleMock = {exports:{}};
 const source = fs.readFileSync('entry/src/main/ets/entryability/EntryAbility.ets','utf8');
 const code = ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
 const kits = {
+ '../model/StartupPresentation':{deferStartupReveal(){},revealStartup(){},cancelStartupReveal(){}},
  '../model/StartupTrace':{startStartupTrace(){},startupMark(){}},
  '../model/IncomingTemplate':{incomingTemplateUri:u=>u?.startsWith('file://')?u:'',stageIncomingTemplate:async()=>'',removeStagedTemplate:(u)=>{if(u)removed.push(u);}},
  '@kit.ArkTS':{taskpool:{Task:class{constructor(fn,...args){this.fn=fn;this.args=args;}},execute:task=>new Promise(resolve=>jobs.push({task,resolve}))}},
