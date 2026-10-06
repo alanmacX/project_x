@@ -258,7 +258,7 @@ export struct BoardCard {
           CardFace({ layerMotion:this.layerMotion, card: this.faceCard(), scaleFactor: this.scaleFactor, tick: this.tick, lifted: this.moving || this.motion.ids.includes(this.card.id), hideContent: this.hideContent, movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
             .width(this.w()).height(this.h()).position({ x: 24, y: 24 }).hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS)
         }.width(this.w() + 48).height(this.h() + 48).position({ x: -24, y: -24 })
-          .renderGroup(this.moving || this.motion.ids.includes(this.card.id) || (this.movingLayerId.length === 0 && this.card.elements.every(el => !el.animated))).hitTestBehavior(HitTestMode.None)
+          .id('deleteFace_'+this.card.id).renderGroup(this.moving || this.motion.ids.includes(this.card.id) || (this.movingLayerId.length === 0 && this.card.elements.every(el => !el.animated))).hitTestBehavior(HitTestMode.None)
       }.scale({ x: this.motion.ids.includes(this.card.id) ? 1 : this.liftScale, y: this.motion.ids.includes(this.card.id) ? 1 : this.liftScale })
         .rotate({ angle: this.motion.ids.includes(this.card.id) ? 0 : this.tilt })
         .width(this.w()).height(this.h()).position({ x: 24, y: 24 })

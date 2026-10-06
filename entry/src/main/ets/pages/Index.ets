@@ -1,3 +1,4 @@
+import { CardDeletionFlight } from '../views/CardDeletionFlight';
 import lazy { enhanceImageJob, supportsSuperResolution } from '../model/SuperResolution';
 import { EnhancementPreview } from '../views/EnhancementPreview';
 import { prepareSubjectDepth } from '../model/SubjectDepthCache';
@@ -97,6 +98,11 @@ struct Index {
   private batteryObserver:BatteryObserver=new BatteryObserver();
   private refreshingCapabilities:boolean=false;
   private widgetRouteTimer:number=-1;
+  @State deletionId:string='';
+  @State deletionBitmap:image.PixelMap|undefined=undefined;
+  private deletionX:number=0;private deletionY:number=0;
+  private deletionW:number=0;private deletionH:number=0;private deletionAngle:number=0;
+  private deletionTimer:number=-1;
   private enhancementDialog: CustomDialogController | null = null;
   private enhancementOpen: boolean = false;
   private readingComparisonOpen: boolean = false;
@@ -245,7 +251,7 @@ struct Index {
   private backgroundGeneration: number = 0;
   private backgroundTimer: number = -1;
   @StorageLink('appBackgrounded') @Watch('appWentBackground') appBackgrounded: boolean = false;
-  private appWentBackground(): void { if(!this.appBackgrounded && this.ready) {this.scheduleForegroundRefresh();this.incomingTemplateChanged();} if (this.appBackgrounded && this.ready) { if(this.scheduleTransition){this.scheduleVisualGeneration++;this.scheduleTransition=false;this.schedulePhase=0;this.timedScene=null;this.scheduledName='';this.scheduledFocusId='';this.renderBoard();} if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); } }
+  private appWentBackground(): void { if(this.appBackgrounded)this.finishCardDeletion(); if(!this.appBackgrounded && this.ready) {this.scheduleForegroundRefresh();this.incomingTemplateChanged();} if (this.appBackgrounded && this.ready) { if(this.scheduleTransition){this.scheduleVisualGeneration++;this.scheduleTransition=false;this.schedulePhase=0;this.timedScene=null;this.scheduledName='';this.scheduledFocusId='';this.renderBoard();} if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); } }
 
   @State repairingSubjects: boolean = false;
   @State tick: number = Date.now();
@@ -556,8 +562,9 @@ struct Index {
       }
     } finally { this.repairingSubjects = false; }
   }
-  aboutToDisappear(): void { this.enhancementDialog?.close();this.enhancementOpen=false; this.backgroundPreviewGeneration++;if(this.backgroundPreviewTimer>=0)clearTimeout(this.backgroundPreviewTimer); if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
+  aboutToDisappear(): void { this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; this.backgroundPreviewGeneration++;if(this.backgroundPreviewTimer>=0)clearTimeout(this.backgroundPreviewTimer); if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
+    if(this.deletionId)return true;
     if(this.homeToolsOpen){this.homeToolsOpen=false;return true;}
     if(this.capabilityPickerOpen){this.capabilityPickerOpen=false;return true;}
     if (this.heroActive) return true;
@@ -896,9 +903,44 @@ struct Index {
     this.getUIContext().showAlertDialog({ title: '删除卡片？', message: '卡片中的内容也会删除。',
       primaryButton: { value: '取消', action: () => {} },
       secondaryButton: { value: '删除', fontColor: '#C43A35', action: () => {
-        this.store.removeCard(id); cleanGroups(this.store.state.cards); this.selectedId = ''; this.editing = false; this.change();
+        this.beginCardDeletion(id);
       } }
     });
+  }
+  private async beginCardDeletion(id:string):Promise<void> {
+    if(this.deletionId||!this.store.findCard(id))return;
+    const canvas=this.store.state.canvasId,card=this.sceneCard(id);
+    this.deletionId=id;
+    this.deletionX=this.sceneX(id)-24;this.deletionY=this.sceneY(id)-24;
+    const scale=this.sceneScale(id);
+    this.deletionW=(card.w*this.boardScale+48)*scale;this.deletionH=(card.h*this.boardScale+48)*scale;
+    this.deletionAngle=this.editing?this.surfaceAngle():card.rot;
+    // A failed or slow capture must never block a confirmed deletion.
+    this.deletionTimer=setTimeout(()=>this.finishCardDeletion(),1000);
+    try {
+      const pixelScale=this.getUIContext().vp2px(1);
+      const captureScale=Math.min(1,640/(Math.max(this.deletionW,this.deletionH)*pixelScale));
+      const bitmap=await this.getUIContext().getComponentSnapshot().get('deleteFace_'+id,{scale:captureScale,waitUntilRenderFinished:false});
+      if(!this.alive||this.deletionId!==id||this.store.state.canvasId!==canvas){bitmap.release();return;}
+      clearTimeout(this.deletionTimer);
+      this.deletionBitmap=bitmap;
+      this.deletionTimer=setTimeout(()=>this.finishCardDeletion(),1000);
+    }catch(_){this.finishCardDeletion();}
+  }
+  private finishCardDeletion():void {
+    if(this.deletionTimer>=0)clearTimeout(this.deletionTimer);this.deletionTimer=-1;
+    const id=this.deletionId;if(!id)return;
+    this.deletionId='';const bitmap=this.deletionBitmap;this.deletionBitmap=undefined;
+    const wasEditing=this.editing;
+    this.store.removeCard(id);cleanGroups(this.store.state.cards);this.selectedId='';
+    if(this.groupSelection.includes(id))this.groupSelection=this.groupSelection.filter(value=>value!==id);
+    this.editing=false;this.editorMounted=false;this.editorReady=false;this.heroActive=false;this.boardOpacity=1;this.scatter=0;
+    // Deletion has no editor values to validate or clone. Publish only the board.
+    this.renderBoard();if(wasEditing)this.layoutBoard();
+    if(this.saveTimer>=0)clearTimeout(this.saveTimer);
+    this.scheduleBackground();this.saveTimer=setTimeout(()=>this.persist(true),120);
+    // Let the Image detach before releasing its native storage.
+    if(bitmap)setTimeout(()=>bitmap.release(),80);
   }
   private boardInteraction(id: string, active: boolean): void {
     if (active) { this.selectedId=id; const card = this.store.findCard(id); this.movingGroupIds = card === null ? [] : groupMembers(this.store.state.cards, card).filter((c: FridgeCard) => c.id !== id).map((c: FridgeCard) => c.id); this.boardMotion.ids = this.movingGroupIds.length > 0 ? [id, ...this.movingGroupIds] : []; }
@@ -1071,6 +1113,10 @@ struct Index {
             .position({x:0,y:this.safeTop + EDITOR_SAFE_GAP}).opacity(this.editorOpacity).hitTestBehavior(HitTestMode.None)
         }
         if (this.viewing) { this.detail() }
+        if(this.deletionId){
+          Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.Block).zIndex(200000)
+          if(this.deletionBitmap!==undefined){CardDeletionFlight({bitmap:this.deletionBitmap,faceWidth:this.deletionW,faceHeight:this.deletionH,originX:this.deletionX,originY:this.deletionY,angle:this.deletionAngle,viewportWidth:this.screenWidth,viewportHeight:this.screenHeight,onDone:()=>this.finishCardDeletion()}).zIndex(200001)}
+        }
       }
     }.width('100%').height('100%').backgroundColor(this.appBackground())
       .bindSheet(this.backgroundOpen||this.scheduleOpen,this.homeTaskSheet,{height:SheetSize.LARGE,showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>{this.backgroundOpen=false;this.backgroundPreviewReady=false;this.backgroundPreviewGeneration++;this.scheduleOpen=false;this.updateScheduledScene(true);}})
@@ -1119,7 +1165,7 @@ struct Index {
             .height(this.creationClip(id) ? this.transitionClipH : this.screenHeight)
             .position({ x: this.creationClipX(id), y: this.creationClipY(id) })
             .borderRadius(this.creationClip(id) ? this.transitionClipRadius : 0).clip(this.creationClip(id))
-            .opacity(this.editing && id === this.selectedId ? 1 : this.boardOpacity)
+            .opacity(this.deletionBitmap!==undefined&&this.deletionId===id?0:this.editing && id === this.selectedId ? 1 : this.boardOpacity)
             .zIndex(this.activeBoardId === id || this.boardMotion.ids.includes(id) ? 100000 + this.cardMap[id].z / (1 + this.cardMap[id].z) : this.cardMap[id].z)
             .hitTestBehavior(this.editing || this.arriving || this.homeToolsMoving || this.scheduledName.length>0 || this.scheduleTransition ? HitTestMode.None : HitTestMode.Transparent)
         }, (id: string) => id)
