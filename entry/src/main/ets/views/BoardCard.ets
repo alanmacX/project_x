@@ -83,6 +83,7 @@ export struct BoardCard {
   @State tilt: number = 0;
   @State liftScale: number = 1;
   @State controlsOpacity: number = 0;
+  @State controlsMounted: boolean = false;
   @State controlsScale: number = .8;
   @State resizeControlScale: number = .8;
   private handlesTimer: number = -1;
@@ -95,8 +96,10 @@ export struct BoardCard {
     this.handlesTimer = setTimeout(() => {
       this.handlesTimer = -1; if (!this.alive) return;
       const opacity = this.shown() ? 1 : 0, scale = this.shown() ? 1 : .8, resizeScale = this.resizing ? 1.12 : scale;
+      if(opacity>0)this.controlsMounted=true;
       if (this.controlsOpacity === opacity && this.controlsScale === scale && this.resizeControlScale === resizeScale) return;
-      this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut, expectedFrameRateRange: this.frameRate }, () => {
+      this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut, expectedFrameRateRange: this.frameRate,
+        onFinish:()=>{if(this.alive&&!this.shown()&&this.controlsOpacity===0)this.controlsMounted=false;} }, () => {
         this.controlsOpacity = opacity; this.controlsScale = scale; this.resizeControlScale = resizeScale;
       });
     }, 0);
@@ -271,6 +274,9 @@ export struct BoardCard {
           PanGesture({ distance: 4 }).onActionStart((e: GestureEvent) => { this.beginFinger(e); this.startMove(); this.move(e); }).onActionUpdate((e: GestureEvent) => this.move(e))
             .onActionEnd((e: GestureEvent) => { this.move(e); this.finishMove(); }).onActionCancel(() => this.cancelMove()),
           TapGesture().onAction(() => { if (!this.moving) this.onSelect(this.card.id); })))
+      // Mount material controls and contour-aware handles only on selection.
+      // Keep them alive through their dismissal animation.
+      if(this.shown() || this.controlsMounted) {
       Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.ERROR }) {SymbolGlyph($r('sys.symbol.xmark')).fontSize(20).fontColor(['#D3423C']).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(24).fontColor('#D3423C').backgroundColor(Color.White)
         .attributeModifier(immersiveChrome())
         .opacity(this.controlsOpacity).scale({ x: this.controlsScale, y: this.controlsScale })
@@ -302,6 +308,7 @@ export struct BoardCard {
         .opacity(this.controlsOpacity).scale({ x: this.controlsScale, y: this.controlsScale })
         .position(this.controlPosition(true, true)).hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('编辑卡片内容').onClick(() => this.onEdit(this.card.id))
+      }
     }.width(this.w() + 48).height(this.h() + 48).opacity(this.heroHidden ? 0 : 1).hitTestBehavior(this.heroHidden ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Transparent)
       .rotate({ angle: this.editingSurface ? this.displayAngle : (this.rotating ? this.liveAngle : this.card.rot) + this.scatterAngle, centerX: 24, centerY: this.h() + 24 })
       .translate({ x: this.scatterX + (this.motion.ids.includes(this.card.id) ? this.motion.offset.x : this.dx) + this.rotationShift().x, y: this.scatterY + (this.motion.ids.includes(this.card.id) ? this.motion.offset.y : this.dy) + this.rotationShift().y })

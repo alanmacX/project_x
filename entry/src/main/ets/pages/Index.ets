@@ -75,9 +75,12 @@ const SHAPES: string[] = ['rect', 'round', 'pill', 'blob'];
 /** Start a transition after the inspector's first measure, not on a guessed timer. */
 class PreparedTransition extends FrameCallback {
   private start: () => void;
-  constructor(start: () => void) { super(); this.start = start; }
-  onFrame(_time: number): void {}
-  onIdle(_budget: number): void { this.start(); }
+  private idle: boolean;
+  constructor(start: () => void, idle: boolean = false) { super(); this.start = start; this.idle = idle; }
+  // Idle callbacks can be indefinitely deferred on a busy/high-refresh display.
+  // Queue transitions after the frame's synchronous measure/layout instead.
+  onFrame(_time: number): void { if(!this.idle)setTimeout(()=>this.start(),0); }
+  onIdle(_budget: number): void { if(this.idle)this.start(); }
 }
 
 @Entry
@@ -228,16 +231,17 @@ struct Index {
   private backgroundGeneration: number = 0;
   private backgroundTimer: number = -1;
   @StorageLink('appBackgrounded') @Watch('appWentBackground') appBackgrounded: boolean = false;
-  private appWentBackground(): void { if(!this.appBackgrounded && this.ready) {this.tick=Date.now();this.foregroundSchedules();this.incomingTemplateChanged();} if (this.appBackgrounded && this.ready) { if(this.scheduleTransition){this.scheduleVisualGeneration++;this.scheduleTransition=false;this.schedulePhase=0;this.timedScene=null;this.scheduledName='';this.scheduledFocusId='';this.renderBoard();} if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); } }
+  private appWentBackground(): void { if(!this.appBackgrounded && this.ready) {this.scheduleForegroundRefresh();this.incomingTemplateChanged();} if (this.appBackgrounded && this.ready) { if(this.scheduleTransition){this.scheduleVisualGeneration++;this.scheduleTransition=false;this.schedulePhase=0;this.timedScene=null;this.scheduledName='';this.scheduledFocusId='';this.renderBoard();} if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); } }
 
   @State repairingSubjects: boolean = false;
   @State tick: number = Date.now();
+  private foregroundRefreshTimer: number = -1;
 
   aboutToAppear(): void {
     this.alive = true;
     this.context = this.getUIContext().getHostContext() ?? null;
     this.initialize();
-    this.clockTimer = setInterval(() => { if(this.gestureGroup.length>0)return;this.tick = Date.now();  this.refreshCapabilities();this.updateScheduledScene(true); }, 60000);
+    this.clockTimer = setInterval(() => { if(this.gestureGroup || this.activeBoardId || this.heroActive || this.arriving)return;this.tick = Math.floor(Date.now()/60000)*60000;this.refreshCapabilities();this.updateScheduledScene(true); }, 60000);
     this.batteryObserver.start(()=>this.refreshCapabilities());
   }
   private initialize(): void {
@@ -259,12 +263,23 @@ struct Index {
       clampCanvasGroups(this.store.state.cards,BOARD_W/this.canvasAspect);
       const routedLaunch = this.routedId.length > 0 || this.viewRouteId.length > 0;
       this.canvasBackground = this.store.state.background; this.layoutBoard(); this.ready = true; this.render(); startupMark('scene-ready');
-      this.getUIContext().postFrameCallback(new PreparedTransition(()=>startupMark('scene-idle')));
+      this.getUIContext().postFrameCallback(new PreparedTransition(()=>startupMark('scene-idle'),true));
       this.scheduleBackground(); this.routeChanged(); this.viewRouteChanged(); this.incomingTemplateChanged();
       if (!routedLaunch) this.startArrival();
-      this.maintenanceTimer = setTimeout(() => { if (this.alive) { this.syncSchedules();this.updateScheduledScene(true);this.warmEditor(); this.persist(); this.repairStoredSubjects();  this.refreshCapabilities(); } }, 750);
+      this.scheduleMaintenance();
 
     }).catch((e: Error) => { this.error = e.message; });
+  }
+  private scheduleMaintenance(): void {
+    this.maintenanceTimer = setTimeout(() => {
+      this.maintenanceTimer = -1;
+      if (!this.alive) return;
+      if (this.arriving || this.heroActive || this.activeBoardId || this.gestureGroup || this.editing || this.busy) {
+        this.scheduleMaintenance(); return;
+      }
+      this.syncSchedules(); this.updateScheduledScene(true); this.persist();
+      this.repairStoredSubjects(); this.refreshCapabilities();
+    }, 1200);
   }
   private refreshCanvasList(): void {
     this.canvasEntries = this.store.catalog.canvases.map((c: CanvasEntry): CanvasEntry => ({id:c.id,name:c.name}));
@@ -275,7 +290,20 @@ struct Index {
     try{await this.store.reloadSceneAcknowledgements();}catch(_){}
     if(!this.alive)return;this.syncSchedules();this.refreshCapabilities();this.updateScheduledScene(true);
   }
-  private syncSchedules():void {this.scheduleRules=this.store.state.sceneRules.slice();this.savedLayouts=this.store.state.sceneLayouts.slice();}
+  private scheduleForegroundRefresh():void {
+    if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer);
+    this.foregroundRefreshTimer=setTimeout(()=>{
+      this.foregroundRefreshTimer=-1;if(!this.alive||this.appBackgrounded)return;
+      if(this.arriving||this.heroActive||this.activeBoardId||this.gestureGroup){this.scheduleForegroundRefresh();return;}
+      // Resume/PageShow arrive together. Reconcile once after the system's
+      // window entrance, instead of invalidating the entire scene twice in it.
+      this.tick=Math.floor(Date.now()/60000)*60000;this.foregroundSchedules();
+    },350);
+  }
+  private syncSchedules():void {
+    if(this.scheduleRules.length>0||this.store.state.sceneRules.length>0)this.scheduleRules=this.store.state.sceneRules.slice();
+    if(this.savedLayouts.length>0||this.store.state.sceneLayouts.length>0)this.savedLayouts=this.store.state.sceneLayouts.slice();
+  }
   private armScheduleTimer():void {
     if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer);if(!this.alive||!this.ready||!this.store.state.sceneRules.some(r=>r.enabled))return;
     const wait=Math.min(60000,Math.max(100,nextSceneBoundary(this.store.state,Date.now())-Date.now()));
@@ -450,16 +478,33 @@ struct Index {
       .scrollBar(BarState.Off).clip(true)
   }
   private arrivalOffsets: Record<string, ShapePoint> = {};
+  @State private startupCardCount: number = -1;
   private startArrival(): void {
     if (this.editing || this.viewing || this.cardIds.length === 0) return;
     this.arrivalOffsets = {};
     this.cards.forEach((card: FridgeCard) => { this.arrivalOffsets[card.id] = arrivalOffset(card, BOARD_W * this.boardScale, this.boardHeight); });
-    this.arriving = true; this.arrival = 1; this.boardOpacity = 0;
-    this.transitionTimer = setTimeout(() => {
-      if (!this.alive) return;
-      this.getUIContext().animateTo({ duration: 520, curve: Curve.Friction, expectedFrameRateRange: this.frameRate,
-        onFinish: () => { if (this.alive) this.arriving = false; } }, () => { this.arrival = 0; this.boardOpacity = 1; });
-    }, 32);
+    // A zero-alpha/offscreen face is culled by the renderer: its texture would
+    // otherwise be uploaded for the first time halfway through the entrance.
+    this.arriving = true; this.arrival = 0; this.boardOpacity = .01;
+    // Do not construct every photo, contour and capability in one launch frame.
+    // Build one stable card per frame before exposing the arrival animation.
+    this.startupCardCount=0; this.prepareStartupCard();
+  }
+  private prepareStartupCard():void {
+    this.getUIContext().postFrameCallback(new PreparedTransition(()=>{
+      if(!this.alive || !this.arriving)return;
+      if(this.startupCardCount<this.cardIds.length) {
+        this.startupCardCount++;this.prepareStartupCard();return;
+      }
+      this.startupCardCount=-1;
+      startupMark('surfaces-ready');this.arrival=1;this.boardOpacity=0;
+      this.getUIContext().postFrameCallback(new PreparedTransition(()=>{
+        if(!this.alive||!this.arriving)return;
+        startupMark('arrival-start');
+        this.getUIContext().animateTo({duration:520,curve:Curve.Friction,expectedFrameRateRange:this.frameRate,
+          onFinish:()=>{if(this.alive){this.arriving=false;startupMark('arrival-end');}}},()=>{this.arrival=0;this.boardOpacity=1;});
+      }));
+    }));
   }
   private arrivalX(id: string): number { return this.arrival * (this.arrivalOffsets[id]?.x ?? 0); }
   private arrivalY(id: string): number { return this.arrival * (this.arrivalOffsets[id]?.y ?? 0); }
@@ -486,7 +531,7 @@ struct Index {
       }
     } finally { this.repairingSubjects = false; }
   }
-  aboutToDisappear(): void { this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
+  aboutToDisappear(): void { if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
     if(this.homeToolsOpen){this.homeToolsOpen=false;return true;}
     if(this.capabilityPickerOpen){this.capabilityPickerOpen=false;return true;}
@@ -525,19 +570,6 @@ struct Index {
     return (horizontal ? dx : dy) / length * Math.max(BOARD_W * this.boardScale, this.boardHeight) * 1.2 * this.scatter;
   }
 
-  private warmEditor(): void {
-    if (!this.editing && !this.viewing && !this.selectedId) {
-      const card = this.cards.slice().sort((a:FridgeCard,b:FridgeCard)=>b.z-a.z).find((item:FridgeCard)=>item.elements.some((el:CanvasElement)=>el.behindCapability));
-      if(card !== undefined) {
-        const element = card.elements.find((el:CanvasElement)=>el.behindCapability)!;
-        this.preview = card; this.layerId = element.id;
-        this.boxPreview = JSON.parse(JSON.stringify(element)) as ElementBox;
-        this.elementPreview = JSON.parse(JSON.stringify(element)) as CanvasElement;
-        this.textValue = element.text; this.elementColor = element.color;
-      }
-    }
-    this.editorMounted = true;
-  }
   private editorLandscape(): boolean { return workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).wide; }
   private editorViewportWidth(): number { return workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).previewW; }
   private previewPaneHeight(): number { return workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).previewH; }
@@ -579,12 +611,16 @@ struct Index {
     this.retiredChrome = this.chromeSnapshot; this.chromeSnapshot = undefined;
   }
   private async prepareEditorMotion(start: () => void): Promise<void> {
+    let completed=false;
+    const finish=():void=>{if(completed)return;completed=true;clearTimeout(deadline);if(this.alive&&this.heroActive)start();};
+    // A snapshot is an optimization, never a prerequisite for opening controls.
+    const deadline=setTimeout(finish,300);
     const signature = [this.selectedId, this.layerId, this.settingsTab, this.revision, this.screenWidth, this.screenHeight,
       this.appDark, this.showBackgroundOptions, this.showLayerOptions, this.undoAvailable, this.redoAvailable,
       this.scroller.currentOffset().yOffset].join(':');
     if (this.retiredChrome !== undefined && this.chromeSignature === signature) {
       this.chromeSnapshot = this.retiredChrome; this.retiredChrome = undefined;
-      this.getUIContext().postFrameCallback(new PreparedTransition(() => { if(this.alive && this.heroActive) start(); })); return;
+      this.getUIContext().postFrameCallback(new PreparedTransition(finish)); return;
     }
     if (this.retiredChrome !== undefined) { this.retiredChrome.release(); this.retiredChrome = undefined; }
     // Material samples moving pixels behind it and cannot be renderGroup-cached.
@@ -592,12 +628,12 @@ struct Index {
     // tools hidden only during the transition. Restore native material afterward.
     this.getUIContext().postFrameCallback(new PreparedTransition(async () => {
       try {
-        const snapshot = await this.getUIContext().getComponentSnapshot().get('editorMotionChrome', {scale: 1, waitUntilRenderFinished: true});
-        if (!this.alive || !this.heroActive) { snapshot.release(); return; }
+        const snapshot = await this.getUIContext().getComponentSnapshot().get('editorMotionChrome', {scale: .75, waitUntilRenderFinished: false});
+        if (completed || !this.alive || !this.heroActive) { snapshot.release(); return; }
         this.chromeSignature = signature; this.chromeSnapshot = snapshot;
       } catch (_) { /* Native tools remain a usable fallback if capture is unavailable. */ }
       if (!this.alive || !this.editing || !this.heroActive) return;
-      this.getUIContext().postFrameCallback(new PreparedTransition(() => { if (this.alive && this.heroActive) start(); }));
+      this.getUIContext().postFrameCallback(new PreparedTransition(finish));
     }));
   }
   private setTransitionClip(board: boolean): void {
@@ -915,7 +951,7 @@ struct Index {
     const card=this.current();if(!card?.capability)return;AppStorage.setOrCreate('readingDemoCard',cardViewSnapshot(card));
     this.getUIContext().getRouter().pushUrl({url:'pages/ReadingDemo'}).catch(()=>{AppStorage.delete('readingDemoCard');if(this.alive)this.getUIContext().getPromptAction().showToast({message:'暂时无法打开对比，请重试'});});
   }
-  onPageShow(): void { this.tick=Date.now();if (this.ready) {this.refreshCapabilities();this.updateScheduledScene(true);} }
+  onPageShow(): void { if(this.ready)this.scheduleForegroundRefresh(); }
   private updateExtraCapability(id:string,next:CapBlock):void {
     const card=this.store.findCard(id);if(!card||card.capability?.k!==next.k)return;
     card.capability=next;this.syncFields();this.change();
@@ -1006,7 +1042,7 @@ struct Index {
     // Cache each unrotated face; transforms remain outside its padded texture.
     Stack({ alignContent: Alignment.TopStart }) {
       Stack({ alignContent: Alignment.TopStart }) {
-        ForEach(this.cardIds, (id: string) => {
+        ForEach(this.startupCardCount>=0?this.cardIds.slice(0,this.startupCardCount):this.cardIds, (id: string) => {
           Stack({ alignContent: Alignment.TopStart }) {
             Stack({ alignContent: Alignment.TopStart }) {
             BoardCard({ layerMotion:this.layerMotion, controlViewportWidth: BOARD_W * this.boardScale, controlViewportHeight: this.boardHeight, motion: this.boardMotion, card: this.sceneCard(id), localCoordinates: true, scatterAngle: 0, editingSurface: this.editing,
@@ -1131,8 +1167,12 @@ struct Index {
                 Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {
                   Row({space:12}) {
                     Stack() {
-                      CardFace({card:this.cardMap[id],scaleFactor:Math.min(44/this.cardMap[id].w,44/this.cardMap[id].h),tick:this.tick})
+                      if(this.cardMap[id].shape==='subject'&&this.cardMap[id].subjectPhoto&&this.cardMap[id].cutout) {
+                        Image(this.cardMap[id].cutout).width(44).height(44).objectFit(ImageFit.Contain).draggable(false)
+                      } else {
+                      CardCanvas({card:this.cardMap[id],scaleFactor:Math.min(44/this.cardMap[id].w,44/this.cardMap[id].h),tick:this.tick})
                         .width(this.cardMap[id].w*Math.min(44/this.cardMap[id].w,44/this.cardMap[id].h)).height(this.cardMap[id].h*Math.min(44/this.cardMap[id].w,44/this.cardMap[id].h))
+                      }
                     }.width(44).height(44).hitTestBehavior(HitTestMode.None)
                     Column({space:4}) {
                       Text(layerLabel(this.cardMap[id])).fontSize(14).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontColor(this.appText()).width('100%')
@@ -1174,16 +1214,18 @@ struct Index {
           }.width('100%')
         }
         Stack({ alignContent: Alignment.Bottom }) {
-        Scroll() {
-          Column({ space: 8 }) {
-            ForEach(layerSections(this.orderedCards()), (section: LayerSection) => {
-              Column({space:4}) {
-                if(section.title.length>0) { Text(section.title).fontSize(12).fontWeight(FontWeight.Medium).fontColor(this.appMuted()).width('100%').padding({left:8,top:8,bottom:4}) }
-                ForEach(section.ids,(id:string)=>{ this.homeLayerRow(id) },(id:string)=>id)
-              }.width('100%')
-            }, (section:LayerSection)=>section.id+':'+section.title+':'+section.ids.join(','))
-          }.width('100%').padding({ bottom: this.homeActionHeight() + 8 })
-        }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
+        List({space:8}) {
+          ForEach(layerSections(this.orderedCards()), (section: LayerSection) => {
+            ForEach(section.ids,(id:string,index:number)=>{
+              ListItem() {
+                Column({space:4}) {
+                  if(index===0&&section.title.length>0) { Text(section.title).fontSize(12).fontWeight(FontWeight.Medium).fontColor(this.appMuted()).width('100%').padding({left:8,top:8,bottom:4}) }
+                  this.homeLayerRow(id)
+                }.width('100%')
+              }
+            },(id:string)=>id)
+          }, (section:LayerSection)=>section.id+':'+section.title+':'+section.ids.join(','))
+        }.width('100%').height('100%').contentEndOffset(this.homeActionHeight()+8).cachedCount(1).scrollBar(BarState.Off)
         if (this.homeActionHeight() > 0) {
         Column({ space: 12 }) {
         if (this.groupSelecting) {
@@ -1223,6 +1265,7 @@ struct Index {
   }
   private async refreshBackground(force: boolean = false): Promise<void> {
     if (this.timedScene||this.scheduleTransition||this.context === null || !['smart','blend'].includes(this.canvasBackground.mode)) return;
+    if(this.activeBoardId||this.gestureGroup||this.heroActive||this.arriving){this.scheduleBackground();return;}
     this.store.state.background = this.canvasBackground; this.store.state.canvasAspect = this.canvasAspect;
     const signature = backgroundSignature(this.store.state);
     if (!force && signature === this.canvasBackground.signature) return;
@@ -1733,7 +1776,7 @@ struct Index {
     const box = this.currentBox(); if (box === null) return;
     this.resizeStart = JSON.parse(JSON.stringify(box)) as ElementBox;
     this.rotateStart = box.rot;
-    if(id!=='capability'){this.layerDrag=id;this.layerMotion.update(id,box);}
+    this.layerDrag=id;this.layerMotion.update(id,box);
     const geometry = this.selectionGeometry();
     this.rotationVector = { x: geometry.rotate.x - geometry.pivot.x, y: geometry.rotate.y - geometry.pivot.y };
   }
@@ -1765,7 +1808,7 @@ struct Index {
     const dw = (this.resizeStart.w - box.w) * w, dh = (this.resizeStart.h - box.h) * h;
     box.x = Math.max(0, Math.min(1 - box.w, this.resizeStart.x + (dw * (1 - c) + dh * sn) / (2 * w)));
     box.y = Math.max(0, Math.min(1 - box.h, this.resizeStart.y + (dh * (1 - c) - dw * sn) / (2 * h)));
-    if(this.layerId==='capability')this.continuousChange(SliderChangeMode.Moving);else this.layerMotion.update(this.layerId,box);
+    this.layerMotion.update(this.layerId,box);
   }
   private rotateElement(e: GestureEvent): void {
     const live = this.currentBox(); if (live === null) return;
@@ -1790,7 +1833,7 @@ struct Index {
     if (this.layerId !== 'capability' && Math.abs(live.x - centerX) * width < 5) live.x = centerX;
     if (this.layerId !== 'capability' && Math.abs(live.y - centerY) * height < 5) live.y = centerY;
     if(this.layerId==='capability'){const fitted=constrainCapabilityDrag(this.preview,live,previous);live.x=fitted.x;live.y=fitted.y;}
-    if(this.layerId==='capability'){this.layerMotion.update(this.layerId,live);this.layerDX = (live.x - this.layerStartX) * width; this.layerDY = (live.y - this.layerStartY) * height;}else this.layerMotion.update(this.layerId,live);
+    this.layerMotion.update(this.layerId,live);
   }
   private cancelTransform(): void {
     const box = this.currentBox(); if (box !== null) { box.x = this.resizeStart.x; box.y = this.resizeStart.y; box.w = this.resizeStart.w; box.h = this.resizeStart.h; box.rot = this.resizeStart.rot; }
@@ -1807,7 +1850,7 @@ struct Index {
       onSelect:()=>{this.layerId=id;this.syncFields();},onStart:(e)=>{
         this.layerId=id;this.beginFinger(e,this.editingAngle()+(this.currentBox()?.rot??0));this.layerDrag=id;const card=this.current();
         if(id==='capability'&&card!==null)card.capBox=JSON.parse(JSON.stringify(capabilityPlacement(card))) as ElementBox;
-        const live=this.currentBox();this.layerStartX=live?.x??0;this.layerStartY=live?.y??0;if(live&&id!=='capability')this.layerMotion.update(id,live);this.syncFields();
+        const live=this.currentBox();this.layerStartX=live?.x??0;this.layerStartY=live?.y??0;if(live)this.layerMotion.update(id,live);this.syncFields();
       },onUpdate:(e)=>this.moveElement(e),onEnd:(e)=>{this.moveElement(e);this.finishLayerDrag();},onCancel:()=>this.finishLayerDrag(true)})
   }
 

@@ -1,0 +1,118 @@
+{
+  "pid": "18861",
+  "UI_frames": [
+    {
+      "start": 543790.446208,
+      "ms": 48.83
+    },
+    {
+      "start": 543790.509215,
+      "ms": 28.58
+    },
+    {
+      "start": 543790.537938,
+      "ms": 9.31
+    },
+    {
+      "start": 543790.547399,
+      "ms": 5.68
+    },
+    {
+      "start": 543790.553245,
+      "ms": 0.08
+    }
+  ],
+  "slow_tasks": [
+    {
+      "start": 543790.788149,
+      "ms": 228.61,
+      "task": "H:Cancelable Event callback:handleId:2|I39"
+    },
+    {
+      "start": 543790.788147,
+      "ms": 228.61,
+      "task": "H:ThreadSafeCallback excute|I39"
+    },
+    {
+      "start": 543790.510411,
+      "ms": 49.2,
+      "task": "H:Native async work execute callback, name:PreferencesGetValue#393451080064, traceid:0xa254f524|I39"
+    },
+    {
+      "start": 543790.44613,
+      "ms": 49.18,
+      "task": "H:ReceiveVsync name:WM_18861 dataCount: 24bytes now:222393803897576 expectedEnd: 222393812241584 vsyncId:6526048, fd:31|M0538"
+    },
+    {
+      "start": 543790.44619,
+      "ms": 48.85,
+      "task": "H:OnVsyncEvent now:222393803897576|I39"
+    },
+    {
+      "start": 543790.446208,
+      "ms": 48.83,
+      "task": "H:UIVsyncTask[timestamp:222393803897576][vsyncID:6526048][instanceID:100000]|M0539"
+    },
+    {
+      "start": 543790.512284,
+      "ms": 47.87,
+      "task": "H:Native async work execute callback, name:PreferencesSetValue#393450796288, traceid:0x0|I39"
+    },
+    {
+      "start": 543790.696979,
+      "ms": 47.12,
+      "task": "H:ThreadSafeCallback excute|I39"
+    },
+    {
+      "start": 543790.696984,
+      "ms": 47.11,
+      "task": "H:Cancelable Event callback:handleId:1|I39"
+    },
+    {
+      "start": 543790.609714,
+      "ms": 39.24,
+      "task": "H:Native async work execute callback, name:PreferencesGetValue#393449989632, traceid:0x0|I39"
+    },
+    {
+      "start": 543790.571052,
+      "ms": 36.75,
+      "task": "H:Native async work execute callback, name:PreferencesFlush#393450797056, traceid:0x0|I39"
+    },
+    {
+      "start": 543790.446317,
+      "ms": 36.62,
+      "task": "H:FlushDirtyNodeUpdate|I39"
+    },
+    {
+      "start": 543790.754371,
+      "ms": 33.76,
+      "task": "H:Native async work complete callback, name:fs.open#393450802048, traceid:0x0|I39"
+    },
+    {
+      "start": 543790.509156,
+      "ms": 28.69,
+      "task": "H:ReceiveVsync name:WM_18861 dataCount: 24bytes now:222393853016712 expectedEnd: 222393861360720 vsyncId:6526054, fd:31|M0538"
+    },
+    {
+      "start": 543790.509215,
+      "ms": 28.58,
+      "task": "H:UIVsyncTask[timestamp:222393853016712][vsyncID:6526054][instanceID:100000]|M0539"
+    },
+    {
+      "start": 543790.509211,
+      "ms": 28.58,
+      "task": "H:OnVsyncEvent now:222393853016712|I39"
+    },
+    {
+      "start": 543790.509251,
+      "ms": 28.25,
+      "task": "H:FlushDirtyNodeUpdate|I39"
+    },
+    {
+      "start": 543790.430757,
+      "ms": 23.92,
+      "task": "H:Native async work execute callback, name:PreferencesRemovePreferencesFromCache#393447925632, traceid:0xa254f524|I39"
+    }
+  ],
+  "startup_marks": []
+}

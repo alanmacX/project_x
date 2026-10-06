@@ -1,0 +1,697 @@
+[
+  {
+    "pid": "18134",
+    "UI_frames": [
+      {
+        "start": 520432.808434,
+        "ms": 4.85
+      },
+      {
+        "start": 520432.815285,
+        "ms": 0.09
+      },
+      {
+        "start": 520432.923716,
+        "ms": 43.05
+      },
+      {
+        "start": 520432.967707,
+        "ms": 54.06
+      },
+      {
+        "start": 520433.022461,
+        "ms": 0.51
+      },
+      {
+        "start": 520433.02371,
+        "ms": 8.81
+      },
+      {
+        "start": 520433.032659,
+        "ms": 0.06
+      },
+      {
+        "start": 520433.040543,
+        "ms": 87.41
+      },
+      {
+        "start": 520433.128466,
+        "ms": 0.3
+      },
+      {
+        "start": 520433.1321,
+        "ms": 64.45
+      },
+      {
+        "start": 520433.196997,
+        "ms": 0.28
+      },
+      {
+        "start": 520433.198938,
+        "ms": 67.25
+      },
+      {
+        "start": 520433.26665,
+        "ms": 0.4
+      },
+      {
+        "start": 520433.282356,
+        "ms": 39.43
+      },
+      {
+        "start": 520433.322057,
+        "ms": 0.33
+      },
+      {
+        "start": 520433.332429,
+        "ms": 2.72
+      },
+      {
+        "start": 520433.349149,
+        "ms": 0.31
+      },
+      {
+        "start": 520433.89952,
+        "ms": 2.77
+      },
+      {
+        "start": 520433.916104,
+        "ms": 0.12
+      },
+      {
+        "start": 520434.683479,
+        "ms": 0.12
+      },
+      {
+        "start": 520434.691698,
+        "ms": 0.24
+      },
+      {
+        "start": 520435.311842,
+        "ms": 16.68
+      },
+      {
+        "start": 520435.328856,
+        "ms": 12.6
+      },
+      {
+        "start": 520435.34159,
+        "ms": 1.27
+      },
+      {
+        "start": 520435.350544,
+        "ms": 0.09
+      },
+      {
+        "start": 520435.367215,
+        "ms": 81.9
+      }
+    ],
+    "slow_tasks": [
+      {
+        "start": 520434.255145,
+        "ms": 125.53,
+        "task": "H:Cancelable Event callback:handleId:2|I39"
+      },
+      {
+        "start": 520434.255143,
+        "ms": 125.53,
+        "task": "H:ThreadSafeCallback excute|I39"
+      },
+      {
+        "start": 520433.040496,
+        "ms": 87.68,
+        "task": "H:ReceiveVsync name:WM_18134 dataCount: 24bytes now:213183483968260 expectedEnd: 213183492305933 vsyncId:5828613, fd:36|M0538"
+      },
+      {
+        "start": 520433.040539,
+        "ms": 87.42,
+        "task": "H:OnVsyncEvent now:213183483968260|I39"
+      },
+      {
+        "start": 520433.040543,
+        "ms": 87.41,
+        "task": "H:UIVsyncTask[timestamp:213183483968260][vsyncID:5828613][instanceID:100000]|M0539"
+      },
+      {
+        "start": 520433.042543,
+        "ms": 84.07,
+        "task": "H:UITaskScheduler::FlushTask|I39"
+      },
+      {
+        "start": 520435.367149,
+        "ms": 82.22,
+        "task": "H:ReceiveVsync name:WM_18134 dataCount: 24bytes now:213185810672453 expectedEnd: 213185819011776 vsyncId:5828695, fd:36|M0538"
+      },
+      {
+        "start": 520435.36721,
+        "ms": 81.91,
+        "task": "H:OnVsyncEvent now:213185810672453|I39"
+      },
+      {
+        "start": 520435.367215,
+        "ms": 81.9,
+        "task": "H:UIVsyncTask[timestamp:213185810672453][vsyncID:5828695][instanceID:100000]|M0539"
+      },
+      {
+        "start": 520435.367404,
+        "ms": 81.6,
+        "task": "H:FlushFocus|I39"
+      },
+      {
+        "start": 520432.726897,
+        "ms": 78.11,
+        "task": "H:PageRouterManager::RunPage|I39"
+      },
+      {
+        "start": 520432.726903,
+        "ms": 78.1,
+        "task": "H:load page: pages/Index(id:1)|M0539"
+      },
+      {
+        "start": 520432.646105,
+        "ms": 76.35,
+        "task": "H:Cancelable Event callback:handleId:1|I39"
+      },
+      {
+        "start": 520432.726916,
+        "ms": 73.98,
+        "task": "H:PageRouterManager::CreatePage|I39"
+      },
+      {
+        "start": 520435.329358,
+        "ms": 73.85,
+        "task": "H:Native async work execute callback, name:PreferencesGetValue#393734390656, traceid:0x0|I39"
+      },
+      {
+        "start": 520432.845755,
+        "ms": 72.86,
+        "task": "H:Native async work complete callback, name:PreferencesGetValue#393447931392, traceid:0x0|I39"
+      },
+      {
+        "start": 520432.727072,
+        "ms": 71.51,
+        "task": "H:JsiDeclarativeEngine::LoadJsWithModule Execute Page code : pages/Index.abc|I39"
+      },
+      {
+        "start": 520432.727068,
+        "ms": 71.51,
+        "task": "H:JsiDeclarativeEngine::LoadPageSource|I39"
+      },
+      {
+        "start": 520432.646881,
+        "ms": 70.6,
+        "task": "H:UI Initialize:app0|M0539"
+      },
+      {
+        "start": 520433.198896,
+        "ms": 67.51,
+        "task": "H:ReceiveVsync name:WM_18134 dataCount: 24bytes now:213183642334313 expectedEnd: 213183659009657 vsyncId:5828623, fd:36|M0538"
+      }
+    ],
+    "startup_marks": [
+      "10-06 15:10:30.675 18134 18134 I A00000/com.fridgewidget.app/FridgeStartup: ability +0ms",
+      "10-06 15:10:30.798 18134 18134 I A00000/com.fridgewidget.app/FridgeStartup: content-loaded +123ms",
+      "10-06 15:10:30.921 18134 18134 I A00000/com.fridgewidget.app/FridgeStartup: storage-read +246ms",
+      "10-06 15:10:30.935 18134 18134 I A00000/com.fridgewidget.app/FridgeStartup: contours-ready +260ms",
+      "10-06 15:10:30.938 18134 18134 I A00000/com.fridgewidget.app/FridgeStartup: material-ready +263ms",
+      "10-06 15:10:30.994 18134 18134 I A00000/com.fridgewidget.app/FridgeStartup: scene-ready +319ms",
+      "10-06 15:10:31.109 18134 18134 I A00000/com.fridgewidget.app/FridgeStartup: scene-idle +434ms",
+      "10-06 15:10:31.399 18134 18134 I A00000/com.fridgewidget.app/FridgeStartup: surfaces-ready +724ms",
+      "10-06 15:10:31.412 18134 18134 I A00000/com.fridgewidget.app/FridgeStartup: arrival-start +737ms",
+      "10-06 15:10:31.960 18134 18134 I A00000/com.fridgewidget.app/FridgeStartup: arrival-end +1285ms"
+    ],
+    "arrival": {
+      "frames": 56,
+      "fps": 108.1,
+      "max_ms": 16.76,
+      "UI_max_ms": 0.31
+    }
+  },
+  {
+    "pid": "18354",
+    "UI_frames": [
+      {
+        "start": 520441.271172,
+        "ms": 5.28
+      },
+      {
+        "start": 520441.276838,
+        "ms": 0.09
+      },
+      {
+        "start": 520441.398453,
+        "ms": 42.21
+      },
+      {
+        "start": 520441.441749,
+        "ms": 55.98
+      },
+      {
+        "start": 520441.498275,
+        "ms": 0.49
+      },
+      {
+        "start": 520441.505183,
+        "ms": 10.33
+      },
+      {
+        "start": 520441.515663,
+        "ms": 0.06
+      },
+      {
+        "start": 520441.521923,
+        "ms": 91.76
+      },
+      {
+        "start": 520441.614166,
+        "ms": 0.3
+      },
+      {
+        "start": 520441.621906,
+        "ms": 67.48
+      },
+      {
+        "start": 520441.689846,
+        "ms": 0.32
+      },
+      {
+        "start": 520441.696939,
+        "ms": 79.82
+      },
+      {
+        "start": 520441.777214,
+        "ms": 0.35
+      },
+      {
+        "start": 520441.78036,
+        "ms": 44.51
+      },
+      {
+        "start": 520441.825134,
+        "ms": 0.37
+      },
+      {
+        "start": 520441.830373,
+        "ms": 2.14
+      },
+      {
+        "start": 520441.838748,
+        "ms": 0.27
+      },
+      {
+        "start": 520442.372469,
+        "ms": 3.04
+      },
+      {
+        "start": 520442.389253,
+        "ms": 0.15
+      }
+    ],
+    "slow_tasks": [
+      {
+        "start": 520442.758188,
+        "ms": 140.75,
+        "task": "H:ThreadSafeCallback excute|I39"
+      },
+      {
+        "start": 520442.758189,
+        "ms": 140.74,
+        "task": "H:Cancelable Event callback:handleId:2|I39"
+      },
+      {
+        "start": 520441.521849,
+        "ms": 92.06,
+        "task": "H:ReceiveVsync name:WM_18354 dataCount: 24bytes now:213191965372328 expectedEnd: 213191973711303 vsyncId:5829032, fd:30|M0538"
+      },
+      {
+        "start": 520441.521923,
+        "ms": 91.76,
+        "task": "H:UIVsyncTask[timestamp:213191965372328][vsyncID:5829032][instanceID:100000]|M0539"
+      },
+      {
+        "start": 520441.52192,
+        "ms": 91.76,
+        "task": "H:OnVsyncEvent now:213191965372328|I39"
+      },
+      {
+        "start": 520441.524177,
+        "ms": 88.07,
+        "task": "H:UITaskScheduler::FlushTask|I39"
+      },
+      {
+        "start": 520441.310505,
+        "ms": 83.28,
+        "task": "H:Native async work complete callback, name:PreferencesGetValue#393452728960, traceid:0x0|I39"
+      },
+      {
+        "start": 520441.696905,
+        "ms": 80.09,
+        "task": "H:ReceiveVsync name:WM_18354 dataCount: 24bytes now:213192140492122 expectedEnd: 213192148831097 vsyncId:5829043, fd:30|M0538"
+      },
+      {
+        "start": 520441.696939,
+        "ms": 79.82,
+        "task": "H:UIVsyncTask[timestamp:213192140492122][vsyncID:5829043][instanceID:100000]|M0539"
+      },
+      {
+        "start": 520441.696936,
+        "ms": 79.82,
+        "task": "H:OnVsyncEvent now:213192140492122|I39"
+      },
+      {
+        "start": 520441.190542,
+        "ms": 77.97,
+        "task": "H:PageRouterManager::RunPage|I39"
+      },
+      {
+        "start": 520441.19055,
+        "ms": 77.96,
+        "task": "H:load page: pages/Index(id:1)|M0539"
+      },
+      {
+        "start": 520441.699452,
+        "ms": 75.82,
+        "task": "H:UITaskScheduler::FlushTask|I39"
+      },
+      {
+        "start": 520441.190565,
+        "ms": 74.08,
+        "task": "H:PageRouterManager::CreatePage|I39"
+      },
+      {
+        "start": 520441.1147,
+        "ms": 71.61,
+        "task": "H:Cancelable Event callback:handleId:1|I39"
+      },
+      {
+        "start": 520441.190748,
+        "ms": 71.59,
+        "task": "H:JsiDeclarativeEngine::LoadPageSource|I39"
+      },
+      {
+        "start": 520441.190753,
+        "ms": 71.58,
+        "task": "H:JsiDeclarativeEngine::LoadJsWithModule Execute Page code : pages/Index.abc|I39"
+      },
+      {
+        "start": 520441.621863,
+        "ms": 67.74,
+        "task": "H:ReceiveVsync name:WM_18354 dataCount: 24bytes now:213192065441938 expectedEnd: 213192073780913 vsyncId:5829038, fd:30|M0538"
+      },
+      {
+        "start": 520441.621906,
+        "ms": 67.48,
+        "task": "H:UIVsyncTask[timestamp:213192065441938][vsyncID:5829038][instanceID:100000]|M0539"
+      },
+      {
+        "start": 520441.621902,
+        "ms": 67.48,
+        "task": "H:OnVsyncEvent now:213192065441938|I39"
+      }
+    ],
+    "startup_marks": [
+      "10-06 15:10:39.147 18354 18354 I A00000/com.fridgewidget.app/FridgeStartup: ability +0ms",
+      "10-06 15:10:39.262 18354 18354 I A00000/com.fridgewidget.app/FridgeStartup: content-loaded +115ms",
+      "10-06 15:10:39.386 18354 18354 I A00000/com.fridgewidget.app/FridgeStartup: storage-read +239ms",
+      "10-06 15:10:39.402 18354 18354 I A00000/com.fridgewidget.app/FridgeStartup: contours-ready +255ms",
+      "10-06 15:10:39.405 18354 18354 I A00000/com.fridgewidget.app/FridgeStartup: material-ready +258ms",
+      "10-06 15:10:39.469 18354 18354 I A00000/com.fridgewidget.app/FridgeStartup: scene-ready +322ms",
+      "10-06 15:10:39.592 18354 18354 I A00000/com.fridgewidget.app/FridgeStartup: scene-idle +445ms",
+      "10-06 15:10:39.902 18354 18354 I A00000/com.fridgewidget.app/FridgeStartup: surfaces-ready +755ms",
+      "10-06 15:10:39.909 18354 18354 I A00000/com.fridgewidget.app/FridgeStartup: arrival-start +762ms",
+      "10-06 15:10:40.444 18354 18354 I A00000/com.fridgewidget.app/FridgeStartup: arrival-end +1297ms"
+    ],
+    "arrival": {
+      "frames": 63,
+      "fps": 119.9,
+      "max_ms": 8.53,
+      "UI_max_ms": 0.27
+    }
+  },
+  {
+    "pid": "18518",
+    "UI_frames": [
+      {
+        "start": 520448.034055,
+        "ms": 44.42
+      },
+      {
+        "start": 520448.079217,
+        "ms": 59.66
+      },
+      {
+        "start": 520448.139491,
+        "ms": 0.53
+      },
+      {
+        "start": 520448.142311,
+        "ms": 9.66
+      },
+      {
+        "start": 520448.152132,
+        "ms": 0.06
+      },
+      {
+        "start": 520448.159037,
+        "ms": 90.78
+      },
+      {
+        "start": 520448.25386,
+        "ms": 0.41
+      },
+      {
+        "start": 520448.259051,
+        "ms": 70.7
+      },
+      {
+        "start": 520448.330225,
+        "ms": 0.32
+      },
+      {
+        "start": 520448.33403,
+        "ms": 69.8
+      },
+      {
+        "start": 520448.404349,
+        "ms": 0.41
+      },
+      {
+        "start": 520448.409091,
+        "ms": 44.41
+      },
+      {
+        "start": 520448.453802,
+        "ms": 0.4
+      },
+      {
+        "start": 520448.459181,
+        "ms": 2.46
+      },
+      {
+        "start": 520448.467528,
+        "ms": 0.29
+      },
+      {
+        "start": 520448.530116,
+        "ms": 0.44
+      },
+      {
+        "start": 520448.98956,
+        "ms": 17.65
+      },
+      {
+        "start": 520449.00749,
+        "ms": 13.33
+      },
+      {
+        "start": 520449.021052,
+        "ms": 1.19
+      },
+      {
+        "start": 520449.026168,
+        "ms": 0.14
+      },
+      {
+        "start": 520449.034445,
+        "ms": 111.91
+      },
+      {
+        "start": 520449.168088,
+        "ms": 1.45
+      },
+      {
+        "start": 520449.17691,
+        "ms": 0.13
+      },
+      {
+        "start": 520449.593248,
+        "ms": 0.31
+      },
+      {
+        "start": 520449.609709,
+        "ms": 0.25
+      },
+      {
+        "start": 520449.955865,
+        "ms": 11.42
+      },
+      {
+        "start": 520449.967433,
+        "ms": 7.57
+      },
+      {
+        "start": 520449.975127,
+        "ms": 0.74
+      },
+      {
+        "start": 520450.009931,
+        "ms": 89.25
+      },
+      {
+        "start": 520450.435367,
+        "ms": 0.24
+      },
+      {
+        "start": 520450.75956,
+        "ms": 16.09
+      },
+      {
+        "start": 520450.775819,
+        "ms": 8.09
+      },
+      {
+        "start": 520450.784035,
+        "ms": 0.83
+      },
+      {
+        "start": 520450.827064,
+        "ms": 3.6
+      },
+      {
+        "start": 520451.185456,
+        "ms": 0.35
+      }
+    ],
+    "slow_tasks": [
+      {
+        "start": 520448.678615,
+        "ms": 161.22,
+        "task": "H:ThreadSafeCallback excute|I39"
+      },
+      {
+        "start": 520448.678616,
+        "ms": 161.21,
+        "task": "H:Cancelable Event callback:handleId:2|I39"
+      },
+      {
+        "start": 520449.034399,
+        "ms": 112.24,
+        "task": "H:ReceiveVsync name:WM_18518 dataCount: 24bytes now:213199477937521 expectedEnd: 213199486275021 vsyncId:5829274, fd:34|M0538"
+      },
+      {
+        "start": 520449.034442,
+        "ms": 111.92,
+        "task": "H:OnVsyncEvent now:213199477937521|I39"
+      },
+      {
+        "start": 520449.034445,
+        "ms": 111.91,
+        "task": "H:UIVsyncTask[timestamp:213199477937521][vsyncID:5829274][instanceID:100000]|M0539"
+      },
+      {
+        "start": 520449.034598,
+        "ms": 111.58,
+        "task": "H:FlushFocus|I39"
+      },
+      {
+        "start": 520448.158992,
+        "ms": 91.07,
+        "task": "H:ReceiveVsync name:WM_18518 dataCount: 24bytes now:213198602497033 expectedEnd: 213198610834533 vsyncId:5829223, fd:34|M0538"
+      },
+      {
+        "start": 520448.159034,
+        "ms": 90.79,
+        "task": "H:OnVsyncEvent now:213198602497033|I39"
+      },
+      {
+        "start": 520448.159037,
+        "ms": 90.78,
+        "task": "H:UIVsyncTask[timestamp:213198602497033][vsyncID:5829223][instanceID:100000]|M0539"
+      },
+      {
+        "start": 520450.009879,
+        "ms": 89.53,
+        "task": "H:ReceiveVsync name:WM_18518 dataCount: 24bytes now:213200453422333 expectedEnd: 213200461759833 vsyncId:5829318, fd:34|M0538"
+      },
+      {
+        "start": 520450.009927,
+        "ms": 89.26,
+        "task": "H:OnVsyncEvent now:213200453422333|I39"
+      },
+      {
+        "start": 520450.009931,
+        "ms": 89.25,
+        "task": "H:UIVsyncTask[timestamp:213200453422333][vsyncID:5829318][instanceID:100000]|M0539"
+      },
+      {
+        "start": 520450.010117,
+        "ms": 88.97,
+        "task": "H:FlushFocus|I39"
+      },
+      {
+        "start": 520448.161047,
+        "ms": 87.35,
+        "task": "H:UITaskScheduler::FlushTask|I39"
+      },
+      {
+        "start": 520450.759172,
+        "ms": 86.82,
+        "task": "H:Native async work execute callback, name:PreferencesGetValue#393450592896, traceid:0x0|I39"
+      },
+      {
+        "start": 520447.950347,
+        "ms": 78.69,
+        "task": "H:Native async work complete callback, name:PreferencesGetValue#393712954880, traceid:0x0|I39"
+      },
+      {
+        "start": 520448.25901,
+        "ms": 70.98,
+        "task": "H:ReceiveVsync name:WM_18518 dataCount: 24bytes now:213198702548627 expectedEnd: 213198710886127 vsyncId:5829232, fd:34|M0538"
+      },
+      {
+        "start": 520448.259048,
+        "ms": 70.71,
+        "task": "H:OnVsyncEvent now:213198702548627|I39"
+      },
+      {
+        "start": 520448.259051,
+        "ms": 70.7,
+        "task": "H:UIVsyncTask[timestamp:213198702548627][vsyncID:5829232][instanceID:100000]|M0539"
+      },
+      {
+        "start": 520448.333982,
+        "ms": 70.1,
+        "task": "H:ReceiveVsync name:WM_18518 dataCount: 24bytes now:213198777586643 expectedEnd: 213198785924143 vsyncId:5829235, fd:34|M0538"
+      }
+    ],
+    "startup_marks": [
+      "10-06 15:10:45.759 18518 18518 I A00000/com.fridgewidget.app/FridgeStartup: ability +0ms",
+      "10-06 15:10:45.896 18518 18518 I A00000/com.fridgewidget.app/FridgeStartup: content-loaded +137ms",
+      "10-06 15:10:46.026 18518 18518 I A00000/com.fridgewidget.app/FridgeStartup: storage-read +267ms",
+      "10-06 15:10:46.041 18518 18518 I A00000/com.fridgewidget.app/FridgeStartup: contours-ready +282ms",
+      "10-06 15:10:46.044 18518 18518 I A00000/com.fridgewidget.app/FridgeStartup: material-ready +285ms",
+      "10-06 15:10:46.105 18518 18518 I A00000/com.fridgewidget.app/FridgeStartup: scene-ready +346ms",
+      "10-06 15:10:46.229 18518 18518 I A00000/com.fridgewidget.app/FridgeStartup: scene-idle +470ms",
+      "10-06 15:10:46.530 18518 18518 I A00000/com.fridgewidget.app/FridgeStartup: surfaces-ready +771ms",
+      "10-06 15:10:46.538 18518 18518 I A00000/com.fridgewidget.app/FridgeStartup: arrival-start +779ms",
+      "10-06 15:10:46.607 18518 18518 I A00000/com.fridgewidget.app/FridgeStartup: arrival-end +848ms"
+    ],
+    "arrival": {
+      "frames": 62,
+      "fps": 118.0,
+      "max_ms": 16.69,
+      "UI_max_ms": 0.44
+    }
+  }
+]

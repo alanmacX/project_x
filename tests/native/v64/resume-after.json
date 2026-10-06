@@ -1,0 +1,56 @@
+{
+  "pid": "10505",
+  "UI_frames": [
+    {
+      "start": 543969.610117,
+      "ms": 0.37
+    },
+    {
+      "start": 543969.656817,
+      "ms": 4.95
+    },
+    {
+      "start": 543969.95702,
+      "ms": 10.34
+    },
+    {
+      "start": 543969.967513,
+      "ms": 7.99
+    },
+    {
+      "start": 543969.975653,
+      "ms": 1.52
+    },
+    {
+      "start": 543969.981846,
+      "ms": 0.12
+    },
+    {
+      "start": 543969.998527,
+      "ms": 1.33
+    },
+    {
+      "start": 543970.006841,
+      "ms": 0.12
+    }
+  ],
+  "slow_tasks": [
+    {
+      "start": 543969.952164,
+      "ms": 32.68,
+      "task": "H:Native async work execute callback, name:PreferencesGetValue#393751632896, traceid:0x0|I39"
+    }
+  ],
+  "startup_marks": [
+    "10-06 21:42:42.336 10505 10505 I A00000/com.fridgewidget.app/FridgeStartup: ability +0ms",
+    "10-06 21:42:42.471 10505 10505 I A00000/com.fridgewidget.app/FridgeStartup: content-loaded +135ms",
+    "10-06 21:42:42.602 10505 10505 I A00000/com.fridgewidget.app/FridgeStartup: storage-read +266ms",
+    "10-06 21:42:42.614 10505 10505 I A00000/com.fridgewidget.app/FridgeStartup: contours-ready +278ms",
+    "10-06 21:42:42.617 10505 10505 I A00000/com.fridgewidget.app/FridgeStartup: material-ready +281ms",
+    "10-06 21:42:42.686 10505 10505 I A00000/com.fridgewidget.app/FridgeStartup: scene-ready +350ms",
+    "10-06 21:42:43.090 10505 10505 I A00000/com.fridgewidget.app/FridgeStartup: surfaces-ready +754ms",
+    "10-06 21:42:43.113 10505 10505 I A00000/com.fridgewidget.app/FridgeStartup: scene-idle +777ms",
+    "10-06 21:42:43.113 10505 10505 I A00000/com.fridgewidget.app/FridgeStartup: arrival-start +777ms",
+    "10-06 21:42:43.659 10505 10505 I A00000/com.fridgewidget.app/FridgeStartup: arrival-end +1323ms"
+  ]
+}

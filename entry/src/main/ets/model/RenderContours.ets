@@ -18,7 +18,7 @@ export function registerRenderContour(card: FridgeCard, prepared: boolean = fals
 export function cardOutline(card: FridgeCard): ShapePoint[][] {
   return card.outline.length > 0 ? card.outline : (contours.get(card.renderContourKey) ?? []);
 }
-export function releaseRenderContours(): void { contours.clear(); }
+export function releaseRenderContours(): void { contours.clear(); serializedEntries=[]; serializedJson=''; }
 
 /** Prime before revealing the board, so topology checks never run in its first animation frame. */
 export async function primeRenderContours(cards: FridgeCard[], snapshot: string): Promise<void> {
@@ -30,6 +30,9 @@ export async function primeRenderContours(cards: FridgeCard[], snapshot: string)
 
 class CachedContour { source: string = ''; outline: ShapePoint[][] = []; }
 class ContourCache { version: number = 1; entries: Record<string, CachedContour> = {}; }
+class SerializedEntry { key: string = ''; source: ShapePoint[][] = []; prepared: ShapePoint[][] = []; }
+let serializedEntries: SerializedEntry[] = [];
+let serializedJson: string = '';
 const encodedSources = new WeakMap<ShapePoint[][], string>();
 function contourSource(outline: ShapePoint[][]): string {
   let source=encodedSources.get(outline);
@@ -56,11 +59,20 @@ export function restoreContourCache(cards: FridgeCard[], json: string): number {
   return restored;
 }
 export function serializeContourCache(cards: FridgeCard[]): string {
-  const cache=new ContourCache();
+  // Moving/resizing changes placement, never the immutable image contour. Avoid
+  // encoding the same potentially megabyte-sized cache after every gesture.
+  const entries: SerializedEntry[] = [];
   for(const card of cards) {
     const outline=compacted.get(card.outline);if(outline===undefined || !card.outline.length)continue;
-    const entry=new CachedContour();entry.source=contourSource(card.outline);entry.outline=outline;cache.entries[assetKey(card)]=entry;
+    const entry=new SerializedEntry();entry.key=assetKey(card);entry.source=card.outline;entry.prepared=outline;entries.push(entry);
   }
-  if(Object.keys(cache.entries).length===0)return '';
-  const json=JSON.stringify(cache);return json.length<=8*1024*1024?json:'';
+  if(entries.length===serializedEntries.length && entries.every((entry:SerializedEntry,index:number)=>{
+    const previous=serializedEntries[index];return entry.key===previous.key && entry.source===previous.source && entry.prepared===previous.prepared;
+  }))return serializedJson;
+  const cache=new ContourCache();
+  for(const item of entries) {
+    const entry=new CachedContour();entry.source=contourSource(item.source);entry.outline=item.prepared;cache.entries[item.key]=entry;
+  }
+  const json=entries.length===0?'':JSON.stringify(cache);
+  serializedEntries=entries;serializedJson=json.length<=8*1024*1024?json:'';return serializedJson;
 }

@@ -8,6 +8,17 @@ const r=load('RenderContours'),s=load('CardSchema');
 const source=new s.FridgeCard();source.id='photo';source.cutout='file://local.png';source.subjectVersion=2;source.shape='subject';source.outline=[[{x:.1,y:.1},{x:.9,y:.1},{x:.9,y:.9},{x:.1,y:.9}]];
 const state=new s.FridgeState();state.cards=[source];await r.primeRenderContours([source],JSON.stringify(state));assert.equal(jobs,1);
 const encoded=r.serializeContourCache([source]);assert.ok(encoded);assert.equal(r.serializeContourCache([]),'');
+r.serializeContourCache([source]);
+const stringify=JSON.stringify;let encodes=0;
+JSON.stringify=(...args)=>{encodes++;return stringify(...args);};
+try {
+ for(let i=0;i<100;i++){source.x=i;source.rot=i;assert.equal(r.serializeContourCache([source]),encoded);}
+ assert.equal(encodes,0,'placement-only saves must not re-encode immutable contour assets');
+ source.subjectVersion++;assert.notEqual(r.serializeContourCache([source]),encoded);
+ assert.equal(encodes,1,'new asset version invalidates serialized cache');source.subjectVersion--;
+ assert.equal(r.serializeContourCache([source]),encoded);
+ assert.equal(r.serializeContourCache([]),'','removed cards cannot survive in derived cache');
+} finally {JSON.stringify=stringify;}
 const fresh=()=>Object.assign(new s.FridgeCard(),JSON.parse(JSON.stringify(source)));
 const restored=fresh();restored.id='duplicate';restored.w=70;restored.rot=40;assert.equal(r.restoreContourCache([restored],encoded),1,'same immutable asset survives duplication, resizing and rotation');
 await r.primeRenderContours([restored],'');assert.equal(jobs,1,'cold cache hit dispatches no topology worker');

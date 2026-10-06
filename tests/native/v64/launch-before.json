@@ -1,0 +1,154 @@
+{
+  "pid": "11881",
+  "UI_frames": [
+    {
+      "start": 519958.380176,
+      "ms": 4.52
+    },
+    {
+      "start": 519958.385086,
+      "ms": 0.09
+    },
+    {
+      "start": 519958.503101,
+      "ms": 400.75
+    },
+    {
+      "start": 519958.909689,
+      "ms": 1.08
+    },
+    {
+      "start": 519958.923242,
+      "ms": 0.65
+    },
+    {
+      "start": 519958.93994,
+      "ms": 0.44
+    },
+    {
+      "start": 519959.439869,
+      "ms": 2.5
+    },
+    {
+      "start": 519959.456736,
+      "ms": 0.21
+    }
+  ],
+  "slow_tasks": [
+    {
+      "start": 519958.503065,
+      "ms": 401.07,
+      "task": "H:ReceiveVsync name:WM_11881 dataCount: 24bytes now:212708941482748 expectedEnd: 212708949819467 vsyncId:5826345, fd:29|M0538"
+    },
+    {
+      "start": 519958.503101,
+      "ms": 400.75,
+      "task": "H:UIVsyncTask[timestamp:212708941482748][vsyncID:5826345][instanceID:100000]|M0539"
+    },
+    {
+      "start": 519958.503098,
+      "ms": 400.75,
+      "task": "H:OnVsyncEvent now:212708941482748|I39"
+    },
+    {
+      "start": 519958.520987,
+      "ms": 371.99,
+      "task": "H:UITaskScheduler::FlushTask|I39"
+    },
+    {
+      "start": 519958.520989,
+      "ms": 223.23,
+      "task": "H:FlushLayoutTask|M0539"
+    },
+    {
+      "start": 519958.521031,
+      "ms": 215.22,
+      "task": "H:CreateTaskMeasure[Stack][self:26][parent:23][layoutConstraint:minSize: [[0.00 x 0.00]]maxSize: [[2560.00 x 1600.00]]percentReference: [[25"
+    },
+    {
+      "start": 519959.85841,
+      "ms": 149.06,
+      "task": "H:Cancelable Event callback:handleId:2|I39"
+    },
+    {
+      "start": 519959.858408,
+      "ms": 149.06,
+      "task": "H:ThreadSafeCallback excute|I39"
+    },
+    {
+      "start": 519958.744239,
+      "ms": 148.68,
+      "task": "H:FlushRenderTask 203|M0539"
+    },
+    {
+      "start": 519958.217774,
+      "ms": 77.91,
+      "task": "H:Cancelable Event callback:handleId:1|I39"
+    },
+    {
+      "start": 519958.300052,
+      "ms": 77.05,
+      "task": "H:PageRouterManager::RunPage|I39"
+    },
+    {
+      "start": 519958.300059,
+      "ms": 77.04,
+      "task": "H:load page: pages/Index(id:1)|M0539"
+    },
+    {
+      "start": 519958.424515,
+      "ms": 73.69,
+      "task": "H:Native async work complete callback, name:PreferencesGetValue#393454851328, traceid:0x0|I39"
+    },
+    {
+      "start": 519958.300075,
+      "ms": 73.03,
+      "task": "H:PageRouterManager::CreatePage|I39"
+    },
+    {
+      "start": 519958.218555,
+      "ms": 71.7,
+      "task": "H:UI Initialize:app0|M0539"
+    },
+    {
+      "start": 519958.300253,
+      "ms": 70.46,
+      "task": "H:JsiDeclarativeEngine::LoadPageSource|I39"
+    },
+    {
+      "start": 519958.300286,
+      "ms": 70.43,
+      "task": "H:JsiDeclarativeEngine::LoadJsWithModule Execute Page code : pages/Index.abc|I39"
+    },
+    {
+      "start": 519959.711086,
+      "ms": 52.38,
+      "task": "H:Native async work execute callback, name:PreferencesGetValue#393511729024, traceid:0x0|I39"
+    },
+    {
+      "start": 519959.786067,
+      "ms": 43.82,
+      "task": "H:ThreadSafeCallback excute|I39"
+    },
+    {
+      "start": 519959.786069,
+      "ms": 43.81,
+      "task": "H:Cancelable Event callback:handleId:1|I39"
+    }
+  ],
+  "startup_marks": [
+    "10-06 15:02:36.237 11881 11881 I A00000/com.fridgewidget.app/FridgeStartup: ability +0ms",
+    "10-06 15:02:36.350 11881 11881 I A00000/com.fridgewidget.app/FridgeStartup: content-loaded +113ms",
+    "10-06 15:02:36.479 11881 11881 I A00000/com.fridgewidget.app/FridgeStartup: storage-read +242ms",
+    "10-06 15:02:36.493 11881 11881 I A00000/com.fridgewidget.app/FridgeStartup: contours-ready +256ms",
+    "10-06 15:02:36.496 11881 11881 I A00000/com.fridgewidget.app/FridgeStartup: material-ready +259ms",
+    "10-06 15:02:36.553 11881 11881 I A00000/com.fridgewidget.app/FridgeStartup: scene-ready +316ms",
+    "10-06 15:02:36.980 11881 11881 I A00000/com.fridgewidget.app/FridgeStartup: scene-idle +743ms"
+  ],
+  "arrival": {
+    "frames": 45,
+    "fps": 87.9,
+    "max_ms": 116.71,
+    "UI_max_ms": 1.08
+  }
+}
