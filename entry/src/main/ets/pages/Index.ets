@@ -1,3 +1,5 @@
+import lazy { enhanceImageJob, supportsSuperResolution } from '../model/SuperResolution';
+import { EnhancementPreview } from '../views/EnhancementPreview';
 import { prepareSubjectDepth } from '../model/SubjectDepthCache';
 import { revealStartup } from '../model/StartupPresentation';
 import { removeStagedTemplate } from '../model/IncomingTemplate';
@@ -95,6 +97,11 @@ struct Index {
   private batteryObserver:BatteryObserver=new BatteryObserver();
   private refreshingCapabilities:boolean=false;
   private widgetRouteTimer:number=-1;
+  private enhancementDialog: CustomDialogController | null = null;
+  private enhancementOpen: boolean = false;
+  private readingComparisonOpen: boolean = false;
+  @State enhancingSubject: boolean = false;
+  @State enhancingBackground: boolean = false;
   private photoCropDialog: CustomDialogController | null = null;
   @State canvasPickerOpen: boolean = false;
   @State canvasCreating: boolean = false;
@@ -248,7 +255,7 @@ struct Index {
     this.alive = true;
     this.context = this.getUIContext().getHostContext() ?? null;
     this.initialize();
-    this.clockTimer = setInterval(() => { if(this.gestureGroup || this.activeBoardId || this.heroActive || this.arriving)return;this.tick = Math.floor(Date.now()/60000)*60000;this.refreshCapabilities();this.updateScheduledScene(true); }, 60000);
+    this.clockTimer = setInterval(() => { if(this.readingComparisonOpen || this.gestureGroup || this.activeBoardId || this.heroActive || this.arriving)return;this.tick = Math.floor(Date.now()/60000)*60000;this.refreshCapabilities();this.updateScheduledScene(true); }, 60000);
     this.batteryObserver.start(()=>this.refreshCapabilities());
   }
   private initialize(): void {
@@ -549,7 +556,7 @@ struct Index {
       }
     } finally { this.repairingSubjects = false; }
   }
-  aboutToDisappear(): void { this.backgroundPreviewGeneration++;if(this.backgroundPreviewTimer>=0)clearTimeout(this.backgroundPreviewTimer); if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
+  aboutToDisappear(): void { this.enhancementDialog?.close();this.enhancementOpen=false; this.backgroundPreviewGeneration++;if(this.backgroundPreviewTimer>=0)clearTimeout(this.backgroundPreviewTimer); if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
     if(this.homeToolsOpen){this.homeToolsOpen=false;return true;}
     if(this.capabilityPickerOpen){this.capabilityPickerOpen=false;return true;}
@@ -954,6 +961,32 @@ struct Index {
       this.busy = false;
     }
   }
+  private async enhancePhoto(subject:boolean):Promise<void> {
+    if(!this.context||this.enhancementOpen||this.enhancingSubject||this.enhancingBackground||this.busy||this.backgroundBusy)return;
+    if(!supportsSuperResolution()){this.getUIContext().getPromptAction().showToast({message:'此功能需要 HarmonyOS API 26 及支持超分的设备'});return;}
+    const card=subject?this.current():null,canvasId=this.store.state.canvasId;
+    const src=subject?(card?.cutout??''):this.canvasBackground.src;
+    if(!src)return;
+    const filesDir=this.context.filesDir;
+    if(subject)this.enhancingSubject=true;else this.enhancingBackground=true;
+    let enhanced='';
+    const discard=(uri:string):void=>{if(uri.startsWith('file://'))fileIo.unlink(uri.slice(7)).catch(()=>{});};
+    try {
+      enhanced=await taskpool.execute(new taskpool.Task(enhanceImageJob,src,filesDir,subject)) as string;
+      const valid=():boolean=>this.alive&&this.store.state.canvasId===canvasId&&(subject?card!==null&&this.store.findCard(card.id)===card&&card.cutout===src:this.canvasBackground.mode==='photo'&&this.canvasBackground.src===src);
+      if(!valid()){discard(enhanced);return;}
+      const result=enhanced;
+      this.enhancementDialog=new CustomDialogController({builder:EnhancementPreview({original:src,enhanced:result,appDark:this.appDark,previewWidth:Math.max(160,Math.min(340,this.screenWidth-80,this.screenHeight-this.safeTop-this.safeBottom-260)),
+        onDiscard:()=>{this.enhancementOpen=false;discard(result);},onUse:()=>{
+          this.enhancementOpen=false;
+          if(!valid()){discard(result);return;}
+          if(subject&&card){card.cutout=result;this.change();}
+          else{const bg=normalizeBackground(JSON.parse(JSON.stringify(this.canvasBackground)) as CanvasBackground);bg.src=result;this.applyBackground(bg);}
+        }}),customStyle:true,autoCancel:true,openAnimation:settingsDialogOpen(),closeAnimation:settingsDialogClose()});
+      this.enhancementOpen=true;this.enhancementDialog.open();
+    } catch(error) {this.enhancementOpen=false;if(enhanced)discard(enhanced);if(this.alive)this.getUIContext().getPromptAction().showToast({message:'未修改原图：'+(error as Error).message});}
+    finally{if(subject)this.enhancingSubject=false;else this.enhancingBackground=false;}
+  }
   private pickDate(): void {
     const cap = this.current()?.capability; if (cap === null || cap === undefined) return;
     const card = this.current();
@@ -964,12 +997,14 @@ struct Index {
       }
     });
   }
-  onPageHide(): void { if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); }
+  onPageHide(): void { if(this.readingComparisonOpen)return; if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); }
   private compareReading():void {
-    const card=this.current();if(!card?.capability)return;AppStorage.setOrCreate('readingDemoCard',cardViewSnapshot(card));
-    this.getUIContext().getRouter().pushUrl({url:'pages/ReadingDemo'}).catch(()=>{AppStorage.delete('readingDemoCard');if(this.alive)this.getUIContext().getPromptAction().showToast({message:'暂时无法打开对比，请重试'});});
+    const card=this.current();if(!card?.capability||this.readingComparisonOpen)return;this.readingComparisonOpen=true;
+    if(this.foregroundRefreshTimer>=0){clearTimeout(this.foregroundRefreshTimer);this.foregroundRefreshTimer=-1;}
+    AppStorage.setOrCreate('readingDemoCard',cardRenderSnapshot(card));
+    this.getUIContext().getRouter().pushUrl({url:'pages/ReadingDemo'}).catch(()=>{this.readingComparisonOpen=false;AppStorage.delete('readingDemoCard');if(this.alive)this.getUIContext().getPromptAction().showToast({message:'暂时无法打开对比，请重试'});});
   }
-  onPageShow(): void { if(this.ready)this.scheduleForegroundRefresh(); }
+  onPageShow(): void { if(this.readingComparisonOpen){this.readingComparisonOpen=false;return;} if(this.ready)this.scheduleForegroundRefresh(); }
   private updateExtraCapability(id:string,next:CapBlock):void {
     const card=this.store.findCard(id);if(!card||card.capability?.k!==next.k)return;
     card.capability=next;this.syncFields();this.change();
@@ -1437,6 +1472,7 @@ struct Index {
           }
           if (this.canvasBackground.mode === 'photo') {
             if (this.canvasBackground.photo.length > 0) { Button('调整照片', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.backgroundBusy).onClick(() => this.openBackgroundCrop(this.canvasBackground.photo)) }
+            if(this.canvasBackground.src.length>0){Button(this.enhancingBackground?'正在提升清晰度':'提升清晰度',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.backgroundBusy&&!this.enhancingBackground&&!this.enhancingSubject).onClick(()=>this.enhancePhoto(false))}
             Button('选择本地照片', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).width('100%').fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.backgroundBusy).onClick(() => this.pickBackgroundPhoto())
             Text('按桌面画布比例拖动、双指缩放后确认；原照片不修改。').fontSize(12).fontColor(this.appMuted()).width('100%')
           }
@@ -2120,6 +2156,7 @@ struct Index {
           .onClick(() => { const card = this.current(); if (card !== null) { card.shape = 'subject'; card.h = card.w / card.subjectAspect; this.change(); } })
       }
       if (this.preview.cutout.length > 0) {
+        Button(this.enhancingSubject?'正在提升清晰度':'提升清晰度',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.busy&&!this.enhancingSubject&&!this.enhancingBackground).onClick(()=>this.enhancePhoto(true))
         Text('主体外观').fontSize(14).fontColor(this.appText()).width('100%')
         SettingsSegmented({labels:['只用形状','主体照片作底图'],selectedIndex:this.preview.subjectPhoto?1:0,appDark:this.appDark,
           onSelect:(index:number)=>{const card=this.current();if(card!==null){card.subjectPhoto=index===1;this.change();}}})

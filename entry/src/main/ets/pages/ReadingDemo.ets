@@ -1,5 +1,7 @@
+import { prepareSubjectDepth } from '../model/SubjectDepthCache';
+import { common } from '@kit.AbilityKit';
 import { FridgeCard } from '../model/CardSchema';
-import { cardViewSnapshot } from '../model/CardViewSnapshot';
+import { cardViewSnapshot, cardRenderSnapshot } from '../model/CardViewSnapshot';
 import { AppDesign } from '../model/AppDesign';
 import { CardFace } from '../views/CardFace';
 import { immersiveChrome } from '../model/ChromeMaterial';
@@ -14,11 +16,27 @@ struct ReadingDemo {
   @State pageHeight:number=720;
   @State samples:FridgeCard[]=[];
   private tick:number=Date.now();
+  private pending:FridgeCard[]=[];
+  private alive:boolean=true;
+  private timer:number=-1;
   aboutToAppear():void {
     const source=AppStorage.get<FridgeCard>('readingDemoCard');
     if(!source?.capability)return;
-    this.samples=['feather','scrim','halo'].map((blend:string)=>{const c=cardViewSnapshot(source);c.capability!.readingStyle='surface';c.capability!.readingBlend=blend;return c;});
+    this.pending=['feather','scrim','halo'].map((blend:string)=>{const c=cardViewSnapshot(source);c.outline=[];c.renderContourKey=source.renderContourKey;c.capability!.readingStyle='surface';c.capability!.readingBlend=blend;return cardRenderSnapshot(c);});
+    this.timer=setTimeout(()=>{this.timer=-1;this.prepare();},400);
     AppStorage.delete('readingDemoCard');
+  }
+  aboutToDisappear():void {this.alive=false;if(this.timer>=0)clearTimeout(this.timer);}
+  private async prepare():Promise<void> {
+    const ctx=this.getUIContext().getHostContext() as common.UIAbilityContext;
+    const card=this.pending[0];if(!card)return;
+    await prepareSubjectDepth([card],this.sampleScale(card),ctx.cacheDir,this.getUIContext().vp2px(1));
+    if(this.alive)this.mount();
+  }
+  private mount():void {
+    if(!this.alive||this.samples.length>=this.pending.length)return;
+    this.samples=this.pending.slice(0,this.samples.length+1);
+    this.timer=setTimeout(()=>{this.timer=-1;this.mount();},32);
   }
   private landscape():boolean {return this.pageWidth>this.pageHeight;}
   private sampleWidth():number {return this.landscape()?(this.pageWidth-64)/3:this.pageWidth-32;}
@@ -28,7 +46,7 @@ struct ReadingDemo {
   sample(card:FridgeCard,index:number) {
     Column({space:12}) {
       Stack() {CardFace({card:card,scaleFactor:this.sampleScale(card),tick:this.tick}).width(card.w*this.sampleScale(card)).height(card.h*this.sampleScale(card))}
-        .width('100%').height(this.previewHeight()).backgroundColor(AppDesign.background(this.dark)).borderRadius(16)
+        .width('100%').height(this.previewHeight()).renderGroup(true).backgroundColor(AppDesign.background(this.dark)).borderRadius(16)
       Text(['01 · 柔光渐隐','02 · 局部衬光','03 · 文字描光'][index]).fontSize(17).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.dark)).width('100%')
       Text(['保留较多底图，柔化文字周围的纹理','文字附近对比更强，适合杂乱照片与小字','底图完整保留，用细描光托住文字'][index]).fontSize(13).fontColor(AppDesign.muted(this.dark)).width('100%')
     }.width(this.sampleWidth()).padding(16).backgroundColor(AppDesign.surface(this.dark)).borderRadius(20)
