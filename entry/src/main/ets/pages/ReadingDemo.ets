@@ -22,7 +22,7 @@ struct ReadingDemo {
   aboutToAppear():void {
     const source=AppStorage.get<FridgeCard>('readingDemoCard');
     if(!source?.capability)return;
-    this.pending=['feather','scrim','halo'].map((blend:string)=>{const c=cardViewSnapshot(source);c.outline=[];c.renderContourKey=source.renderContourKey;c.capability!.readingStyle='surface';c.capability!.readingBlend=blend;return cardRenderSnapshot(c);});
+    this.pending=['paper','feather','scrim','halo'].map((blend:string)=>{const c=cardViewSnapshot(source);c.outline=[];c.renderContourKey=source.renderContourKey;c.capability!.readingStyle='surface';c.capability!.readingBlend=blend;return cardRenderSnapshot(c);});
     this.timer=setTimeout(()=>{this.timer=-1;this.prepare();},400);
     AppStorage.delete('readingDemoCard');
   }
@@ -39,7 +39,7 @@ struct ReadingDemo {
     this.timer=setTimeout(()=>{this.timer=-1;this.mount();},32);
   }
   private landscape():boolean {return this.pageWidth>this.pageHeight;}
-  private sampleWidth():number {return this.landscape()?(this.pageWidth-64)/3:this.pageWidth-32;}
+  private sampleWidth():number {return this.landscape()?(this.pageWidth-80)/4:this.pageWidth-32;}
   private previewHeight():number {return this.landscape()?Math.max(200,this.pageHeight-this.safeTop-this.safeBottom-230):230;}
   private sampleScale(card:FridgeCard):number {return Math.min((this.sampleWidth()-48)/card.w,(this.previewHeight()-40)/card.h);}
   @Builder
@@ -47,8 +47,8 @@ struct ReadingDemo {
     Column({space:12}) {
       Stack() {CardFace({card:card,scaleFactor:this.sampleScale(card),tick:this.tick}).width(card.w*this.sampleScale(card)).height(card.h*this.sampleScale(card))}
         .width('100%').height(this.previewHeight()).renderGroup(true).backgroundColor(AppDesign.background(this.dark)).borderRadius(16)
-      Text(['01 · 柔光渐隐','02 · 局部衬光','03 · 文字描光'][index]).fontSize(17).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.dark)).width('100%')
-      Text(['保留较多底图，柔化文字周围的纹理','文字附近对比更强，适合杂乱照片与小字','底图完整保留，用细描光托住文字'][index]).fontSize(13).fontColor(AppDesign.muted(this.dark)).width('100%')
+      Text(['01 · 薄纸标签','02 · 柔光渐隐','03 · 局部衬光','04 · 文字描光'][index]).fontSize(17).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.dark)).width('100%')
+      Text(['米白纸面、细薄厚度与轻阴影；文字无光晕','保留较多底图，柔化文字周围的纹理','文字附近对比更强，适合杂乱照片与小字','底图完整保留，用细描光托住文字'][index]).fontSize(13).fontColor(AppDesign.muted(this.dark)).width('100%')
     }.width(this.sampleWidth()).padding(16).backgroundColor(AppDesign.surface(this.dark)).borderRadius(20)
   }
   build() {

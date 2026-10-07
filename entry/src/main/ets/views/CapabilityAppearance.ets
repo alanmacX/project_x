@@ -50,8 +50,8 @@ export struct CapabilityAppearance {
       }.width('100%')
       Row({space:12}) {
         Text('融合').fontSize(14).fontColor(AppDesign.text(this.appDark)).width(48)
-        SettingsSelect({labels:['柔光','衬光','描光'],selectedIndex:Math.max(0,['feather','scrim','halo'].indexOf(this.card.capability?.readingBlend??'feather')),appDark:this.appDark,
-          onSelect:(index:number)=>this.onBlend(['feather','scrim','halo'][index])}).layoutWeight(1)
+        SettingsSelect({labels:['薄纸标签','柔光','衬光','描光'],selectedIndex:Math.max(0,['paper','feather','scrim','halo'].indexOf(this.card.capability?.readingBlend??'feather')),appDark:this.appDark,
+          onSelect:(index:number)=>this.onBlend(['paper','feather','scrim','halo'][index])}).layoutWeight(1)
       }.width('100%')
       Button('对比融合方案',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).width('100%').fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.onCompare())
       }.width('100%').transition(settingsReveal())

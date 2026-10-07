@@ -22,7 +22,7 @@ export struct ReadingComparison {
   private choose(index:number):void {
     this.selected=index;
     const sample=cardViewSnapshot(this.card);
-    if(sample.capability){sample.capability.readingStyle='surface';sample.capability.readingBlend=['feather','scrim','halo'][index];}
+    if(sample.capability){sample.capability.readingStyle='surface';sample.capability.readingBlend=['paper','feather','scrim','halo'][index];}
     this.sample=cardRenderSnapshot(sample);
     this.queueDepth();
   }
@@ -46,10 +46,10 @@ export struct ReadingComparison {
     Scroll() {
     Column({space:12}) {
       Text('融合方案对比').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%').padding({right:40})
-      SettingsSegmented({labels:['柔光渐隐','局部衬光','文字描光'],selectedIndex:this.selected,appDark:this.appDark,onSelect:(index:number)=>this.choose(index)})
+      SettingsSegmented({labels:['薄纸','柔光','衬光','描光'],selectedIndex:this.selected,appDark:this.appDark,onSelect:(index:number)=>this.choose(index)})
       Stack() {CardFace({card:this.sample,scaleFactor:this.sampleScale(),tick:this.tick}).width(this.sample.w*this.sampleScale()).height(this.sample.h*this.sampleScale())}
         .width('100%').height(this.previewHeight()).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
-      Text(['柔化文字周围的纹理，保留较多底图','提高文字附近的对比，适合杂乱照片','保留底图，用细描光托住文字'][this.selected]).fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%').maxLines(2)
+      Text(['米白薄纸与轻微厚度，完整保留文字清晰度','柔化文字周围的纹理，保留较多底图','提高文字附近的对比，适合杂乱照片','保留底图，用细描光托住文字'][this.selected]).fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%').maxLines(2)
     }.width('100%').padding({left:20,right:20,top:16,bottom:24})
     }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
       .onAreaChange((_:Area,area:Area)=>{const width=Number(area.width),height=Number(area.height);if(width!==this.panelWidth||height!==this.panelHeight){this.panelWidth=width;this.panelHeight=height;this.queueDepth();}})

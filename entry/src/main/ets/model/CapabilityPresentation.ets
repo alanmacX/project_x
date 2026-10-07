@@ -54,3 +54,8 @@ export function readingHalo(ink: string, scale: number, enabled: boolean, blend:
   return [{ radius: (blend==='halo'?1.1:.65) * scale, color: color, offsetX: 0, offsetY: 0 },
     { radius: (blend==='halo'?2.2:1.8) * scale, color: color, offsetX: 0, offsetY: 0 }];
 }
+
+/** Opaque, thin paper keeps dense information readable without photo blur or glyph glow. */
+export const READING_PAPER_COLOR:string='#FBF7EE';
+export function paperReadingInk(ink:string):string {return textContrast(ink,READING_PAPER_COLOR)>=4.5?ink:'#343129';}
+export function paperReadingRadius(width:number,height:number):number {return Math.max(0,Math.min(10,Math.min(width,height)*.16));}

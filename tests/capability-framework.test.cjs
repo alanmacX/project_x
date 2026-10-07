@@ -163,3 +163,8 @@ for(const k of ['clock','date','battery','agenda','timetable']){const cap={k};co
 console.log('PASS free foreground placement, edge recovery, readable size, storage/snapshot roundtrip and enlarged content');
 
 const cardHit=load('CardHitTest');assert.equal(cardHit.cardContainsPoint(free,.7*free.w,.7*free.h,1),true,'foreground over a transparent silhouette is selectable');assert.equal(cardHit.cardContainsPoint(free,.98*free.w,.98*free.h,1),false,'remaining transparent space stays inert');
+
+for(const ink of ['#FFFFFF','#F8F8F8','#323232','#D0A050','#000000'])assert.ok(p.textContrast(p.paperReadingInk(ink),p.READING_PAPER_COLOR)>=4.5);
+assert.equal(p.paperReadingInk('#323232'),'#323232');assert.equal(p.paperReadingRadius(180,100),10);assert.equal(p.paperReadingRadius(20,20),3.2);
+const paperState=new s.FridgeState();paperState.cards=[new s.FridgeCard()];paperState.cards[0].capability={k:'clock',readingStyle:'surface',readingBlend:'paper'};assert.equal(s.normalizeState(JSON.parse(JSON.stringify(paperState))).cards[0].capability.readingBlend,'paper');
+console.log('PASS thin-paper contrast, compact corner geometry and persisted material choice');

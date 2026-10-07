@@ -1,0 +1,7 @@
+# Thin-paper capability backing — 2026-10-07
+
+An optional `readingBlend: paper` material, not a migration of existing canvases. Available under capability appearance → layout/readability → blending, and the comparison sheet starts with the new paper sample. The shared CardCanvas renderer uses #FBF7EE, compact adaptive corners (up to 10 card vp), 0.9 vp backing thickness and one shallow shadow. It does not sample/blur the photograph, allocate generated textures, enlarge the capability box, or enable glyph halos. Existing dark/custom ink is retained when it meets 4.5:1 contrast; other ink falls back to #343129. The existing ability opacity applies to the complete label.
+
+Tests cover paper contrast, small corner bounds and storage normalization. Release HAP and all model test suites pass. A temporary read-only QA page used an existing device cutout with identical weekly-calendar content across old feather, paper app, and paper widget-rendering modes. Native MatePad capture confirms the expected paper appearance and both rendering modes. This is not a desktop Form-host capture or an FPS measurement. The temporary page, entry override and personal fixture were removed before the production build; no canvas data was changed.
+
+The previous materials remain available for comparison; no default material was replaced. Albums still use their own fixed composition.
