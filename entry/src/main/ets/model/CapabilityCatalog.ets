@@ -13,7 +13,7 @@ export const CAPABILITY_CATALOG: CapabilityDescriptor[] = [
   {key:'yearprogress',name:'年度进度',group:'时间',summary:'一年的时间进度',source:'系统时间',detail:'年度进度'},
   {key:'timetable',name:'课程表',group:'生活',summary:'下一课或每日概览',source:'本地课表 · ICS / WakeUp 文件导入',detail:'课程安排'},
   {key:'agenda',name:'日程',group:'生活',summary:'接下来要做的安排',source:'本地日历文件',detail:'日程列表'},
-  {key:'album',name:'音乐专辑',group:'生活',summary:'居中封面与静态融合背景',source:'本地封面 · 离线融合背景',detail:'专辑'},
+  {key:'album',name:'音乐专辑',group:'生活',summary:'封面库、定时轮换与融合背景',source:'本地封面库 · 离线轮换',detail:'专辑'},
   {key:'battery',name:'电量',group:'生活',summary:'本机电量和充电状态',source:'系统电量',detail:'电量状态'}
 ];
 export function capabilityDescriptor(key: string): CapabilityDescriptor {

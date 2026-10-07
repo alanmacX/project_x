@@ -1,3 +1,4 @@
+import { nextAlbumBoundary } from './AlbumRotation';
 import { nextCityBoundary } from './TimeCapabilities';
 import { parsePickupNotice } from './ParcelIntake';
 import { dateKey, holidayName } from './HolidayCalendar';
@@ -100,6 +101,7 @@ export function teachingDayLabel(cap:CapBlock,now:number):string {
 export function pickupCandidates(text: string): ParcelItem[] { return parsePickupNotice(text); }
 export function pendingParcels(cap: CapBlock): ParcelItem[] { return (cap.parcels??[]).filter((p)=>!p.picked); }
 export function nextDataBoundary(cap: CapBlock, now:number):number {
+  if(cap.k==='album')return nextAlbumBoundary(cap,now);
   const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate()+1);
   const events=cap.k==='agenda'?agendaItems(cap,now):cap.k==='timetable'?coursesOnDay(cap,now).concat(coursesOnDay(cap,tomorrow.getTime())):[];
   const midnight=new Date(now);midnight.setHours(24,0,0,0);

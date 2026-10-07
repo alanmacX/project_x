@@ -20,6 +20,7 @@ export struct CapabilitySettings {
   @Prop @Watch('inputChanged') cap:CapBlock={k:'battery'};
   @Prop @Watch('inputChanged') cardId:string='';
   @Prop appDark:boolean=false;
+  @Prop tick:number=0;
   onUpdate:(id:string,cap:CapBlock)=>void=()=>{};
   @State busy:boolean=false;
   @State wholeCalendarAccess:boolean=false;
@@ -98,7 +99,7 @@ export struct CapabilitySettings {
   }
   build() {
     Column({space:12}) {
-      if(this.cap.k==='album') {AlbumSettings({cap:this.cap,cardId:this.cardId,appDark:this.appDark,onUpdate:this.onUpdate})}
+      if(this.cap.k==='album') {AlbumSettings({tick:this.tick,cap:this.cap,cardId:this.cardId,appDark:this.appDark,onUpdate:this.onUpdate})}
       if(this.cap.k==='battery') {
         Text('本机电量与充电状态，前台响应系统变化；桌面由系统周期刷新。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
         SettingsAction({label:this.busy?'更新中':'更新电量',onPress:()=>this.refresh(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})

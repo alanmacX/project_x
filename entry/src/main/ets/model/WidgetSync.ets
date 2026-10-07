@@ -1,3 +1,4 @@
+import { nextAlbumBoundary } from './AlbumRotation';
 import { resolveScheduledScene, sceneWidgetContext, nextSceneBoundary, activeSceneRule } from './SceneSchedule';
 import { refreshMinutes } from './WidgetRefreshPolicy';
 import { normalizeState } from './CardSchema';
@@ -41,7 +42,8 @@ export async function pushWidgets(context: Context, json: string): Promise<void>
       const targetJson=targetId===canvasId?json:await prefs.get(canvasKey(targetId),'') as string;return targetJson?normalizeState(JSON.parse(targetJson) as FridgeState):null;
     });
     const sceneJson=scene.ruleId?JSON.stringify(scene.state):baseId===canvasId?json:JSON.stringify(base);
-    const deadline=nextSceneBoundary(base,Date.now());
+    const now=Date.now();
+    const deadline=Math.min(nextSceneBoundary(base,now),...scene.state.cards.filter(c=>c.capability?.k==='album').map(c=>nextAlbumBoundary(c.capability!,now)));
     const minutes=Math.min(refreshMinutes(base),refreshMinutes(scene.state));
     for (let attempt = 0; attempt < 3; attempt++) {
       try {

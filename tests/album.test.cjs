@@ -8,7 +8,25 @@ function load(name){if(cache.has(name))return cache.get(name);const module={expo
 const {albumCoverSize,albumAnchors}=load('AlbumLayout');
 const {blendPixels}=load('BackgroundPalette');
 const {FridgeCard,normalizeState,defaultState,typeLabel}=load('CardSchema');
-assert.equal(albumCoverSize(80,180),56);assert.equal(albumCoverSize(240,120),84);
+assert.equal(albumCoverSize(80,180),67.2);assert.equal(albumCoverSize(240,120),100.8);assert.equal(albumCoverSize(100,100,3),94);assert.equal(albumCoverSize(100,100,15),70);
 const anchors=albumAnchors(['#AB2233','#D5A862','#415E89']),a=blendPixels(anchors,'#AB2233',48,48),b=blendPixels(anchors,'#AB2233',48,48);assert.deepEqual(a,b,'static field is deterministic');assert.equal(a.length,48*48*4);assert.ok(a.every((v,i)=>i%4!==3||v===255));
 const card=new FridgeCard();card.id='album';card.shape='subject';card.frame=true;card.capability={k:'album',albumCover:'https://untrusted/image',albumBackground:'file:///saved/background.png',artist:'The Beatles'};const state=defaultState();state.cards=[card];const saved=normalizeState(state).cards[0];assert.equal(saved.capability.albumCover,'');assert.equal(saved.capability.albumBackground,'file:///saved/background.png');assert.equal(saved.shape,'rect');assert.equal(saved.frame,false);assert.equal(typeLabel('album'),'音乐专辑');
 console.log('PASS: centre sizing; deterministic static FluidGradient field; locked shape; local asset normalization.');
+
+const {activeAlbum,nextAlbumBoundary,selectAlbum}=load('AlbumRotation');
+const {normalizeCapability}=load('CardSchema');
+const {nextDataBoundary}=load('CapabilityData');
+const {refreshMinutes}=load('WidgetRefreshPolicy');
+const items=[{id:'a',cover:'file:///saved/a.jpg',background:'file:///saved/a.png',title:'A',artist:'One'},{id:'b',cover:'file:///saved/b.jpg',background:'file:///saved/b.png',title:'B',artist:'Two'}];
+const epoch=1700000000000,cap={k:'album',albumItems:items,albumId:'a',albumCover:items[0].cover,albumBackground:items[0].background,albumRotationMinutes:60,albumRotationStart:epoch};
+assert.equal(activeAlbum(cap,epoch+3599999).id,'a');assert.equal(activeAlbum(cap,epoch+3600000).id,'b');assert.equal(activeAlbum(cap,epoch+7200000).id,'a');
+assert.equal(nextAlbumBoundary(cap,epoch+3600000),epoch+7200000);assert.equal(nextAlbumBoundary({...cap,albumRotationMinutes:0},epoch),Infinity);
+assert.equal(nextDataBoundary(cap,epoch+3590000),epoch+3600000);const timed=defaultState();const timedCard=new FridgeCard();timedCard.capability=cap;timed.cards=[timedCard];assert.equal(refreshMinutes(timed,epoch+3000000),10);
+assert.equal(normalizeCapability({...cap,albumItems:[...items,{id:'bad',cover:'https://remote/cover',background:'file:///saved/b.png'}],albumInset:100}).albumItems.length,2);assert.equal(normalizeCapability({...cap,albumInset:100}).albumInset,20);
+const selected=selectAlbum(cap,items[1],epoch+4000000);assert.equal(activeAlbum(selected,epoch+4000000).id,'b');assert.equal(activeAlbum(selected,epoch+7600000).id,'a');
+const {exportTemplate,materializeTemplate}=load('TemplateIO');
+(async()=>{for(const item of items){files.set(item.cover.slice(7),Buffer.from('cover'));files.set(item.background.slice(7),Buffer.from('background'));}
+const shared=defaultState();const album=new FridgeCard();album.id='playlist';album.capability=cap;shared.cards=[album];
+const file=await exportTemplate(JSON.stringify(shared),'playlist','/saved','/cache');const raw=files.get(file).toString();assert.equal(JSON.parse(raw).assets.length,4);
+const imported=JSON.parse(await materializeTemplate(raw,'/received')).cards[0].capability;assert.equal(imported.albumItems.length,2);assert.equal(activeAlbum(imported,epoch+3600000).title,'B');assert.ok(imported.albumItems.every(a=>a.cover.startsWith('file:///received/')&&a.background.startsWith('file:///received/')));
+console.log('PASS: rotation boundaries, restart determinism, manual selection anchor, portable cover-library assets.');})().catch(e=>{console.error(e);process.exitCode=1;});

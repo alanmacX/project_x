@@ -17,8 +17,15 @@ export class CapType {
   static readonly YEAR_PROGRESS: string = 'yearprogress';
 }
 export const CAPABILITIES: string[] = ['clock', 'date', 'calendar', 'countdown', 'anniversary', 'dayprogress', 'yearprogress', 'battery', 'agenda', 'timetable', 'worldclock', 'lunar', 'album'];
+export interface AlbumCover {
+  id:string; cover:string; background:string; title:string; artist:string;
+}
 export interface CapBlock {
   k: string;
+  albumItems?: AlbumCover[];
+  albumInset?: number;
+  albumRotationMinutes?: number;
+  albumRotationStart?: number;
   albumId?: string;
   albumCover?: string;
   albumBackground?: string;
@@ -302,6 +309,11 @@ export function normalizeCapability(raw: CapBlock): CapBlock {
     cap.albumCover=local(raw.albumCover);cap.albumBackground=local(raw.albumBackground);
     cap.albumId=typeof raw.albumId==='string'?raw.albumId.slice(0,96):'';cap.albumSource=['local','musicbrainz'].includes(raw.albumSource??'')?raw.albumSource:'';
     cap.artist=typeof raw.artist==='string'?raw.artist.slice(0,160):'';
+    cap.albumInset=bounded(raw.albumInset??8,0,20,8);
+    cap.albumRotationMinutes=[60,180,360,1440].includes(raw.albumRotationMinutes??0)?raw.albumRotationMinutes:0;
+    cap.albumRotationStart=bounded(raw.albumRotationStart??0,0,8640000000000000,0);
+    const ids:string[]=[];
+    cap.albumItems=(Array.isArray(raw.albumItems)?raw.albumItems:[]).filter((a:AlbumCover)=>a!==null&&a!==undefined&&typeof a.id==='string'&&a.id.length>0&&!!local(a.cover)&&!!local(a.background)&&!ids.includes(a.id.slice(0,96))&&(ids.push(a.id.slice(0,96))>0)).slice(0,12).map((a:AlbumCover):AlbumCover=>({id:a.id.slice(0,96),cover:local(a.cover),background:local(a.background),title:typeof a.title==='string'?a.title.slice(0,160):'',artist:typeof a.artist==='string'?a.artist.slice(0,160):''}));
   }
   if (raw.k === 'worldclock') cap.zone = clockZone(typeof raw.zone === 'string' ? raw.zone : '');
   cap.readingStyle = ['plain','surface'].includes(raw.readingStyle ?? '') ? raw.readingStyle : 'auto';

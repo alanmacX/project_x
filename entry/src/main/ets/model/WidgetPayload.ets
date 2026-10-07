@@ -1,3 +1,4 @@
+import { activeAlbum } from './AlbumRotation';
 import { compactContours } from './ContourGeometry';
 import { fileIo } from '@kit.CoreFileKit';
 import { FridgeState, ShapePoint, normalizeState } from './CardSchema';
@@ -22,6 +23,7 @@ export async function prepareWidgetPayload(json: string, contourCache: string = 
       card.outline = valid ? cached : compactContours(card.outline);
       const cap=card.capability;
       if(cap?.k==='album') {
+        const album=activeAlbum(cap);cap.albumCover=album.cover;cap.albumBackground=album.background;cap.title=album.title;cap.artist=album.artist;cap.albumId=album.id;cap.albumItems=[];cap.albumRotationMinutes=0;
         for(const field of ['albumCover','albumBackground']) {
           const src=field==='albumCover'?cap.albumCover??'':cap.albumBackground??'';
           if(!src.startsWith('file://'))continue;

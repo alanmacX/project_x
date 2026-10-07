@@ -105,7 +105,7 @@ export struct CardCanvas {
     Stack({ alignContent: Alignment.TopStart }) {
       Stack({ alignContent: Alignment.TopStart }) {
       if(this.card.capability?.k==='album') {
-        AlbumCapability({cap:this.card.capability!,cardWidth:this.card.w,cardHeight:this.card.h,scaleFactor:this.scaleFactor})
+        AlbumCapability({tick:this.tick,widget:this.widget,cap:this.card.capability!,cardWidth:this.card.w,cardHeight:this.card.h,scaleFactor:this.scaleFactor})
       } else {
       Column().width('100%').height('100%').backgroundColor(materialColors(this.card.material, this.card.paper, this.card.ink)[0])
       if (this.card.shape === 'subject' && this.card.subjectPhoto && this.card.cutout.length > 0) {

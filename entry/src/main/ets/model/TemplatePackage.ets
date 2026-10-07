@@ -18,13 +18,13 @@ export function readPackage(json: string): TemplatePackage {
   if(raw.kind==='card'&&raw.state.cards.length!==1)throw new Error('卡片包内容不完整');
   const keys:string[]=[];for(const a of raw.assets){if(typeof a.key!=='string'||keys.includes(a.key)||!/^asset:\/\/\d+$/.test(a.key)||!/^\.(png|jpg|jpeg|gif|webp)$/.test(a.extension)||typeof a.data!=='string'||a.data.length>32*1024*1024)throw new Error('作品图片无效');keys.push(a.key);}
   const refs:string[]=[raw.state.background?.src??'',raw.state.background?.photo??''];
-  for(const c of raw.state.cards){refs.push(c.cutout??'',c.capability?.albumCover??'',c.capability?.albumBackground??'');for(const el of c.elements??[])refs.push(el.src??'');}
+  for(const c of raw.state.cards){refs.push(c.cutout??'',c.capability?.albumCover??'',c.capability?.albumBackground??'');for(const a of c.capability?.albumItems??[])refs.push(a.cover,a.background);for(const el of c.elements??[])refs.push(el.src??'');}
   if(refs.some((src:string)=>src.length>0&&!keys.includes(src)))throw new Error('作品图片引用不完整');
   // Normal runtime schemas intentionally reject package-local asset URIs.
   // Normalize their temporary file representation, then restore the validated keys.
   const swap=(from:string,to:string):void=>{
     const bg=raw.state.background;if(bg!==undefined){if(bg.src===from)bg.src=to;if(bg.photo===from)bg.photo=to;}
-    for(const c of raw.state.cards){if(c.cutout===from)c.cutout=to;if(c.capability){if(c.capability.albumCover===from)c.capability.albumCover=to;if(c.capability.albumBackground===from)c.capability.albumBackground=to;}for(const el of c.elements??[])if(el.src===from)el.src=to;}
+    for(const c of raw.state.cards){if(c.cutout===from)c.cutout=to;if(c.capability){if(c.capability.albumCover===from)c.capability.albumCover=to;if(c.capability.albumBackground===from)c.capability.albumBackground=to;for(const a of c.capability.albumItems??[]){if(a.cover===from)a.cover=to;if(a.background===from)a.background=to;}}for(const el of c.elements??[])if(el.src===from)el.src=to;}
   };
   for(const c of raw.state.cards){if(typeof c.id!=='string'||(c.elements??[]).length>128||(c.outline??[]).length>128||(c.outline??[]).reduce((sum:number,row)=>sum+row.length,0)>16384)throw new Error('作品图层或轮廓过多');}
   for(const key of keys)swap(key,'file:///template/'+key.slice(8));
