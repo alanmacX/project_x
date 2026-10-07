@@ -10,7 +10,7 @@ export struct BatteryCapability {
   @Prop compact:boolean=false;
   private diameter():number {return (this.compact?48:72)*this.unit;}
   private labelFont():number {return (this.compact?10:14)*this.unit;}
-  private label():string {return batteryLevel(this.cap)<0?'—':String(batteryLevel(this.cap))+'%';}
+  private label():string {return batteryLevel(this.cap)<0?'—':String(batteryLevel(this.cap));}
   build() {
     Column({space:2*this.unit}) {
       Stack({alignContent:Alignment.TopStart}) {

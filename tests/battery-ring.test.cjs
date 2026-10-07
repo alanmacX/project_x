@@ -23,7 +23,7 @@ assert.equal(p.batteryTint({percent:10,charging:true},'#262824'),p.batteryTint({
 assert.equal(p.batteryTint({percent:10,refreshState:'failed'},'#262824'),'#262824','stale readings never imply live charging');
 console.log('PASS battery ring: bottom 72-degree gap, sweep flags, finite scaled coordinates, zero/unknown level and charge/low/stale states');
 for(const diameter of [38.4,48,72,144]) {
- for(const label of ['—','0%','18%','67%','100%']) {
+ for(const label of ['—','0','18','67','100']) {
   const glyphs=p.batteryArcLabel(diameter,label,diameter/5);
   assert.equal(glyphs.length,label.length);
   for(const glyph of glyphs) {
