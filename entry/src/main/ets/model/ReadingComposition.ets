@@ -1,9 +1,10 @@
+import { edgeAttachment } from './EdgeAttachment';
 import { readingStyles, defaultReadingStyle } from './ReadingStylePolicy';
 import { FridgeCard, ElementBox } from './CardSchema';
 export { readingStyles } from './ReadingStylePolicy';
-export const READING_COMPOSITIONS:string[]=['bare','badge','sticker','space','tag','dock'];
-export const READING_COMPOSITION_LABELS:string[]=['裸字','徽章','自适应贴片','负空间布局','边缘挂签','信息 Dock'];
-export const READING_COMPOSITION_NOTES:string[]=['云白云母笔触轻扫内容背后，边缘自然淡出','圆形视觉焦点；适合电量等单项数据','半透、柔软轮廓；适合日期与中等信息量','轻云朵放在主体旁；可拖动到留白区域','带连接环的小标签；适合倒计时与进度','侧边小面板；适合课程表、日程等多行信息'];
+export const READING_COMPOSITIONS:string[]=['bare','badge','sticker','tag'];
+export const READING_COMPOSITION_LABELS:string[]=['笔触','徽章','边缘自适应','挂钩'];
+export const READING_COMPOSITION_NOTES:string[]=['半透明笔触，贴近内容区域','电量专用圆形徽章','沿卡片左右边缘滑动，选择内贴合或外贴合','穿孔挂钩，上沿留出内容避让区'];
 export function isReadingComposition(blend:string):boolean {return READING_COMPOSITIONS.includes(blend);}
 export function compositionSuggestion(kind:string):string {return defaultReadingStyle(kind);}
 /** Smooth fixed-complexity silhouette; generated in native pixel coordinates, no outline scan. */
@@ -30,7 +31,7 @@ export class CompositionOverflow {left:number=0;top:number=0;right:number=0;bott
 /** Cache fringe includes external attachments, including their rotated corners. */
 export function compositionOverflow(card:FridgeCard,scale:number):CompositionOverflow {
  const out=new CompositionOverflow();if(!card.capFree||!isReadingComposition(card.capability?.readingBlend??''))return out;
- const b=card.capBox,w=b.w*card.w,h=b.h*card.h,a=b.rot*Math.PI/180;
+ const b=card.capability?.readingBlend==='sticker'?edgeAttachment(card,card.capBox,card.capability.readingEdge||'left',card.capability.readingOutside===true).box:card.capBox,w=b.w*card.w,h=b.h*card.h,a=b.rot*Math.PI/180;
  const rw=Math.abs(Math.cos(a))*w+Math.abs(Math.sin(a))*h,rh=Math.abs(Math.sin(a))*w+Math.abs(Math.cos(a))*h;
  const cx=(b.x+b.w/2)*card.w,cy=(b.y+b.h/2)*card.h,fringe=['tag','dock'].includes(card.capability?.readingBlend??'')?50:Math.max(w,h)*.06;
  out.left=Math.max(0,-(cx-rw/2-fringe))*scale;out.top=Math.max(0,-(cy-rh/2-fringe))*scale;

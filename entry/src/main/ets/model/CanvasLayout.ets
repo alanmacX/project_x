@@ -106,24 +106,27 @@ function interiorMask(card: FridgeCard): InteriorMask {
   }
   if(maskCache.size>=128)maskCache.delete(Array.from(maskCache.keys())[0]);maskCache.set(key,mask);return mask;
 }
-/** Cached silhouette edges; four array reads per drag, no live contour traversal. */
+class SideProfile {left:number[]=[];right:number[]=[];}
+const sideProfiles=new Map<string,SideProfile>();
+/** Exact contour intersections are sampled once, then interpolated in O(1) per drag sample. */
 export function capabilityAttachmentEdges(card:FridgeCard,box:ElementBox):number[] {
  const cx=box.x+box.w/2,cy=box.y+box.h/2;
- if(card.shape==='round') {
-  const dx=Math.sqrt(Math.max(0,.25-Math.pow(cy-.5,2))),dy=Math.sqrt(Math.max(0,.25-Math.pow(cx-.5,2)));
-  return [.5-dx,.5+dx,.5-dy,.5+dy];
+ if(card.shape==='round') {const dx=Math.sqrt(Math.max(0,.25-Math.pow(cy-.5,2))),dy=Math.sqrt(Math.max(0,.25-Math.pow(cx-.5,2)));return [.5-dx,.5+dx,.5-dy,.5+dy];}
+ if(card.shape!=='subject'||!cardOutline(card).length){
+  const edge=(left:boolean):number=>{const top=cy<.5,f=card.shape==='blob'?(top?(left?.28:.12):(left?.18:.26)):0;
+   const rx=f||Math.min(.5,(card.shape==='pill'?Math.min(card.w,card.h)/2:16)/card.w),ry=f||Math.min(.5,(card.shape==='pill'?Math.min(card.w,card.h)/2:16)/card.h),y=top?cy:1-cy;
+   return y>=ry?0:rx*(1-Math.sqrt(Math.max(0,1-Math.pow((y-ry)/ry,2))));};
+  return [edge(true),1-edge(false),0,1];
  }
- if(card.shape!=='subject'||!cardOutline(card).length)return [0,1,0,1];
- const mask=interiorMask(card),stride=MASK_SIZE+1;
- if(!mask.left?.length){
-  mask.left=new Array<number>(MASK_SIZE).fill(1);mask.right=new Array<number>(MASK_SIZE).fill(0);
-  mask.top=new Array<number>(MASK_SIZE).fill(1);mask.bottom=new Array<number>(MASK_SIZE).fill(0);
-  for(let y=0;y<MASK_SIZE;y++)for(let x=0;x<MASK_SIZE;x++){
-   if(mask.integral[(y+1)*stride+x+1]-mask.integral[y*stride+x+1]-mask.integral[(y+1)*stride+x]+mask.integral[y*stride+x]===0){mask.left[y]=Math.min(mask.left[y],x/MASK_SIZE);mask.right[y]=Math.max(mask.right[y],(x+1)/MASK_SIZE);mask.top[x]=Math.min(mask.top[x],y/MASK_SIZE);mask.bottom[x]=Math.max(mask.bottom[x],(y+1)/MASK_SIZE);}
-  }
+ const key=outlineIdentity(card);let profile=sideProfiles.get(key);
+ if(!profile){
+  profile=new SideProfile();const loops=cardOutline(card);
+  for(let i=0;i<=256;i++){const xs=outlineIntervals(Math.max(.000001,Math.min(.999999,i/256)),loops);profile.left.push(xs.length?xs[0]:NaN);profile.right.push(xs.length?xs[xs.length-1]:NaN);}
+  for(const values of [profile.left,profile.right]){let first=values.findIndex(Number.isFinite);if(first<0){values.fill(values===profile.left?0:1);continue;}for(let i=0;i<first;i++)values[i]=values[first];let last=first;for(let i=first+1;i<values.length;i++)if(Number.isFinite(values[i])){for(let j=last+1;j<i;j++)values[j]=values[last]+(values[i]-values[last])*(j-last)/(i-last);last=i;}for(let i=last+1;i<values.length;i++)values[i]=values[last];}
+  if(sideProfiles.size>=128)sideProfiles.delete(Array.from(sideProfiles.keys())[0]);sideProfiles.set(key,profile);
  }
- const row=Math.max(0,Math.min(MASK_SIZE-1,Math.floor(cy*MASK_SIZE))),col=Math.max(0,Math.min(MASK_SIZE-1,Math.floor(cx*MASK_SIZE)));
- return [mask.left[row]<mask.right[row]?mask.left[row]:0,mask.left[row]<mask.right[row]?mask.right[row]:1,mask.top[col]<mask.bottom[col]?mask.top[col]:0,mask.top[col]<mask.bottom[col]?mask.bottom[col]:1];
+ const at=Math.max(0,Math.min(256,cy*256)),i=Math.floor(at),j=Math.min(256,i+1);
+ return [profile.left[i]+(profile.left[j]-profile.left[i])*(at-i),profile.right[i]+(profile.right[j]-profile.right[i])*(at-i),0,1];
 }
 /** Convex regular shapes need only four analytic corner checks, even while resizing. */
 function regularContains(card:FridgeCard,box:ElementBox):boolean {
@@ -165,7 +168,7 @@ export function fitCapabilityPosition(card:FridgeCard,requested:ElementBox):Elem
 }
 /** Gesture path uses constant-time mask queries, never a contour scan or nearest-position search. */
 export function constrainCapabilityDrag(card:FridgeCard,requested:ElementBox,previous:ElementBox):ElementBox {
-  if(card.capFree)return freeCapabilityBox(requested,isReadingComposition(card.capability?.readingBlend??''));
+  if(card.capFree)return freeCapabilityBox(requested,isReadingComposition(card.capability?.readingBlend??''),card.capability?.readingBlend==='sticker');
   if(card.shape==='subject'&&cardOutline(card).length===0)return fitContentBox(requested,safeContentBox(card));
   const f=subjectSurfaceFactor(card),inset=(1-f)/2,mask=card.shape==='subject'?interiorMask(card):undefined;
   const valid=(x:number,y:number):boolean=>{const box=new ElementBox();box.x=(x-inset)/f;box.y=(y-inset)/f;box.w=requested.w/f;box.h=requested.h/f;return mask!==undefined?maskContains(mask,box):regularContains(card,box);};
@@ -179,8 +182,8 @@ export function constrainCapabilityDrag(card:FridgeCard,requested:ElementBox,pre
   return result;
 }
 /** Foreground movement stays continuous across concavities and transparent holes. */
-export function freeCapabilityBox(requested:ElementBox,outside:boolean=false):ElementBox {
-  const box=new ElementBox();box.w=Math.min(1,Math.max(.01,requested.w));box.h=Math.min(1,Math.max(.01,requested.h));
+export function freeCapabilityBox(requested:ElementBox,outside:boolean=false,wide:boolean=false):ElementBox {
+  const box=new ElementBox();box.w=Math.min(wide?3:1,Math.max(.01,requested.w));box.h=Math.min(1,Math.max(.01,requested.h));
   box.x=Math.max(outside?-2:0,Math.min(outside?2:1-box.w,requested.x));box.y=Math.max(outside?-2:0,Math.min(outside?2:1-box.h,requested.y));box.rot=outside?requested.rot:0;box.opacity=requested.opacity;return box;
 }
 export function capabilityObstructed(card:FridgeCard):boolean {
@@ -193,7 +196,7 @@ export function capabilityBox(card: FridgeCard): ElementBox {
   const cached=layoutCache.get(key);if(cached!==undefined)return cached;
   const requested=new ElementBox();requested.x=card.capBox.x;requested.y=card.capBox.y;requested.opacity=card.capBox.opacity;requested.rot=card.capBox.rot;
   requested.w=Math.max(card.capBox.w,minimum.w/card.w);requested.h=Math.max(card.capBox.h,minimum.h/card.h);
-  const result=card.capFree?freeCapabilityBox(requested,isReadingComposition(card.capability?.readingBlend??'')):fitCapabilityPosition(card,requested);
+  const result=card.capFree?freeCapabilityBox(requested,isReadingComposition(card.capability?.readingBlend??''),card.capability?.readingBlend==='sticker'):fitCapabilityPosition(card,requested);
   if(layoutCache.size>128)layoutCache.clear();layoutCache.set(key,result);return result;
 }
 export function resizeFactor(w: number, h: number, dx: number, dy: number, angle: number): number {

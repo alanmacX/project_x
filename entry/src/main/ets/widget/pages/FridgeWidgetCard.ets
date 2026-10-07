@@ -40,15 +40,12 @@ struct FridgeWidgetCard {
   private imageReady(src:string):void {
     if(!this.alive||!this.incoming||this.incoming.src!==src||this.blending)return;
     this.blending=true;const generation=this.generation;
-    // Establish the incoming node before animating its opacity. Form pages have
-    // global animateTo, but no app UIContext or JS timer-based frame loop.
-    animateTo({duration:16,onFinish:()=>{
-      if(!this.alive||generation!==this.generation)return;
-      animateTo({duration:240,curve:Curve.EaseInOut,onFinish:()=>{
-        if(!this.alive||generation!==this.generation||!this.incoming)return;
-        this.displayed=this.incoming;this.incoming=null;this.mix=0;this.blending=false;
-      }},()=>this.mix=1);
-    }},()=>this.mix=.001);
+    // Visibility commits in the animation update itself. Completion is cleanup only;
+    // a suspended Form host may omit callbacks without hiding the newest artwork.
+    animateTo({duration:240,curve:Curve.EaseInOut,onFinish:()=>{
+      if(!this.alive||generation!==this.generation||!this.incoming)return;
+      this.displayed=this.incoming;this.incoming=null;this.mix=0;this.blending=false;
+    }},()=>this.mix=1);
   }
   private syncPacket():void {
     if(!this.alive||!this.packetJson||this.appliedPacket===this.packetJson)return;
@@ -69,22 +66,15 @@ struct FridgeWidgetCard {
       if(backgroundChanged)try{this.canvasBackground=normalizeBackground(JSON.parse(packet.background) as CanvasBackground);}catch(_){}
       this.sceneReady=true;this.refresh();
     };
-    if(first){apply();return;}
-    // Form pages support the global animation API; UIContext.animateTo is app-only.
-    this.sceneAnimating=true;
-    const finish=():void=>{if(!this.alive||generation!==this.sceneGeneration)return;this.sceneAnimating=false;this.syncPacket();};
-    if(differentCanvas) {
-      animateTo({duration:240,curve:Curve.EaseIn,onFinish:()=>{if(!this.alive||generation!==this.sceneGeneration)return;apply();
-        // Commit the new nodes at the offscreen pose before their entrance.
-        // Form renderers do not support JS timers or app UIContext methods.
-        animateTo({duration:16,onFinish:()=>{if(this.alive&&generation===this.sceneGeneration)animateTo({duration:420,curve:Curve.Friction,onFinish:finish},()=>this.scenePhase=0);}},()=>this.scenePhase=1.001);
-      }},()=>this.scenePhase=1);
-    }else animateTo({duration:180,curve:Curve.EaseOut,onFinish:finish},()=>{apply();this.scenePhase=0;});
+    // Commit the complete latest scene now. A Form can be suspended before animation
+    // completion; correctness must never depend on an onFinish callback.
+    this.sceneAnimating=false;this.scenePhase=0;
+    if(first)apply();
+    else animateTo({duration:differentCanvas?300:180,curve:Curve.EaseOut},()=>apply());
   }
+
   private sceneOffset(id:string,horizontal:boolean):number {
-    const rect=scenePercent(this.cardMap[id],this.widthValue()/this.heightValue()),dx=rect.x+rect.w/2-50,dy=rect.y+rect.h/2-50;
-    const axis=Math.abs(dx)>=Math.abs(dy),length=Math.max(this.widthValue(),this.heightValue())*1.5;
-    return (horizontal===axis?(horizontal?(dx<0?-1:1):(dy<0?-1:1))*length:0)*this.scenePhase;
+    return 0;
   }
   @LocalStorageProp('background') @Watch('syncBackground') backgroundJson: string = '{}';
   @State canvasBackground: CanvasBackground = new CanvasBackground();
@@ -142,17 +132,18 @@ struct FridgeWidgetCard {
         }
       }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
       ForEach(this.cardIds, (id: string) => {
-        Stack({ alignContent: Alignment.TopStart }) {
-        CardFace({ card: this.cardMap[id], scaleFactor: this.widthValue() / BOARD_W, tick: this.rev, widget: true })
-          .width('100%').height('100%').hitTestBehavior(HitTestMode.None)
-
-        }
-          .width(scenePercent(this.cardMap[id], this.widthValue() / this.heightValue()).w + '%').height(scenePercent(this.cardMap[id], this.widthValue() / this.heightValue()).h + '%')
-          .position({x:0,y:0})
-          .rotate({ angle: this.cardMap[id].rot, centerX: 0, centerY: '100%' }).translate({x:scenePercent(this.cardMap[id],this.widthValue()/this.heightValue()).x*this.widthValue()/100+this.sceneOffset(id,true),y:scenePercent(this.cardMap[id],this.widthValue()/this.heightValue()).y*this.heightValue()/100+this.sceneOffset(id,false)}).zIndex(this.cardMap[id].z)
-          .transition(TransitionEffect.OPACITY.combine(TransitionEffect.scale({x:.96,y:.96})))
-          .hitTestBehavior(HitTestMode.None)
+        Stack({alignContent:Alignment.TopStart}) {
+          CardFace({card:this.cardMap[id],scaleFactor:this.widthValue()/BOARD_W,tick:this.rev,widget:true})
+            .width('100%').height('100%').hitTestBehavior(HitTestMode.None)
+        }.width(scenePercent(this.cardMap[id],this.widthValue()/this.heightValue()).w+'%')
+          .height(scenePercent(this.cardMap[id],this.widthValue()/this.heightValue()).h+'%')
+          .position({x:scenePercent(this.cardMap[id],this.widthValue()/this.heightValue()).x+'%',y:scenePercent(this.cardMap[id],this.widthValue()/this.heightValue()).y+'%'})
+          .rotate({angle:this.cardMap[id].rot,centerX:0,centerY:'100%'})
+          .zIndex(this.cardMap[id].z).hitTestBehavior(HitTestMode.None)
       }, (id: string) => id)
+      // One stable event surface above all artwork, including overflow and images.
+      Column().width('100%').height('100%').backgroundColor(Color.Transparent)
+        .zIndex(1000000).hitTestBehavior(HitTestMode.Block).accessibilityText('打开冰箱贴画布').onClick(()=>this.open())
     }.width('100%').height('100%').backgroundColor(Color.White).borderRadius(24).clip(true)
       .onSizeChange((_: SizeOptions, size: SizeOptions) => {
         const width = Number(size.width), height = Number(size.height);
@@ -160,6 +151,6 @@ struct FridgeWidgetCard {
           this.measuredWidth = width; this.measuredHeight = height;
         }
       })
-      .accessibilityText('打开冰箱贴画布').onClick(() => this.open())
+      .accessibilityLevel('no')
   }
 }

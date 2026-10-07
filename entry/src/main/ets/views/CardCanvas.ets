@@ -1,3 +1,5 @@
+import { isReadingComposition } from '../model/ReadingComposition';
+import { edgeAttachment, EdgeAttachment } from '../model/EdgeAttachment';
 import { hookReserve } from '../model/MicaGeometry';
 import { EditorLayerMotion } from '../model/EditorLayerMotion';
 import { AlbumCapability } from './AlbumCapability';
@@ -46,7 +48,7 @@ struct CanvasElementLayer {
     Column() {ElementView({element:this.element,ink:this.ink,scaleFactor:this.scaleFactor,widget:this.widget})}
       .width(this.box().w*100+'%').height(this.box().h*100+'%')
       .position({x:this.box().x*100+'%',y:this.box().y*100+'%'})
-      .rotate({angle:this.box().rot}).rotate({angle:this.box().rot}).opacity(this.box().opacity).renderGroup(!this.element.animated)
+      .rotate({angle:this.box().rot}).opacity(this.box().opacity).renderGroup(!this.element.animated)
   }
 }
 
@@ -57,8 +59,17 @@ struct CapabilityContentLayer {
   @Prop scaleFactor: number = 1;
   @Prop tick: number = 0;
   private box(): ElementBox { return this.motion.id==='capability'?this.motion.box:capabilityPlacement(this.card); }
+  private contactKey:string='';
+  private contactValue:EdgeAttachment=new EdgeAttachment();
+  private contact():EdgeAttachment {
+    const b=this.box(),edge=this.card.capability?.readingEdge||'left';
+    if(this.card.capability?.readingBlend!=='sticker')return new EdgeAttachment();
+    const key=[b.y,b.w,b.h,this.card.w,this.card.h,this.card.cutout,this.card.subjectVersion,this.card.renderContourKey,this.card.shape,edge,this.card.capability?.readingOutside].join(':');
+    if(key!==this.contactKey){this.contactKey=key;this.contactValue=edgeAttachment(this.card,b,edge,this.card.capability?.readingOutside===true);}return this.contactValue;
+  }
+
   private capSurfaceBox(): ElementBox {
-    const box = this.box(), f = subjectSurfaceFactor(this.card), inset = (1 - f) / 2;
+    const box = this.card.capability?.readingBlend==='sticker'?this.contact().box:this.box(), f = subjectSurfaceFactor(this.card), inset = (1 - f) / 2;
     const surface = new ElementBox(); surface.x = (box.x - inset) / f; surface.y = (box.y - inset) / f;
     surface.w = box.w / f; surface.h = box.h / f; return surface;
   }
@@ -67,13 +78,13 @@ struct CapabilityContentLayer {
   private paperLabel():boolean {return this.hasReadingSurface()&&['paper','bare','badge','sticker','space','tag','dock'].includes(this.card.capability?.readingBlend??'');}
   build() {
     Stack() {
-      Column() { CapabilityView({cap:this.card.capability!,ink:this.paperLabel()?paperReadingInk(this.capabilityInk()):this.capabilityInk(),readingHaloEnabled:(this.hasReadingSurface()&&!this.paperLabel())||this.card.capability?.readingBlend==='bare',contentBackingEnabled:this.hasReadingSurface(),backingEdge:this.motion.id==='capability'?this.motion.edge:(this.card.capability?.readingEdge??''),backingTint:this.card.capability?.readingTint||materialColors(this.card.material,this.card.paper,this.card.ink)[0],scaleFactor:this.scaleFactor,
-        contentWidth:this.card.w*this.box().w-2*capabilityInset(this.card),contentHeight:this.card.h*this.box().h-2*capabilityInset(this.card)-hookReserve(this.card.capability?.readingBlend??''),tick:this.tick}) }
+      Column() { CapabilityView({cap:this.card.capability!,ink:this.paperLabel()?paperReadingInk(this.capabilityInk()):this.capabilityInk(),readingHaloEnabled:(this.hasReadingSurface()&&!this.paperLabel())||this.card.capability?.readingBlend==='bare',contentBackingEnabled:this.hasReadingSurface(),backingEdge:this.card.capability?.readingEdge??'left',backingProfile:this.contact().profile,backingLeft:(this.card.capability?.readingEdge!=='right')!==(this.card.capability?.readingOutside===true),backingGutter:this.contact().gutter,backingTint:this.card.capability?.readingTint||materialColors(this.card.material,this.card.paper,this.card.ink)[0],scaleFactor:this.scaleFactor,
+        contentWidth:this.card.w*(this.card.capability?.readingBlend==='sticker'?this.contact().box.w:this.box().w)-2*capabilityInset(this.card)-this.contact().gutter,contentHeight:this.card.h*this.box().h-2*capabilityInset(this.card)-hookReserve(this.card.capability?.readingBlend??''),tick:this.tick}) }
         .padding(0).width('100%').height('100%')
     }.width((this.capSurfaceBox().w*100)+'%').height((this.capSurfaceBox().h*100)+'%')
       .position({x:(this.capSurfaceBox().x*100)+'%',y:(this.capSurfaceBox().y*100)+'%'})
 
-      .rotate({angle:this.box().rot}).opacity(this.box().opacity)
+      .rotate({angle:this.card.capability?.readingBlend==='sticker'?0:this.box().rot}).opacity(this.box().opacity)
   }
 }
 
@@ -89,7 +100,7 @@ export struct CardCanvas {
   @Prop movingLayerId: string = '';
   @Prop moveX: number = 0;
   @Prop moveY: number = 0;
-  private freeCapability():boolean {return this.card.capFree || this.layerMotion.id==='capability';}
+  private freeCapability():boolean {return this.card.capFree || isReadingComposition(this.card.capability?.readingBlend??'') || this.layerMotion.id==='capability';}
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       Stack({ alignContent: Alignment.TopStart }) {

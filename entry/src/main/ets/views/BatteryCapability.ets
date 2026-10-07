@@ -12,6 +12,10 @@ export struct BatteryCapability {
   @Prop contentBackingEnabled:boolean=false;
   @Prop backingTint:string='#E8D6B0';
   @Prop backingEdge:string='';
+  @Prop backingProfile:number[]=[];
+  @Prop backingLeft:boolean=true;
+  @Prop backingGutter:number=0;
+  @Prop scaleFactor:number=1;
   @Prop unit:number=1;
   @Prop compact:boolean=false;
   private diameter():number {return (this.compact?48:72)*this.unit;}
@@ -25,12 +29,15 @@ export struct BatteryCapability {
     const half=(this.labelFont()*(.62*(this.label().length-1)+1.1)+4*this.unit)/2/(this.diameter()*.44)*180/Math.PI;
     return batteryPaperArcMask(vp2px(this.labelPaperDiameter()),vp2px(Math.max(0,this.diameter()*.44-this.labelFont()*.625-2*this.unit)),90-half,half*2);
   }
+  @Builder private edgeBacking(){if(this.contentBackingEnabled&&this.backingProfile.length){ReadingBacking({blend:'sticker',profile:this.backingProfile,contactLeft:this.backingLeft,scaleFactor:this.unit})}}
   build() {
+    Stack() {
+      this.edgeBacking()
     Column() {
       Stack({alignContent:Alignment.TopStart}) {
         if(this.contentBackingEnabled&&['badge','tag','dock'].includes(this.cap.readingBlend??'')) {
-          ReadingBacking({blend:this.cap.readingBlend??'badge',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,scaleFactor:this.unit}).width(this.labelPaperDiameter()).height(this.labelPaperDiameter()+hookReserve(this.cap.readingBlend??'')*this.unit).position({x:(this.diameter()-this.labelPaperDiameter())/2,y:(this.diameter()-this.labelPaperDiameter())/2-hookReserve(this.cap.readingBlend??'')*this.unit})
-        } else if(this.contentBackingEnabled) {
+          ReadingBacking({surfaceWidth:this.labelPaperDiameter(),surfaceHeight:this.labelPaperDiameter()+hookReserve(this.cap.readingBlend??'')*this.unit,blend:this.cap.readingBlend??'badge',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,scaleFactor:this.unit}).width(this.labelPaperDiameter()).height(this.labelPaperDiameter()+hookReserve(this.cap.readingBlend??'')*this.unit).position({x:(this.diameter()-this.labelPaperDiameter())/2,y:(this.diameter()-this.labelPaperDiameter())/2-hookReserve(this.cap.readingBlend??'')*this.unit})
+        } else if(this.contentBackingEnabled&&!this.backingProfile.length) {
           ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,radius:999,scaleFactor:this.unit}).width(this.paperDiameter()).height(this.paperDiameter())
             .clip(new Path().commands(this.paperMask())).position({x:(this.diameter()-this.paperDiameter())/2,y:(this.diameter()-this.paperDiameter())/2})
           ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,radius:999,scaleFactor:this.unit}).width(this.labelPaperDiameter()).height(this.labelPaperDiameter())
@@ -63,7 +70,8 @@ export struct BatteryCapability {
           }
         },(index:number)=>String(index))
       }.width(this.diameter()).height(this.diameter()+8*this.unit).translate({y:hookReserve(this.cap.readingBlend??'')*this.unit/2})
-    }.width('100%').height('100%').justifyContent(FlexAlign.Center)
+    }.width('100%').height('100%').padding({left:this.backingLeft?this.backingGutter*this.scaleFactor:0,right:!this.backingLeft?this.backingGutter*this.scaleFactor:0}).justifyContent(FlexAlign.Center)
+    }.width('100%').height('100%')
       .accessibilityText(batteryStatus(this.cap)+' '+(batteryLevel(this.cap)<0?'':batteryLevel(this.cap)+'%'))
   }
 }

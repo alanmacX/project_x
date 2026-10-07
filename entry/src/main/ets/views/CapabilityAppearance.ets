@@ -19,6 +19,7 @@ export struct CapabilityAppearance {
   onCompare:()=>void=()=>{};
   onHook:(position:number)=>void=()=>{};
   onBlend:(blend:string)=>void=()=>{};
+  onAttachment:(side:string,outer:boolean)=>void=()=>{};
   onArrange:(anchor:string)=>void=()=>{};
   onStyle:(style:string)=>void=()=>{};
   onColor:()=>void=()=>{};
@@ -37,7 +38,7 @@ export struct CapabilityAppearance {
       }.width('100%')
       ColorSetting({label:'内容颜色',color:this.ink(),automatic:!this.card.ink,sourceKey:this.card.id+':ink:',appDark:this.appDark,
         onPick:(color:string,key:string)=>this.onColorPick(color,key),onFallback:()=>this.onColor()})
-      if(this.card.capability?.k!=='album') {Text('在预览中拖动内容，用角落手柄放大；可自由摆放到卡片外；贴片与负空间靠近边框时只吸附最近一边。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
+      if(this.card.capability?.k!=='album') {Text('笔触与挂钩可自由摆放；边缘自适应沿左右轮廓滑动，用角落手柄调整大小。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
       if(this.card.capability?.k!=='album') {Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
         Row(){Text('排版与可读性').fontSize(14).maxLines(1).layoutWeight(1).fontColor(AppDesign.text(this.appDark));Blank();SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([AppDesign.muted(this.appDark)]).rotate({angle:this.readingExpanded?180:0})}.width('100%').padding({left:12,right:12})
       }.width('100%').height(44).padding(0).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.getUIContext().animateTo(settingsDialogOpen(),()=>this.readingExpanded=!this.readingExpanded))
@@ -60,6 +61,10 @@ export struct CapabilityAppearance {
       }.width('100%')
       Text('建议：'+READING_COMPOSITION_LABELS[READING_COMPOSITIONS.indexOf(compositionSuggestion(this.card.capability?.k??''))]+' · 已筛选适合此能力的样式').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       Text(READING_COMPOSITION_NOTES[Math.max(0,READING_COMPOSITIONS.indexOf(this.card.capability?.readingBlend??''))]).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+      if(this.card.capability?.readingBlend==='sticker'){
+        SettingsSegmented({labels:['左侧','右侧'],selectedIndex:this.card.capability.readingEdge==='right'?1:0,appDark:this.appDark,onSelect:(i:number)=>this.onAttachment(i===0?'left':'right',this.card.capability?.readingOutside===true)})
+        SettingsSegmented({labels:['内贴合','外贴合'],selectedIndex:this.card.capability.readingOutside?1:0,appDark:this.appDark,onSelect:(i:number)=>this.onAttachment(this.card.capability?.readingEdge||'left',i===1)})
+      }
       if(['tag','dock'].includes(this.card.capability?.readingBlend??'')) {HookPlacement({hookLocation:this.card.capability?.readingHook??.2,appDark:this.appDark,onChoose:(p:number)=>this.onHook(p)})}
       Button('对比融合方案',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).width('100%').fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.onCompare())
       }.width('100%').transition(settingsReveal())

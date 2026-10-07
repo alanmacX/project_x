@@ -1,5 +1,6 @@
 import { EditorLayerMotion } from '../model/EditorLayerMotion';
-import { ElementBox } from '../model/CardSchema';
+import { ElementBox, FridgeCard } from '../model/CardSchema';
+import { edgeAttachment } from '../model/EdgeAttachment';
 import { selectionHandles, SelectionHandles } from '../model/SelectionHandles';
 import { immersiveChrome } from '../model/ChromeMaterial';
 import { AppDesign } from '../model/AppDesign';
@@ -7,6 +8,7 @@ import { AppDesign } from '../model/AppDesign';
 export struct EditorLayerTarget {
   @ObjectLink motion:EditorLayerMotion;
   @Prop targetId:string='';
+  @Prop attachmentCard:FridgeCard|null=null;
   @Prop box:ElementBox=new ElementBox();
   @Prop factor:number=1;
   @Prop selected:boolean=false;
@@ -15,7 +17,7 @@ export struct EditorLayerTarget {
   onUpdate:(e:GestureEvent)=>void=()=>{};
   onEnd:(e:GestureEvent)=>void=()=>{};
   onCancel:()=>void=()=>{};
-  private live():ElementBox {return this.motion.id===this.targetId?this.motion.box:this.box;}
+  private live():ElementBox {const b=this.motion.id===this.targetId?this.motion.box:this.box,c=this.attachmentCard;return c?.capability?.readingBlend==='sticker'?edgeAttachment(c,b,c.capability.readingEdge||'left',c.capability.readingOutside===true).box:b;}
   private inset():number {return (1-this.factor)/2;}
   build() {
     Stack().width(this.live().w*this.factor*100+'%').height(this.live().h*this.factor*100+'%')
@@ -28,6 +30,7 @@ export struct EditorLayerTarget {
 export struct EditorLayerHandles {
   @ObjectLink motion:EditorLayerMotion;
   @Prop targetId:string='';
+  @Prop attachmentCard:FridgeCard|null=null;
   @Prop box:ElementBox=new ElementBox();
   @Prop contentW:number=1;
   @Prop contentH:number=1;
@@ -44,7 +47,8 @@ export struct EditorLayerHandles {
   onEnd:()=>void=()=>{};
   onCancel:()=>void=()=>{};
   private handles():SelectionHandles {
-    const b=this.motion.id===this.targetId?this.motion.box:this.box,inset=(1-this.factor)/2,box=new ElementBox();
+    const raw=this.motion.id===this.targetId?this.motion.box:this.box,c=this.attachmentCard;
+    const b=c?.capability?.readingBlend==='sticker'?edgeAttachment(c,raw,c.capability.readingEdge||'left',c.capability.readingOutside===true).box:raw,inset=(1-this.factor)/2,box=new ElementBox();
     box.x=inset+b.x*this.factor;box.y=inset+b.y*this.factor;box.w=b.w*this.factor;box.h=b.h*this.factor;box.rot=b.rot;
     return selectionHandles(box,this.contentW,this.contentH,this.angle,this.viewportWidth,this.viewportHeight,this.left,this.top);
   }
@@ -58,5 +62,5 @@ export struct EditorLayerHandles {
       .gesture(PanGesture({distance:2}).onActionStart((e)=>this.onStart(e)).onActionUpdate((e)=>{if(resize)this.onResize(e);else this.onRotate(e);})
         .onActionEnd((e)=>{if(resize)this.onResize(e);else this.onRotate(e);this.onEnd();}).onActionCancel(()=>this.onCancel()))
   }
-  build() {Stack({alignContent:Alignment.TopStart}) {this.handle(true);this.handle(false)}.width('100%').height('100%').hitTestBehavior(HitTestMode.Transparent)}
+  build() {Stack({alignContent:Alignment.TopStart}) {this.handle(true);if(this.attachmentCard?.capability?.readingBlend!=='sticker'){this.handle(false)}}.width('100%').height('100%').hitTestBehavior(HitTestMode.Transparent)}
 }

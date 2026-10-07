@@ -20,6 +20,9 @@ export struct SummaryCapability {
   @Prop contentBackingEnabled:boolean=false;
   @Prop backingTint:string='#E8D6B0';
   @Prop backingEdge:string='';
+  @Prop backingProfile:number[]=[];
+  @Prop backingLeft:boolean=true;
+  @Prop backingGutter:number=0;
   @Prop scaleFactor: number = 1;
   @State presentation: SummaryPresentation = new SummaryPresentation();
   aboutToAppear(): void { this.refresh(); }
@@ -27,16 +30,20 @@ export struct SummaryCapability {
   private contentScale(): number { return Math.max(.001,capabilityContentScale(this.cap,this.contentWidth,this.contentHeight)); }
   private s(): number { return this.scaleFactor*this.contentScale(); }
   private backingWidth():number {
-    const s=this.s(),measure=(text:string,font:number):number=>paperTextWidth(this.getUIContext(),text,font);
+    if(this.backingProfile.length)return (this.contentWidth+2*compositionPadding(this.cap.readingBlend??'')+this.backingGutter)*this.scaleFactor;
+    const s=this.s(),measure=(text:string,font:number):number=>paperTextWidth(text,font);
     let width=measure(this.presentation.heading,11*s)+(this.presentation.remaining?measure('+'+this.presentation.remaining,11*s)+8*s:0);
     if(!this.presentation.events.length)width=Math.max(width,measure(this.presentation.empty,16*s));
     for(const event of this.presentation.events)width=Math.max(width,measure(event.title,16*s),measure(eventWhen(event,this.tick||Date.now())+(event.location?' · '+event.location:''),11*s));
     return Math.min((this.contentWidth+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,Math.ceil(width)+2*compositionPadding(this.cap.readingBlend??'')*s);
   }
-  @Builder private readingBackground() {if(this.contentBackingEnabled){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,radius:8*this.s(),scaleFactor:this.s()})}}
+  @Builder private readingBackground() {if(this.contentBackingEnabled){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,profile:this.backingProfile,contactLeft:this.backingLeft,surfaceWidth:this.backingWidth(),surfaceHeight:(this.contentHeight+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,hook:this.cap.readingHook??.2,ink:this.ink,radius:8*this.s(),scaleFactor:this.s()})}}
   @Builder private readingHook() {if(this.contentBackingEnabled&&['tag','dock'].includes(this.cap.readingBlend??'')){ReadingHook({hook:this.cap.readingHook??.2,scaleFactor:this.s()})}}
+  @State private backingHeight:number=0;
   build() {
     Column() {
+    Stack({alignContent:Alignment.TopStart}) {
+      if(this.contentBackingEnabled){Column(){this.readingBackground()}.width(this.backingWidth()).height(this.backingHeight).position({x:0,y:0}).hitTestBehavior(HitTestMode.None)}
     Column() {
     Column({space:8*this.s()}) {
       Row() {
@@ -52,9 +59,11 @@ export struct SummaryCapability {
           Text(eventWhen(e,this.tick||Date.now())+(e.location?' · '+e.location:'')).fontSize(11*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.s(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
         }.width('100%').height(this.contentBackingEnabled?undefined:40*this.s()).alignItems(HorizontalAlign.Start)
       },(e:AgendaItem)=>e.id)
-    }.width(this.contentBackingEnabled?Math.max(1,this.backingWidth()-2*compositionPadding(this.cap.readingBlend??'')*this.s()):'100%').constraintSize({maxHeight:this.contentBackingEnabled?Math.max(1,this.contentHeight*this.scaleFactor):undefined}).clip(this.contentBackingEnabled)
-    }.width(this.contentBackingEnabled?this.backingWidth():'100%').height(this.contentBackingEnabled?undefined:'100%').padding({left:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0,right:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0,bottom:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0,top:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s()+hookReserve(this.cap.readingBlend??'')*this.s():0})
-      .background(this.readingBackground).overlay(this.readingHook).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Start)
-    }.width('100%').height('100%').justifyContent(this.backingEdge==='top'?FlexAlign.Start:this.backingEdge==='bottom'?FlexAlign.End:FlexAlign.Center).alignItems(this.backingEdge==='left'?HorizontalAlign.Start:this.backingEdge==='right'?HorizontalAlign.End:HorizontalAlign.Center)
+    }.width(this.contentBackingEnabled?Math.max(1,this.backingWidth()-2*compositionPadding(this.cap.readingBlend??'')*this.s()-this.backingGutter*this.scaleFactor):'100%').constraintSize({maxHeight:this.contentBackingEnabled?Math.max(1,this.contentHeight*this.scaleFactor):undefined}).clip(this.contentBackingEnabled)
+    }.width(this.contentBackingEnabled?this.backingWidth():'100%').height(this.backingProfile.length?'100%':this.contentBackingEnabled?undefined:'100%').padding({left:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s()+(this.backingLeft?this.backingGutter*this.scaleFactor:0):0,right:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s()+(!this.backingLeft?this.backingGutter*this.scaleFactor:0):0,bottom:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0,top:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s()+hookReserve(this.cap.readingBlend??'')*this.s():0})
+      .onSizeChange((_:SizeOptions,size:SizeOptions)=>{const h=Number(size.height);if(h>0&&Math.abs(h-this.backingHeight)>.01)this.backingHeight=h;}).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Start)
+      if(this.contentBackingEnabled&&['tag','dock'].includes(this.cap.readingBlend??'')){Column(){this.readingHook()}.width(this.backingWidth()).height(this.backingHeight).position({x:0,y:0}).hitTestBehavior(HitTestMode.None)}
+    }.width(this.contentBackingEnabled?this.backingWidth():'100%').height(this.backingProfile.length?'100%':this.contentBackingEnabled?undefined:'100%')
+    }.width('100%').height('100%').justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
   }
 }

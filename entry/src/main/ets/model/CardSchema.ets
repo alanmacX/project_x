@@ -37,6 +37,7 @@ export interface CapBlock {
   albumSource?: string;
   readingBlend?: string; // bare | badge | sticker | space | tag | dock; legacy paper/feather/scrim/halo retained
   readingEdge?: string;
+  readingOutside?: boolean;
   readingHook?: number;
   readingTintKey?: string;
   readingTint?: string; // local photo palette, persisted; never sampled while moving
@@ -281,6 +282,7 @@ export function normalizeState(raw: FridgeState): FridgeState {
         if (card.capability === null) {
           card.capability = normalizeCapability(cap);
           if(card.capFree&&['bare','badge','sticker','space','tag','dock'].includes(card.capability.readingBlend??'')) {
+            if(card.capability.readingBlend==='sticker')card.capBox.w=bounded(source.capBox?.w,.01,3,.8);
             card.capBox.x=bounded(source.capBox?.x,-2,2,.1);
             card.capBox.y=bounded(source.capBox?.y,-2,2,.12);
             card.capBox.rot=bounded(source.capBox?.rot,-180,180,0);
@@ -335,12 +337,13 @@ export function normalizeCapability(raw: CapBlock): CapBlock {
   }
   if (raw.k === 'worldclock') cap.zone = clockZone(typeof raw.zone === 'string' ? raw.zone : '');
   cap.readingStyle = ['plain','surface'].includes(raw.readingStyle ?? '') ? raw.readingStyle : 'auto';
+  cap.readingOutside=raw.readingOutside===true;
   cap.readingEdge=['left','right','top','bottom'].includes(raw.readingEdge??'')?raw.readingEdge:'';
   cap.readingHook=bounded(raw.readingHook??.2,0,1,.2);
   cap.readingTintKey=typeof raw.readingTintKey==='string'?raw.readingTintKey.slice(0,64):'';
   cap.readingTint=/^#[0-9a-fA-F]{6}$/.test(raw.readingTint??'')?raw.readingTint:'';
   cap.readingBlend=['bare','badge','sticker','space','tag','dock','paper','feather','scrim','halo'].includes(raw.readingBlend??'')?raw.readingBlend:'feather';
-  if(raw.k!=='album')cap.readingBlend=COMPOSITION_KEYS.includes(cap.readingBlend??'')?validReadingStyle(raw.k,cap.readingBlend!):defaultReadingStyle(raw.k);
+  if(raw.k!=='album')cap.readingBlend=['bare','badge','sticker','space','tag','dock'].includes(cap.readingBlend??'')?validReadingStyle(raw.k,cap.readingBlend!):defaultReadingStyle(raw.k);
   cap.parcelPlace = typeof raw.parcelPlace === 'string' ? raw.parcelPlace.slice(0,80) : '';
   cap.title = typeof raw.title === 'string' ? raw.title.slice(0,160) : '';
   cap.interval = Math.round(bounded(raw.interval ?? 60,30,1440,60));

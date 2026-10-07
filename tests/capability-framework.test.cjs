@@ -172,18 +172,19 @@ console.log('PASS thin-paper contrast, compact corner geometry and persisted mat
 for(const ink of ['#FFFFFF','#323232','#6D6D6D','#000000'])for(const background of ['#000000','#FFFFFF'])assert.ok(p.textContrast(p.paperReadingInk(ink),p.paperReadingBackground(background))>=4.5,'translucent paper keeps ink readable over darkest/lightest photographs');
 assert.equal(p.READING_PAPER_FILL.slice(1,3),'80');
 
-const textWidth=load('PaperTextWidth');let nativeTextMeasures=0;
-const context={vp2px:(v)=>v*2,px2vp:(v)=>v/2,getMeasureUtils:()=>({measureTextSize:()=>{nativeTextMeasures++;return {width:100,height:20};}})};
-for(let i=0;i<500;i++)assert.equal(textWidth.paperTextWidth(context,'同一文字',14),50);
-assert.equal(nativeTextMeasures,1,'dragging must reuse native text measurements');
-textWidth.paperTextWidth(context,'更长的文字',14);assert.equal(nativeTextMeasures,2,'changed content gets a new width');
+const textWidth=load('PaperTextWidth');
+assert.ok(textWidth.paperTextWidth('88:88',42,500)>100);
+assert.ok(textWidth.paperTextWidth('课程表',14)>=42);
+assert.equal(textWidth.paperTextWidth('88:88',42,500),textWidth.paperTextWidth('88:88',42,500));
+assert.ok(!fs.readFileSync(path.join(root,'PaperTextWidth.ets'),'utf8').includes('getMeasureUtils'), 'Form metrics never require an app UIContext');
+assert.ok(textWidth.paperTextWidth('更长的文字',14)>textWidth.paperTextWidth('文字',14),'changed content gets a new width');
 const batteryPaper=load('BatteryPresentation');assert.equal(batteryPaper.batteryPaperMask(0,10),'');assert.equal(batteryPaper.batteryPaperMask(100,NaN),'');
 const ringMask=batteryPaper.batteryPaperMask(100,30);assert.ok(ringMask.includes('0 1 1')&&ringMask.includes('0 1 0'),'opposite circle winding leaves the photo visible at the centre');
-console.log('PASS content-sized paper native measurement cache and hollow battery masking');
+console.log('PASS content-sized paper shared font advances and hollow battery masking');
 
 assert.equal(batteryPaper.batteryPaperArcMask(100,40,126,0),'');assert.ok(batteryPaper.batteryPaperArcMask(100,40,126,288).includes('0 1 1'));assert.ok(batteryPaper.batteryPaperArcMask(100,30,70,40).includes('0 0 0'),'number backing uses only its local arc');
 const compositions=load('ReadingComposition');
-assert.equal(compositions.READING_COMPOSITIONS.length,6);
+assert.equal(compositions.READING_COMPOSITIONS.length,4);
 for(const kind of s.CAPABILITIES.filter(k=>k!=='album')) for(const blend of compositions.readingStyles(kind)){
  const card=new s.FridgeCard();card.id=kind+'-'+blend;card.capability={k:kind,readingBlend:blend,readingTint:'#F8CF32'};card.capFree=true;card.capBox.x=-.35;card.capBox.y=.6;card.capBox.w=.65;card.capBox.h=.5;card.capBox.rot=-12;
  const restored=s.normalizeState({...s.defaultState(),cards:[card]}).cards[0];assert.equal(restored.capability.readingBlend,blend);assert.equal(restored.capability.readingTint,'#F8CF32');assert.equal(restored.capBox.x,-.35);assert.equal(restored.capBox.rot,-12);
@@ -192,15 +193,15 @@ for(const kind of s.CAPABILITIES.filter(k=>k!=='album')) for(const blend of comp
 }
 for(const blend of ['space','sticker'])for(const [w,h] of [[1,1],[100,40],[40,150]]){const path=compositions.compositionPath(blend,w,h);assert.ok(path.endsWith('Z'));assert.ok(!/NaN|Infinity/.test(path));assert.equal((path.match(/ C /g)||[]).length,6);}
 assert.equal(compositions.compositionPath('sticker',0,20),'');
-console.log('PASS six compositions: compatible capability/style pairs, material/position/rotation persistence, bounded external drag, finite fixed-complexity silhouettes and bare-text contract');
-const external=new s.FridgeCard();external.capFree=true;external.capability={k:'worldclock',readingBlend:'space'};external.capBox={x:-.35,y:.6,w:.65,h:.5,rot:25,opacity:1};
+console.log('PASS simplified compositions: compatible capability/style pairs, material/position/rotation persistence, bounded external drag, finite fixed-complexity silhouettes and bare-text contract');
+const external=new s.FridgeCard();external.capFree=true;external.capability={k:'worldclock',readingBlend:'sticker'};external.capBox={x:-.35,y:.6,w:.65,h:.5,rot:25,opacity:1};
 const fringe=compositions.compositionOverflow(external,2);assert.ok(fringe.left>0&&fringe.bottom>0);assert.equal(compositions.compositionOverflow({...external,capFree:false},2).left,0);
 console.log('PASS external composition cache includes rotated attachment overflow without changing artwork bounds');
 
 const policy=load('ReadingStylePolicy');
-for(const k of ['clock','date','countdown','anniversary','dayprogress','yearprogress','agenda','timetable'])assert.deepEqual(policy.readingStyles(k),['bare','sticker','space','tag','dock']);
-for(const k of ['worldclock','lunar'])assert.deepEqual(policy.readingStyles(k),['sticker','space','tag','dock']);
-assert.deepEqual(policy.readingStyles('calendar'),['sticker','space']);assert.deepEqual(policy.readingStyles('battery'),['badge','tag','dock']);assert.deepEqual(policy.readingStyles('album'),[]);
+for(const k of s.CAPABILITIES.filter(k=>k!=='album'&&k!=='battery'))assert.deepEqual(policy.readingStyles(k),['bare','tag','sticker']);
+assert.deepEqual(policy.readingStyles('battery'),['badge','bare','tag','sticker']);assert.deepEqual(policy.readingStyles('album'),[]);
+assert.equal(policy.validReadingStyle('clock','dock'),'tag');assert.equal(policy.validReadingStyle('calendar','space'),'sticker');
 for(const k of s.CAPABILITIES.filter(k=>k!=='album'))for(const style of compositions.READING_COMPOSITIONS)assert.ok(policy.readingStyles(k).includes(s.normalizeState({...s.defaultState(),cards:[{...new s.FridgeCard(),capability:{k,readingBlend:style}}]}).cards[0].capability.readingBlend));
 for(const scale of [.5,1,2]){
  const box={x:4/(200*scale),y:.4,w:.3,h:.3,rot:0,opacity:1};const snapped=compositions.snapComposition(box,200,240,scale,'sticker');assert.equal(snapped.edge,'left');assert.equal(snapped.box.x,0);assert.equal(snapped.box.y,.4);
@@ -211,7 +212,8 @@ for(const scale of [.5,1,2]){
 }
 for(const edge of ['left','right','top','bottom']){const path=compositions.compositionPath('sticker',180,80,edge);assert.ok(!/NaN|Infinity|@/.test(path));assert.equal((path.match(/ C /g)||[]).length,5);assert.ok(path.endsWith('Z'));}
 for(let u=0;u<=1;u+=.01){const p=compositions.hookPoint(u);assert.ok(p[1]<=.5+1e-12);assert.ok(Math.abs(compositions.hookPosition(...p)-u)<.002);}
-const backing=fs.readFileSync(path.resolve(root,'../views/ReadingBacking.ets'),'utf8');assert.ok(!/@State/.test(backing),'paint dimensions cannot feed observed native layout');assert.ok(backing.includes('vp2px(w),vp2px(h),vp2px(s)'),'SVG path coordinates must be physical px');assert.ok(backing.includes("globalCompositeOperation='destination-out'"),'hole is transparent, not painted over');assert.ok(backing.includes('this.paintWidth=w;this.paintHeight=h;this.paint()'),'size changes repaint imperatively');
+const backing=fs.readFileSync(path.resolve(root,'../views/ReadingBacking.ets'),'utf8');assert.ok(!backing.includes('Canvas(this.context)'),'moving materials cannot clear and repaint a Canvas');assert.ok(backing.includes('Counter-clockwise subpath'),'punched hole uses real transparent winding');assert.ok(backing.includes('onSizeChange'),'material follows native layout without a bitmap resize callback');
+
 const mica=load('MicaGeometry');
 for(const style of ['tag','dock']){assert.equal(mica.hookReserve(style),20);for(const u of [0,.5,1]){const x=mica.hookCenter(u,100,1);assert.ok(x>=14&&x<=86);assert.ok(10+3.3<20+compositions.compositionPadding(style),'hole stays above content');}}
 for(const style of ['bare','space','sticker'])assert.equal(mica.hookReserve(style),0);
@@ -229,3 +231,15 @@ const boundaryCard=new s.FridgeCard();boundaryCard.shape='subject';boundaryCard.
 const edgeBox={x:.253,y:.35,w:.2,h:.2,rot:0,opacity:1},boundary=g.capabilityAttachmentEdges(boundaryCard,edgeBox);
 assert.ok(Math.abs(boundary[0]-.25)<.02&&Math.abs(boundary[1]-.75)<.02);assert.equal(compositions.snapComposition(edgeBox,240,240,1,'sticker','',boundary).box.x,boundary[0]);
 let edgeTime=performance.now();for(let i=0;i<5000;i++){const b=g.capabilityAttachmentEdges(boundaryCard,edgeBox);compositions.snapComposition(edgeBox,240,240,1,'sticker','',b);}console.log('5000 warm silhouette-edge snaps: '+(performance.now()-edgeTime).toFixed(2)+' ms (host CPU, not device FPS)');
+
+const attachments=load('EdgeAttachment');
+for(const shape of ['round','rect','pill','blob','subject'])for(const side of ['left','right'])for(const outer of [false,true]){
+ const card=new s.FridgeCard();card.shape=shape;card.w=240;card.h=280;card.capability={k:'date',readingBlend:'sticker'};card.outline=[[{x:.25,y:0},{x:.65,y:0},{x:.95,y:.5},{x:.65,y:1},{x:.25,y:1},{x:.05,y:.5}]];
+ for(let step=0;step<=30;step++){const b={x:0,y:step/50,w:.6,h:.35,rot:0,opacity:1},contact=attachments.edgeAttachment(card,b,side,outer);assert.equal(contact.profile.length,25);for(let i=0;i<=24;i++)assert.ok(contact.profile[i]>=-.001&&contact.profile[i]<=1.001);assert.ok(Number.isFinite(contact.gutter));assert.ok(contact.box.w*card.w-contact.gutter>=m.capabilityReadableMinimum(card.capability).w+11.99,'contour cannot invade the readable content budget');}
+}
+console.log('PASS 620 side attachments: continuous inner/outer contact, finite sampled profiles and protected content budgets');
+
+// Contact excursions add material, never steal the user's content width, even beyond artwork bounds.
+for(const side of ['left','right'])for(const outer of [false,true]){const c=new s.FridgeCard();c.w=90;c.h=160;c.shape='round';c.capability={k:'clock'};const b=new s.ElementBox();b.w=1.6;b.h=.3;let width;for(let i=0;i<50;i++){b.y=i/70;const a=attachments.edgeAttachment(c,b,side,outer);const core=a.box.w*c.w-a.gutter;assert.ok(Math.abs(core-144)<1e-8);assert.ok(a.box.w>1);if(width!==undefined)assert.ok(Math.abs(core-width)<1e-8);width=core;}}
+
+const readingNative=fs.readFileSync(path.join(root,'../views/ReadingBacking.ets'),'utf8');assert.ok(readingNative.includes('Path().commands(this.path())'),'live contour is a native Path rather than a resized and cleared Canvas');const layerSource=fs.readFileSync(path.join(root,'../views/CardCanvas.ets'),'utf8');assert.ok(layerSource.includes("this.card.capFree || isReadingComposition(this.card.capability?.readingBlend??'')"),'starting a material drag cannot replace its rendering branch');

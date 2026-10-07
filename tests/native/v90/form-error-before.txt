@@ -1,0 +1,8 @@
+10-08 00:44:33.317  6018 14573 E C03F00/com.ohos.formrenderservice/ArkCompiler: TypeError: Cannot read property vp2px of undefined
+10-08 00:44:33.317  6018 14573 E C03F00/com.ohos.formrenderservice/ArkCompiler:     at paperTextWidth (entry|entry|1.0.0|src/main/ets/model/PaperTextWidth.ts:5:1)
+10-08 00:44:33.317  6018 14573 E C03F00/com.ohos.formrenderservice/ArkCompiler: TypeError: Cannot read property vp2px of undefined
+10-08 00:44:33.317  6018 14573 E C03F00/com.ohos.formrenderservice/ArkCompiler:     at paperTextWidth (entry|entry|1.0.0|src/main/ets/model/PaperTextWidth.ts:5:1)
+10-08 00:44:33.317  6018 14573 E C03F00/com.ohos.formrenderservice/ArkCompiler: TypeError: Cannot read property vp2px of undefined
+10-08 00:44:33.317  6018 14573 E C03F00/com.ohos.formrenderservice/ArkCompiler:     at paperTextWidth (entry|entry|1.0.0|src/main/ets/model/PaperTextWidth.ts:5:1)
+10-08 00:44:33.317  6018 14573 E C03F00/com.ohos.formrenderservice/ArkCompiler: TypeError: Cannot read property vp2px of undefined
+10-08 00:44:33.317  6018 14573 E C03F00/com.ohos.formrenderservice/ArkCompiler:     at paperTextWidth (entry|entry|1.0.0|src/main/ets/model/PaperTextWidth.ts:5:1)

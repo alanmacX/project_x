@@ -1,3 +1,4 @@
+import { edgeAttachment } from '../model/EdgeAttachment';
 import { capabilityAttachmentEdges } from '../model/CanvasLayout';
 import { defaultReadingStyle } from '../model/ReadingStylePolicy';
 import { compositionPlacement, isReadingComposition, snapComposition, readingStyles } from '../model/ReadingComposition';
@@ -1883,7 +1884,7 @@ struct Index {
           } else if (this.settingsTab === 1 && (this.layerId === 'capability' || this.layerId.length === 0)) {
             if(this.preview.capability===null){Column({space:16}) {this.capabilityPanel()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)}
             if(this.preview.capability!==null) {
-              CapabilityAppearance({card:this.preview,appDark:this.appDark,onChoose:()=>this.chooseCapability(),onCompare:()=>this.compareReading(),onBlend:(blend)=>this.chooseReadingComposition(blend),onHook:(position:number)=>{const card=this.current();if(card?.capability){card.capability.readingHook=position;this.change();}},onArrange:(anchor:string)=>this.arrangeCapability(anchor),onColor:()=>this.chooseColor('ink'),onColorPick:(color:string,key:string)=>this.setCardColor('ink',color,key),onStyle:(style:string)=>{
+              CapabilityAppearance({card:this.preview,appDark:this.appDark,onChoose:()=>this.chooseCapability(),onCompare:()=>this.compareReading(),onBlend:(blend)=>this.chooseReadingComposition(blend),onHook:(position:number)=>{const card=this.current();if(card?.capability){card.capability.readingHook=position;this.change();}},onAttachment:(side:string,outer:boolean)=>{const c=this.current();if(c?.capability){c.capability.readingEdge=side;c.capability.readingOutside=outer;const a=edgeAttachment(c,c.capBox,side,outer);c.capBox.x=a.box.x;c.capBox.y=a.box.y;c.capBox.rot=0;this.change();}},onArrange:(anchor:string)=>this.arrangeCapability(anchor),onColor:()=>this.chooseColor('ink'),onColorPick:(color:string,key:string)=>this.setCardColor('ink',color,key),onStyle:(style:string)=>{
                 const card=this.current();if(card?.capability){card.capability.readingStyle=style;this.change();}
               }})
             }
@@ -1918,7 +1919,7 @@ struct Index {
         .position({ x: this.previewViewport().left, y: this.previewViewport().top })
 
       if (this.preview.capability?.k!=='album' && this.layerId.length > 0 && (this.layerId!=='capability'||this.preview.capability!==null)  ) {
-        EditorLayerHandles({motion:this.layerMotion,targetId:this.layerId,box:this.boxPreview,factor:this.layerId==='capability'?1:subjectSurfaceFactor(this.preview),
+        EditorLayerHandles({attachmentCard:this.layerId==='capability'?this.preview:null,motion:this.layerMotion,targetId:this.layerId,box:this.boxPreview,factor:this.layerId==='capability'?1:subjectSurfaceFactor(this.preview),
           contentW:this.preview.w*this.editorScale(),contentH:this.preview.h*this.editorScale(),angle:this.editingAngle(),viewportWidth:this.editorViewportWidth(),viewportHeight:this.editorCanvasHeight(),
           left:this.previewViewport().left,top:this.previewViewport().top,appDark:this.appDark,onStart:(e)=>this.startTransform(this.layerId,e),onResize:(e)=>this.resizeElement(e),onRotate:(e)=>this.rotateElement(e),onEnd:()=>this.flushPreview(),onCancel:()=>this.cancelTransform()})
       }
@@ -1985,7 +1986,7 @@ struct Index {
       const factor = Math.max(minFactor, Math.min(nextW / this.resizeStart.w, (1 - this.resizeStart.x) / this.resizeStart.w, (1 - this.resizeStart.y) / this.resizeStart.h));
       box.w = this.resizeStart.w * factor; box.h = this.resizeStart.h * factor;
     } else if(this.layerId==='capability') {
-      box.w=Math.min(1,Math.max(minW,nextW));box.h=Math.min(1,Math.max(minH,nextH));
+      box.w=Math.min(this.preview.capability?.readingBlend==='sticker'?3:1,Math.max(minW,nextW));box.h=Math.min(1,Math.max(minH,nextH));
     } else {
       box.w = Math.max(minW, Math.min(1 - box.x, nextW)); box.h = Math.max(minH, Math.min(1 - box.y, nextH));
     }
@@ -1997,9 +1998,11 @@ struct Index {
     box.y = Math.max(outside?-2:0, Math.min(outside?2:1-box.h, this.resizeStart.y + (dh * (1 - c) - dw * sn) / (2 * h)));
     if(this.layerId==='capability'&&this.layerMotion.edge==='right')box.x=this.resizeStart.x+this.resizeStart.w-box.w;
     if(this.layerId==='capability'&&this.layerMotion.edge==='bottom')box.y=this.resizeStart.y+this.resizeStart.h-box.h;
+    if(this.layerId==='capability'&&this.preview.capability?.readingBlend==='sticker'){const a=edgeAttachment(this.preview,box,this.preview.capability.readingEdge||'left',this.preview.capability.readingOutside===true);box.x=a.box.x;box.y=a.box.y;box.rot=0;}
     this.layerMotion.update(this.layerId,box);
   }
   private rotateElement(e: GestureEvent): void {
+    if(this.layerId==='capability'&&this.preview.capability?.readingBlend==='sticker')return;
     const live = this.currentBox(); if (live === null) return;
     const offset = this.fingerOffset(e);
     let delta = Math.atan2(this.rotationVector.y + offset.y, this.rotationVector.x + offset.x) - Math.atan2(this.rotationVector.y, this.rotationVector.x);
@@ -2023,7 +2026,11 @@ struct Index {
     const centerX = (1 - live.w) / 2, centerY = (1 - live.h) / 2;
     if (this.layerId !== 'capability' && Math.abs(live.x - centerX) * width < 5) live.x = centerX;
     if (this.layerId !== 'capability' && Math.abs(live.y - centerY) * height < 5) live.y = centerY;
-    if(this.layerId==='capability'){const fitted=constrainCapabilityDrag(this.preview,live,previous),snap=snapComposition(fitted,this.preview.w,this.preview.h,this.editorScale(),this.preview.capability?.readingBlend??'',this.layerMotion.edge,['space','sticker'].includes(this.preview.capability?.readingBlend??'')?capabilityAttachmentEdges(this.preview,fitted):[0,1,0,1]);live.x=snap.box.x;live.y=snap.box.y;this.layerMotion.edge=snap.edge;}
+    if(this.layerId==='capability'){
+      if(this.preview.capability?.readingBlend==='sticker'){
+        const attached=edgeAttachment(this.preview,live,this.preview.capability.readingEdge||'left',this.preview.capability.readingOutside===true);live.x=attached.box.x;live.y=attached.box.y;live.rot=0;this.layerMotion.edge=attached.side;
+      }else{const fitted=constrainCapabilityDrag(this.preview,live,previous);live.x=fitted.x;live.y=fitted.y;}
+    }
     this.layerMotion.update(this.layerId,live);
   }
   private cancelTransform(): void {
@@ -2032,12 +2039,12 @@ struct Index {
     this.layerMotion.edge=this.current()?.capability?.readingEdge??'';this.flushPreview();
   }
   private touchBox(id: string): ElementBox {
-    if (id === 'capability') return capabilityPlacement(this.preview);
+    if (id === 'capability') {const b=capabilityPlacement(this.preview),c=this.preview;return c.capability?.readingBlend==='sticker'?edgeAttachment(c,b,c.capability.readingEdge||'left',c.capability.readingOutside===true).box:b;}
     return this.elementTouchBox(this.preview.elements.find((el: CanvasElement) => el.id === id) ?? new CanvasElement());
   }
   @Builder
   layerTouch(id: string) {
-    EditorLayerTarget({motion:this.layerMotion,targetId:id,box:id==='capability'?capabilityPlacement(this.preview):this.preview.elements.find((el)=>el.id===id)??new ElementBox(),
+    EditorLayerTarget({attachmentCard:id==='capability'?this.preview:null,motion:this.layerMotion,targetId:id,box:id==='capability'?capabilityPlacement(this.preview):this.preview.elements.find((el)=>el.id===id)??new ElementBox(),
       factor:id==='capability'?1:subjectSurfaceFactor(this.preview),selected:this.layerId===id,
       onSelect:()=>{this.layerId=id;this.syncFields();},onStart:(e)=>{
         this.layerId=id;this.beginFinger(e,this.editingAngle()+(this.currentBox()?.rot??0));this.layerDrag=id;const card=this.current();
@@ -2235,8 +2242,9 @@ struct Index {
   }
   private chooseReadingComposition(blend:string):void {
     const card=this.current();if(!card?.capability||!readingStyles(card.capability.k).includes(blend))return;
-    card.capability.readingBlend=blend;card.capability.readingStyle='surface';card.capability.readingEdge='';
+    card.capability.readingBlend=blend;card.capability.readingStyle='surface';card.capability.readingEdge=blend==='sticker'?'left':'';
     card.capBox=compositionPlacement(card,capabilityPlacement(card),blend);card.capFree=true;
+    if(blend==='sticker'){const a=edgeAttachment(card,card.capBox,'left',card.capability.readingOutside===true);card.capBox.x=a.box.x;card.capBox.y=a.box.y;card.capBox.rot=0;}
     this.change();
 
   }

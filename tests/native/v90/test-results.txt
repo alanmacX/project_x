@@ -1,0 +1,61 @@
+PASS album image callbacks: Form and initial load need no app UIContext; paired app transitions preserve generation guards.
+PASS: centre sizing; deterministic static FluidGradient field; locked shape; local asset normalization.
+PASS: rotation boundaries, restart determinism, manual selection anchor, portable cover-library assets.
+PASS central guides: physical 4vp tolerance, responsive aspect/density, constrained snap and rotated group centre.
+PASS: appearance follows system; no window calls before content load or after destruction; abnormal native window cannot crash foreground.
+PASS receiving lifecycle: late stale delivery cleanup, latest request retained and replaced pending copy removed
+PASS background: measured cluster proportions, transparent pixels, minority accents, Overlay hue preservation, single-hue light/shade depth, actual weighted worker output and movement-stable/versioned cache
+PASS battery ring: bottom 72-degree gap, sweep flags, finite scaled coordinates, zero/unknown level and charge/low/stale states
+PASS battery arc lettering: same-circle positions, tangent rotations, symmetric centring and zero/unknown/three-digit labels
+PASS timed delivery: atomic packet, bound-source ownership, target fanout, original geometry during battery updates, persisted acknowledgement and foreground merge, refresh minimum/quota, imported schedule remapping and opt-in.
+PASS: legacy migration, lazy multi-canvas storage, independent duplication, widget bindings/deletion and removed-form cleanup, preserved corruption, movement-stable palette, offline refresh guard, live battery/Form refresh, conservative pickup OCR, course week/parity/boundaries, bounded ICS/JSON imports with recurrence exceptions and calendar ACL gate.
+PASS capability framework: complete catalog; adaptive list budgets; protected photo reading insets; shape-safe presets; local labelled pickup parsing/merge/capacity; 44vp rendered/hit geometry; compact deep links; template locality; month migration
+PASS grouped layer ordering; detached canvas snapshots; transparent reading veil and contrasting glyph halos; whole-silhouette placement and bounded drag
+5000 cached capability drag queries: 2.23 ms (model CPU, not device FPS)
+PASS group centre/pivot, scale/rotation roundtrip across widget aspects; reactive ungroup snapshot
+PASS render-cache reuse and isolated nested content/geometry updates
+PASS host-aware group bounds, rigid pan geometry and responsive typography floors including subject border
+PASS group recovery preserves composition and is idempotent across host aspects
+PASS small artwork persistence/group floor; compact clock and upcoming lesson keep readable content inside a narrow photo
+PASS free foreground placement, edge recovery, readable size, storage/snapshot roundtrip and enlarged content
+PASS thin-paper contrast, compact corner geometry and persisted material choice
+PASS content-sized paper shared font advances and hollow battery masking
+PASS simplified compositions: compatible capability/style pairs, material/position/rotation persistence, bounded external drag, finite fixed-complexity silhouettes and bare-text contract
+PASS external composition cache includes rotated attachment overflow without changing artwork bounds
+PASS mica geometry: 60,500 safe-area samples; transparent holes remain in reserved header; no observed measurement feedback
+PASS explicit style policy, legacy migration, one-edge physical snapping, finite attached shapes, freely placed hooks and feedback-free native backing
+5000 warm silhouette-edge snaps: 1.86 ms (host CPU, not device FPS)
+PASS 620 side attachments: continuous inner/outer contact, finite sampled profiles and protected content budgets
+PASS API24 material module and method guards
+PASS editor gesture state: detached geometry, immutable frame snapshots, same-layer updates and explicit completion without artwork mutation
+PASS Form material construction without UIContext: clock, battery, timetable and variable text metrics; native material children.
+PASS: holidays, unpublished years, school overrides, whole-day transfer/parity, cancellation, single-lesson moves, midnight boundary, normalization, all-day ICS and recurrence rejection
+PASS offline ICS timetable: semester recurrence, named timezone, excluded weeks, exact dates, VTIMEZONE isolation and unsupported data rejection
+PASS multi-file calendar merge: civil-week rebasing and exact duplicate removal
+PASS: local-only migration, retired URL results retained as static artwork, correct capability labels; bounded URI staging, short reads/writes, truncation failure rollback, oversized/remote rejection and descriptor cleanup.
+PASS: compact/full capability layouts and substantially smaller subject date minimum; isolated noise/spur cleanup with preserved interior/thin subject; subject white-edge safe bounds; serialized FormExtension calendar actions and retired-capability migration; one widget size; app/widget geometry parity across four viewports, preserved card aspect and off-canvas positions, actual FormKit dimensions; TaskPool dispatch and failure cleanup, 1024px decode limit, optimized/reference Gaussian equality; smoothing alpha, tight crop, coordinate preservation, 32 capability minima, thin-shape refusal; safe layout, non-overlap, cropped bounds, resize projection, full-foreground overlay; v2 zero/one capability, legacy migration, canvas content/captions, box constraints, save queue/retry/reload, corrupt-data preservation, image+subject form transfer/cleanup, mask contours/holes/disconnected parts, native segmentation cleanup/failures
+PASS anchored native menus: measured pixel/vp coordinates, single owner, exit-before-next-menu and cancellation.
+PASS paper mesh: flat UV alignment, bounded ball, finite geometry, depth ordering and allocation reuse across aspect ratios
+PASS startup layout handoff: immutable geometry, exact placement, no UI contour scanning and asset-version invalidation
+PASS cold contour cache: exact-source/asset matching, worker avoidance, geometry reuse, corruption/version fallback and edit invalidation
+PASS Form packet controller: 100 interrupted switches, dropped animation callbacks, atomic latest artwork, resumed host and density-independent percent placement.
+500 focus projections × 32 cards: 17.20 ms (host CPU only)
+PASS timed scenes: weekly/one-off/overnight, exact boundaries, latched focus, stale acknowledgement, overlap restore, source isolation, rotated edge slivers, missing targets, limits and persisted geometry
+PASS explicit normal layout selection, restoration, persistence, missing-target protection and immutable saved layouts
+PASS async one-level canvas resolution and base-owned widget acknowledgement context
+PASS: local course JSON conversion, interrupted teaching weeks, distinct school schedules and calendar replacement isolation.
+PASS: PNG/JPEG packing, legal app file URI, native preview and anchors, resource cleanup, failed export never shared.
+PASS sketch contour: endpoints, untouched original, exact closed seam, corner retention, <4% silhouette-area change, bounded long-stroke output; 4096 samples 2.33 ms (host only)
+PASS startup: frame callbacks progress without idle budget; one card per prepared frame; warm textures before coordinated arrival; destroyed-page cancellation
+PASS resume: lifecycle coalescing, window entrance budget, gesture/transition deferral and background cancellation
+PASS starting-window handoff: once-only reveal, cancellation, stage replacement, deadline and native rejection
+PASS relief cache: shared path parsing, exact eight bands, resource cleanup, placement/data reuse and size/asset invalidation
+PASS super resolution: transparent edge color, premultiplication, immutable alpha, mask size validation
+PASS: editable card/canvas packages; all image bytes and GIF preserved; image deduplication; sender paths removed; subject/background asset keys survive normalization; groups and every ID remapped; unsupported/truncated references rejected; missing file aborts export; descriptors released.
+PASS native time capabilities: DST changes and midnight scheduling, half/quarter-hour zones, civil-day rollover, lunar new year/full moon/leap month and readable minimum sizes
+PASS fixed-format clock sizing at native glyph budget across compact/full host sizes
+{"scenario":"10,000 warm timetable minimum + card placement lookups (model CPU only, not device FPS)","milliseconds":11.78}
+PASS timetable: 10-minute handoff, evening/holiday gating, whole-day brief, tomorrow empty, short classes, transfers, dense adaptive sizing/cache, narrow cutout rejection, update boundaries, week overlaps/parity and migration
+PASS Form backdrop: immediate cold load, decode-gated fade, repeated/interrupting packets, hidden cleanup and whole-widget routing.
+PASS responsive workspace: 16 phone/tablet/split-window sizes, four canvas ratios, safe areas, portrait artwork priority and settings budget
+PASS Pura X Max / Mate X7: both screens, both orientations, three safe-area configurations, five ratios

@@ -6,8 +6,8 @@ export function capabilityMinimum(cap: CapBlock | null, compact: boolean = false
   const size = new CapabilitySize();
   if (cap === null) { size.w = 0; size.h = 0; return size; }
   if (cap.k === 'timetable') {
-    const count=cap.timetableMode==='day'?timetableCapacity(cap):1, columns=availableWidth>=192?briefColumns(availableWidth):count>10?3:2;
-    size.w = cap.timetableMode === 'day' ? columns* (columns===3?88:96) : compact ? 96 : 128;
+    const count=cap.timetableMode==='day'?timetableCapacity(cap):1, columns=availableWidth>=320?briefColumns(availableWidth):1;
+    size.w = cap.timetableMode === 'day' ? columns*144 : compact ? 96 : 128;
     size.h = cap.timetableMode === 'day' ? briefHeight(count, columns) : compact ? 80 : 116;
     return size;
   }

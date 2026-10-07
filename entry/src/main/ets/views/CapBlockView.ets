@@ -36,6 +36,9 @@ export struct CapabilityView {
   @Prop contentBackingEnabled:boolean=false;
   @Prop backingTint:string='#E8D6B0';
   @Prop backingEdge:string='';
+  @Prop backingProfile:number[]=[];
+  @Prop backingLeft:boolean=true;
+  @Prop backingGutter:number=0;
   @Prop scaleFactor: number = 1;
   @Prop contentWidth: number = 150;
   @Prop contentHeight: number = 140;
@@ -67,8 +70,9 @@ export struct CapabilityView {
     return Math.max(16*this.unit(),Math.min((this.compact() ? 24 : 44) * this.unit(), (this.contentWidth * this.scaleFactor - 32 * this.unit()) / (digits * .6)));
   }
   private ownBacking():boolean {return this.contentBackingEnabled&&!['battery','timetable','agenda'].includes(this.cap.k);}
-  private measured(text:string,font:number,weight:number=400):number {return paperTextWidth(this.getUIContext(),text,font,weight);}
+  private measured(text:string,font:number,weight:number=400):number {return paperTextWidth(text,font,weight);}
   private backingWidth():number {
+    if(this.backingProfile.length)return (this.contentWidth+2*compositionPadding(this.cap.readingBlend??'')+this.backingGutter)*this.scaleFactor;
     const u=this.unit(),max=this.contentWidth*this.scaleFactor;let width=max;
     if(this.cap.k==='clock')width=this.measured('88:88',this.clockFont(),500);
     else if(this.cap.k==='worldclock') {const city=cityReading(this.cap.zone??'',this.now().getTime());width=Math.max(this.measured(city.city,12*u),this.measured('88:88',this.clockFont(true),500),this.measured('12月31日 · 周三',11*u),this.compact()?0:this.measured(city.difference,11*u));}
@@ -79,10 +83,13 @@ export struct CapabilityView {
     else if(this.cap.k==='dayprogress'||this.cap.k==='yearprogress')width=Math.max(64*u,this.measured(typeLabel(this.cap.k),12*u),this.measured('100%',(this.compact()?24:38)*u));
     return Math.min((this.contentWidth+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,Math.ceil(width)+2*compositionPadding(this.cap.readingBlend??'')*u);
   }
-  @Builder private readingBackground() {if(this.ownBacking()){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,radius:Math.min(8*this.unit(),this.backingWidth()*.12),scaleFactor:this.unit()})}}
+  @Builder private readingBackground() {if(this.ownBacking()){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,profile:this.backingProfile,contactLeft:this.backingLeft,surfaceWidth:this.backingWidth(),surfaceHeight:(this.contentHeight+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,hook:this.cap.readingHook??.2,ink:this.ink,radius:Math.min(8*this.unit(),this.backingWidth()*.12),scaleFactor:this.unit()})}}
   @Builder private readingHook() {if(this.ownBacking()&&['tag','dock'].includes(this.cap.readingBlend??'')){ReadingHook({hook:this.cap.readingHook??.2,scaleFactor:this.unit()})}}
+  @State private backingHeight:number=0;
   build() {
     Column() {
+    Stack({alignContent:Alignment.TopStart}) {
+      if(this.ownBacking()){Column(){this.readingBackground()}.width(this.backingWidth()).height(this.backingHeight).position({x:0,y:0}).hitTestBehavior(HitTestMode.None)}
     Column() {
     Column({ space: 4 * this.unit() }) {
       if (this.undersized()) {
@@ -152,11 +159,11 @@ export struct CapabilityView {
         }.width('100%').justifyContent(FlexAlign.Center).alignItems(VerticalAlign.Bottom)
         if (!this.compact()) { Text(this.cap.date ?? '').fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:0.6) }
       } else if(this.cap.k==='battery') {
-        BatteryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentBackingEnabled:this.contentBackingEnabled,backingTint:this.backingTint,backingEdge:this.backingEdge,unit:this.unit(),compact:this.compact()})
+        BatteryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentBackingEnabled:this.contentBackingEnabled,backingTint:this.backingTint,backingEdge:this.backingEdge,backingProfile:this.backingProfile,backingLeft:this.backingLeft,backingGutter:this.backingGutter,scaleFactor:this.scaleFactor,unit:this.unit(),compact:this.compact()})
       } else if(this.cap.k==='timetable') {
-        TimetableCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentBackingEnabled:this.contentBackingEnabled,backingTint:this.backingTint,backingEdge:this.backingEdge,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
+        TimetableCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentBackingEnabled:this.contentBackingEnabled,backingTint:this.backingTint,backingEdge:this.backingEdge,backingProfile:this.backingProfile,backingLeft:this.backingLeft,backingGutter:this.backingGutter,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
       } else if(this.cap.k==='agenda') {
-        SummaryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentBackingEnabled:this.contentBackingEnabled,backingTint:this.backingTint,backingEdge:this.backingEdge,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
+        SummaryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentBackingEnabled:this.contentBackingEnabled,backingTint:this.backingTint,backingEdge:this.backingEdge,backingProfile:this.backingProfile,backingLeft:this.backingLeft,backingGutter:this.backingGutter,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
       } else {
         Text(typeLabel(this.cap.k)).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:0.65)
         Text(Math.floor(progressOf(this.cap.k, this.now()) * 100) + '%').maxLines(1).fontSize(((this.compact() ? 24 : 38) * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend))
@@ -165,9 +172,11 @@ export struct CapabilityView {
           Row().width((progressOf(this.cap.k, this.now()) * 100) + '%').height(4 * this.unit()).backgroundColor(this.ink)
         }.width('100%').height(4 * this.unit()).borderRadius(2).clip(true)
       }
-    }.width(this.ownBacking()?Math.max(1,this.backingWidth()-2*compositionPadding(this.cap.readingBlend??'')*this.unit()):'100%').constraintSize({maxHeight:this.ownBacking()?Math.max(1,this.contentHeight*this.scaleFactor):undefined}).clip(this.ownBacking())
-    }.width(this.ownBacking()?this.backingWidth():'100%').height(this.ownBacking()?undefined:'100%').padding({left:this.ownBacking()?compositionPadding(this.cap.readingBlend??'')*this.unit():0,right:this.ownBacking()?compositionPadding(this.cap.readingBlend??'')*this.unit():0,bottom:this.ownBacking()?compositionPadding(this.cap.readingBlend??'')*this.unit():0,top:this.ownBacking()?compositionPadding(this.cap.readingBlend??'')*this.unit()+hookReserve(this.cap.readingBlend??'')*this.unit():0})
-      .background(this.readingBackground).overlay(this.readingHook).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
-    }.width('100%').height('100%').justifyContent(this.backingEdge==='top'?FlexAlign.Start:this.backingEdge==='bottom'?FlexAlign.End:FlexAlign.Center).alignItems(this.backingEdge==='left'?HorizontalAlign.Start:this.backingEdge==='right'?HorizontalAlign.End:HorizontalAlign.Center)
+    }.width(this.ownBacking()?Math.max(1,this.backingWidth()-2*compositionPadding(this.cap.readingBlend??'')*this.unit()-this.backingGutter*this.scaleFactor):'100%').constraintSize({maxHeight:this.ownBacking()?Math.max(1,this.contentHeight*this.scaleFactor):undefined}).clip(this.ownBacking())
+    }.width(this.ownBacking()?this.backingWidth():'100%').height(this.backingProfile.length?'100%':this.ownBacking()?undefined:'100%').padding({left:this.ownBacking()?compositionPadding(this.cap.readingBlend??'')*this.unit()+(this.backingLeft?this.backingGutter*this.scaleFactor:0):0,right:this.ownBacking()?compositionPadding(this.cap.readingBlend??'')*this.unit()+(!this.backingLeft?this.backingGutter*this.scaleFactor:0):0,bottom:this.ownBacking()?compositionPadding(this.cap.readingBlend??'')*this.unit():0,top:this.ownBacking()?compositionPadding(this.cap.readingBlend??'')*this.unit()+hookReserve(this.cap.readingBlend??'')*this.unit():0})
+      .onSizeChange((_:SizeOptions,size:SizeOptions)=>{const h=Number(size.height);if(h>0&&Math.abs(h-this.backingHeight)>.01)this.backingHeight=h;}).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+      if(this.ownBacking()&&['tag','dock'].includes(this.cap.readingBlend??'')){Column(){this.readingHook()}.width(this.backingWidth()).height(this.backingHeight).position({x:0,y:0}).hitTestBehavior(HitTestMode.None)}
+    }.width(this.ownBacking()?this.backingWidth():'100%').height(this.backingProfile.length?'100%':this.ownBacking()?undefined:'100%')
+    }.width('100%').height('100%').justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
   }
 }

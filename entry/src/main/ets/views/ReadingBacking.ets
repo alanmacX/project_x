@@ -1,51 +1,42 @@
+import { attachedPath } from '../model/EdgeAttachment';
 import { readingSurfaceColor } from '../model/CapabilityPresentation';
 import { isReadingComposition, compositionPadding } from '../model/ReadingComposition';
 import { hookCenter, hookReserve, micaPath } from '../model/MicaGeometry';
 import { PaperBacking } from './PaperBacking';
-/** Imperative paint only: size changes never write observed layout state. */
+/** Shared native material paths; translating a card never clears a bitmap surface. */
 @Component
 export struct ReadingBacking {
- @Prop @Watch('paint') blend:string='paper';
+ @Prop blend:string='paper';
  @Prop ink:string='#262824';
  @Prop tint:string='#E8D6B0';
- @Prop @Watch('paint') edge:string='';
- @Prop @Watch('paint') hook:number=.2;
+ @Prop edge:string='';
+ @Prop profile:number[]=[];
+ @Prop contactLeft:boolean=true;
+ @Prop hook:number=.2;
  @Prop radius:number=8;
- @Prop @Watch('paint') scaleFactor:number=1;
- private context:CanvasRenderingContext2D=new CanvasRenderingContext2D(new RenderingContextSettings(true));
- private ready:boolean=false;
- private paintWidth:number=0;
- private paintHeight:number=0;
- private paint():void {
-  if(!this.ready||this.paintWidth<=0||this.paintHeight<=0)return;
-  const c=this.context,w=this.paintWidth,h=this.paintHeight,s=this.scaleFactor;
-  c.clearRect(0,0,w,h);c.save();
-  if(this.blend==='bare') {
-   const p=compositionPadding(this.blend)*s;
-   // A horizontal loaded-brush pass: translucent overlap, tapered bristle tips and parallel fibres.
-   // Successive loaded-brush passes feather the fringe; no single hard cut-out edge.
-   for(let pass=0;pass<8;pass++) {
-    const inset=p*.35*pass/7;c.save();c.translate(inset,inset);
-    c.fillStyle='rgba(247,249,252,0.095)';
-    c.fill(new Path2D(micaPath('bare',vp2px(w-2*inset),vp2px(h-2*inset),vp2px(s))));c.restore();
-   }
-   c.lineCap='butt';
-   for(let i=0;i<28;i++) {
-    const y=(i+.2+(i%3)*.25)*h/28,tip=(.2+(i*7%9)*.32)*s;
-    c.strokeStyle=i%3===0?'rgba(255,255,255,0.12)':'rgba(234,240,247,0.06)';c.lineWidth=(.25+(i%4)*.13)*s;
-    c.beginPath();c.moveTo(tip,y);c.bezierCurveTo(w*.28,y-.7*s,w*.68,y+.7*s,w-tip,y+.25*s);c.stroke();
-   }
-  } else {
-   const path=new Path2D(micaPath(this.blend,vp2px(w),vp2px(h),vp2px(s),this.edge));
-   c.fillStyle='rgba(247,249,252,0.74)';c.fill(path);
-   c.strokeStyle='rgba(255,255,255,0.34)';c.lineWidth=.6*s;c.stroke(path);
-  }
+ @Prop surfaceWidth:number=0;
+ @Prop surfaceHeight:number=0;
+ @Prop scaleFactor:number=1;
+ // Native paths participate in layout in both ArkUI and the restricted Form host.
+ // No bitmap-clear or onReady/resize handoff is needed when the label changes size.
+ @State private actualWidth:number=0;
+ @State private actualHeight:number=0;
+ private w():number {return this.actualWidth||this.surfaceWidth;}
+ private h():number {return this.actualHeight||this.surfaceHeight;}
+ private path(inset:number=0):string {
+  const w=vp2px(Math.max(0,this.w()-2*inset)),h=vp2px(Math.max(0,this.h()-2*inset)),s=vp2px(this.scaleFactor);
+  if(w<=0||h<=0)return '';
+  let path=this.profile.length?attachedPath(w,h,this.profile,this.contactLeft,6*s):micaPath(this.blend,w,h,s,this.edge);
   if(hookReserve(this.blend)>0) {
-   const x=hookCenter(this.hook,w,s),y=10*s,r=3.3*s;
-   c.globalCompositeOperation='destination-out';c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.fill();
-   c.globalCompositeOperation='source-over';c.strokeStyle='rgba(79,85,92,0.22)';c.lineWidth=.8*s;c.beginPath();c.arc(x,y,r+.4*s,0,Math.PI*2);c.stroke();
+   const x=vp2px(hookCenter(this.hook,this.w(),this.scaleFactor)),y=10*s,r=3.3*s;
+   // Counter-clockwise subpath punches a real transparent hole using nonzero winding.
+   path+=` M ${x+r} ${y} A ${r} ${r} 0 1 0 ${x-r} ${y} A ${r} ${r} 0 1 0 ${x+r} ${y} Z`;
   }
-  c.restore();
+  return path;
+ }
+ private fibre(index:number):string {
+  const w=vp2px(this.w()),h=vp2px(this.h()),s=vp2px(this.scaleFactor),y=(index+.2+(index%3)*.25)*h/28,tip=(.2+(index*7%9)*.32)*s;
+  return `M ${tip} ${y} C ${w*.28} ${y-.7*s} ${w*.68} ${y+.7*s} ${w-tip} ${y+.25*s}`;
  }
  private texture():Resource {
   const color=readingSurfaceColor(this.ink),scrim=this.blend==='scrim';
@@ -57,11 +48,19 @@ export struct ReadingBacking {
  build() {
   Stack() {
    if(isReadingComposition(this.blend)) {
-    Canvas(this.context).width('100%').height('100%')
-     .onReady(()=>{this.ready=true;this.paintWidth=this.context.width;this.paintHeight=this.context.height;this.paint();})
-     .onAreaChange((_:Area,a:Area)=>{const w=Number(a.width),h=Number(a.height);if(w!==this.paintWidth||h!==this.paintHeight){this.paintWidth=w;this.paintHeight=h;this.paint();}})
+    if(this.blend==='bare') {
+     ForEach([0,1,2,3,4,5,6,7],(pass:number)=>{
+      Path().commands(this.path(compositionPadding(this.blend)*this.scaleFactor*.35*pass/7)).fill('#18F7F9FC').stroke(Color.Transparent).antiAlias(true)
+       .width('100%').height('100%').translate({x:compositionPadding(this.blend)*this.scaleFactor*.35*pass/7,y:compositionPadding(this.blend)*this.scaleFactor*.35*pass/7})
+     },(pass:number)=>String(pass))
+     ForEach(Array.from({length:28},(_:number,i:number)=>i),(index:number)=>{
+      Path().commands(this.fibre(index)).fill(Color.Transparent).stroke(index%3===0?'#1FFFFFFF':'#0FEAF0F7').strokeWidth((.25+(index%4)*.13)*this.scaleFactor).width('100%').height('100%')
+     },(index:number)=>String(index))
+    } else {
+     Path().commands(this.path()).fill('#BDF7F9FC').stroke('#57FFFFFF').strokeWidth(.6*this.scaleFactor).antiAlias(true).width('100%').height('100%')
+    }
    } else if(this.blend==='paper'){PaperBacking({radius:this.radius,scaleFactor:this.scaleFactor})}
    else if(this.blend!=='halo'){Image(this.texture()).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)}
-  }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
+  }.width('100%').height('100%').onSizeChange((_:SizeOptions,size:SizeOptions)=>{const w=Number(size.width),h=Number(size.height);if(w>0&&h>0&&(Math.abs(w-this.actualWidth)>.01||Math.abs(h-this.actualHeight)>.01)){this.actualWidth=w;this.actualHeight=h;}}).hitTestBehavior(HitTestMode.None)
  }
 }

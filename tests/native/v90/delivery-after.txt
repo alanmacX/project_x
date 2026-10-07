@@ -1,0 +1,2 @@
+10-08 00:49:37.800 17160 17215 I A00000/com.fridgewidget.app/WidgetPerf: delivery queue=1 rect=23 prepare=21 bind=6 ipc=28 total=79 images=0 json=113363
+10-08 00:49:37.801 17160 17160 I A00000/com.fridgewidget.app/WidgetPerf: save snapshot=1 diskQueue=17 delivery=113 total=131
