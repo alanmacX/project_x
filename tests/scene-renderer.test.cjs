@@ -5,7 +5,7 @@ const source=fs.readFileSync('entry/src/main/ets/widget/pages/FridgeWidgetCard.e
 const controller=source.slice(source.indexOf('  private syncPacket()'),source.indexOf('  private sceneOffset('));
 const disappear=source.match(/  aboutToDisappear\(\):void \{[^\n]+/)[0];
 const jobs=[];const env={exports:{},Curve:{EaseIn:0,Friction:1},cardRenderSnapshot:c=>c,normalizeBackground:b=>b,animateTo:(o,update)=>{update();jobs.push(o);}};
-const code=ts.transpileModule('export class Harness {parse(json:string){return JSON.parse(json);}'+controller+disappear+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
+const code=ts.transpileModule('export class Harness {refresh(){}parse(json:string){return JSON.parse(json);}'+controller+disappear+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
 vm.runInNewContext(code,env);const scene=new env.exports.Harness();Object.assign(scene,{alive:true,sceneGeneration:0,appliedPacket:'',sceneAnimating:false,scenePhase:0});
 const packet=(canvasId,id,colour,rev)=>JSON.stringify({canvasId,cards:JSON.stringify([{id,z:1}]),background:JSON.stringify({color:colour}),context:'',rev});
 scene.packetJson=packet('a','a1','red',1);scene.syncPacket();assert.equal(scene.cardIds[0],'a1');assert.equal(scene.canvasBackground.color,'red');assert.equal(jobs.length,0);
@@ -20,5 +20,5 @@ scene.packetJson=packet('d','d2','cream',6);scene.syncPacket();assert.equal(jobs
 // A newer packet returning to the outgoing canvas must cancel an in-flight switch.
 scene.sceneAnimating=false;scene.packetJson=packet('e','e1','pink',7);scene.syncPacket();const pending=jobs.shift();
 scene.packetJson=packet('d','d2','cream',8);scene.syncPacket();pending.onFinish();assert.equal(scene.displayCanvasId,'d','stale target cannot survive a return to the visible scene');
-jobs.shift().onFinish();assert.equal(scene.sceneAnimating,false);
+jobs.shift().onFinish();assert.equal(scene.sceneAnimating,false);assert.equal(scene.scenePhase,0,'returning to the visible canvas clears the offscreen pose');
 console.log('PASS Form transition controller: atomic scene/background, newer packet interruption, stale callbacks, hidden/reappearing host and same-canvas animation.');
