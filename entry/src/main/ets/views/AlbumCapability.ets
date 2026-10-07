@@ -28,6 +28,7 @@ export struct AlbumCapability {
     if(cover!==this.current.cover)return;
     if(background)this.backgroundReady=true;else this.coverReady=true;
     if(!this.coverReady||!this.backgroundReady)return;
+    if(this.widget||!this.previous.cover){this.opacityValue=1;this.previous={id:'',cover:'',background:'',title:'',artist:''};return;}
     const generation=this.generation;
     this.getUIContext().animateTo({duration:420,curve:Curve.EaseInOut,onFinish:()=>{if(generation===this.generation)this.previous={id:'',cover:'',background:'',title:'',artist:''};}},()=>this.opacityValue=1);
   }

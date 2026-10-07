@@ -130,7 +130,7 @@ struct FridgeWidgetCard {
       }, (id: string) => id)
       if(this.focusId) {Button('恢复',{type:ButtonType.Capsule}).height(44).padding({left:16,right:16}).fontSize(12).backgroundColor('#EEFFFFFF').fontColor('#303030').position({x:12,y:12}).zIndex(100001).onClick(()=>this.restoreScene())}
       Button('打开', { type: ButtonType.Capsule }).width(56).height(44).padding(0).fontSize(12).borderRadius(10)
-        .backgroundColor('#EEFFFFFF').fontColor('#303030').position({ x: '100%', y: '100%' }).translate({ x: -64, y: -52 }).zIndex(100000)
+        .backgroundColor('#EEFFFFFF').fontColor('#303030').position({x:Math.max(0,this.widthValue()-64),y:Math.max(0,this.heightValue()-52)}).zIndex(100000)
         .accessibilityText('打开卡片画布').onClick(() => this.open())
     }.width('100%').height('100%').backgroundColor(Color.White).borderRadius(24).clip(true)
       .onSizeChange((_: SizeOptions, size: SizeOptions) => {

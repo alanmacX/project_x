@@ -3,6 +3,8 @@ export class GroupPose { scale:number=1; angle:number=0; }
 /** All members consume one atomic translation. */
 @Observed
 export class BoardMotion {
+  @Track guideVertical:boolean=false;
+  @Track guideHorizontal:boolean=false;
   @Track ids: string[] = [];
   @Track pivot: ShapePoint = {x:0,y:0};
   @Track transformIds: string[] = [];

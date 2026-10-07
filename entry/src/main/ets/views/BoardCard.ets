@@ -1,3 +1,5 @@
+import { alignToCanvas } from '../model/AlignmentGuide';
+import { groupBox } from '../model/GroupGeometry';
 import { EditorLayerMotion } from '../model/EditorLayerMotion';
 import { immersiveChrome } from '../model/ChromeMaterial';
 import { BoardMotion } from '../model/BoardMotion';
@@ -72,6 +74,8 @@ export struct BoardCard {
   onSelect: (id: string) => void = () => {};
   onDelete: (id: string) => void = () => {};
   onEdit: (id: string) => void = () => {};
+  getAlignmentAnchor:(card:FridgeCard)=>ShapePoint=(card:FridgeCard)=>{const box=groupBox([card],this.controlViewportHeight/this.scaleFactor);return {x:box.x+box.w/2,y:box.y+box.h/2};};
+  private alignmentAnchor:ShapePoint={x:0,y:0};
   getMoveBounds: (card: FridgeCard) => DragBounds = (card: FridgeCard) => dragBounds(card);
   onMove: (x: number, y: number) => void = () => {};
   onInteraction: (active: boolean) => void = () => {};
@@ -201,16 +205,19 @@ export struct BoardCard {
     return {x:2+x*Math.cos(a)+y*Math.sin(a),y:2+h-x*Math.sin(a)+y*Math.cos(a)};
   }
   private startMove(): void {
-    this.animateLift(true); this.originX = this.card.x; this.originY = this.card.y; this.dx = 0; this.dy = 0; this.dragX = 0; this.dragY = 0; this.lastDX = 0; this.moveBounds = this.getMoveBounds(this.card); this.moving = true; this.onInteraction(true);
+    this.animateLift(true); this.originX = this.card.x; this.originY = this.card.y; this.dx = 0; this.dy = 0; this.dragX = 0; this.dragY = 0; this.lastDX = 0; this.moveBounds = this.getMoveBounds(this.card);this.alignmentAnchor=this.getAlignmentAnchor(this.card); this.moving = true; this.onInteraction(true);
   }
   private move(e: GestureEvent): void {
     const offset = this.screenOffset(e);
-    const x = Math.max(this.moveBounds.minX, Math.min(this.moveBounds.maxX, this.originX + offset.x / this.scaleFactor));
-    const y = Math.max(this.moveBounds.minY, Math.min(this.moveBounds.maxY, this.originY + offset.y / this.yScaleFactor));
+    let x = Math.max(this.moveBounds.minX, Math.min(this.moveBounds.maxX, this.originX + offset.x / this.scaleFactor));
+    let y = Math.max(this.moveBounds.minY, Math.min(this.moveBounds.maxY, this.originY + offset.y / this.yScaleFactor));
+    const aligned=alignToCanvas(x,y,{x:this.originX,y:this.originY},this.alignmentAnchor,this.controlViewportHeight/this.scaleFactor,this.scaleFactor,this.moveBounds);x=aligned.x;y=aligned.y;
+    if(this.motion.guideVertical!==aligned.vertical)this.motion.guideVertical=aligned.vertical;
+    if(this.motion.guideHorizontal!==aligned.horizontal)this.motion.guideHorizontal=aligned.horizontal;
     this.dragX = (x - this.originX) * this.scaleFactor; this.dragY = (y - this.originY) * this.yScaleFactor;
     if (this.motion.ids.includes(this.card.id)) { this.onMove(this.dragX, this.dragY); return; }
     this.dx = this.dragX; this.dy = this.dragY;
-    this.tilt = this.tilt * .65 + Math.max(-3, Math.min(3, (offset.x - this.lastDX) * .12)) * .35; this.lastDX = offset.x;
+    this.tilt = aligned.vertical||aligned.horizontal?0:this.tilt * .65 + Math.max(-3, Math.min(3, (offset.x - this.lastDX) * .12)) * .35; this.lastDX = offset.x;
   }
   private cancelMove(): void { this.animateLift(false); this.dx = 0; this.dy = 0; this.moving = false; this.tilt = 0; this.onInteraction(false); }
   private finishMove(): void {

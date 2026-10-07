@@ -15,11 +15,11 @@ export struct BatteryCapability {
   build() {
     Column() {
       Stack({alignContent:Alignment.TopStart}) {
-        Path().commands(batteryRingPath(this.getUIContext().vp2px(this.diameter()))).fill(Color.Transparent).stroke(this.ink)
+        Path().commands(batteryRingPath(vp2px(this.diameter()))).fill(Color.Transparent).stroke(this.ink)
           .strokeWidth((this.compact?3.5:5)*this.unit).strokeLineCap(LineCapStyle.Round).opacity(.14)
           .width(this.diameter()).height(this.diameter())
         if(batteryLevel(this.cap)>0) {
-          Path().commands(batteryRingPath(this.getUIContext().vp2px(this.diameter()),batteryLevel(this.cap))).fill(Color.Transparent).stroke(batteryTint(this.cap,this.ink))
+          Path().commands(batteryRingPath(vp2px(this.diameter()),batteryLevel(this.cap))).fill(Color.Transparent).stroke(batteryTint(this.cap,this.ink))
             .strokeWidth((this.compact?3.5:5)*this.unit).strokeLineCap(LineCapStyle.Round).opacity(this.cap.refreshState==='failed'?.45:1)
             .width(this.diameter()).height(this.diameter())
         }
