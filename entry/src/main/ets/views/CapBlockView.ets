@@ -1,3 +1,5 @@
+import { ReadingBacking } from './ReadingBacking';
+import { paperTextWidth } from '../model/PaperTextWidth';
 import { readingHalo } from '../model/CapabilityPresentation';
 import { cityReading, clockOffset, lunarReading } from '../model/TimeCapabilities';
 import { SummaryCapability } from './SummaryCapability';
@@ -28,6 +30,7 @@ export struct CapabilityView {
   @Prop cap: CapBlock = { k: 'clock' };
   @Prop ink: string = '#262824';
   @Prop readingHaloEnabled: boolean = false;
+  @Prop contentBackingEnabled:boolean=false;
   @Prop scaleFactor: number = 1;
   @Prop contentWidth: number = 150;
   @Prop contentHeight: number = 140;
@@ -43,6 +46,7 @@ export struct CapabilityView {
     const min = capabilityMinimum(this.cap, this.compact(), this.contentWidth);
     return Math.min(2, this.contentWidth / min.w, this.contentHeight / min.h) * this.scaleFactor;
   }
+  private dateFont():number {return boundedReadoutFont((this.compact()?24:54)*this.unit(),this.contentWidth*this.scaleFactor,2.8);}
   private clockFont(world: boolean = false): number {
     const nominal = world ? (this.compact()?28:40) : (this.compact()?24:42);
     // Four digits plus colon, with room for the widest system font glyphs.
@@ -57,7 +61,22 @@ export struct CapabilityView {
     const digits = (Math.abs(daysLeftOf(this.cap.date ?? '')) + '').length;
     return Math.max(16*this.unit(),Math.min((this.compact() ? 24 : 44) * this.unit(), (this.contentWidth * this.scaleFactor - 32 * this.unit()) / (digits * .6)));
   }
+  private ownBacking():boolean {return this.contentBackingEnabled&&!['battery','timetable','agenda'].includes(this.cap.k);}
+  private measured(text:string,font:number,weight:number=400):number {return paperTextWidth(this.getUIContext(),text,font,weight);}
+  private backingWidth():number {
+    const u=this.unit(),max=this.contentWidth*this.scaleFactor;let width=max;
+    if(this.cap.k==='clock')width=this.measured('88:88',this.clockFont(),500);
+    else if(this.cap.k==='worldclock') {const city=cityReading(this.cap.zone??'',this.now().getTime());width=Math.max(this.measured(city.city,12*u),this.measured('88:88',this.clockFont(true),500),this.measured('12月31日 · 周三',11*u),this.compact()?0:this.measured(city.difference,11*u));}
+    else if(this.cap.k==='lunar') {const lunar=lunarReading(this.now().getTime());width=Math.max(this.measured('农历',12*u),this.measured(lunar.date,this.lunarFont(),500),this.measured(lunar.year,12*u));}
+    else if(this.cap.k==='date')width=Math.max(this.measured('88日',this.dateFont(),500),this.measured(holidayName(this.now())||this.now().getFullYear()+'年'+(this.now().getMonth()+1)+'月 · 周三',12*u));
+    else if(this.cap.k==='calendar')width=7*(this.measured('88',12*u)+(this.compact()?3:7)*u);
+    else if(this.cap.k==='countdown'||this.cap.k==='anniversary')width=Math.max(this.measured(this.cap.title||typeLabel(this.cap.k),12*u),this.measured(String(Math.abs(daysLeftOf(this.cap.date??''))),this.counterFont(),500)+this.measured(this.cap.k==='anniversary'?(daysLeftOf(this.cap.date??'')>0?'天后':'天'):(daysLeftOf(this.cap.date??'')<0?'天前':'天'),12*u)+3*u,this.compact()?0:this.measured(this.cap.date??'',10*u));
+    else if(this.cap.k==='dayprogress'||this.cap.k==='yearprogress')width=Math.max(64*u,this.measured(typeLabel(this.cap.k),12*u),this.measured('100%',(this.compact()?24:38)*u));
+    return Math.min((this.contentWidth+8)*this.scaleFactor,Math.ceil(width)+8*u);
+  }
+  @Builder private readingBackground() {if(this.ownBacking()){ReadingBacking({blend:this.cap.readingBlend??'feather',ink:this.ink,radius:Math.min(8*this.unit(),this.backingWidth()*.12),scaleFactor:this.scaleFactor})}}
   build() {
+    Column() {
     Column({ space: 4 * this.unit() }) {
       if (this.undersized()) {
         Text('放大卡片').fontSize(12*this.scaleFactor).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').textAlign(TextAlign.Center)
@@ -77,7 +96,7 @@ export struct CapabilityView {
         Text(lunarReading(this.now().getTime()).date).fontSize(this.lunarFont()+'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).maxLines(1)
         Text(lunarReading(this.now().getTime()).year).fontSize((12*this.unit())+'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.65).maxLines(1)
       } else if (this.cap.k === 'date') {
-        TextClock().format('dd').fontSize(((this.compact() ? 24 : 54) * this.unit()) + 'vp').fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend))
+        TextClock().format('dd').fontSize(this.dateFont() + 'vp').height(this.dateFont()*1.35).width(Math.min(this.contentWidth*this.scaleFactor,this.measured('88日',this.dateFont(),500))).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend))
         Text(holidayName(this.now()) || (this.now().getFullYear()+'年'+(this.now().getMonth()+1)+'月 · '+['周日','周一','周二','周三','周四','周五','周六'][this.now().getDay()]+(holidayMarker(this.now())==='班'?' · 班':''))).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:0.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
       } else if (this.cap.k === 'calendar' && this.compact() && (this.cap.calendarOffset ?? 0) === 0) {
         Text((this.now().getMonth() + 1) + '月 · 本周').fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend))
@@ -97,7 +116,7 @@ export struct CapabilityView {
         Text((this.calendarDate().getMonth() + 1) + '月').fontSize((28 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend))
         Text('点按查看月历').fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.6)
       } else if (this.cap.k === 'calendar') {
-        Text(this.calendarDate().getFullYear() + '年' + (this.calendarDate().getMonth() + 1) + '月').fontSize((14 * this.unit()) + 'vp').minFontSize(10*this.unit()).maxFontSize(14*this.unit()).maxLines(1).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).height(44*this.unit()).width('100%').padding({left:44*this.unit(),right:44*this.unit()}).textAlign(TextAlign.Center)
+        Text(this.calendarDate().getFullYear() + '年' + (this.calendarDate().getMonth() + 1) + '月').fontSize((14 * this.unit()) + 'vp').minFontSize(10*this.unit()).maxFontSize(14*this.unit()).maxLines(1).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).height((this.ownBacking()?20:44)*this.unit()).width('100%').padding({left:(this.ownBacking()?0:44)*this.unit(),right:(this.ownBacking()?0:44)*this.unit()}).textAlign(TextAlign.Center)
         Row() {
           ForEach(['日', '一', '二', '三', '四', '五', '六'], (day: string) => {
             Text(day).fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:0.5).layoutWeight(1).textAlign(TextAlign.Center)
@@ -126,11 +145,11 @@ export struct CapabilityView {
         }.width('100%').justifyContent(FlexAlign.Center).alignItems(VerticalAlign.Bottom)
         if (!this.compact()) { Text(this.cap.date ?? '').fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:0.6) }
       } else if(this.cap.k==='battery') {
-        BatteryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,unit:this.unit(),compact:this.compact()})
+        BatteryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentBackingEnabled:this.contentBackingEnabled,unit:this.unit(),compact:this.compact()})
       } else if(this.cap.k==='timetable') {
-        TimetableCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
+        TimetableCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentBackingEnabled:this.contentBackingEnabled,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
       } else if(this.cap.k==='agenda') {
-        SummaryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
+        SummaryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentBackingEnabled:this.contentBackingEnabled,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
       } else {
         Text(typeLabel(this.cap.k)).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:0.65)
         Text(Math.floor(progressOf(this.cap.k, this.now()) * 100) + '%').maxLines(1).fontSize(((this.compact() ? 24 : 38) * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend))
@@ -139,6 +158,8 @@ export struct CapabilityView {
           Row().width((progressOf(this.cap.k, this.now()) * 100) + '%').height(4 * this.unit()).backgroundColor(this.ink)
         }.width('100%').height(4 * this.unit()).borderRadius(2).clip(true)
       }
+    }.width(this.ownBacking()?this.backingWidth():'100%').height(this.ownBacking()?undefined:'100%').padding(this.ownBacking()?4*this.unit():0)
+      .background(this.readingBackground).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
     }.width('100%').height('100%').justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
   }
 }

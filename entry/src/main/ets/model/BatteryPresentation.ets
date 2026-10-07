@@ -37,3 +37,18 @@ export function batteryArcLabel(diameter:number,label:string,font:number):Batter
     return point;
   });
 }
+
+/** Opposite winding clips a true annulus; its centre reveals the photograph. */
+export function batteryPaperMask(diameter:number,innerRadius:number):string {
+  if(!Number.isFinite(diameter)||diameter<=0||!Number.isFinite(innerRadius))return '';
+  const r=diameter/2,c=r,inner=Math.max(0,Math.min(r,innerRadius));
+  return 'M '+(c+r)+' '+c+' A '+r+' '+r+' 0 1 1 '+(c-r)+' '+c+' A '+r+' '+r+' 0 1 1 '+(c+r)+' '+c+' Z M '+(c+inner)+' '+c+' A '+inner+' '+inner+' 0 1 0 '+(c-inner)+' '+c+' A '+inner+' '+inner+' 0 1 0 '+(c+inner)+' '+c+' Z';
+}
+/** A rounded annular segment: thin behind the dial, wider only under the numeric gap. */
+export function batteryPaperArcMask(diameter:number,innerRadius:number,startDegrees:number,sweepDegrees:number):string {
+  if(!Number.isFinite(diameter)||diameter<=0||!Number.isFinite(innerRadius)||!Number.isFinite(startDegrees)||!Number.isFinite(sweepDegrees)||sweepDegrees<=0)return '';
+  if(sweepDegrees>=360)return batteryPaperMask(diameter,innerRadius);
+  const r=diameter/2,c=r,inner=Math.max(0,Math.min(r,innerRadius)),cap=(r-inner)/2,start=startDegrees*Math.PI/180,end=(startDegrees+sweepDegrees)*Math.PI/180;
+  const x0=c+r*Math.cos(start),y0=c+r*Math.sin(start),x1=c+r*Math.cos(end),y1=c+r*Math.sin(end),xi1=c+inner*Math.cos(end),yi1=c+inner*Math.sin(end),xi0=c+inner*Math.cos(start),yi0=c+inner*Math.sin(start),large=sweepDegrees>180?1:0;
+  return 'M '+x0+' '+y0+' A '+r+' '+r+' 0 '+large+' 1 '+x1+' '+y1+' A '+cap+' '+cap+' 0 0 1 '+xi1+' '+yi1+' A '+inner+' '+inner+' 0 '+large+' 0 '+xi0+' '+yi0+' A '+cap+' '+cap+' 0 0 1 '+x0+' '+y0+' Z';
+}

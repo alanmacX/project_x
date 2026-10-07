@@ -171,3 +171,14 @@ console.log('PASS thin-paper contrast, compact corner geometry and persisted mat
 
 for(const ink of ['#FFFFFF','#323232','#6D6D6D','#000000'])for(const background of ['#000000','#FFFFFF'])assert.ok(p.textContrast(p.paperReadingInk(ink),p.paperReadingBackground(background))>=4.5,'translucent paper keeps ink readable over darkest/lightest photographs');
 assert.equal(p.READING_PAPER_FILL.slice(1,3),'80');
+
+const textWidth=load('PaperTextWidth');let nativeTextMeasures=0;
+const context={vp2px:(v)=>v*2,px2vp:(v)=>v/2,getMeasureUtils:()=>({measureTextSize:()=>{nativeTextMeasures++;return {width:100,height:20};}})};
+for(let i=0;i<500;i++)assert.equal(textWidth.paperTextWidth(context,'同一文字',14),50);
+assert.equal(nativeTextMeasures,1,'dragging must reuse native text measurements');
+textWidth.paperTextWidth(context,'更长的文字',14);assert.equal(nativeTextMeasures,2,'changed content gets a new width');
+const batteryPaper=load('BatteryPresentation');assert.equal(batteryPaper.batteryPaperMask(0,10),'');assert.equal(batteryPaper.batteryPaperMask(100,NaN),'');
+const ringMask=batteryPaper.batteryPaperMask(100,30);assert.ok(ringMask.includes('0 1 1')&&ringMask.includes('0 1 0'),'opposite circle winding leaves the photo visible at the centre');
+console.log('PASS content-sized paper native measurement cache and hollow battery masking');
+
+assert.equal(batteryPaper.batteryPaperArcMask(100,40,126,0),'');assert.ok(batteryPaper.batteryPaperArcMask(100,40,126,288).includes('0 1 1'));assert.ok(batteryPaper.batteryPaperArcMask(100,30,70,40).includes('0 0 0'),'number backing uses only its local arc');

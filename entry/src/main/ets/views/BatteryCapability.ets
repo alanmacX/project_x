@@ -1,20 +1,39 @@
+import { ReadingBacking } from './ReadingBacking';
 import { readingHalo } from '../model/CapabilityPresentation';
 import { CapBlock } from '../model/CardSchema';
-import { batteryLevel, batteryStatus, batteryTint, batteryRingPath, batteryArcLabel, BatteryArcGlyph } from '../model/BatteryPresentation';
+import { batteryLevel, batteryStatus, batteryTint, batteryRingPath, batteryArcLabel, batteryPaperArcMask, BatteryArcGlyph } from '../model/BatteryPresentation';
 @Component
 export struct BatteryCapability {
   @Prop cap:CapBlock={k:'battery'};
   @Prop ink:string='#262824';
   @Prop readingHaloEnabled:boolean=false;
+  @Prop contentBackingEnabled:boolean=false;
   @Prop unit:number=1;
   @Prop compact:boolean=false;
   private diameter():number {return (this.compact?48:72)*this.unit;}
   private labelFont():number {return (this.compact?10:14)*this.unit;}
   private label():string {return batteryLevel(this.cap)<0?'—':String(batteryLevel(this.cap));}
   private glyph(index:number):BatteryArcGlyph {return batteryArcLabel(this.diameter(),this.label(),this.labelFont())[index];}
+  private paperDiameter():number {return this.diameter()*.88+(this.compact?3.5:5)*this.unit+4*this.unit;}
+  private paperMask():string {return batteryPaperArcMask(vp2px(this.paperDiameter()),vp2px(Math.max(0,this.diameter()*.44-(this.compact?3.5:5)*this.unit/2-2*this.unit)),126,288);}
+  private labelPaperDiameter():number {return this.diameter()*.88+this.labelFont()*1.25+4*this.unit;}
+  private labelPaperMask():string {
+    const half=(this.labelFont()*(.62*(this.label().length-1)+1.1)+4*this.unit)/2/(this.diameter()*.44)*180/Math.PI;
+    return batteryPaperArcMask(vp2px(this.labelPaperDiameter()),vp2px(Math.max(0,this.diameter()*.44-this.labelFont()*.625-2*this.unit)),90-half,half*2);
+  }
   build() {
     Column() {
       Stack({alignContent:Alignment.TopStart}) {
+        if(this.contentBackingEnabled) {
+          ReadingBacking({blend:this.cap.readingBlend??'feather',ink:this.ink,radius:999,scaleFactor:this.unit}).width(this.paperDiameter()).height(this.paperDiameter())
+            .clip(new Path().commands(this.paperMask())).position({x:(this.diameter()-this.paperDiameter())/2,y:(this.diameter()-this.paperDiameter())/2})
+          ReadingBacking({blend:this.cap.readingBlend??'feather',ink:this.ink,radius:999,scaleFactor:this.unit}).width(this.labelPaperDiameter()).height(this.labelPaperDiameter())
+            .clip(new Path().commands(this.labelPaperMask())).position({x:(this.diameter()-this.labelPaperDiameter())/2,y:(this.diameter()-this.labelPaperDiameter())/2})
+          if(this.cap.charging||this.cap.chargeState==='full') {
+            ReadingBacking({blend:this.cap.readingBlend??'feather',ink:this.ink,radius:999,scaleFactor:this.unit}).width((this.compact?19:26)*this.unit).height((this.compact?19:26)*this.unit)
+              .position({x:(this.diameter()-(this.compact?19:26)*this.unit)/2,y:(this.diameter()-(this.compact?19:26)*this.unit)/2})
+          }
+        }
         Path().commands(batteryRingPath(vp2px(this.diameter()))).fill(Color.Transparent).stroke(this.ink)
           .strokeWidth((this.compact?3.5:5)*this.unit).strokeLineCap(LineCapStyle.Round).opacity(.14)
           .width(this.diameter()).height(this.diameter())
