@@ -37,7 +37,7 @@ const kits = {
     open: async name => { opened.push(name); if (name.includes('missing')) throw Error('missing photo'); return {fd: 11}; },
     closeSync: fd => closed.push(fd),
   } },
-  '@kit.PerformanceAnalysisKit': { hilog: {warn: () => {}, error: () => {}} },
+  '@kit.PerformanceAnalysisKit': { hilog: {info: () => {},warn: () => {}, error: () => {}} },
 };
 const jobs = [];
 kits['@kit.ArkTS'] = { taskpool: { Task: class { constructor(fn,...args){this.fn=fn;this.args=args;} setTransferList(list){this.transfer=list;} }, execute: async task => { jobs.push(task.fn.name); await new Promise(resolve=>setImmediate(resolve)); return task.fn(...task.args); } } };
@@ -312,8 +312,18 @@ function load(name) {
   assert.equal(payload.cards,undefined); assert.equal(payload.faceCards,undefined); assert.equal(payload.background,undefined,'artwork is transferred only once in the atomic packet');
   assert.notEqual(widgetImageKey('photo_image',img.src),widgetImageKey('photo_image','file:///private/replacement.gif'),'replacing a photo refreshes its image resource');
   assert.equal(photo.elements[0].src,'file:///private/photo.gif'); assert.equal(transfer.paper,'#234567');
-  assert.equal(closed.length,2); failForm=true;
-  await assert.rejects(updateWidget('removed',snapshot,'4*4'),/removed form/); assert.equal(closed.length,4);
+  const openedBefore=opened.length;
+  await updateWidget('123',snapshot,'4*4');
+  assert.equal(updates.at(-1).data.formImages,undefined,'unchanged images use NO_OPERATION, not an empty replacement');
+  assert.equal(opened.length,openedBefore,'data-only changes never reopen images');
+  const coalescedBefore=updates.length;await Promise.all([updateWidget('coalesced',snapshot,'4*4'),updateWidget('coalesced',snapshot,'4*4')]);assert.equal(updates.length-coalescedBefore,1,'overlapping identical cold requests are acknowledged by one delivery');
+  assert.equal(JSON.parse(updates.at(-1).data.scenePacket).cards,JSON.parse(payload.scenePacket).cards,'cached image delivery keeps exactly the same visual scene');
+  failForm=true;await assert.rejects(updateWidget('123',snapshot,'4*4'),/removed form/);
+  await updateWidget('123',snapshot,'4*4');
+  assert.equal(Object.keys(updates.at(-1).data.formImages).length,2,'failed update invalidates reuse and restores the full image set');
+  const realNow=Date.now;try {Date.now=()=>realNow()+61000;await updateWidget('123',snapshot,'4*4');assert.equal(Object.keys(updates.at(-1).data.formImages).length,2,'expired acknowledgement performs a full recovery transfer');}finally{Date.now=realNow;}
+  assert.equal(closed.length,8); failForm=true;
+  await assert.rejects(updateWidget('removed',snapshot,'4*4'),/removed form/); assert.equal(closed.length,10);
   photo.elements[0].src='file:///private/missing.jpg';
   await updateWidget('123',JSON.stringify({schemaVersion:2,cards:[photo]}),'4*4');
   assert.equal(JSON.parse(JSON.parse(updates.at(-1).data.scenePacket).cards)[0].elements[0].src,'');
@@ -478,9 +488,29 @@ function load(name) {
   assert.equal(normalizeState({cards:[]}).canvasAspect,1);
   kits['@kit.FormKit'].FormExtensionAbility=class {context={};};
   kits['@kit.AbilityKit']={};
+  const {widgetBoundary,scheduleWidget}=load('WidgetSchedule');
+  const boundaryNow=new Date('2026-10-07T08:00:00').getTime(),staticScene=defaultState();staticScene.cards=[];
+  assert.equal(widgetBoundary(staticScene,boundaryNow),Infinity,'static artwork does not poll');
+  const boundaryCard=new FridgeCard();boundaryCard.capability={k:'anniversary'};staticScene.cards=[boundaryCard];
+  assert.equal(widgetBoundary(staticScene,boundaryNow),new Date('2026-10-08T00:00:00').getTime(),'anniversary advances at midnight');
+  let schedules=0;const scheduler=kits['@kit.FormKit'].formProvider.setFormNextRefreshTime;
+  kits['@kit.FormKit'].formProvider.setFormNextRefreshTime=async(id,minutes)=>{schedules++;assert.equal(minutes,5);};
+  await Promise.all([scheduleWidget(prefs,'schedule-test',boundaryNow+60000,boundaryNow),scheduleWidget(prefs,'schedule-test',boundaryNow+60000,boundaryNow)]);
+  assert.equal(schedules,1,'repeated edits/extension requests share the acknowledged deadline');
+  await scheduleWidget(prefs,'schedule-test',Infinity,boundaryNow);assert.equal(schedules,1);
+  kits['@kit.FormKit'].formProvider.setFormNextRefreshTime=scheduler;
+  assert.equal(formConfig.forms[0].updateDuration,2,'hourly fallback reserves quota for actual content boundaries');
   const FormAbility=load('../form/FridgeFormAbility').default, formAbility=new FormAbility();
   cal.id='action-calendar';custom.id='untouched';custom.elements[0].text='preserved';
   disk.set('fridge_state_json',JSON.stringify({schemaVersion:2,cards:[cal,custom]}));disk.set('fridge_form_dims_json',JSON.stringify({native:'6*4'}));
+  formAbility.onFormEvent('native','{"cardId":"action-calendar","operation":"nextMonth"}');
+  formAbility.onFormEvent('native','{"cardId":"action-calendar","operation":"nextMonth"}');await formAbility.actionQueue;
+  const b1=new FridgeCard(),b2=new FridgeCard();b1.id='battery1';b2.id='battery2';b1.capability={k:'battery'};b2.capability={k:'battery'};
+  disk.set('fridge_state_json',JSON.stringify({schemaVersion:2,cards:[b1,b2]}));
+  const refreshBefore=updates.length;formAbility.onUpdateForm('native');await formAbility.actionQueue;
+  assert.equal(updates.length-refreshBefore,1,'multiple local capability results publish one complete frame');
+  assert.equal(JSON.parse(disk.get('fridge_state_json')).cards[1].capability.percent,60);
+  disk.set('fridge_state_json',JSON.stringify({schemaVersion:2,cards:[cal,custom]}));
   formAbility.onFormEvent('native','{"cardId":"action-calendar","operation":"nextMonth"}');
   formAbility.onFormEvent('native','{"cardId":"action-calendar","operation":"nextMonth"}');await formAbility.actionQueue;
   let actionState=JSON.parse(disk.get('fridge_state_json'));assert.equal(actionState.cards[0].capability.calendarOffset,2,'serialized native message actions do not lose increments');

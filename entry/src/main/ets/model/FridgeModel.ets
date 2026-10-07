@@ -1,3 +1,4 @@
+import { hilog } from '@kit.PerformanceAnalysisKit';
 import { restoreStartupLayouts } from './CanvasLayout';
 import { taskpool } from '@kit.ArkTS';
 import { hydrateCanvas, CanvasLoadResult } from './CanvasLoadWorker';
@@ -148,7 +149,9 @@ export class FridgeStore {
     await this.prefs.put('fridge_canvas_specs_json', JSON.stringify(this.canvasSpecs)); await this.prefs.flush();
   }
   save(syncWidgets: boolean = true): Promise<void> {
+    const started=Date.now();
     const snapshot = storageSnapshot(this.state), id = this.state.canvasId, catalogJson = JSON.stringify(this.catalog);
+    const captured=Date.now();
     const pending = this.saveQueue.catch(() => {}).then(async () => {
       if (this.prefs === null) throw new Error('本地存储尚未就绪');
       if (snapshot !== this.savedScenes[id]) {
@@ -162,7 +165,11 @@ export class FridgeStore {
       await this.cacheContours().catch(()=>{});
     });
     this.saveQueue = pending;
-    return pending.then(() => syncWidgets ? this.queueFor(id).submit(snapshot) : Promise.resolve());
+    return pending.then(async () => {
+      const persisted=Date.now();
+      if(syncWidgets)await this.queueFor(id).submit(snapshot);
+      hilog.info(0,'WidgetPerf','save snapshot=%{public}d diskQueue=%{public}d delivery=%{public}d total=%{public}d',captured-started,persisted-captured,Date.now()-persisted,Date.now()-started);
+    });
   }
   nextZ(): number { return ++this.state.maxZ; }
   bringToFront(card: FridgeCard): void { card.z = this.nextZ(); }

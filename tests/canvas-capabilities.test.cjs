@@ -38,7 +38,7 @@ const kits = {
     open: async name => { opened.push(name); if (name.includes('missing')) throw Error('missing photo'); return {fd: 11}; },
     closeSync: fd => closed.push(fd),
   } },
-  '@kit.PerformanceAnalysisKit': { hilog: {warn: () => {}, error: () => {}} },
+  '@kit.PerformanceAnalysisKit': { hilog: {info:()=>{},warn: () => {}, error: () => {}} },
 };
 kits['@kit.ImageKit']={image:{}};
 kits['@ohos.net.http']={default:{}};
@@ -123,7 +123,7 @@ function load(name) {
  finally {clearTimeout(timeout);releaseRegistration();await completedAdd;kits['@kit.FormKit'].formProvider.updateForm=originalUpdate;}
  assert.ok(updates.find(u=>u.id==='instant').data.scenePacket,'initial artwork is sent while registration is still pending');
  const {pushWidgets}=load('WidgetSync');removedForm='fb';await pushWidgets(ctx,JSON.stringify(b));assert.ok(!JSON.parse(disk.get('fridge_form_dims_json')).fb,'removed form is pruned without retrying indefinitely');assert.equal(JSON.parse(disk.get('fridge_form_dims_json')).fa,'4*4','another live canvas binding is preserved');assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).fa,'canvas_main');removedForm='';
- assert.equal(schedules.length,0,'ordinary saves and battery updates never spend one-shot refresh quota');
+ const ordinarySchedules=schedules.length;await pushWidgets(ctx,JSON.stringify(b));assert.equal(schedules.length,ordinarySchedules,'ordinary saves never re-request an acknowledged content boundary');schedules.length=0;
  // Use midday: a real run near midnight has a nearer calendar refresh boundary.
  const actualNow=Date.now;Date.now=()=>new Date('2026-10-04T12:00:00').getTime();
  try { const event=new FridgeCard(),now=Date.now();event.capability={k:'agenda',agendaSource:'imported',events:[{id:'e',title:'即将开始',start:now+10*60000,end:now+70*60000,location:'',allDay:false}]};a.cards.push(event);disk.set(canvasKey(a.canvasId),JSON.stringify(a));form.onUpdateForm('fa');await form.actionQueue;assert.equal(schedules.length,1);assert.equal(schedules[0].id,'fa');assert.equal(schedules[0].minutes,10,'a nearer calendar boundary uses one system scheduling request');

@@ -5,12 +5,27 @@ import { FridgeState, ShapePoint, normalizeState } from './CardSchema';
 import { widgetImageKey } from './WidgetImageKey';
 export interface WidgetPayload {
   background: string; cards: string;
-  images: Record<string, Object>; descriptors: number[];
+  images: Record<string, Object>; descriptors: number[]; manifest: string;
 }
 /** Parse/normalize/serialize large masks and prepare file descriptors away from the UI thread. */
 @Concurrent
-export async function prepareWidgetPayload(json: string, contourCache: string = ''): Promise<WidgetPayload> {
-  const state: FridgeState = normalizeState(JSON.parse(json) as FridgeState), payload: WidgetPayload = { background: '{}', cards: '[]', images: {}, descriptors: [] };
+export async function prepareWidgetPayload(json: string, contourCache: string = '', previousManifest: string = ''): Promise<WidgetPayload> {
+  const state: FridgeState = normalizeState(JSON.parse(json) as FridgeState), payload: WidgetPayload = { background: '{}', cards: '[]', images: {}, descriptors: [], manifest: '' };
+  // Prepare the complete identity set before opening anything. A partial formImages map
+  // replaces the system image cache; reuse is therefore all-or-nothing.
+  const keys:string[]=[];
+  for(const card of state.cards) {
+    if(card.cutout.startsWith('file://'))keys.push(widgetImageKey(card.id+'_subject',card.cutout));
+    for(const element of card.elements)if(element.kind==='image'&&element.src.startsWith('file://'))keys.push(widgetImageKey(card.id+'_'+element.id,element.src));
+    if(card.capability?.k==='album') {
+      const album=activeAlbum(card.capability);
+      if(album.cover.startsWith('file://'))keys.push(widgetImageKey(card.id+'_albumCover',album.cover));
+      if(album.background.startsWith('file://'))keys.push(widgetImageKey(card.id+'_albumBackground',album.background));
+    }
+  }
+  if(state.background.src.startsWith('file://'))keys.push(widgetImageKey('canvas_background',state.background.src));
+  payload.manifest=JSON.stringify(keys.sort());
+  const reuse=previousManifest!==''&&previousManifest===payload.manifest;
   let cache: Record<string, Object> = {};
   try {const parsed=JSON.parse(contourCache) as Record<string,Object>;if(parsed.version===1 && parsed.entries)cache=parsed.entries as Record<string,Object>;}catch(_){}
   try {
@@ -28,32 +43,32 @@ export async function prepareWidgetPayload(json: string, contourCache: string = 
           const src=field==='albumCover'?cap.albumCover??'':cap.albumBackground??'';
           if(!src.startsWith('file://'))continue;
           const key=widgetImageKey(card.id+'_'+field,src);let mapped='';
-          try {const file=await fileIo.open(src.slice(7),fileIo.OpenMode.READ_ONLY);payload.descriptors.push(file.fd);payload.images[key]=file.fd;mapped='memory://'+key;}catch(_){}
+          try {if(!reuse){const file=await fileIo.open(src.slice(7),fileIo.OpenMode.READ_ONLY);payload.descriptors.push(file.fd);payload.images[key]=file.fd;}mapped='memory://'+key;}catch(_){payload.manifest='';}
           if(field==='albumCover')cap.albumCover=mapped;else cap.albumBackground=mapped;
         }
       }
       if (card.cutout.startsWith('file://')) {
         const key = widgetImageKey(card.id + '_subject', card.cutout);
         try {
-          const file = await fileIo.open(card.cutout.slice(7), fileIo.OpenMode.READ_ONLY);
-          payload.descriptors.push(file.fd); payload.images[key] = file.fd; card.cutout = 'memory://' + key;
-        } catch (_) { card.cutout = ''; card.shape = 'rect'; }
+          if(!reuse){const file = await fileIo.open(card.cutout.slice(7), fileIo.OpenMode.READ_ONLY);
+          payload.descriptors.push(file.fd); payload.images[key] = file.fd;} card.cutout = 'memory://' + key;
+        } catch (_) { payload.manifest=''; card.cutout = ''; card.shape = 'rect'; }
       }
       for (const element of card.elements) {
         if (element.kind === 'image' && element.src.startsWith('file://')) {
           const key = widgetImageKey(card.id + '_' + element.id, element.src);
           try {
-            const file = await fileIo.open(element.src.slice(7), fileIo.OpenMode.READ_ONLY);
-            payload.descriptors.push(file.fd); payload.images[key] = file.fd; element.src = 'memory://' + key;
-          } catch (_) { element.src = ''; }
+            if(!reuse){const file = await fileIo.open(element.src.slice(7), fileIo.OpenMode.READ_ONLY);
+            payload.descriptors.push(file.fd); payload.images[key] = file.fd;} element.src = 'memory://' + key;
+          } catch (_) { payload.manifest=''; element.src = ''; }
         }
       }
     }
     if (state.background.src.startsWith('file://')) {
       const key = widgetImageKey('canvas_background', state.background.src);
-      try { const file = await fileIo.open(state.background.src.slice(7), fileIo.OpenMode.READ_ONLY);
-        payload.descriptors.push(file.fd); payload.images[key] = file.fd; state.background.src = 'memory://' + key;
-      } catch (_) { state.background.src = ''; }
+      try { if(!reuse){const file = await fileIo.open(state.background.src.slice(7), fileIo.OpenMode.READ_ONLY);
+        payload.descriptors.push(file.fd); payload.images[key] = file.fd;} state.background.src = 'memory://' + key;
+      } catch (_) { payload.manifest=''; state.background.src = ''; }
     }
     payload.background = JSON.stringify(state.background);
     payload.cards = JSON.stringify(state.cards);

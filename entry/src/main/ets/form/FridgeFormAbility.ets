@@ -1,9 +1,9 @@
 import { resolveScheduledScene, sceneWidgetContext, dismissScene, ScheduledScene } from '../model/SceneSchedule';
 import { pushWidgets } from '../model/WidgetSync';
-import { refreshMinutes } from '../model/WidgetRefreshPolicy';
+import { widgetBoundary, scheduleWidget } from '../model/WidgetSchedule';
 import { needsDataRefresh, capabilityRequestKey, mergeCapabilityResult } from '../model/CapabilityData';
 import { readCatalog, canvasKey, boundCanvas } from '../model/CanvasLibrary';
-import { FormExtensionAbility, formBindingData, formProvider } from '@kit.FormKit';
+import { FormExtensionAbility, formBindingData } from '@kit.FormKit';
 import { Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import preferences from '@ohos.data.preferences';
@@ -78,10 +78,8 @@ export default class FridgeFormAbility extends FormExtensionAbility {
       const prefs=await preferences.getPreferences(this.context,STORE_NAME);
       const json=await prefs.get(canvasKey(id),'') as string;return json?normalizeState(JSON.parse(json) as FridgeState):null;
     });
-    const minutes=Math.min(refreshMinutes(base),refreshMinutes(scene.state));
-    // Baseline 30-minute refresh is declared in the form profile. Only a nearer boundary
-    // needs a one-shot request; editing the scene must not consume its daily quota.
-    if(minutes<30)await formProvider.setFormNextRefreshTime(formId,minutes).catch(()=>{});
+    const prefs=await preferences.getPreferences(this.context,STORE_NAME),now=Date.now();
+    await scheduleWidget(prefs,formId,Math.min(widgetBoundary(base,now),widgetBoundary(scene.state,now)),now);
   }
 
   onAddForm(want: Want): formBindingData.FormBindingData {
@@ -95,7 +93,7 @@ export default class FridgeFormAbility extends FormExtensionAbility {
       registered.catch(()=>{}); // Observe disk failures while native delivery is in flight.
       try {await updateWidget(id,JSON.stringify(scene.state),dim,sceneWidgetContext(scene),await this.contourCache(scene.state.canvasId));}
       finally {await registered;}
-      await this.refreshDueData(id);await this.scheduleForm(id);
+      if(await this.refreshDueData(id))await this.pushForm(id);await this.scheduleForm(id);
     }).catch((e: Error) => {
       hilog.error(0x0000, 'FridgeForm', 'add %{public}s', e.message);
     });
@@ -104,11 +102,13 @@ export default class FridgeFormAbility extends FormExtensionAbility {
 
   onUpdateForm(formId: string): void {
     this.actionQueue = this.actionQueue.catch(() => {}).then(async () => {
-      await this.pushForm(formId); await this.refreshDueData(formId); await this.scheduleForm(formId);
+      try {await this.refreshDueData(formId);}catch(e){hilog.warn(0,'FridgeForm','local data refresh: %{public}s',(e as Error).message);}
+      await this.pushForm(formId); await this.scheduleForm(formId);
     }).catch((e: Error) => hilog.error(0x0000, 'FridgeForm', 'update %{public}s', e.message));
   }
 
-  private async refreshDueData(formId:string):Promise<void> {
+  private async refreshDueData(formId:string):Promise<boolean> {
+    let changed=false;
     let state=(await this.displayedScene(formId)).state,canvasId=state.canvasId;
     for(const original of state.cards.slice()) {
       const cap=original.capability;if(!cap||!needsDataRefresh(cap))continue;
@@ -122,8 +122,9 @@ export default class FridgeFormAbility extends FormExtensionAbility {
       const prefs=await preferences.getPreferences(this.context,STORE_NAME);const raw=await prefs.get(canvasKey(canvasId),'') as string;
       const originalState=raw?normalizeState(JSON.parse(raw) as FridgeState):await this.loadState(formId);const stored=originalState.cards.find(c=>c.id===original.id);
       if(!stored?.capability||capabilityRequestKey(stored.capability)!==key||(stored.capability.attemptedAt??0)!==attempted)continue;
-      stored.capability=mergeCapabilityResult(stored.capability,next);await this.saveStateAndWidgets(originalState);
+      stored.capability=mergeCapabilityResult(stored.capability,next);await this.saveState(originalState);changed=true;
     }
+    return changed;
   }
   private actionQueue: Promise<void> = Promise.resolve();
   onFormEvent(formId: string, event: string): void {
@@ -145,11 +146,14 @@ export default class FridgeFormAbility extends FormExtensionAbility {
 
 
 
-  private async saveStateAndWidgets(state: FridgeState): Promise<void> {
+  private async saveState(state: FridgeState): Promise<void> {
     const prefs = await preferences.getPreferences(this.context, STORE_NAME);
     const catalogJson = await prefs.get('fridge_canvases_json','') as string;
     if (catalogJson) await prefs.put(canvasKey(state.canvasId),JSON.stringify(state));
     else await prefs.put(KEY_STATE, JSON.stringify(state)); await prefs.flush();
+  }
+  private async saveStateAndWidgets(state: FridgeState): Promise<void> {
+    await this.saveState(state);
     await pushWidgets(this.context,JSON.stringify(state));
   }
 

@@ -962,7 +962,7 @@ struct Index {
       this.scheduleBackground();
       // Commit and interaction-end belong to the same gesture. Publish once,
       // after the geometry handoff; backgrounding still flushes immediately.
-      this.saveTimer = setTimeout(() => { this.saveTimer = -1; if (this.alive) this.persist(true); }, 120);
+      this.saveTimer = setTimeout(() => { this.saveTimer = -1; if (this.alive) this.persist(true); }, 32);
     }
   }
   private commitGeometry(updated: FridgeCard): void {
