@@ -3,7 +3,7 @@ import { image } from '@kit.ImageKit';
 import { CapBlock } from './CardSchema';
 import { imagePalette } from './BackgroundInputs';
 import { blendPixels } from './BackgroundPalette';
-import { albumAnchors } from './AlbumLayout';
+import { albumAnchors, isSquareAlbumCover } from './AlbumLayout';
 @Concurrent
 export async function importAlbumCover(uri:string,json:string,filesDir:string):Promise<string> {
   const cap=JSON.parse(json) as CapBlock,created:string[]=[];let input:fileIo.File|null=null;
@@ -12,7 +12,9 @@ export async function importAlbumCover(uri:string,json:string,filesDir:string):P
   try {
     input=await fileIo.open(uri.startsWith('file:///')?uri.slice(7):uri,fileIo.OpenMode.READ_ONLY);
     const size=(await fileIo.stat(input.fd)).size;if(size<=0||size>24*1024*1024)throw new Error('封面文件须小于 24 MB');
-    source=image.createImageSource(input.fd);const info=await source.getImageInfo(),ratio=Math.min(1,500/Math.max(info.size.width,info.size.height));pixel=await source.createPixelMap({desiredSize:{width:Math.max(1,Math.round(info.size.width*ratio)),height:Math.max(1,Math.round(info.size.height*ratio))}});
+    source=image.createImageSource(input.fd);const info=await source.getImageInfo();
+    if(!isSquareAlbumCover(info.size.width,info.size.height))throw new Error('请选择正方形专辑封面（1:1），可先在相册中裁剪');
+    const ratio=Math.min(1,500/Math.max(info.size.width,info.size.height));pixel=await source.createPixelMap({desiredSize:{width:Math.max(1,Math.round(info.size.width*ratio)),height:Math.max(1,Math.round(info.size.height*ratio))}});
     packer=image.createImagePacker();created.push(cover);file=await fileIo.open(cover,fileIo.OpenMode.CREATE|fileIo.OpenMode.READ_WRITE);await packer.packToFile(pixel,file.fd,{format:'image/jpeg',quality:94});fileIo.closeSync(file.fd);file=null;await pixel.release();pixel=null;
     const palette=await imagePalette('file://'+cover),rgba=blendPixels(albumAnchors(palette),palette[0],320,320);
     pixel=await image.createPixelMap(rgba.buffer as ArrayBuffer,{size:{width:320,height:320},srcPixelFormat:image.PixelMapFormat.RGBA_8888,pixelFormat:image.PixelMapFormat.RGBA_8888,alphaType:image.AlphaType.OPAQUE});

@@ -5,13 +5,14 @@ const io={OpenMode:{READ_ONLY:0,CREATE:1,READ_WRITE:2,TRUNC:4},openSync(p,mode){
 const kits={'@kit.CoreFileKit':{fileIo:io},'@kit.ArkTS':{util:{Base64Helper:class{encodeToStringSync(b){return Buffer.from(b).toString('base64');}decodeSync(s){return new Uint8Array(Buffer.from(s,'base64'));}},TextEncoder:class{encodeInto(s){return new TextEncoder().encode(s);}},TextDecoder:class{decodeWithStream(b){return new TextDecoder().decode(b);}}}}};
 function load(name){if(cache.has(name))return cache.get(name);const module={exports:{}};cache.set(name,module.exports);const code=ts.transpileModule(fs.readFileSync(path.join(root,name+'.ets'),'utf8').replace(/^@Concurrent\s*$/gm,''),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;vm.runInThisContext('(function(require,module,exports){'+code+'\n})', {filename:name})(s=>kits[s]||load(s.replace('./','')),module,module.exports);cache.set(name,module.exports);return module.exports;}
 
-const {albumCoverSize,albumCoverRadius,albumAnchors}=load('AlbumLayout');
+const {albumCoverSize,albumCoverRadius,albumAnchors,isSquareAlbumCover}=load('AlbumLayout');
 const {blendPixels}=load('BackgroundPalette');
 const {FridgeCard,normalizeState,defaultState,typeLabel}=load('CardSchema');
-assert.equal(albumCoverSize(80,180),76);assert.equal(albumCoverSize(240,120),114);assert.equal(albumCoverSize(100,100,3),94);assert.equal(albumCoverSize(100,100,15),70);
+assert.ok(Math.abs(albumCoverSize(80,180)-72.16)<1e-9);assert.ok(Math.abs(albumCoverSize(240,120)-108.24)<1e-9);assert.equal(albumCoverSize(100,100,3),94);assert.equal(albumCoverSize(100,100,15),70);
 const {shapeRadius,cardCornerRadius}=load('CardSchema');const roundedAlbum=new FridgeCard();roundedAlbum.capability={k:'album'};
-assert.equal(albumCoverRadius(180,180),4);assert.equal(albumCoverRadius(180,300,3),4);assert.equal(cardCornerRadius(roundedAlbum),16);assert.equal(cardCornerRadius(roundedAlbum,2),32);assert.equal(cardCornerRadius(new FridgeCard()),shapeRadius('rect'));assert.ok(albumCoverRadius(20,20)<=albumCoverSize(20,20)/2);
+assert.equal(albumCoverRadius(180,180),14);assert.equal(albumCoverRadius(180,300,3),14);assert.equal(cardCornerRadius(roundedAlbum),20);assert.equal(cardCornerRadius(roundedAlbum,2),40);assert.equal(cardCornerRadius(new FridgeCard()),shapeRadius('rect'));assert.ok(albumCoverRadius(20,20)<=albumCoverSize(20,20)/2);
 for(const shape of ['round','pill','blob','subject']){const restricted=defaultState();const c=new FridgeCard();c.shape=shape;c.capability={k:'album'};restricted.cards=[c];assert.equal(normalizeState(restricted).cards[0].shape,'rect');}
+assert.equal(isSquareAlbumCover(500,500),true);for(const [w,h] of [[500,499],[400,600],[0,0],[-1,-1],[NaN,500],[20.5,20.5]])assert.equal(isSquareAlbumCover(w,h),false);
 const anchors=albumAnchors(['#AB2233','#D5A862','#415E89']),a=blendPixels(anchors,'#AB2233',48,48),b=blendPixels(anchors,'#AB2233',48,48);assert.deepEqual(a,b,'static field is deterministic');assert.equal(a.length,48*48*4);assert.ok(a.every((v,i)=>i%4!==3||v===255));
 const card=new FridgeCard();card.id='album';card.shape='subject';card.frame=true;card.capability={k:'album',albumCover:'https://untrusted/image',albumBackground:'file:///saved/background.png',artist:'The Beatles'};const state=defaultState();state.cards=[card];const saved=normalizeState(state).cards[0];assert.equal(saved.capability.albumCover,'');assert.equal(saved.capability.albumBackground,'file:///saved/background.png');assert.equal(saved.shape,'rect');assert.equal(saved.frame,false);assert.equal(typeLabel('album'),'音乐专辑');
 console.log('PASS: centre sizing; deterministic static FluidGradient field; locked shape; local asset normalization.');
@@ -25,7 +26,7 @@ const epoch=1700000000000,cap={k:'album',albumItems:items,albumId:'a',albumCover
 assert.equal(activeAlbum(cap,epoch+3599999).id,'a');assert.equal(activeAlbum(cap,epoch+3600000).id,'b');assert.equal(activeAlbum(cap,epoch+7200000).id,'a');
 assert.equal(nextAlbumBoundary(cap,epoch+3600000),epoch+7200000);assert.equal(nextAlbumBoundary({...cap,albumRotationMinutes:0},epoch),Infinity);
 assert.equal(nextDataBoundary(cap,epoch+3590000),epoch+3600000);const timed=defaultState();const timedCard=new FridgeCard();timedCard.capability=cap;timed.cards=[timedCard];assert.equal(refreshMinutes(timed,epoch+3000000),10);
-assert.equal(normalizeCapability({...cap,albumItems:[...items,{id:'bad',cover:'https://remote/cover',background:'file:///saved/b.png'}],albumInset:100}).albumItems.length,2);assert.equal(normalizeCapability({...cap,albumInset:100}).albumInset,2.5);
+assert.equal(normalizeCapability({...cap,albumItems:[...items,{id:'bad',cover:'https://remote/cover',background:'file:///saved/b.png'}],albumInset:100}).albumItems.length,2);assert.equal(normalizeCapability({...cap,albumInset:100}).albumInset,4.9);
 const selected=selectAlbum(cap,items[1],epoch+4000000);assert.equal(activeAlbum(selected,epoch+4000000).id,'b');assert.equal(activeAlbum(selected,epoch+7600000).id,'a');
 const {exportTemplate,materializeTemplate}=load('TemplateIO');
 (async()=>{for(const item of items){files.set(item.cover.slice(7),Buffer.from('cover'));files.set(item.background.slice(7),Buffer.from('background'));}

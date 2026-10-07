@@ -7,9 +7,9 @@ export const BOARD_H: number = 470;
 /** Artwork bounds only; capability readability is enforced separately by layout. */
 export const MIN_CARD_EDGE: number = 32;
 export const RECT_CORNER_RADIUS: number = 16;
-export const ALBUM_INSET: number = 2.5;
-export const ALBUM_CORNER_RADIUS: number = 4;
-export const ALBUM_CARD_CORNER_RADIUS: number = RECT_CORNER_RADIUS;
+export const ALBUM_INSET: number = 4.9;
+export const ALBUM_CORNER_RADIUS: number = 14;
+export const ALBUM_CARD_CORNER_RADIUS: number = 20;
 export const MIN_SUBJECT_EDGE: number = 16;
 export class CapType {
   static readonly CLOCK: string = 'clock';
@@ -182,7 +182,7 @@ export function shapeRadius(shape: string, scale: number = 1): BorderRadiuses | 
   if (shape === 'blob') return { topLeft: '28%', topRight: '12%', bottomLeft: '18%', bottomRight: '26%' };
   return shape === 'subject' ? 0 : RECT_CORNER_RADIUS * scale;
 }
-/** Original album pairing: standard rounded card, subtle artwork corners. */
+/** Album geometry approved in the interactive demo; shared by app, export and widget. */
 export function cardCornerRadius(card:FridgeCard,scale:number=1):BorderRadiuses | Length {
   return card.capability?.k==='album'?ALBUM_CARD_CORNER_RADIUS*scale:shapeRadius(card.shape,scale);
 }

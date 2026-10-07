@@ -7,3 +7,6 @@ export function albumAnchors(palette:string[]):BackgroundAnchor[] {
   const positions:number[][]=[[.18,.24],[.82,.32],[.48,.84]];
   return palette.slice(0,3).map((color:string,i:number):BackgroundAnchor=>({color:color,x:positions[i][0],y:positions[i][1],weight:1}));
 }
+
+/** Album artwork is square; reject other ratios before decoding or creating assets. */
+export function isSquareAlbumCover(width:number,height:number):boolean {return Number.isInteger(width)&&width>0&&width===height;}

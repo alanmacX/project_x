@@ -89,7 +89,7 @@ export struct AlbumSettings {
       Text('定时轮换').fontSize(14).fontColor(AppDesign.text(this.appDark)).width('100%')
       SettingsSegmented({labels:['关闭','1小时','3小时','6小时','每天'],selectedIndex:Math.max(0,[0,60,180,360,1440].indexOf(this.cap.albumRotationMinutes??0)),appDark:this.appDark,onSelect:(i:number)=>{if(i>0&&albumLibrary(this.cap).length<2){this.message='请先添加至少两张封面';return;}this.message='';this.setRotation(i);}})
       Text('按库内顺序轮换；桌面更新由系统调度，可能稍有延迟。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
-      Text('封面居中，背景在本机自动生成，无需联网。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+      Text('仅支持正方形封面（1:1）；背景在本机自动生成，无需联网。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       SettingsAction({label:this.sources?'收起封面来源建议':'封面来源建议',appDark:this.appDark,fillWidth:true,onPress:()=>this.sources=!this.sources})
       if(this.sources) {
         SettingsAction({label:'iSearch · 中文封面搜索 ↗',appDark:this.appDark,fillWidth:true,onPress:()=>this.source('https://i.oppsu.cn/')})
