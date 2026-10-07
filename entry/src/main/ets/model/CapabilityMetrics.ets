@@ -1,4 +1,4 @@
-import { timetableCapacity, briefHeight, briefColumns } from './TimetableLayout';
+import { timetableCapacity, briefHeight, briefColumns, LESSON_MIN_WIDTH } from './TimetableLayout';
 import { CapBlock } from './CardSchema';
 export class CapabilitySize { w: number = 112; h: number = 58; }
 /** Full and compact layouts have separate readable minima; neither shrinks to microscopic text. */
@@ -7,8 +7,8 @@ export function capabilityMinimum(cap: CapBlock | null, compact: boolean = false
   if (cap === null) { size.w = 0; size.h = 0; return size; }
   if (cap.k === 'timetable') {
     const count=cap.timetableMode==='day'?timetableCapacity(cap):1, columns=briefColumns(availableWidth);
-    size.w = cap.timetableMode === 'day' ? columns*120 : compact ? 96 : 128;
-    size.h = cap.timetableMode === 'day' ? briefHeight(count, columns) : compact ? 80 : 116;
+    size.w = cap.timetableMode === 'day' ? columns*LESSON_MIN_WIDTH : compact ? 80 : LESSON_MIN_WIDTH;
+    size.h = cap.timetableMode === 'day' ? briefHeight(count, columns) : briefHeight(1,1);
     return size;
   }
   if (compact) {
