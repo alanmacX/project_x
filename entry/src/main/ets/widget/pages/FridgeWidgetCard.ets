@@ -141,9 +141,6 @@ struct FridgeWidgetCard {
           .rotate({angle:this.cardMap[id].rot,centerX:0,centerY:'100%'})
           .zIndex(this.cardMap[id].z).hitTestBehavior(HitTestMode.None)
       }, (id: string) => id)
-      // One stable event surface above all artwork, including overflow and images.
-      Column().width('100%').height('100%').backgroundColor(Color.Transparent)
-        .zIndex(1000000).hitTestBehavior(HitTestMode.Block).accessibilityText('打开冰箱贴画布').onClick(()=>this.open())
     }.width('100%').height('100%').backgroundColor(Color.White).borderRadius(24).clip(true)
       .onSizeChange((_: SizeOptions, size: SizeOptions) => {
         const width = Number(size.width), height = Number(size.height);
@@ -151,6 +148,7 @@ struct FridgeWidgetCard {
           this.measuredWidth = width; this.measuredHeight = height;
         }
       })
-      .accessibilityLevel('no')
+      .accessibilityText('打开冰箱贴画布')
+      .onClick(() => this.open())
   }
 }
