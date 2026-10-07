@@ -1,0 +1,14 @@
+{
+  "clock-stroke": {
+    "max_mean_absolute_difference": 0.0,
+    "samples": 16
+  },
+  "calendar-right": {
+    "max_mean_absolute_difference": 0.0,
+    "samples": 16
+  },
+  "worldclock-lobe": {
+    "max_mean_absolute_difference": 0.0,
+    "samples": 16
+  }
+}

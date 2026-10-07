@@ -44,7 +44,7 @@ for(const ink of ['#262824','#FFFFFF','#777777','#AA4455','#FFDD00','#000000','#
 for(const blend of ['feather','scrim','halo']) {
  const input=new s.FridgeState(),card=new s.FridgeCard();card.capability={k:'clock',readingBlend:blend,readingStyle:'surface'};input.cards=[card];
  const restored=s.normalizeState(JSON.parse(JSON.stringify(input)));
- assert.equal(restored.cards[0].capability.readingBlend,blend,'reading comparison choice survives storage/import normalization');
+ assert.equal(restored.cards[0].capability.readingBlend,'bare','legacy material migrates to neutral mica without changing artwork');
  const maxAlpha=parseInt(p.readingVeilColor('#FFFFFF',1,blend).slice(1,3),16)/255;
  assert.ok(maxAlpha<=(blend==='scrim'?.722:.421));assert.equal(p.readingVeilColor('#FFFFFF',0,blend).slice(1,3),'00');
 }
@@ -166,7 +166,7 @@ const cardHit=load('CardHitTest');assert.equal(cardHit.cardContainsPoint(free,.7
 
 for(const ink of ['#FFFFFF','#F8F8F8','#323232','#D0A050','#000000'])assert.ok(p.textContrast(p.paperReadingInk(ink),p.READING_PAPER_COLOR)>=4.5);
 assert.equal(p.paperReadingInk('#101010'),'#101010');assert.equal(p.paperReadingRadius(180,100),10);assert.equal(p.paperReadingRadius(20,20),3.2);
-const paperState=new s.FridgeState();paperState.cards=[new s.FridgeCard()];paperState.cards[0].capability={k:'clock',readingStyle:'surface',readingBlend:'paper'};assert.equal(s.normalizeState(JSON.parse(JSON.stringify(paperState))).cards[0].capability.readingBlend,'paper');
+const paperState=new s.FridgeState();paperState.cards=[new s.FridgeCard()];paperState.cards[0].capability={k:'clock',readingStyle:'surface',readingBlend:'paper'};assert.equal(s.normalizeState(JSON.parse(JSON.stringify(paperState))).cards[0].capability.readingBlend,'bare');
 console.log('PASS thin-paper contrast, compact corner geometry and persisted material choice');
 
 for(const ink of ['#FFFFFF','#323232','#6D6D6D','#000000'])for(const background of ['#000000','#FFFFFF'])assert.ok(p.textContrast(p.paperReadingInk(ink),p.paperReadingBackground(background))>=4.5,'translucent paper keeps ink readable over darkest/lightest photographs');
@@ -184,15 +184,37 @@ console.log('PASS content-sized paper native measurement cache and hollow batter
 assert.equal(batteryPaper.batteryPaperArcMask(100,40,126,0),'');assert.ok(batteryPaper.batteryPaperArcMask(100,40,126,288).includes('0 1 1'));assert.ok(batteryPaper.batteryPaperArcMask(100,30,70,40).includes('0 0 0'),'number backing uses only its local arc');
 const compositions=load('ReadingComposition');
 assert.equal(compositions.READING_COMPOSITIONS.length,6);
-for(const kind of s.CAPABILITIES.filter(k=>k!=='album')) for(const blend of compositions.READING_COMPOSITIONS){
+for(const kind of s.CAPABILITIES.filter(k=>k!=='album')) for(const blend of compositions.readingStyles(kind)){
  const card=new s.FridgeCard();card.id=kind+'-'+blend;card.capability={k:kind,readingBlend:blend,readingTint:'#F8CF32'};card.capFree=true;card.capBox.x=-.35;card.capBox.y=.6;card.capBox.w=.65;card.capBox.h=.5;card.capBox.rot=-12;
  const restored=s.normalizeState({...s.defaultState(),cards:[card]}).cards[0];assert.equal(restored.capability.readingBlend,blend);assert.equal(restored.capability.readingTint,'#F8CF32');assert.equal(restored.capBox.x,-.35);assert.equal(restored.capBox.rot,-12);
- const drag=g.constrainCapabilityDrag(restored,{...restored.capBox,x:-100,y:100},restored.capBox);assert.ok(drag.x+drag.w>0&&drag.y<1);assert.equal(drag.rot,-12);
- assert.equal(p.readingSurface(restored.capability,true,false),blend!=='bare');
+ const drag=g.constrainCapabilityDrag(restored,{...restored.capBox,x:-100,y:100},restored.capBox);assert.equal(drag.x,-2);assert.equal(drag.y,2);assert.equal(drag.rot,-12);
+ assert.equal(p.readingSurface(restored.capability,true,false),true);
 }
 for(const blend of ['space','sticker'])for(const [w,h] of [[1,1],[100,40],[40,150]]){const path=compositions.compositionPath(blend,w,h);assert.ok(path.endsWith('Z'));assert.ok(!/NaN|Infinity/.test(path));assert.equal((path.match(/ C /g)||[]).length,6);}
 assert.equal(compositions.compositionPath('sticker',0,20),'');
-console.log('PASS six compositions: all non-album capabilities, material/position/rotation persistence, bounded external drag, finite fixed-complexity silhouettes and bare-text contract');
+console.log('PASS six compositions: compatible capability/style pairs, material/position/rotation persistence, bounded external drag, finite fixed-complexity silhouettes and bare-text contract');
 const external=new s.FridgeCard();external.capFree=true;external.capability={k:'worldclock',readingBlend:'space'};external.capBox={x:-.35,y:.6,w:.65,h:.5,rot:25,opacity:1};
 const fringe=compositions.compositionOverflow(external,2);assert.ok(fringe.left>0&&fringe.bottom>0);assert.equal(compositions.compositionOverflow({...external,capFree:false},2).left,0);
 console.log('PASS external composition cache includes rotated attachment overflow without changing artwork bounds');
+
+const policy=load('ReadingStylePolicy');
+for(const k of ['clock','date','countdown','anniversary','dayprogress','yearprogress','agenda','timetable'])assert.deepEqual(policy.readingStyles(k),['bare','sticker','space','tag','dock']);
+for(const k of ['worldclock','lunar'])assert.deepEqual(policy.readingStyles(k),['sticker','space','tag','dock']);
+assert.deepEqual(policy.readingStyles('calendar'),['sticker','space']);assert.deepEqual(policy.readingStyles('battery'),['badge','tag','dock']);assert.deepEqual(policy.readingStyles('album'),[]);
+for(const k of s.CAPABILITIES.filter(k=>k!=='album'))for(const style of compositions.READING_COMPOSITIONS)assert.ok(policy.readingStyles(k).includes(s.normalizeState({...s.defaultState(),cards:[{...new s.FridgeCard(),capability:{k,readingBlend:style}}]}).cards[0].capability.readingBlend));
+for(const scale of [.5,1,2]){
+ const box={x:4/(200*scale),y:.4,w:.3,h:.3,rot:0,opacity:1};const snapped=compositions.snapComposition(box,200,240,scale,'sticker');assert.equal(snapped.edge,'left');assert.equal(snapped.box.x,0);assert.equal(snapped.box.y,.4);
+ assert.equal(compositions.snapComposition({...box,x:8/(200*scale)},200,240,scale,'space').edge,'');
+ const outside=compositions.snapComposition({...box,x:-.3+2/(200*scale)},200,240,scale,'space');assert.equal(outside.edge,'right');assert.equal(outside.box.x,-.3);
+ assert.equal(compositions.snapComposition({...box,x:8/(200*scale)},200,240,scale,'space','left').edge,'left');
+ assert.equal(compositions.snapComposition({...box,rot:12},200,240,scale,'space').edge,'');
+}
+for(const edge of ['left','right','top','bottom']){const path=compositions.compositionPath('sticker',180,80,edge);assert.ok(!/NaN|Infinity|@/.test(path));assert.equal((path.match(/ C /g)||[]).length,5);assert.ok(path.endsWith('Z'));}
+for(let u=0;u<=1;u+=.01){const p=compositions.hookPoint(u);assert.ok(p[1]<=.5+1e-12);assert.ok(Math.abs(compositions.hookPosition(...p)-u)<.002);}
+const backing=fs.readFileSync(path.resolve(root,'../views/ReadingBacking.ets'),'utf8');assert.ok(!/@State|onAreaChange/.test(backing),'backing cannot feed measured geometry back into native layout');assert.ok(backing.includes('.objectFit(ImageFit.Fill)'));assert.ok(backing.includes('app.media.mica_brush'));assert.ok(fs.readFileSync(path.resolve(root,'../views/ReadingHook.ets'),'utf8').includes('sourceSize({width:64,height:64})'));
+console.log('PASS explicit style policy, legacy migration, one-edge physical snapping, finite attached shapes, freely placed hooks and feedback-free native backing');
+
+const boundaryCard=new s.FridgeCard();boundaryCard.shape='subject';boundaryCard.capability={k:'calendar',readingBlend:'sticker'};boundaryCard.outline=[[{x:.25,y:.15},{x:.75,y:.15},{x:.75,y:.85},{x:.25,y:.85}]];
+const edgeBox={x:.253,y:.35,w:.2,h:.2,rot:0,opacity:1},boundary=g.capabilityAttachmentEdges(boundaryCard,edgeBox);
+assert.ok(Math.abs(boundary[0]-.25)<.02&&Math.abs(boundary[1]-.75)<.02);assert.equal(compositions.snapComposition(edgeBox,240,240,1,'sticker','',boundary).box.x,boundary[0]);
+let edgeTime=performance.now();for(let i=0;i<5000;i++){const b=g.capabilityAttachmentEdges(boundaryCard,edgeBox);compositions.snapComposition(edgeBox,240,240,1,'sticker','',b);}console.log('5000 warm silhouette-edge snaps: '+(performance.now()-edgeTime).toFixed(2)+' ms (host CPU, not device FPS)');

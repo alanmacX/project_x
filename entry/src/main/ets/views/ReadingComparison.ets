@@ -1,4 +1,4 @@
-import { READING_COMPOSITIONS, READING_COMPOSITION_LABELS, READING_COMPOSITION_NOTES, compositionPlacement, compositionOverflow } from '../model/ReadingComposition';
+import { READING_COMPOSITIONS, READING_COMPOSITION_LABELS, READING_COMPOSITION_NOTES, compositionPlacement, compositionOverflow, readingStyles } from '../model/ReadingComposition';
 import { common } from '@kit.AbilityKit';
 import { FridgeCard } from '../model/CardSchema';
 import { cardViewSnapshot, cardRenderSnapshot } from '../model/CardViewSnapshot';
@@ -20,10 +20,12 @@ export struct ReadingComparison {
   private generation:number=0;
   aboutToAppear():void {this.choose(0);}
   aboutToDisappear():void {this.alive=false;this.generation++;if(this.prepareTimer>=0)clearTimeout(this.prepareTimer);}
+  private styles():string[] {return readingStyles(this.card.capability?.k??'');}
+  private labels():string[] {return this.styles().map((s:string)=>READING_COMPOSITION_LABELS[READING_COMPOSITIONS.indexOf(s)]);}
   private choose(index:number):void {
     this.selected=index;
     const sample=cardViewSnapshot(this.card);
-    if(sample.capability){sample.capability.readingStyle='surface';sample.capability.readingBlend=READING_COMPOSITIONS[index];}
+    if(sample.capability){sample.capability.readingStyle='surface';sample.capability.readingBlend=this.styles()[index];}
     sample.capFree=true;if(sample.capability)sample.capBox=compositionPlacement(sample,sample.capBox,sample.capability.readingBlend??'');this.sample=cardRenderSnapshot(sample);
     this.queueDepth();
   }
@@ -47,10 +49,10 @@ export struct ReadingComparison {
     Scroll() {
     Column({space:12}) {
       Text('融合方案对比').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%').padding({right:40})
-      SettingsSelect({labels:READING_COMPOSITION_LABELS,selectedIndex:this.selected,appDark:this.appDark,onSelect:(index:number)=>this.choose(index)})
+      SettingsSelect({labels:this.labels(),selectedIndex:this.selected,appDark:this.appDark,onSelect:(index:number)=>this.choose(index)})
       Stack() {CardFace({card:this.sample,scaleFactor:this.sampleScale(),tick:this.tick}).width(this.sample.w*this.sampleScale()).height(this.sample.h*this.sampleScale()).translate({x:(compositionOverflow(this.sample,1).left-compositionOverflow(this.sample,1).right)*this.sampleScale()/2,y:(compositionOverflow(this.sample,1).top-compositionOverflow(this.sample,1).bottom)*this.sampleScale()/2})}
         .width('100%').height(this.previewHeight()).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
-      Text(READING_COMPOSITION_NOTES[this.selected]).fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%').maxLines(2)
+      Text(READING_COMPOSITION_NOTES[READING_COMPOSITIONS.indexOf(this.styles()[this.selected])]).fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%').maxLines(2)
     }.width('100%').padding({left:20,right:20,top:16,bottom:24})
     }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
       .onAreaChange((_:Area,area:Area)=>{const width=Number(area.width),height=Number(area.height);if(width!==this.panelWidth||height!==this.panelHeight){this.panelWidth=width;this.panelHeight=height;this.queueDepth();}})

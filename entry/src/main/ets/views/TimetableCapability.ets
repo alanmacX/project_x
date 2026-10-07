@@ -1,3 +1,4 @@
+import { ReadingHook } from './ReadingHook';
 import { compositionPadding } from '../model/ReadingComposition';
 import { ReadingBacking } from './ReadingBacking';
 import { paperTextWidth } from '../model/PaperTextWidth';
@@ -15,6 +16,7 @@ export struct TimetableCapability {
   @Prop readingHaloEnabled: boolean = false;
   @Prop contentBackingEnabled:boolean=false;
   @Prop backingTint:string='#E8D6B0';
+  @Prop backingEdge:string='';
   @Prop contentWidth: number = 192;
   @Prop contentHeight: number = 150;
   @Prop scaleFactor: number = 1;
@@ -45,7 +47,7 @@ export struct TimetableCapability {
     return 14*1.35*this.s()*(wraps?2:1);
   }
   private dayCellHeight():number {return this.contentBackingEnabled?this.dayTitleHeight()+(11*1.35+3+4)*this.s():LESSON_CELL_HEIGHT*this.s();}
-  @Builder private readingBackground() {if(this.contentBackingEnabled){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,ink:this.ink,radius:8*this.s(),scaleFactor:this.scaleFactor})}}
+  @Builder private readingBackground() {if(this.contentBackingEnabled){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,radius:8*this.s(),scaleFactor:this.scaleFactor})}}
   @Builder
   heading() {
     Row({space:4*this.s()}) {
@@ -53,6 +55,7 @@ export struct TimetableCapability {
       Text(this.dateLabel()).fontSize(10*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.5)
     }.width('100%').height((this.contentBackingEnabled?16:BRIEF_HEADER_HEIGHT)*this.s()).alignItems(VerticalAlign.Top)
   }
+  @Builder private readingHook() {if(this.contentBackingEnabled&&['tag','dock'].includes(this.cap.readingBlend??'')){ReadingHook({hook:this.cap.readingHook??.2,scaleFactor:this.s()})}}
   build() {
     Column() {
     Column() {
@@ -86,7 +89,7 @@ export struct TimetableCapability {
         }.width('100%').layoutWeight(this.contentBackingEnabled?0:1).alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Center)
       }
     }.width(this.contentBackingEnabled?this.backingWidth():'100%').height(this.contentBackingEnabled?undefined:'100%').padding(this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0)
-      .background(this.readingBackground).alignItems(HorizontalAlign.Start)
-    }.width('100%').height('100%').justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+      .background(this.readingBackground).overlay(this.readingHook).alignItems(HorizontalAlign.Start)
+    }.width('100%').height('100%').justifyContent(this.backingEdge==='top'?FlexAlign.Start:this.backingEdge==='bottom'?FlexAlign.End:FlexAlign.Center).alignItems(this.backingEdge==='left'?HorizontalAlign.Start:this.backingEdge==='right'?HorizontalAlign.End:HorizontalAlign.Center)
   }
 }

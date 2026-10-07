@@ -1,6 +1,6 @@
-import { compositionPlacement, isReadingComposition } from '../model/ReadingComposition';
-import { readingToneJob } from '../model/ReadingToneWorker';
-import { cardSource, hash } from '../model/BackgroundInputs';
+import { capabilityAttachmentEdges } from '../model/CanvasLayout';
+import { defaultReadingStyle } from '../model/ReadingStylePolicy';
+import { compositionPlacement, isReadingComposition, snapComposition, readingStyles } from '../model/ReadingComposition';
 import { CenterGuides } from '../views/CenterGuides';
 import lazy { ReadingComparison } from '../views/ReadingComparison';
 import { CardDeletionFlight } from '../views/CardDeletionFlight';
@@ -790,7 +790,7 @@ struct Index {
     this.previewTimer = setTimeout(() => { this.previewTimer = -1; if (this.alive) this.render(); }, 16);
   }
   private flushPreview(): void {
-    if (this.previewTimer >= 0) clearTimeout(this.previewTimer); this.previewTimer = -1; this.change(); this.layerMotion.clear(); this.layerDrag=''; this.gestureGroup = '';
+    if (this.previewTimer >= 0) clearTimeout(this.previewTimer); this.previewTimer = -1; if(this.layerMotion.id==='capability'&&this.current()?.capability)this.current()!.capability!.readingEdge=this.layerMotion.edge; this.change(); this.layerMotion.clear(); this.layerDrag=''; this.gestureGroup = '';
   }
   private select(id: string, refresh: boolean = false): void {
     if (!refresh && !this.editing && !this.viewing && this.selectedId === id) return;
@@ -880,7 +880,7 @@ struct Index {
     if (card.capability?.k === k) { this.layerId = 'capability'; this.syncFields(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); return; }
     if (k === 'none') { card.capability = null; this.layerId = ''; }
     else {
-      const cap: CapBlock = { k: k };
+      const cap: CapBlock = { k:k,readingBlend:k==='album'?undefined:defaultReadingStyle(k),readingStyle:'surface' };
       if (k === 'countdown' || k === 'anniversary') {
         const date = new Date(); cap.date = date.getFullYear() + '-' + ('0' + (date.getMonth() + 1)).slice(-2) + '-' + ('0' + date.getDate()).slice(-2);
         cap.title = '';
@@ -1883,7 +1883,7 @@ struct Index {
           } else if (this.settingsTab === 1 && (this.layerId === 'capability' || this.layerId.length === 0)) {
             if(this.preview.capability===null){Column({space:16}) {this.capabilityPanel()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)}
             if(this.preview.capability!==null) {
-              CapabilityAppearance({card:this.preview,appDark:this.appDark,onChoose:()=>this.chooseCapability(),onCompare:()=>this.compareReading(),onBlend:(blend)=>this.chooseReadingComposition(blend),onArrange:(anchor:string)=>this.arrangeCapability(anchor),onColor:()=>this.chooseColor('ink'),onColorPick:(color:string,key:string)=>this.setCardColor('ink',color,key),onStyle:(style:string)=>{
+              CapabilityAppearance({card:this.preview,appDark:this.appDark,onChoose:()=>this.chooseCapability(),onCompare:()=>this.compareReading(),onBlend:(blend)=>this.chooseReadingComposition(blend),onHook:(position:number)=>{const card=this.current();if(card?.capability){card.capability.readingHook=position;this.change();}},onArrange:(anchor:string)=>this.arrangeCapability(anchor),onColor:()=>this.chooseColor('ink'),onColorPick:(color:string,key:string)=>this.setCardColor('ink',color,key),onStyle:(style:string)=>{
                 const card=this.current();if(card?.capability){card.capability.readingStyle=style;this.change();}
               }})
             }
@@ -1933,6 +1933,7 @@ struct Index {
   }
   private finishLayerDrag(cancelled: boolean = false): void {
     if (cancelled) { const box = this.currentBox(); if (box !== null) { box.x = this.layerStartX; box.y = this.layerStartY; } if(this.layerId==='capability'&&this.current()!==null)this.current()!.capFree=this.layerFreeStart; }
+    if(!cancelled&&this.layerId==='capability'&&this.current()?.capability)this.current()!.capability!.readingEdge=this.layerMotion.edge;
     this.syncFields(); this.change(); this.layerMotion.clear(); this.layerDrag = ''; this.layerDX = 0; this.layerDY = 0; this.gestureGroup = '';
   }
   private beginFinger(e: GestureEvent, degrees: number): void {
@@ -1959,7 +1960,7 @@ struct Index {
     const box = this.currentBox(); if (box === null) return;
     this.resizeStart = JSON.parse(JSON.stringify(box)) as ElementBox;
     this.rotateStart = box.rot;
-    this.layerDrag=id;this.layerMotion.update(id,box);
+    this.layerDrag=id;this.layerMotion.edge=id==='capability'?(card?.capability?.readingEdge??''):'';this.layerMotion.update(id,box);
     const geometry = this.selectionGeometry();
     this.rotationVector = { x: geometry.rotate.x - geometry.pivot.x, y: geometry.rotate.y - geometry.pivot.y };
   }
@@ -1992,8 +1993,10 @@ struct Index {
     const local = this.resizeStart.rot * Math.PI / 180, c = Math.cos(local), sn = Math.sin(local);
     const dw = (this.resizeStart.w - box.w) * w, dh = (this.resizeStart.h - box.h) * h;
     const outside=this.layerId==='capability'&&isReadingComposition(this.preview.capability?.readingBlend??'');
-    box.x = Math.max(outside?-box.w*.8:0, Math.min(outside?1-box.w*.2:1-box.w, this.resizeStart.x + (dw * (1 - c) + dh * sn) / (2 * w)));
-    box.y = Math.max(outside?-box.h*.8:0, Math.min(outside?1-box.h*.2:1-box.h, this.resizeStart.y + (dh * (1 - c) - dw * sn) / (2 * h)));
+    box.x = Math.max(outside?-2:0, Math.min(outside?2:1-box.w, this.resizeStart.x + (dw * (1 - c) + dh * sn) / (2 * w)));
+    box.y = Math.max(outside?-2:0, Math.min(outside?2:1-box.h, this.resizeStart.y + (dh * (1 - c) - dw * sn) / (2 * h)));
+    if(this.layerId==='capability'&&this.layerMotion.edge==='right')box.x=this.resizeStart.x+this.resizeStart.w-box.w;
+    if(this.layerId==='capability'&&this.layerMotion.edge==='bottom')box.y=this.resizeStart.y+this.resizeStart.h-box.h;
     this.layerMotion.update(this.layerId,box);
   }
   private rotateElement(e: GestureEvent): void {
@@ -2003,6 +2006,7 @@ struct Index {
     if (delta > Math.PI) delta -= 2 * Math.PI; if (delta < -Math.PI) delta += 2 * Math.PI;
     const value = this.rotateStart + delta * 180 / Math.PI;
     live.rot = Math.abs(value - Math.round(value / 15) * 15) < 3 ? Math.round(value / 15) * 15 : value;
+    if(this.layerId==='capability'&&Math.abs(live.rot)>3)this.layerMotion.edge='';
     this.layerMotion.update(this.layerId,live);
   }
   private moveElement(e: GestureEvent): void {
@@ -2013,18 +2017,19 @@ struct Index {
     const offset = this.fingerOffset(e);
     const dx = offset.x * Math.cos(angle) + offset.y * Math.sin(angle), dy = -offset.x * Math.sin(angle) + offset.y * Math.cos(angle);
     const previous=new ElementBox();previous.x=live.x;previous.y=live.y;previous.w=live.w;previous.h=live.h;
-    live.x = Math.max(0, Math.min(1 - live.w, this.layerStartX + dx / width));
-    live.y = Math.max(0, Math.min(1 - live.h, this.layerStartY + dy / height));
+    const free=this.layerId==='capability'&&isReadingComposition(this.preview.capability?.readingBlend??'');
+    live.x = Math.max(free?-2:0, Math.min(free?2:1-live.w, this.layerStartX + dx / width));
+    live.y = Math.max(free?-2:0, Math.min(free?2:1-live.h, this.layerStartY + dy / height));
     const centerX = (1 - live.w) / 2, centerY = (1 - live.h) / 2;
     if (this.layerId !== 'capability' && Math.abs(live.x - centerX) * width < 5) live.x = centerX;
     if (this.layerId !== 'capability' && Math.abs(live.y - centerY) * height < 5) live.y = centerY;
-    if(this.layerId==='capability'){const fitted=constrainCapabilityDrag(this.preview,live,previous);live.x=fitted.x;live.y=fitted.y;}
+    if(this.layerId==='capability'){const fitted=constrainCapabilityDrag(this.preview,live,previous),snap=snapComposition(fitted,this.preview.w,this.preview.h,this.editorScale(),this.preview.capability?.readingBlend??'',this.layerMotion.edge,['space','sticker'].includes(this.preview.capability?.readingBlend??'')?capabilityAttachmentEdges(this.preview,fitted):[0,1,0,1]);live.x=snap.box.x;live.y=snap.box.y;this.layerMotion.edge=snap.edge;}
     this.layerMotion.update(this.layerId,live);
   }
   private cancelTransform(): void {
     const box = this.currentBox(); if (box !== null) { box.x = this.resizeStart.x; box.y = this.resizeStart.y; box.w = this.resizeStart.w; box.h = this.resizeStart.h; box.rot = this.resizeStart.rot; }
     if(this.layerId==='capability'&&this.current()!==null)this.current()!.capFree=this.layerFreeStart;
-    this.flushPreview();
+    this.layerMotion.edge=this.current()?.capability?.readingEdge??'';this.flushPreview();
   }
   private touchBox(id: string): ElementBox {
     if (id === 'capability') return capabilityPlacement(this.preview);
@@ -2038,7 +2043,7 @@ struct Index {
         this.layerId=id;this.beginFinger(e,this.editingAngle()+(this.currentBox()?.rot??0));this.layerDrag=id;const card=this.current();
         this.layerFreeStart=card?.capFree??false;
         if(id==='capability'&&card!==null){card.capBox=JSON.parse(JSON.stringify(capabilityPlacement(card))) as ElementBox;card.capFree=true;}
-        const live=this.currentBox();this.layerStartX=live?.x??0;this.layerStartY=live?.y??0;if(live)this.layerMotion.update(id,live);this.syncFields();
+        const live=this.currentBox();this.layerStartX=live?.x??0;this.layerStartY=live?.y??0;if(live){this.layerMotion.edge=id==='capability'?(card?.capability?.readingEdge??''):'';this.layerMotion.update(id,live);}this.syncFields();
       },onUpdate:(e)=>this.moveElement(e),onEnd:(e)=>{this.moveElement(e);this.finishLayerDrag();},onCancel:()=>this.finishLayerDrag(true)})
   }
 
@@ -2229,18 +2234,11 @@ struct Index {
     }.width('100%')
   }
   private chooseReadingComposition(blend:string):void {
-    const card=this.current();if(!card?.capability||card.capability.k==='album')return;
-    card.capability.readingBlend=blend;card.capability.readingStyle='surface';
+    const card=this.current();if(!card?.capability||!readingStyles(card.capability.k).includes(blend))return;
+    card.capability.readingBlend=blend;card.capability.readingStyle='surface';card.capability.readingEdge='';
     card.capBox=compositionPlacement(card,capabilityPlacement(card),blend);card.capFree=true;
     this.change();
-    const id=card.id,source=cardSource(card),key=hash(source+':'+card.subjectVersion);
-    if(!source||card.capability.readingTint&&card.capability.readingTintKey===key)return;
-    taskpool.execute(new taskpool.Task(readingToneJob,source)).then((result:Object)=>{
-      const color=result as string;
-      const current=this.current();
-      if(!this.alive||!this.editing||!current?.capability||current.id!==id||cardSource(current)!==source)return;
-      current.capability.readingTint=color;current.capability.readingTintKey=key;this.change();
-    }).catch(()=>{});
+
   }
   private arrangeCapability(anchor:string):void {
     const card=this.current();if(card===null || card.capability===null)return;

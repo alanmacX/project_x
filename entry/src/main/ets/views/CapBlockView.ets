@@ -1,3 +1,4 @@
+import { ReadingHook } from './ReadingHook';
 import { compositionPadding } from '../model/ReadingComposition';
 import { ReadingBacking } from './ReadingBacking';
 import { paperTextWidth } from '../model/PaperTextWidth';
@@ -33,6 +34,7 @@ export struct CapabilityView {
   @Prop readingHaloEnabled: boolean = false;
   @Prop contentBackingEnabled:boolean=false;
   @Prop backingTint:string='#E8D6B0';
+  @Prop backingEdge:string='';
   @Prop scaleFactor: number = 1;
   @Prop contentWidth: number = 150;
   @Prop contentHeight: number = 140;
@@ -74,9 +76,10 @@ export struct CapabilityView {
     else if(this.cap.k==='calendar')width=7*(this.measured('88',12*u)+(this.compact()?3:7)*u);
     else if(this.cap.k==='countdown'||this.cap.k==='anniversary')width=Math.max(this.measured(this.cap.title||typeLabel(this.cap.k),12*u),this.measured(String(Math.abs(daysLeftOf(this.cap.date??''))),this.counterFont(),500)+this.measured(this.cap.k==='anniversary'?(daysLeftOf(this.cap.date??'')>0?'天后':'天'):(daysLeftOf(this.cap.date??'')<0?'天前':'天'),12*u)+3*u,this.compact()?0:this.measured(this.cap.date??'',10*u));
     else if(this.cap.k==='dayprogress'||this.cap.k==='yearprogress')width=Math.max(64*u,this.measured(typeLabel(this.cap.k),12*u),this.measured('100%',(this.compact()?24:38)*u));
-    return Math.min((this.contentWidth+8)*this.scaleFactor,Math.ceil(width)+2*compositionPadding(this.cap.readingBlend??'')*u);
+    return Math.min((this.contentWidth+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,Math.ceil(width)+2*compositionPadding(this.cap.readingBlend??'')*u);
   }
-  @Builder private readingBackground() {if(this.ownBacking()){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,ink:this.ink,radius:Math.min(8*this.unit(),this.backingWidth()*.12),scaleFactor:this.scaleFactor})}}
+  @Builder private readingBackground() {if(this.ownBacking()){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,radius:Math.min(8*this.unit(),this.backingWidth()*.12),scaleFactor:this.scaleFactor})}}
+  @Builder private readingHook() {if(this.ownBacking()&&['tag','dock'].includes(this.cap.readingBlend??'')){ReadingHook({hook:this.cap.readingHook??.2,scaleFactor:this.unit()})}}
   build() {
     Column() {
     Column({ space: 4 * this.unit() }) {
@@ -147,11 +150,11 @@ export struct CapabilityView {
         }.width('100%').justifyContent(FlexAlign.Center).alignItems(VerticalAlign.Bottom)
         if (!this.compact()) { Text(this.cap.date ?? '').fontSize((10 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:0.6) }
       } else if(this.cap.k==='battery') {
-        BatteryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentBackingEnabled:this.contentBackingEnabled,backingTint:this.backingTint,unit:this.unit(),compact:this.compact()})
+        BatteryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentBackingEnabled:this.contentBackingEnabled,backingTint:this.backingTint,backingEdge:this.backingEdge,unit:this.unit(),compact:this.compact()})
       } else if(this.cap.k==='timetable') {
-        TimetableCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentBackingEnabled:this.contentBackingEnabled,backingTint:this.backingTint,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
+        TimetableCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentBackingEnabled:this.contentBackingEnabled,backingTint:this.backingTint,backingEdge:this.backingEdge,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
       } else if(this.cap.k==='agenda') {
-        SummaryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentBackingEnabled:this.contentBackingEnabled,backingTint:this.backingTint,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
+        SummaryCapability({cap:this.cap,ink:this.ink,readingHaloEnabled:this.readingHaloEnabled,contentBackingEnabled:this.contentBackingEnabled,backingTint:this.backingTint,backingEdge:this.backingEdge,contentWidth:this.contentWidth,contentHeight:this.contentHeight,scaleFactor:this.scaleFactor,tick:this.tick})
       } else {
         Text(typeLabel(this.cap.k)).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:0.65)
         Text(Math.floor(progressOf(this.cap.k, this.now()) * 100) + '%').maxLines(1).fontSize(((this.compact() ? 24 : 38) * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend))
@@ -161,7 +164,7 @@ export struct CapabilityView {
         }.width('100%').height(4 * this.unit()).borderRadius(2).clip(true)
       }
     }.width(this.ownBacking()?this.backingWidth():'100%').height(this.ownBacking()?undefined:'100%').padding(this.ownBacking()?compositionPadding(this.cap.readingBlend??'')*this.unit():0)
-      .background(this.readingBackground).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
-    }.width('100%').height('100%').justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+      .background(this.readingBackground).overlay(this.readingHook).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+    }.width('100%').height('100%').justifyContent(this.backingEdge==='top'?FlexAlign.Start:this.backingEdge==='bottom'?FlexAlign.End:FlexAlign.Center).alignItems(this.backingEdge==='left'?HorizontalAlign.Start:this.backingEdge==='right'?HorizontalAlign.End:HorizontalAlign.Center)
   }
 }

@@ -1,4 +1,4 @@
-import { isReadingComposition } from './ReadingComposition';
+import { isReadingComposition, compositionPadding } from './ReadingComposition';
 import { readingSurface } from './CapabilityPresentation';
 import { cardOutline } from './RenderContours';
 import { FridgeCard, ElementBox, ShapePoint, BOARD_W, BOARD_H, MIN_CARD_EDGE, MIN_SUBJECT_EDGE } from './CardSchema';
@@ -89,7 +89,7 @@ export function fitContentBox(requested: ElementBox, safe: ElementBox): ElementB
 }
 const layoutCache = new Map<string, ElementBox>();
 const MASK_SIZE: number = 96;
-class InteriorMask { integral: number[] = []; }
+class InteriorMask { integral:number[]=[]; left:number[]=[];right:number[]=[];top:number[]=[];bottom:number[]=[]; }
 const maskCache = new Map<string, InteriorMask>();
 function interiorMask(card: FridgeCard): InteriorMask {
   const key=outlineIdentity(card),cached=maskCache.get(key);if(cached!==undefined)return cached;
@@ -104,6 +104,25 @@ function interiorMask(card: FridgeCard): InteriorMask {
     }
   }
   if(maskCache.size>=128)maskCache.delete(Array.from(maskCache.keys())[0]);maskCache.set(key,mask);return mask;
+}
+/** Cached silhouette edges; four array reads per drag, no live contour traversal. */
+export function capabilityAttachmentEdges(card:FridgeCard,box:ElementBox):number[] {
+ const cx=box.x+box.w/2,cy=box.y+box.h/2;
+ if(card.shape==='round') {
+  const dx=Math.sqrt(Math.max(0,.25-Math.pow(cy-.5,2))),dy=Math.sqrt(Math.max(0,.25-Math.pow(cx-.5,2)));
+  return [.5-dx,.5+dx,.5-dy,.5+dy];
+ }
+ if(card.shape!=='subject'||!cardOutline(card).length)return [0,1,0,1];
+ const mask=interiorMask(card),stride=MASK_SIZE+1;
+ if(!mask.left?.length){
+  mask.left=new Array<number>(MASK_SIZE).fill(1);mask.right=new Array<number>(MASK_SIZE).fill(0);
+  mask.top=new Array<number>(MASK_SIZE).fill(1);mask.bottom=new Array<number>(MASK_SIZE).fill(0);
+  for(let y=0;y<MASK_SIZE;y++)for(let x=0;x<MASK_SIZE;x++){
+   if(mask.integral[(y+1)*stride+x+1]-mask.integral[y*stride+x+1]-mask.integral[(y+1)*stride+x]+mask.integral[y*stride+x]===0){mask.left[y]=Math.min(mask.left[y],x/MASK_SIZE);mask.right[y]=Math.max(mask.right[y],(x+1)/MASK_SIZE);mask.top[x]=Math.min(mask.top[x],y/MASK_SIZE);mask.bottom[x]=Math.max(mask.bottom[x],(y+1)/MASK_SIZE);}
+  }
+ }
+ const row=Math.max(0,Math.min(MASK_SIZE-1,Math.floor(cy*MASK_SIZE))),col=Math.max(0,Math.min(MASK_SIZE-1,Math.floor(cx*MASK_SIZE)));
+ return [mask.left[row]<mask.right[row]?mask.left[row]:0,mask.left[row]<mask.right[row]?mask.right[row]:1,mask.top[col]<mask.bottom[col]?mask.top[col]:0,mask.top[col]<mask.bottom[col]?mask.bottom[col]:1];
 }
 /** Convex regular shapes need only four analytic corner checks, even while resizing. */
 function regularContains(card:FridgeCard,box:ElementBox):boolean {
@@ -161,7 +180,7 @@ export function constrainCapabilityDrag(card:FridgeCard,requested:ElementBox,pre
 /** Foreground movement stays continuous across concavities and transparent holes. */
 export function freeCapabilityBox(requested:ElementBox,outside:boolean=false):ElementBox {
   const box=new ElementBox();box.w=Math.min(1,Math.max(.01,requested.w));box.h=Math.min(1,Math.max(.01,requested.h));
-  box.x=Math.max(outside?-box.w*.8:0,Math.min(outside?1-box.w*.2:1-box.w,requested.x));box.y=Math.max(outside?-box.h*.8:0,Math.min(outside?1-box.h*.2:1-box.h,requested.y));box.rot=outside?requested.rot:0;box.opacity=requested.opacity;return box;
+  box.x=Math.max(outside?-2:0,Math.min(outside?2:1-box.w,requested.x));box.y=Math.max(outside?-2:0,Math.min(outside?2:1-box.h,requested.y));box.rot=outside?requested.rot:0;box.opacity=requested.opacity;return box;
 }
 export function capabilityObstructed(card:FridgeCard):boolean {
   return card.elements.some((el)=>!el.behindCapability && (el.kind==='text'||el.kind==='image') && card.capBox.x<el.x+el.w && card.capBox.x+card.capBox.w>el.x && card.capBox.y<el.y+el.h && card.capBox.y+card.capBox.h>el.y);
@@ -242,6 +261,7 @@ export function cardHandlePoint(card: FridgeCard, right: boolean, bottom: boolea
 /** Backing and inset belong to layout, so a photo subject never silently loses readable space. */
 export function capabilityInset(card: FridgeCard): number {
   // Feathered reading fields have no hard perimeter requiring a panel-sized gutter.
+  if(isReadingComposition(card.capability?.readingBlend??''))return compositionPadding(card.capability!.readingBlend!);
   return readingSurface(card.capability, card.shape === 'subject' && card.subjectPhoto, capabilityObstructed(card)) ? 4 : 0;
 }
 export function cardCapabilityMinimum(card: FridgeCard, compact: boolean = true, width: number = 0): CapabilitySize {
@@ -265,7 +285,7 @@ class StartupLayoutCache {
 }
 /** Only immutable photo assets can retain the same identity across worker boundaries. */
 export function warmStartupLayouts(cards: FridgeCard[]): string {
-  for(const card of cards) {minimumCardSize(card);if(card.capability!==null)capabilityPlacement(card);}
+  for(const card of cards) {minimumCardSize(card);if(card.capability!==null)capabilityPlacement(card);if(card.capability&&['space','sticker'].includes(card.capability.readingBlend??''))capabilityAttachmentEdges(card,card.capBox);}
   const assets=cards.filter((card:FridgeCard)=>card.shape==='subject'&&card.cutout.length>0).map(outlineIdentity);
   const cache=new StartupLayoutCache();
   for(const entry of subjectCache)if(assets.some((asset:string)=>entry[0].endsWith(':'+asset)))cache.interiors[entry[0]]=entry[1];
