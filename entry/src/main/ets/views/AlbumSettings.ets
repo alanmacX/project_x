@@ -69,8 +69,6 @@ export struct AlbumSettings {
       SettingsAction({label:this.busy?'处理中':this.cap.albumCover?'添加到封面库':'选择本地封面',appDark:this.appDark,fillWidth:true,isEnabled:!this.busy&&albumLibrary(this.cap).length<12,onPress:()=>this.choose()})
       TextInput({text:this.currentAlbum().title,placeholder:'专辑名（可选）'}).height(44).maxLength(160).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(14).enabled(!this.busy).onChange((v:string)=>this.text(v,false))
       TextInput({text:this.currentAlbum().artist,placeholder:'歌手（可选）'}).height(44).maxLength(160).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(14).enabled(!this.busy).onChange((v:string)=>this.text(v,true))
-      Text('封面留边').fontSize(14).fontColor(AppDesign.text(this.appDark)).width('100%')
-      SettingsSegmented({labels:['紧凑','标准','宽松'],selectedIndex:(this.cap.albumInset??8)<=3?0:(this.cap.albumInset??8)<=8?1:2,appDark:this.appDark,onSelect:(i:number)=>{const next=JSON.parse(JSON.stringify(this.cap)) as CapBlock;next.albumInset=[3,8,15][i];this.onUpdate(this.cardId,next);}})
       if(albumLibrary(this.cap).length) {
         Text('封面库 · '+albumLibrary(this.cap).length+'/12').fontSize(14).fontColor(AppDesign.text(this.appDark)).width('100%')
         Grid() {

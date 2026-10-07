@@ -7,6 +7,7 @@ export const BOARD_H: number = 470;
 /** Artwork bounds only; capability readability is enforced separately by layout. */
 export const MIN_CARD_EDGE: number = 32;
 export const RECT_CORNER_RADIUS: number = 16;
+export const ALBUM_INSET: number = 2.5;
 export const ALBUM_CORNER_RADIUS: number = 4;
 export const ALBUM_CARD_CORNER_RADIUS: number = RECT_CORNER_RADIUS;
 export const MIN_SUBJECT_EDGE: number = 16;
@@ -316,7 +317,7 @@ export function normalizeCapability(raw: CapBlock): CapBlock {
     cap.albumCover=local(raw.albumCover);cap.albumBackground=local(raw.albumBackground);
     cap.albumId=typeof raw.albumId==='string'?raw.albumId.slice(0,96):'';cap.albumSource=['local','musicbrainz'].includes(raw.albumSource??'')?raw.albumSource:'';
     cap.artist=typeof raw.artist==='string'?raw.artist.slice(0,160):'';
-    cap.albumInset=bounded(raw.albumInset??8,0,20,8);
+    cap.albumInset=ALBUM_INSET;
     cap.albumRotationMinutes=[60,180,360,1440].includes(raw.albumRotationMinutes??0)?raw.albumRotationMinutes:0;
     cap.albumRotationStart=bounded(raw.albumRotationStart??0,0,8640000000000000,0);
     const ids:string[]=[];

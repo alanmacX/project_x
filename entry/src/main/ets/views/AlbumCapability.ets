@@ -36,8 +36,8 @@ export struct AlbumCapability {
     Stack() {
       if(album.background) {Image(album.background).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false).onComplete(()=>{if(incoming)this.ready(album.cover,true)}).onError(()=>{if(incoming)this.ready(album.cover,true)})}
       if(album.cover) {
-        Image(album.cover).width(albumCoverSize(this.cardWidth,this.cardHeight,this.cap.albumInset)*this.scaleFactor).height(albumCoverSize(this.cardWidth,this.cardHeight,this.cap.albumInset)*this.scaleFactor)
-          .objectFit(ImageFit.Contain).borderRadius(albumCoverRadius(this.cardWidth,this.cardHeight,this.cap.albumInset)*this.scaleFactor).draggable(false)
+        Image(album.cover).width(albumCoverSize(this.cardWidth,this.cardHeight)*this.scaleFactor).height(albumCoverSize(this.cardWidth,this.cardHeight)*this.scaleFactor)
+          .objectFit(ImageFit.Contain).borderRadius(albumCoverRadius(this.cardWidth,this.cardHeight)*this.scaleFactor).draggable(false)
           .shadow({radius:12*this.scaleFactor,color:'#35000000',offsetY:5*this.scaleFactor})
           .accessibilityText((album.title||'专辑')+' · '+album.artist)
           .onComplete(()=>{if(incoming)this.ready(album.cover,false)}).onError(()=>{if(incoming)this.ready(album.cover,false)})

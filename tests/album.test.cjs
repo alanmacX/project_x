@@ -8,7 +8,7 @@ function load(name){if(cache.has(name))return cache.get(name);const module={expo
 const {albumCoverSize,albumCoverRadius,albumAnchors}=load('AlbumLayout');
 const {blendPixels}=load('BackgroundPalette');
 const {FridgeCard,normalizeState,defaultState,typeLabel}=load('CardSchema');
-assert.equal(albumCoverSize(80,180),67.2);assert.equal(albumCoverSize(240,120),100.8);assert.equal(albumCoverSize(100,100,3),94);assert.equal(albumCoverSize(100,100,15),70);
+assert.equal(albumCoverSize(80,180),76);assert.equal(albumCoverSize(240,120),114);assert.equal(albumCoverSize(100,100,3),94);assert.equal(albumCoverSize(100,100,15),70);
 const {shapeRadius,cardCornerRadius}=load('CardSchema');const roundedAlbum=new FridgeCard();roundedAlbum.capability={k:'album'};
 assert.equal(albumCoverRadius(180,180),4);assert.equal(albumCoverRadius(180,300,3),4);assert.equal(cardCornerRadius(roundedAlbum),16);assert.equal(cardCornerRadius(roundedAlbum,2),32);assert.equal(cardCornerRadius(new FridgeCard()),shapeRadius('rect'));assert.ok(albumCoverRadius(20,20)<=albumCoverSize(20,20)/2);
 for(const shape of ['round','pill','blob','subject']){const restricted=defaultState();const c=new FridgeCard();c.shape=shape;c.capability={k:'album'};restricted.cards=[c];assert.equal(normalizeState(restricted).cards[0].shape,'rect');}
@@ -25,7 +25,7 @@ const epoch=1700000000000,cap={k:'album',albumItems:items,albumId:'a',albumCover
 assert.equal(activeAlbum(cap,epoch+3599999).id,'a');assert.equal(activeAlbum(cap,epoch+3600000).id,'b');assert.equal(activeAlbum(cap,epoch+7200000).id,'a');
 assert.equal(nextAlbumBoundary(cap,epoch+3600000),epoch+7200000);assert.equal(nextAlbumBoundary({...cap,albumRotationMinutes:0},epoch),Infinity);
 assert.equal(nextDataBoundary(cap,epoch+3590000),epoch+3600000);const timed=defaultState();const timedCard=new FridgeCard();timedCard.capability=cap;timed.cards=[timedCard];assert.equal(refreshMinutes(timed,epoch+3000000),10);
-assert.equal(normalizeCapability({...cap,albumItems:[...items,{id:'bad',cover:'https://remote/cover',background:'file:///saved/b.png'}],albumInset:100}).albumItems.length,2);assert.equal(normalizeCapability({...cap,albumInset:100}).albumInset,20);
+assert.equal(normalizeCapability({...cap,albumItems:[...items,{id:'bad',cover:'https://remote/cover',background:'file:///saved/b.png'}],albumInset:100}).albumItems.length,2);assert.equal(normalizeCapability({...cap,albumInset:100}).albumInset,2.5);
 const selected=selectAlbum(cap,items[1],epoch+4000000);assert.equal(activeAlbum(selected,epoch+4000000).id,'b');assert.equal(activeAlbum(selected,epoch+7600000).id,'a');
 const {exportTemplate,materializeTemplate}=load('TemplateIO');
 (async()=>{for(const item of items){files.set(item.cover.slice(7),Buffer.from('cover'));files.set(item.background.slice(7),Buffer.from('background'));}

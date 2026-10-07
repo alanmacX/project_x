@@ -93,6 +93,13 @@ class PreparedTransition extends FrameCallback {
 @Entry
 @Component
 struct Index {
+  @State navMenuOpen:boolean=false;
+  @State navMenuItems:MenuElement[]=[];
+  @State navMenuTitle:string='';
+  @State navMenuX:number=0;
+  @State navMenuY:number=0;
+  private navMenuResult:number=-1;
+  private navMenuResolve:((index:number)=>void)|null=null;
   @State chromeSnapshot: image.PixelMap | undefined = undefined;
   private retiredChrome: image.PixelMap | undefined = undefined;
   private chromeSignature: string = '';
@@ -568,8 +575,9 @@ struct Index {
       }
     } finally { this.repairingSubjects = false; }
   }
-  aboutToDisappear(): void { this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; this.backgroundPreviewGeneration++;if(this.backgroundPreviewTimer>=0)clearTimeout(this.backgroundPreviewTimer); if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
+  aboutToDisappear(): void { this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; this.backgroundPreviewGeneration++;if(this.backgroundPreviewTimer>=0)clearTimeout(this.backgroundPreviewTimer); if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
+    if(this.navMenuOpen){this.finishNavMenu(-1);return true;}
     if(this.deletionId)return true;
     if(this.homeToolsOpen){this.homeToolsOpen=false;return true;}
     if(this.showBackgroundOptions){this.showBackgroundOptions=false;return true;}
@@ -1130,6 +1138,8 @@ struct Index {
             .position({x:0,y:this.safeTop + EDITOR_SAFE_GAP}).opacity(this.editorOpacity).hitTestBehavior(HitTestMode.None)
         }
         if (this.viewing) { this.detail() }
+        Column().width(1).height(1).position({x:this.navMenuX,y:this.navMenuY}).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
+          .bindMenu(this.navMenuOpen,this.navMenuItems,{title:this.navMenuTitle,placement:Placement.BottomRight,systemMaterial:chromeMaterial(),backgroundColor:AppDesign.popup(this.appDark),onDisappear:()=>this.finishNavMenu(this.navMenuResult)})
         if(this.deletionId){
           Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.Block).zIndex(200000)
           if(this.deletionBitmap!==undefined){CardDeletionFlight({bitmap:this.deletionBitmap,faceWidth:this.deletionW,faceHeight:this.deletionH,originX:this.deletionX,originY:this.deletionY,angle:this.deletionAngle,viewportWidth:this.screenWidth,viewportHeight:this.screenHeight,onDone:()=>this.finishCardDeletion()}).zIndex(200001)}
@@ -1581,12 +1591,13 @@ struct Index {
         }, (card: FridgeCard) => card.id)
       }.width(this.shareWidth).height(this.shareCanvasHeight).backgroundColor(this.shareOpaque ? Color.White : Color.Transparent).clip(true)
       if (!this.shareSingle) {
-        Row() {
+        Row({space:2}) {
+          Image($r('app.media.foreground')).width(52).height(52).objectFit(ImageFit.Contain).accessibilityText('冰箱贴 logo')
           Stack() {
             Image($rawfile('share/signature.png')).width(170).height(170 / 3).objectFit(ImageFit.Contain)
               .accessibilityText('created by 冰箱贴')
-          }.width(170).height(36).clip(true)
-        }.width('100%').height(36).justifyContent(FlexAlign.Center).backgroundColor('#F7F5EF')
+          }.width(170).height(56)
+        }.width('100%').height(56).justifyContent(FlexAlign.Center).backgroundColor('#F7F5EF')
       }
     }.width(this.shareWidth).height(this.shareHeight)
   }
@@ -1606,9 +1617,9 @@ struct Index {
     this.sharing=true;
     try { const source=await this.store.canvasSnapshot(canvasId||this.store.state.canvasId);
       if(single && !source.cards.some((card:FridgeCard)=>card.id===id))return;
-      const result=await this.getUIContext().getPromptAction().showActionMenu({systemMaterial:chromeMaterial(),title:single?'卡片作品':'画布作品',buttons:[
-      {text:single?'分享可编辑卡片':'分享可编辑画布',color:this.appText()}, {text:single?'分享卡片图片':'分享到社媒 · 画布展示图',color:this.appText()}]});
-      if(result.index===1){await this.shareArtwork(single,source,id);return;}
+      const choice=await this.navChoice(single?'卡片作品':'画布作品',[single?'分享可编辑卡片':'分享可编辑画布',single?'分享卡片图片':'分享到社媒 · 画布展示图'],single?'shareCard':'shareCanvas');
+      if(choice<0)return;
+      if(choice===1){await this.shareArtwork(single,source,id);return;}
       const path=await taskpool.execute(new taskpool.Task(exportTemplate,JSON.stringify(source),id,this.context.filesDir,this.context.cacheDir)) as string;
       await shareTemplateFile(this.context as common.UIAbilityContext,path,single?'shareCard':'shareCanvas');
     }catch(e){this.templateError('分享未完成',e as Error);}finally{this.sharing=false;}
@@ -1666,9 +1677,8 @@ struct Index {
   private async shareArtwork(single: boolean, source: FridgeState, cardId: string): Promise<void> {
     if (this.context === null || this.heroActive || this.arriving) return;
     try {
-      const formatIndex = single ? (await this.getUIContext().getPromptAction().showActionMenu({ systemMaterial:chromeMaterial(), title: '分享卡片图片', buttons: [
-        { text: '透明 PNG', color: this.appText() }, { text: '实色底 JPG', color: this.appText() }
-      ] })).index : 0;
+      const formatIndex = single ? await this.navChoice('分享卡片图片',['透明 PNG','实色底 JPG'],'shareCard') : 0;
+      if(formatIndex<0)return;
       this.sharing = true; this.shareSingle = single; this.shareOpaque = !single || formatIndex === 1; this.shareTick = Date.now(); this.shareBackground = normalizeBackground(JSON.parse(JSON.stringify(source.background)) as CanvasBackground);
       const card = source.cards.find((item:FridgeCard)=>item.id===cardId)??null; if (single && card === null) return;
       this.shareCards = (single ? [card!] : source.cards).map((item: FridgeCard) => cardRenderSnapshot(item)).sort((a: FridgeCard,b: FridgeCard) => a.z-b.z);
@@ -1679,7 +1689,7 @@ struct Index {
         this.shareWidth = Math.max(...xs)-Math.min(...xs)+48; this.shareHeight = Math.max(...ys)-Math.min(...ys)+48;
       } else { this.shareWidth = BOARD_W; this.shareHeight = BOARD_W/source.canvasAspect; }
       this.shareCanvasHeight = this.shareHeight;
-      if (!single) this.shareHeight += 36;
+      if (!single) this.shareHeight += 56;
       const scale = Math.min(3, 1280/this.getUIContext().vp2px(Math.max(this.shareWidth,this.shareHeight)));
       const pixel = await this.getUIContext().getComponentSnapshot().createFromBuilder(() => { this.shareScene(); }, 350, true, { scale: scale, waitUntilRenderFinished: true });
       try { await sharePixelMap(this.context as common.UIAbilityContext, pixel, single && this.shareOpaque, single ? 'shareCard' : 'shareCanvas'); }
@@ -1764,8 +1774,8 @@ struct Index {
             backIcon: { icon:new SymbolGlyphModifier($r('sys.symbol.arrow_counterclockwise')).fontColor([this.appText()]),label: '撤销', type: IconStyleMode.NORMAL, isEnabled: this.undoAvailable && !this.heroActive, action: () => this.restoreHistory(false) },
             menu: { maxCount: 4, value: [
               { content: { icon: new SymbolGlyphModifier($r('sys.symbol.rectangle_and_arrowshape_turn_up_right')).fontColor([this.appText()]), label: '分享卡片', type: IconStyleMode.NORMAL, componentId: 'shareCard', isEnabled: !this.sharing && !this.heroActive, action: () => this.shareMenu(true) } },
-              { content: { icon:new SymbolGlyphModifier($r('sys.symbol.plus')).fontColor([this.appText()]),label: '添加', type: IconStyleMode.NORMAL, isEnabled: !this.heroActive && this.preview.capability?.k!=='album', action: () => this.showAddMenu() } },
-              { content: { icon:new SymbolGlyphModifier($r('sys.symbol.ellipsis_circle')).fontColor([this.appText()]),label: '更多操作', type: IconStyleMode.NORMAL, isEnabled: !this.heroActive, action: () => this.showEditorActions() } },
+              { content: { icon:new SymbolGlyphModifier($r('sys.symbol.plus')).fontColor([this.appText()]),label: '添加', type: IconStyleMode.NORMAL, componentId:'editorAdd', isEnabled: !this.heroActive && this.preview.capability?.k!=='album', action: () => this.showAddMenu() } },
+              { content: { icon:new SymbolGlyphModifier($r('sys.symbol.ellipsis_circle')).fontColor([this.appText()]),label: '更多操作', type: IconStyleMode.NORMAL, componentId:'editorMore', isEnabled: !this.heroActive, action: () => this.showEditorActions() } },
               { content: { label: '完成', type: TextStyleMode.NORMAL, isEnabled: !this.heroActive, action: () => this.closeEditor() } }
             ] }
           },
@@ -1786,15 +1796,30 @@ struct Index {
       .visibility(this.editing && this.chromeSnapshot === undefined ? Visibility.Visible : Visibility.Hidden)
       .accessibilityLevel(this.editing ? 'yes' : 'no-hide-descendants')
   }
-  private showEditorActions():void {
-    const redo=this.redoAvailable;
-    this.getUIContext().getPromptAction().showActionMenu({systemMaterial:chromeMaterial(),title:'卡片操作',buttons:redo?[{text:'重做',color:this.appText()},{text:'复制卡片',color:this.appText()}]:[{text:'复制卡片',color:this.appText()}]})
-      .then((result)=>{if(!this.alive||!this.editing||this.heroActive)return;if(redo&&result.index===0)this.restoreHistory(true);else this.duplicate();}).catch(()=>{});
+  private finishNavMenu(index:number):void {
+    const resolve=this.navMenuResolve;this.navMenuResolve=null;this.navMenuOpen=false;if(resolve)resolve(index);
   }
-  private showAddMenu(): void {
-    this.getUIContext().getPromptAction().showActionMenu({ systemMaterial:chromeMaterial(), title: '添加到当前图层', buttons: [
-      { text: '文字', color: this.appText() }, { text: '本地图片 / GIF', color: this.appText() }, { text: '形状', color: this.appText() }
-    ] }).then((result) => { if (this.alive && this.editing) this.addElement(['text', 'image', 'shape'][result.index]); }).catch(() => {});
+  private navChoice(title:string,labels:string[],anchor:string):Promise<number> {
+    if(this.navMenuResolve)return Promise.resolve(-1);
+    this.navMenuResult=-1;this.navMenuTitle=title;
+    this.navMenuX=this.screenWidth-72;this.navMenuY=this.safeTop+64;
+    try {
+      const rect=this.getUIContext().getComponentUtils().getRectangleById(anchor);
+      if(rect.size.width>0){this.navMenuX=Math.min(this.screenWidth-16,this.getUIContext().px2vp(rect.windowOffset.x+rect.size.width));this.navMenuY=this.getUIContext().px2vp(rect.windowOffset.y+rect.size.height)+4;}
+    }catch(_){}
+    return new Promise<number>((resolve)=>{
+      this.navMenuResolve=resolve;this.navMenuItems=labels.map((value:string,index:number):MenuElement=>({value:value,action:()=>{this.navMenuResult=index;this.navMenuOpen=false;}}));this.navMenuOpen=true;
+    });
+  }
+  private async showEditorActions():Promise<void> {
+    const redo=this.redoAvailable,id=this.selectedId;
+    const index=await this.navChoice('卡片操作',redo?['重做','复制卡片']:['复制卡片'],'editorMore');
+    if(index<0||!this.alive||!this.editing||this.heroActive||id!==this.selectedId)return;
+    if(redo&&index===0)this.restoreHistory(true);else this.duplicate();
+  }
+  private async showAddMenu():Promise<void> {
+    const id=this.selectedId,index=await this.navChoice('添加到当前图层',['文字','本地图片 / GIF','形状'],'editorAdd');
+    if(index>=0&&this.alive&&this.editing&&!this.heroActive&&id===this.selectedId)this.addElement(['text','image','shape'][index]);
   }
   private editorControlsWidth(): number {
     return (this.editorLandscape() ? this.screenWidth - this.editorViewportWidth() : this.screenWidth) - 32;
