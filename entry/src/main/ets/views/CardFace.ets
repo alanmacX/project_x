@@ -2,7 +2,7 @@ import { subjectDepthImage } from '../model/SubjectDepthCache';
 import { EditorLayerMotion } from '../model/EditorLayerMotion';
 import { contourPath } from '../model/ContourPath';
 import { cardOutline } from '../model/RenderContours';
-import { FridgeCard, materialColors, shapeRadius } from '../model/CardSchema';
+import { FridgeCard, materialColors, cardCornerRadius } from '../model/CardSchema';
 import { CardCanvas } from './CardCanvas';
 import { subjectSurfaceFactor } from '../model/CanvasLayout';
 import { cardDepthScale, cardEdgeColor } from '../model/CardDepth';
@@ -58,7 +58,7 @@ export struct CardFace {
           .width('100%').height('100%').translate({y:offset}).hitTestBehavior(HitTestMode.None)
       }
     } else {
-      Column().width('100%').height('100%').backgroundColor(color).borderRadius(shapeRadius(this.card.shape,this.scaleFactor))
+      Column().width('100%').height('100%').backgroundColor(color).borderRadius(cardCornerRadius(this.card,this.scaleFactor))
         .translate({y:offset}).shadow({radius:vp2px(radius),color:shadowColor,offsetY:vp2px(shadowY)}).hitTestBehavior(HitTestMode.None)
     }
   }
@@ -80,9 +80,9 @@ export struct CardFace {
       CardCanvas({ layerMotion:this.layerMotion, card: this.card, scaleFactor: this.scaleFactor, tick: this.tick, widget: this.widget, hideContent: this.hideContent,
         movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
         .width((subjectSurfaceFactor(this.card) * 100) + '%').height((subjectSurfaceFactor(this.card) * 100) + '%')
-        .borderRadius(shapeRadius(this.card.shape,this.scaleFactor)).border({ width: this.card.frame && this.card.shape !== 'subject' ? 3 * this.scaleFactor : 0, color: '#FFFFFF' })
+        .borderRadius(cardCornerRadius(this.card,this.scaleFactor)).border({ width: this.card.frame && this.card.shape !== 'subject' ? 3 * this.scaleFactor : 0, color: '#FFFFFF' })
       if(this.card.shape!=='subject') {
-        Column().width('100%').height('100%').borderRadius(shapeRadius(this.card.shape,this.scaleFactor))
+        Column().width('100%').height('100%').borderRadius(cardCornerRadius(this.card,this.scaleFactor))
           .border({width:.6,color:{top:'#88FFFFFF',left:'#48FFFFFF',right:'#14000000',bottom:'#20000000'}})
           .hitTestBehavior(HitTestMode.None)
       }

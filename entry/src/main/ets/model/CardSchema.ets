@@ -7,6 +7,7 @@ export const BOARD_H: number = 470;
 /** Artwork bounds only; capability readability is enforced separately by layout. */
 export const MIN_CARD_EDGE: number = 32;
 export const RECT_CORNER_RADIUS: number = 16;
+export const ALBUM_CORNER_RADIUS: number = 4;
 export const MIN_SUBJECT_EDGE: number = 16;
 export class CapType {
   static readonly CLOCK: string = 'clock';
@@ -178,6 +179,10 @@ export function shapeRadius(shape: string, scale: number = 1): BorderRadiuses | 
   if (shape === 'pill') return 999;
   if (shape === 'blob') return { topLeft: '28%', topRight: '12%', bottomLeft: '18%', bottomRight: '26%' };
   return shape === 'subject' ? 0 : RECT_CORNER_RADIUS * scale;
+}
+/** Album artwork and every outer face layer share the original subtle corner. */
+export function cardCornerRadius(card:FridgeCard,scale:number=1):BorderRadiuses | Length {
+  return card.capability?.k==='album'?ALBUM_CORNER_RADIUS*scale:shapeRadius(card.shape,scale);
 }
 export function defaultState(): FridgeState { return new FridgeState(); }
 export function bounded(value: number, min: number, max: number, fallback: number): number {

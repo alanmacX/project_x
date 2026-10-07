@@ -3,7 +3,7 @@ import { AlbumCapability } from './AlbumCapability';
 import { readingSurface, readingSurfaceColor } from '../model/CapabilityPresentation';
 import { capabilityInset } from '../model/CanvasLayout';
 import { AnimatedPhoto } from './AnimatedPhoto';
-import { FridgeCard, CanvasElement, ElementBox, materialColors, shapeRadius } from '../model/CardSchema';
+import { FridgeCard, CanvasElement, ElementBox, materialColors, cardCornerRadius } from '../model/CardSchema';
 import { capabilityObstructed, capabilityBox, capabilityPlacement, fitContentBox, safeContentBox, subjectSurfaceFactor } from '../model/CanvasLayout';
 import { CapabilityView } from './CapBlockView';
 
@@ -120,7 +120,7 @@ export struct CardCanvas {
           .blendMode(BlendMode.DST_IN, BlendApplyType.OFFSCREEN)
       }
       }
-    }.width('100%').height('100%').borderRadius(shapeRadius(this.card.shape,this.scaleFactor)).clip(true)
+    }.width('100%').height('100%').borderRadius(cardCornerRadius(this.card,this.scaleFactor)).clip(true)
       .blendMode(BlendMode.SRC_OVER, this.card.shape === 'subject' ? BlendApplyType.OFFSCREEN : BlendApplyType.FAST)
       if(this.freeCapability() && !this.hideContent && this.card.capability!==null && this.card.capability.k!=='album') {
         CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick})

@@ -77,7 +77,7 @@ export struct AlbumSettings {
           ForEach(albumLibrary(this.cap),(album:AlbumCover)=>{
             GridItem() {
               Column({space:6}) {
-                Button({type:ButtonType.Normal}) {Image(album.cover).width('100%').aspectRatio(1).objectFit(ImageFit.Cover).borderRadius(8).clip(true).draggable(false)}
+                Button({type:ButtonType.Normal}) {Image(album.cover).width('100%').aspectRatio(1).objectFit(ImageFit.Contain).borderRadius(4).draggable(false)}
                   .width('100%').padding(4).borderRadius(12).backgroundColor(album.id===this.currentAlbum().id?AppDesign.selected(this.appDark):AppDesign.control(this.appDark))
                   .onClick(()=>this.onUpdate(this.cardId,selectAlbum(this.cap,album)))
                 Text(album.title||'未命名专辑').fontSize(11).fontColor(AppDesign.text(this.appDark)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
