@@ -13,7 +13,7 @@ export struct BatteryCapability {
   private label():string {return batteryLevel(this.cap)<0?'—':String(batteryLevel(this.cap));}
   private glyph(index:number):BatteryArcGlyph {return batteryArcLabel(this.diameter(),this.label(),this.labelFont())[index];}
   build() {
-    Column({space:2*this.unit}) {
+    Column() {
       Stack({alignContent:Alignment.TopStart}) {
         Path().commands(batteryRingPath(this.getUIContext().vp2px(this.diameter()))).fill(Color.Transparent).stroke(this.ink)
           .strokeWidth((this.compact?3.5:5)*this.unit).strokeLineCap(LineCapStyle.Round).opacity(.14)
@@ -37,10 +37,6 @@ export struct BatteryCapability {
           }
         },(index:number)=>String(index))
       }.width(this.diameter()).height(this.diameter()+8*this.unit)
-      if(!this.compact) {
-        Text(batteryStatus(this.cap)).fontSize(11*this.unit).fontColor(this.ink)
-          .textShadow(readingHalo(this.ink,this.unit,this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.65).maxLines(1)
-      }
     }.width('100%').height('100%').justifyContent(FlexAlign.Center)
       .accessibilityText(batteryStatus(this.cap)+' '+(batteryLevel(this.cap)<0?'':batteryLevel(this.cap)+'%'))
   }
