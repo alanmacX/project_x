@@ -1,3 +1,4 @@
+import { hookReserve } from '../model/MicaGeometry';
 import { EditorLayerMotion } from '../model/EditorLayerMotion';
 import { AlbumCapability } from './AlbumCapability';
 import { readingSurface, paperReadingInk } from '../model/CapabilityPresentation';
@@ -67,7 +68,7 @@ struct CapabilityContentLayer {
   build() {
     Stack() {
       Column() { CapabilityView({cap:this.card.capability!,ink:this.paperLabel()?paperReadingInk(this.capabilityInk()):this.capabilityInk(),readingHaloEnabled:(this.hasReadingSurface()&&!this.paperLabel())||this.card.capability?.readingBlend==='bare',contentBackingEnabled:this.hasReadingSurface(),backingEdge:this.motion.id==='capability'?this.motion.edge:(this.card.capability?.readingEdge??''),backingTint:this.card.capability?.readingTint||materialColors(this.card.material,this.card.paper,this.card.ink)[0],scaleFactor:this.scaleFactor,
-        contentWidth:this.card.w*this.box().w-2*capabilityInset(this.card),contentHeight:this.card.h*this.box().h-2*capabilityInset(this.card),tick:this.tick}) }
+        contentWidth:this.card.w*this.box().w-2*capabilityInset(this.card),contentHeight:this.card.h*this.box().h-2*capabilityInset(this.card)-hookReserve(this.card.capability?.readingBlend??''),tick:this.tick}) }
         .padding(0).width('100%').height('100%')
     }.width((this.capSurfaceBox().w*100)+'%').height((this.capSurfaceBox().h*100)+'%')
       .position({x:(this.capSurfaceBox().x*100)+'%',y:(this.capSurfaceBox().y*100)+'%'})

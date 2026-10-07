@@ -1,3 +1,4 @@
+import { hookReserve } from '../model/MicaGeometry';
 import { ReadingHook } from './ReadingHook';
 import { compositionPadding } from '../model/ReadingComposition';
 import { ReadingBacking } from './ReadingBacking';
@@ -38,16 +39,16 @@ export struct TimetableCapability {
       let cell=0;for(const lesson of this.display.lessons)cell=Math.max(cell,measure(lesson.title,14*s),measure(lesson.location||'地点待定',11*s));
       width=Math.max(width,(cell+8*s)*this.columns());
     } else {const lesson=this.display.lessons[0];width=Math.max(width,measure(lesson.title,(this.compactUpcoming()?16:20)*s),measure(timeText(lesson.start)+'–'+timeText(lesson.end),11*s),measure(lesson.location||'地点待定',12*s));}
-    return Math.min((this.contentWidth+8)*this.scaleFactor,Math.ceil(width)+2*compositionPadding(this.cap.readingBlend??'')*s);
+    return Math.min((this.contentWidth+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,Math.ceil(width)+2*compositionPadding(this.cap.readingBlend??'')*s);
   }
   private dayTitleHeight():number {
     if(!this.contentBackingEnabled)return 34*this.s();
-    const width=(this.backingWidth()-8*this.s())/this.columns()-8*this.s();
+    const width=(this.backingWidth()-2*compositionPadding(this.cap.readingBlend??'')*this.s())/this.columns()-8*this.s();
     const wraps=this.display.lessons.some((lesson)=>paperTextWidth(this.getUIContext(),lesson.title,14*this.s(),500)>width);
     return 14*1.35*this.s()*(wraps?2:1);
   }
   private dayCellHeight():number {return this.contentBackingEnabled?this.dayTitleHeight()+(11*1.35+3+4)*this.s():LESSON_CELL_HEIGHT*this.s();}
-  @Builder private readingBackground() {if(this.contentBackingEnabled){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,radius:8*this.s(),scaleFactor:this.scaleFactor})}}
+  @Builder private readingBackground() {if(this.contentBackingEnabled){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,radius:8*this.s(),scaleFactor:this.s()})}}
   @Builder
   heading() {
     Row({space:4*this.s()}) {
@@ -57,6 +58,7 @@ export struct TimetableCapability {
   }
   @Builder private readingHook() {if(this.contentBackingEnabled&&['tag','dock'].includes(this.cap.readingBlend??'')){ReadingHook({hook:this.cap.readingHook??.2,scaleFactor:this.s()})}}
   build() {
+    Column() {
     Column() {
     Column() {
       this.heading()
@@ -88,7 +90,8 @@ export struct TimetableCapability {
           Text(this.display.lessons[0].location||'地点待定').fontSize(12*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.75).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
         }.width('100%').layoutWeight(this.contentBackingEnabled?0:1).alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Center)
       }
-    }.width(this.contentBackingEnabled?this.backingWidth():'100%').height(this.contentBackingEnabled?undefined:'100%').padding(this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0)
+    }.width(this.contentBackingEnabled?Math.max(1,this.backingWidth()-2*compositionPadding(this.cap.readingBlend??'')*this.s()):'100%').constraintSize({maxHeight:this.contentBackingEnabled?Math.max(1,this.contentHeight*this.scaleFactor):undefined}).clip(this.contentBackingEnabled)
+    }.width(this.contentBackingEnabled?this.backingWidth():'100%').height(this.contentBackingEnabled?undefined:'100%').padding({left:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0,right:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0,bottom:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0,top:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s()+hookReserve(this.cap.readingBlend??'')*this.s():0})
       .background(this.readingBackground).overlay(this.readingHook).alignItems(HorizontalAlign.Start)
     }.width('100%').height('100%').justifyContent(this.backingEdge==='top'?FlexAlign.Start:this.backingEdge==='bottom'?FlexAlign.End:FlexAlign.Center).alignItems(this.backingEdge==='left'?HorizontalAlign.Start:this.backingEdge==='right'?HorizontalAlign.End:HorizontalAlign.Center)
   }

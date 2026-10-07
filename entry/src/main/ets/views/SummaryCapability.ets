@@ -1,3 +1,4 @@
+import { hookReserve } from '../model/MicaGeometry';
 import { ReadingHook } from './ReadingHook';
 import { compositionPadding } from '../model/ReadingComposition';
 import { ReadingBacking } from './ReadingBacking';
@@ -30,11 +31,12 @@ export struct SummaryCapability {
     let width=measure(this.presentation.heading,11*s)+(this.presentation.remaining?measure('+'+this.presentation.remaining,11*s)+8*s:0);
     if(!this.presentation.events.length)width=Math.max(width,measure(this.presentation.empty,16*s));
     for(const event of this.presentation.events)width=Math.max(width,measure(event.title,16*s),measure(eventWhen(event,this.tick||Date.now())+(event.location?' · '+event.location:''),11*s));
-    return Math.min((this.contentWidth+8)*this.scaleFactor,Math.ceil(width)+2*compositionPadding(this.cap.readingBlend??'')*s);
+    return Math.min((this.contentWidth+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,Math.ceil(width)+2*compositionPadding(this.cap.readingBlend??'')*s);
   }
-  @Builder private readingBackground() {if(this.contentBackingEnabled){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,radius:8*this.s(),scaleFactor:this.scaleFactor})}}
+  @Builder private readingBackground() {if(this.contentBackingEnabled){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,radius:8*this.s(),scaleFactor:this.s()})}}
   @Builder private readingHook() {if(this.contentBackingEnabled&&['tag','dock'].includes(this.cap.readingBlend??'')){ReadingHook({hook:this.cap.readingHook??.2,scaleFactor:this.s()})}}
   build() {
+    Column() {
     Column() {
     Column({space:8*this.s()}) {
       Row() {
@@ -50,7 +52,8 @@ export struct SummaryCapability {
           Text(eventWhen(e,this.tick||Date.now())+(e.location?' · '+e.location:'')).fontSize(11*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.s(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
         }.width('100%').height(this.contentBackingEnabled?undefined:40*this.s()).alignItems(HorizontalAlign.Start)
       },(e:AgendaItem)=>e.id)
-    }.width(this.contentBackingEnabled?this.backingWidth():'100%').height(this.contentBackingEnabled?undefined:'100%').padding(this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0)
+    }.width(this.contentBackingEnabled?Math.max(1,this.backingWidth()-2*compositionPadding(this.cap.readingBlend??'')*this.s()):'100%').constraintSize({maxHeight:this.contentBackingEnabled?Math.max(1,this.contentHeight*this.scaleFactor):undefined}).clip(this.contentBackingEnabled)
+    }.width(this.contentBackingEnabled?this.backingWidth():'100%').height(this.contentBackingEnabled?undefined:'100%').padding({left:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0,right:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0,bottom:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0,top:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s()+hookReserve(this.cap.readingBlend??'')*this.s():0})
       .background(this.readingBackground).overlay(this.readingHook).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Start)
     }.width('100%').height('100%').justifyContent(this.backingEdge==='top'?FlexAlign.Start:this.backingEdge==='bottom'?FlexAlign.End:FlexAlign.Center).alignItems(this.backingEdge==='left'?HorizontalAlign.Start:this.backingEdge==='right'?HorizontalAlign.End:HorizontalAlign.Center)
   }

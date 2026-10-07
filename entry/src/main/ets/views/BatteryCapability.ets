@@ -1,3 +1,4 @@
+import { hookReserve } from '../model/MicaGeometry';
 import { ReadingHook } from './ReadingHook';
 import { ReadingBacking } from './ReadingBacking';
 import { readingHalo } from '../model/CapabilityPresentation';
@@ -28,7 +29,7 @@ export struct BatteryCapability {
     Column() {
       Stack({alignContent:Alignment.TopStart}) {
         if(this.contentBackingEnabled&&['badge','tag','dock'].includes(this.cap.readingBlend??'')) {
-          ReadingBacking({blend:this.cap.readingBlend??'badge',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,scaleFactor:this.unit}).width(this.diameter()+6*this.unit).height(this.diameter()+6*this.unit).position({x:-3*this.unit,y:-3*this.unit})
+          ReadingBacking({blend:this.cap.readingBlend??'badge',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,scaleFactor:this.unit}).width(this.labelPaperDiameter()).height(this.labelPaperDiameter()+hookReserve(this.cap.readingBlend??'')*this.unit).position({x:(this.diameter()-this.labelPaperDiameter())/2,y:(this.diameter()-this.labelPaperDiameter())/2-hookReserve(this.cap.readingBlend??'')*this.unit})
         } else if(this.contentBackingEnabled) {
           ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,radius:999,scaleFactor:this.unit}).width(this.paperDiameter()).height(this.paperDiameter())
             .clip(new Path().commands(this.paperMask())).position({x:(this.diameter()-this.paperDiameter())/2,y:(this.diameter()-this.paperDiameter())/2})
@@ -39,7 +40,7 @@ export struct BatteryCapability {
               .position({x:(this.diameter()-(this.compact?19:26)*this.unit)/2,y:(this.diameter()-(this.compact?19:26)*this.unit)/2})
           }
         }
-        if(this.contentBackingEnabled&&['tag','dock'].includes(this.cap.readingBlend??'')){ReadingHook({hook:this.cap.readingHook??.2,scaleFactor:this.unit}).width(this.diameter()+6*this.unit).height(this.diameter()+6*this.unit).position({x:-3*this.unit,y:-3*this.unit})}
+        if(this.contentBackingEnabled&&['tag','dock'].includes(this.cap.readingBlend??'')){ReadingHook({hook:this.cap.readingHook??.2,scaleFactor:this.unit}).width(this.labelPaperDiameter()).height(this.labelPaperDiameter()+hookReserve(this.cap.readingBlend??'')*this.unit).position({x:(this.diameter()-this.labelPaperDiameter())/2,y:(this.diameter()-this.labelPaperDiameter())/2-hookReserve(this.cap.readingBlend??'')*this.unit})}
         Path().commands(batteryRingPath(vp2px(this.diameter()))).fill(Color.Transparent).stroke(this.ink)
           .strokeWidth((this.compact?3.5:5)*this.unit).strokeLineCap(LineCapStyle.Round).opacity(.14)
           .width(this.diameter()).height(this.diameter())
@@ -61,7 +62,7 @@ export struct BatteryCapability {
             .accessibilityLevel('no')
           }
         },(index:number)=>String(index))
-      }.width(this.diameter()).height(this.diameter()+8*this.unit)
+      }.width(this.diameter()).height(this.diameter()+8*this.unit).translate({y:hookReserve(this.cap.readingBlend??'')*this.unit/2})
     }.width('100%').height('100%').justifyContent(FlexAlign.Center)
       .accessibilityText(batteryStatus(this.cap)+' '+(batteryLevel(this.cap)<0?'':batteryLevel(this.cap)+'%'))
   }

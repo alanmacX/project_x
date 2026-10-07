@@ -25,7 +25,7 @@ export function compositionPlacement(card:FridgeCard,box:ElementBox,blend:string
   return out;
 }
 
-export function compositionPadding(blend:string):number {return blend==='space'?10:blend==='sticker'?6:4;}
+export function compositionPadding(blend:string):number {return blend==='space'?10:blend==='bare'?8:blend==='sticker'?6:4;}
 export class CompositionOverflow {left:number=0;top:number=0;right:number=0;bottom:number=0;}
 /** Cache fringe includes external attachments, including their rotated corners. */
 export function compositionOverflow(card:FridgeCard,scale:number):CompositionOverflow {

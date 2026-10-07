@@ -1,3 +1,4 @@
+import { hookReserve } from './MicaGeometry';
 import { isReadingComposition, compositionPadding } from './ReadingComposition';
 import { readingSurface } from './CapabilityPresentation';
 import { cardOutline } from './RenderContours';
@@ -267,7 +268,7 @@ export function capabilityInset(card: FridgeCard): number {
 export function cardCapabilityMinimum(card: FridgeCard, compact: boolean = true, width: number = 0): CapabilitySize {
   const inset = capabilityInset(card), available=Math.max(0,width - inset*2);
   const size = compact ? capabilityReadableMinimum(card.capability,available) : capabilityMinimum(card.capability,false,available);
-  if(card.capability!==null) { size.w += inset*2; size.h += inset*2; } return size;
+  if(card.capability!==null) { size.w += inset*2; size.h += inset*2+hookReserve(card.capability.readingBlend??''); } return size;
 }
 /** Presets choose a readable island inside the actual silhouette; artwork geometry stays intact. */
 export function capabilityPreset(card: FridgeCard, anchor: string): ElementBox {

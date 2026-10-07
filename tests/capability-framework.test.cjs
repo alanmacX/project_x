@@ -211,7 +211,18 @@ for(const scale of [.5,1,2]){
 }
 for(const edge of ['left','right','top','bottom']){const path=compositions.compositionPath('sticker',180,80,edge);assert.ok(!/NaN|Infinity|@/.test(path));assert.equal((path.match(/ C /g)||[]).length,5);assert.ok(path.endsWith('Z'));}
 for(let u=0;u<=1;u+=.01){const p=compositions.hookPoint(u);assert.ok(p[1]<=.5+1e-12);assert.ok(Math.abs(compositions.hookPosition(...p)-u)<.002);}
-const backing=fs.readFileSync(path.resolve(root,'../views/ReadingBacking.ets'),'utf8');assert.ok(!/@State|onAreaChange/.test(backing),'backing cannot feed measured geometry back into native layout');assert.ok(backing.includes('.objectFit(ImageFit.Fill)'));assert.ok(backing.includes('app.media.mica_brush'));assert.ok(fs.readFileSync(path.resolve(root,'../views/ReadingHook.ets'),'utf8').includes('sourceSize({width:64,height:64})'));
+const backing=fs.readFileSync(path.resolve(root,'../views/ReadingBacking.ets'),'utf8');assert.ok(!/@State/.test(backing),'paint dimensions cannot feed observed native layout');assert.ok(backing.includes('vp2px(w),vp2px(h),vp2px(s)'),'SVG path coordinates must be physical px');assert.ok(backing.includes("globalCompositeOperation='destination-out'"),'hole is transparent, not painted over');assert.ok(backing.includes('this.paintWidth=w;this.paintHeight=h;this.paint()'),'size changes repaint imperatively');
+const mica=load('MicaGeometry');
+for(const style of ['tag','dock']){assert.equal(mica.hookReserve(style),20);for(const u of [0,.5,1]){const x=mica.hookCenter(u,100,1);assert.ok(x>=14&&x<=86);assert.ok(10+3.3<20+compositions.compositionPadding(style),'hole stays above content');}}
+for(const style of ['bare','space','sticker'])assert.equal(mica.hookReserve(style),0);
+// Sample every Bezier segment, then check a grid spanning the entire safe content rectangle.
+function polygon(path){const tokens=path.match(/[MCQLZ]|-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi);let i=0,x=0,y=0,out=[];while(i<tokens.length){const op=tokens[i++];if(op==='Z')break;if(op==='M'||op==='L'){x=+tokens[i++];y=+tokens[i++];out.push([x,y]);}else{const start=[x,y],a=[+tokens[i++],+tokens[i++]],b=op==='C'?[+tokens[i++],+tokens[i++]]:a,end=[+tokens[i++],+tokens[i++]];for(let j=1;j<=32;j++){const t=j/32,v=1-t;out.push(op==='C'?[v**3*start[0]+3*v*v*t*a[0]+3*v*t*t*b[0]+t**3*end[0],v**3*start[1]+3*v*v*t*a[1]+3*v*t*t*b[1]+t**3*end[1]]:[v*v*start[0]+2*v*t*a[0]+t*t*end[0],v*v*start[1]+2*v*t*a[1]+t*t*end[1]]);} [x,y]=end;}}return out;}
+function inside(poly,x,y){let yes=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>y)!==(b[1]>y)&&x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0])yes=!yes;}return yes;}
+for(const style of ['bare','space','sticker','tag','dock'])for(const edge of ['', 'left','right','top','bottom'])for(const scale of [.25,.5,1,2])for(const [rw,rh] of [[32,32],[80,50],[300,40],[40,300],[240,180]]){
+ const w=rw*scale,h=rh*scale,poly=polygon(mica.micaPath(style,w,h,scale,edge)),p=compositions.compositionPadding(style)*scale,top=p+mica.hookReserve(style)*scale;
+ for(let ix=0;ix<=10;ix++)for(let iy=0;iy<=10;iy++){const x=p+(w-2*p)*ix/10,y=top+Math.max(0,h-top-p)*iy/10;assert.ok(inside(poly,x,y),`${style}/${edge}/${scale}/${rw}x${rh}: content ${x},${y} outside material`);}
+}
+console.log('PASS mica geometry: 60,500 safe-area samples; transparent holes remain in reserved header; no observed measurement feedback');
 console.log('PASS explicit style policy, legacy migration, one-edge physical snapping, finite attached shapes, freely placed hooks and feedback-free native backing');
 
 const boundaryCard=new s.FridgeCard();boundaryCard.shape='subject';boundaryCard.capability={k:'calendar',readingBlend:'sticker'};boundaryCard.outline=[[{x:.25,y:.15},{x:.75,y:.15},{x:.75,y:.85},{x:.25,y:.85}]];

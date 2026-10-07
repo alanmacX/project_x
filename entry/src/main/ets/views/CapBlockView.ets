@@ -1,3 +1,4 @@
+import { hookReserve } from '../model/MicaGeometry';
 import { ReadingHook } from './ReadingHook';
 import { compositionPadding } from '../model/ReadingComposition';
 import { ReadingBacking } from './ReadingBacking';
@@ -78,9 +79,10 @@ export struct CapabilityView {
     else if(this.cap.k==='dayprogress'||this.cap.k==='yearprogress')width=Math.max(64*u,this.measured(typeLabel(this.cap.k),12*u),this.measured('100%',(this.compact()?24:38)*u));
     return Math.min((this.contentWidth+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,Math.ceil(width)+2*compositionPadding(this.cap.readingBlend??'')*u);
   }
-  @Builder private readingBackground() {if(this.ownBacking()){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,radius:Math.min(8*this.unit(),this.backingWidth()*.12),scaleFactor:this.scaleFactor})}}
+  @Builder private readingBackground() {if(this.ownBacking()){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,radius:Math.min(8*this.unit(),this.backingWidth()*.12),scaleFactor:this.unit()})}}
   @Builder private readingHook() {if(this.ownBacking()&&['tag','dock'].includes(this.cap.readingBlend??'')){ReadingHook({hook:this.cap.readingHook??.2,scaleFactor:this.unit()})}}
   build() {
+    Column() {
     Column() {
     Column({ space: 4 * this.unit() }) {
       if (this.undersized()) {
@@ -163,7 +165,8 @@ export struct CapabilityView {
           Row().width((progressOf(this.cap.k, this.now()) * 100) + '%').height(4 * this.unit()).backgroundColor(this.ink)
         }.width('100%').height(4 * this.unit()).borderRadius(2).clip(true)
       }
-    }.width(this.ownBacking()?this.backingWidth():'100%').height(this.ownBacking()?undefined:'100%').padding(this.ownBacking()?compositionPadding(this.cap.readingBlend??'')*this.unit():0)
+    }.width(this.ownBacking()?Math.max(1,this.backingWidth()-2*compositionPadding(this.cap.readingBlend??'')*this.unit()):'100%').constraintSize({maxHeight:this.ownBacking()?Math.max(1,this.contentHeight*this.scaleFactor):undefined}).clip(this.ownBacking())
+    }.width(this.ownBacking()?this.backingWidth():'100%').height(this.ownBacking()?undefined:'100%').padding({left:this.ownBacking()?compositionPadding(this.cap.readingBlend??'')*this.unit():0,right:this.ownBacking()?compositionPadding(this.cap.readingBlend??'')*this.unit():0,bottom:this.ownBacking()?compositionPadding(this.cap.readingBlend??'')*this.unit():0,top:this.ownBacking()?compositionPadding(this.cap.readingBlend??'')*this.unit()+hookReserve(this.cap.readingBlend??'')*this.unit():0})
       .background(this.readingBackground).overlay(this.readingHook).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
     }.width('100%').height('100%').justifyContent(this.backingEdge==='top'?FlexAlign.Start:this.backingEdge==='bottom'?FlexAlign.End:FlexAlign.Center).alignItems(this.backingEdge==='left'?HorizontalAlign.Start:this.backingEdge==='right'?HorizontalAlign.End:HorizontalAlign.Center)
   }

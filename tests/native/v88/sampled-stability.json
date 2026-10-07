@@ -1,0 +1,13 @@
+{
+  "card_left_top": {
+    "max_mean_absolute_delta": 0.0
+  },
+  "calendar_material": {
+    "max_mean_absolute_delta": 0.0
+  },
+  "hook_material": {
+    "max_mean_absolute_delta": 0.0
+  },
+  "samples": 16,
+  "note": "16 idle snapshots after dynamic updates and hook movement; static paint regions only, not a frame-rate measurement."
+}
