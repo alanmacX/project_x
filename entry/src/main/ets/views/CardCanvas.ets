@@ -76,9 +76,11 @@ struct CapabilityContentLayer {
     Stack() {
       if(this.paperLabel()) {
         Column().width('100%').height('100%').backgroundColor(READING_PAPER_FILL).borderRadius(this.paperRadius())
-          .backgroundImage($r('app.media.reading_paper_grain'),ImageRepeat.XY).backgroundImageSize({width:96*this.scaleFactor,height:96*this.scaleFactor})
           .border({width:{bottom:.6*this.scaleFactor},color:'#35A79A82'})
           .shadow({radius:3*this.scaleFactor,color:'#16000000',offsetY:1.2*this.scaleFactor}).hitTestBehavior(HitTestMode.None)
+        Column().width('100%').height('100%').backgroundImage($r('app.media.reading_paper_fibres'),ImageRepeat.XY)
+          .backgroundImageSize({width:160*this.scaleFactor,height:160*this.scaleFactor}).borderRadius(this.paperRadius()).clip(true)
+          .opacity(.55).hitTestBehavior(HitTestMode.None)
       } else if(this.hasReadingSurface() && this.card.capability?.readingBlend!=='halo') {
         // One precomputed alpha field: native gradient bounds differ across Form hosts.
         Image(this.readingTexture()).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)

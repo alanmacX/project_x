@@ -57,10 +57,10 @@ export function readingHalo(ink: string, scale: number, enabled: boolean, blend:
 
 /** Translucent tracing paper: one tint layer, static grain, no opaque backing or photo blur. */
 export const READING_PAPER_COLOR:string='#FBF7EE';
-export const READING_PAPER_FILL:string='#B8FBF7EE';
+export const READING_PAPER_FILL:string='#80FBF7EE';
 export function paperReadingBackground(background:string):string {
-  const alpha=184/255;
+  const alpha=128/255;
   return '#'+[1,3,5].map((i:number)=>Math.round(parseInt(READING_PAPER_COLOR.slice(i,i+2),16)*alpha+parseInt(background.slice(i,i+2),16)*(1-alpha)).toString(16).padStart(2,'0')).join('');
 }
-export function paperReadingInk(ink:string):string {return Math.min(textContrast(ink,paperReadingBackground('#000000')),textContrast(ink,paperReadingBackground('#FFFFFF')))>=4.5?ink:'#343129';}
+export function paperReadingInk(ink:string):string {return Math.min(textContrast(ink,paperReadingBackground('#000000')),textContrast(ink,paperReadingBackground('#FFFFFF')))>=4.5?ink:'#10100C';}
 export function paperReadingRadius(width:number,height:number):number {return Math.max(0,Math.min(10,Math.min(width,height)*.16));}
