@@ -1,6 +1,6 @@
 import { EditorLayerMotion } from '../model/EditorLayerMotion';
 import { AlbumCapability } from './AlbumCapability';
-import { readingSurface, readingSurfaceColor, READING_PAPER_COLOR, paperReadingInk, paperReadingRadius } from '../model/CapabilityPresentation';
+import { readingSurface, readingSurfaceColor, READING_PAPER_FILL, paperReadingInk, paperReadingRadius } from '../model/CapabilityPresentation';
 import { capabilityInset } from '../model/CanvasLayout';
 import { AnimatedPhoto } from './AnimatedPhoto';
 import { FridgeCard, CanvasElement, ElementBox, materialColors, cardCornerRadius } from '../model/CardSchema';
@@ -75,9 +75,10 @@ struct CapabilityContentLayer {
   build() {
     Stack() {
       if(this.paperLabel()) {
-        Column().width('100%').height('100%').backgroundColor('#D9CFBD').borderRadius(this.paperRadius())
-          .translate({y:.9*this.scaleFactor}).shadow({radius:4*this.scaleFactor,color:'#20000000',offsetY:2*this.scaleFactor}).hitTestBehavior(HitTestMode.None)
-        Column().width('100%').height('100%').backgroundColor(READING_PAPER_COLOR).borderRadius(this.paperRadius()).hitTestBehavior(HitTestMode.None)
+        Column().width('100%').height('100%').backgroundColor(READING_PAPER_FILL).borderRadius(this.paperRadius())
+          .backgroundImage($r('app.media.reading_paper_grain'),ImageRepeat.XY).backgroundImageSize({width:96*this.scaleFactor,height:96*this.scaleFactor})
+          .border({width:{bottom:.6*this.scaleFactor},color:'#35A79A82'})
+          .shadow({radius:3*this.scaleFactor,color:'#16000000',offsetY:1.2*this.scaleFactor}).hitTestBehavior(HitTestMode.None)
       } else if(this.hasReadingSurface() && this.card.capability?.readingBlend!=='halo') {
         // One precomputed alpha field: native gradient bounds differ across Form hosts.
         Image(this.readingTexture()).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)

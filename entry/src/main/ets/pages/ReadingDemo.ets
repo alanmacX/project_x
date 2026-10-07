@@ -48,7 +48,7 @@ struct ReadingDemo {
       Stack() {CardFace({card:card,scaleFactor:this.sampleScale(card),tick:this.tick}).width(card.w*this.sampleScale(card)).height(card.h*this.sampleScale(card))}
         .width('100%').height(this.previewHeight()).renderGroup(true).backgroundColor(AppDesign.background(this.dark)).borderRadius(16)
       Text(['01 · 薄纸标签','02 · 柔光渐隐','03 · 局部衬光','04 · 文字描光'][index]).fontSize(17).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.dark)).width('100%')
-      Text(['米白纸面、细薄厚度与轻阴影；文字无光晕','保留较多底图，柔化文字周围的纹理','文字附近对比更强，适合杂乱照片与小字','底图完整保留，用细描光托住文字'][index]).fontSize(13).fontColor(AppDesign.muted(this.dark)).width('100%')
+      Text(['半透米白纸面与静态纸纹；保留底图，无文字光晕','保留较多底图，柔化文字周围的纹理','文字附近对比更强，适合杂乱照片与小字','底图完整保留，用细描光托住文字'][index]).fontSize(13).fontColor(AppDesign.muted(this.dark)).width('100%')
     }.width(this.sampleWidth()).padding(16).backgroundColor(AppDesign.surface(this.dark)).borderRadius(20)
   }
   build() {

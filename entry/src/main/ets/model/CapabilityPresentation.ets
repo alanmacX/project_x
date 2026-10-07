@@ -55,7 +55,12 @@ export function readingHalo(ink: string, scale: number, enabled: boolean, blend:
     { radius: (blend==='halo'?2.2:1.8) * scale, color: color, offsetX: 0, offsetY: 0 }];
 }
 
-/** Opaque, thin paper keeps dense information readable without photo blur or glyph glow. */
+/** Translucent tracing paper: one tint layer, static grain, no opaque backing or photo blur. */
 export const READING_PAPER_COLOR:string='#FBF7EE';
-export function paperReadingInk(ink:string):string {return textContrast(ink,READING_PAPER_COLOR)>=4.5?ink:'#343129';}
+export const READING_PAPER_FILL:string='#B8FBF7EE';
+export function paperReadingBackground(background:string):string {
+  const alpha=184/255;
+  return '#'+[1,3,5].map((i:number)=>Math.round(parseInt(READING_PAPER_COLOR.slice(i,i+2),16)*alpha+parseInt(background.slice(i,i+2),16)*(1-alpha)).toString(16).padStart(2,'0')).join('');
+}
+export function paperReadingInk(ink:string):string {return Math.min(textContrast(ink,paperReadingBackground('#000000')),textContrast(ink,paperReadingBackground('#FFFFFF')))>=4.5?ink:'#343129';}
 export function paperReadingRadius(width:number,height:number):number {return Math.max(0,Math.min(10,Math.min(width,height)*.16));}

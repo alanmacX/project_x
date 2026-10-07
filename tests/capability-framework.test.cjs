@@ -168,3 +168,6 @@ for(const ink of ['#FFFFFF','#F8F8F8','#323232','#D0A050','#000000'])assert.ok(p
 assert.equal(p.paperReadingInk('#323232'),'#323232');assert.equal(p.paperReadingRadius(180,100),10);assert.equal(p.paperReadingRadius(20,20),3.2);
 const paperState=new s.FridgeState();paperState.cards=[new s.FridgeCard()];paperState.cards[0].capability={k:'clock',readingStyle:'surface',readingBlend:'paper'};assert.equal(s.normalizeState(JSON.parse(JSON.stringify(paperState))).cards[0].capability.readingBlend,'paper');
 console.log('PASS thin-paper contrast, compact corner geometry and persisted material choice');
+
+for(const ink of ['#FFFFFF','#323232','#6D6D6D','#000000'])for(const background of ['#000000','#FFFFFF'])assert.ok(p.textContrast(p.paperReadingInk(ink),p.paperReadingBackground(background))>=4.5,'translucent paper keeps ink readable over darkest/lightest photographs');
+assert.equal(p.READING_PAPER_FILL.slice(1,3),'B8');
