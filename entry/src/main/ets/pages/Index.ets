@@ -1,3 +1,6 @@
+import { compositionPlacement, isReadingComposition } from '../model/ReadingComposition';
+import { readingToneJob } from '../model/ReadingToneWorker';
+import { cardSource, hash } from '../model/BackgroundInputs';
 import { CenterGuides } from '../views/CenterGuides';
 import lazy { ReadingComparison } from '../views/ReadingComparison';
 import { CardDeletionFlight } from '../views/CardDeletionFlight';
@@ -1880,7 +1883,7 @@ struct Index {
           } else if (this.settingsTab === 1 && (this.layerId === 'capability' || this.layerId.length === 0)) {
             if(this.preview.capability===null){Column({space:16}) {this.capabilityPanel()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)}
             if(this.preview.capability!==null) {
-              CapabilityAppearance({card:this.preview,appDark:this.appDark,onChoose:()=>this.chooseCapability(),onCompare:()=>this.compareReading(),onBlend:(blend)=>{const card=this.current();if(card?.capability){card.capability.readingBlend=blend;card.capability.readingStyle='surface';this.change();}},onArrange:(anchor:string)=>this.arrangeCapability(anchor),onColor:()=>this.chooseColor('ink'),onColorPick:(color:string,key:string)=>this.setCardColor('ink',color,key),onStyle:(style:string)=>{
+              CapabilityAppearance({card:this.preview,appDark:this.appDark,onChoose:()=>this.chooseCapability(),onCompare:()=>this.compareReading(),onBlend:(blend)=>this.chooseReadingComposition(blend),onArrange:(anchor:string)=>this.arrangeCapability(anchor),onColor:()=>this.chooseColor('ink'),onColorPick:(color:string,key:string)=>this.setCardColor('ink',color,key),onStyle:(style:string)=>{
                 const card=this.current();if(card?.capability){card.capability.readingStyle=style;this.change();}
               }})
             }
@@ -1988,8 +1991,9 @@ struct Index {
     // Keep the opposite corner still when resizing a rotated element.
     const local = this.resizeStart.rot * Math.PI / 180, c = Math.cos(local), sn = Math.sin(local);
     const dw = (this.resizeStart.w - box.w) * w, dh = (this.resizeStart.h - box.h) * h;
-    box.x = Math.max(0, Math.min(1 - box.w, this.resizeStart.x + (dw * (1 - c) + dh * sn) / (2 * w)));
-    box.y = Math.max(0, Math.min(1 - box.h, this.resizeStart.y + (dh * (1 - c) - dw * sn) / (2 * h)));
+    const outside=this.layerId==='capability'&&isReadingComposition(this.preview.capability?.readingBlend??'');
+    box.x = Math.max(outside?-box.w*.8:0, Math.min(outside?1-box.w*.2:1-box.w, this.resizeStart.x + (dw * (1 - c) + dh * sn) / (2 * w)));
+    box.y = Math.max(outside?-box.h*.8:0, Math.min(outside?1-box.h*.2:1-box.h, this.resizeStart.y + (dh * (1 - c) - dw * sn) / (2 * h)));
     this.layerMotion.update(this.layerId,box);
   }
   private rotateElement(e: GestureEvent): void {
@@ -2223,6 +2227,20 @@ struct Index {
         CapabilitySettings({tick:this.tick,cap:this.preview.capability!,cardId:this.preview.id,appDark:this.appDark,onUpdate:(id:string,next:CapBlock)=>this.updateExtraCapability(id,next)})
       }
     }.width('100%')
+  }
+  private chooseReadingComposition(blend:string):void {
+    const card=this.current();if(!card?.capability||card.capability.k==='album')return;
+    card.capability.readingBlend=blend;card.capability.readingStyle='surface';
+    card.capBox=compositionPlacement(card,capabilityPlacement(card),blend);card.capFree=true;
+    this.change();
+    const id=card.id,source=cardSource(card),key=hash(source+':'+card.subjectVersion);
+    if(!source||card.capability.readingTint&&card.capability.readingTintKey===key)return;
+    taskpool.execute(new taskpool.Task(readingToneJob,source)).then((result:Object)=>{
+      const color=result as string;
+      const current=this.current();
+      if(!this.alive||!this.editing||!current?.capability||current.id!==id||cardSource(current)!==source)return;
+      current.capability.readingTint=color;current.capability.readingTintKey=key;this.change();
+    }).catch(()=>{});
   }
   private arrangeCapability(anchor:string):void {
     const card=this.current();if(card===null || card.capability===null)return;

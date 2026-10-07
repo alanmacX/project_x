@@ -1,3 +1,4 @@
+import { compositionOverflow, CompositionOverflow } from '../model/ReadingComposition';
 import { alignToCanvas } from '../model/AlignmentGuide';
 import { groupBox } from '../model/GroupGeometry';
 import { EditorLayerMotion } from '../model/EditorLayerMotion';
@@ -253,6 +254,7 @@ export struct BoardCard {
     if (this.atMinimum) this.getUIContext().getPromptAction().showToast({ message: this.card.capability === null ? '已到最小尺寸' : '已到最小可读尺寸；移除能力后可继续缩小' });
     this.atMinimum = false;
   }
+  private attachmentOverflow():CompositionOverflow {return compositionOverflow(this.faceCard(),this.scaleFactor);}
   private faceCard(): FridgeCard {
     if (!this.resizing) return this.card;
     const card = this.copyCard(); card.w = this.liveW; card.h = this.liveH; return card;
@@ -263,8 +265,8 @@ export struct BoardCard {
         // Shadow fringe stays in the texture; rotation and translation stay outside it.
         Stack({ alignContent: Alignment.TopStart }) {
           CardFace({ layerMotion:this.layerMotion, card: this.faceCard(), scaleFactor: this.scaleFactor, tick: this.tick, lifted: this.moving || this.motion.ids.includes(this.card.id), hideContent: this.hideContent, movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
-            .width(this.w()).height(this.h()).position({ x: 24, y: 24 }).hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS)
-        }.width(this.w() + 48).height(this.h() + 48).position({ x: -24, y: -24 })
+            .width(this.w()).height(this.h()).position({ x: 24+this.attachmentOverflow().left, y: 24+this.attachmentOverflow().top }).hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS)
+        }.width(this.w()+48+this.attachmentOverflow().left+this.attachmentOverflow().right).height(this.h()+48+this.attachmentOverflow().top+this.attachmentOverflow().bottom).position({ x: -24-this.attachmentOverflow().left, y: -24-this.attachmentOverflow().top })
           .id('deleteFace_'+this.card.id).renderGroup(this.moving || this.motion.ids.includes(this.card.id) || (this.movingLayerId.length === 0 && this.card.elements.every(el => !el.animated))).hitTestBehavior(HitTestMode.None)
       }.scale({ x: this.motion.ids.includes(this.card.id) ? 1 : this.liftScale, y: this.motion.ids.includes(this.card.id) ? 1 : this.liftScale })
         .rotate({ angle: this.motion.ids.includes(this.card.id) ? 0 : this.tilt })

@@ -1,3 +1,4 @@
+import { compositionPadding } from '../model/ReadingComposition';
 import { ReadingBacking } from './ReadingBacking';
 import { paperTextWidth } from '../model/PaperTextWidth';
 import { readingHalo } from '../model/CapabilityPresentation';
@@ -15,6 +16,7 @@ export struct SummaryCapability {
   @Prop ink: string = '#262824';
   @Prop readingHaloEnabled: boolean = false;
   @Prop contentBackingEnabled:boolean=false;
+  @Prop backingTint:string='#E8D6B0';
   @Prop scaleFactor: number = 1;
   @State presentation: SummaryPresentation = new SummaryPresentation();
   aboutToAppear(): void { this.refresh(); }
@@ -26,9 +28,9 @@ export struct SummaryCapability {
     let width=measure(this.presentation.heading,11*s)+(this.presentation.remaining?measure('+'+this.presentation.remaining,11*s)+8*s:0);
     if(!this.presentation.events.length)width=Math.max(width,measure(this.presentation.empty,16*s));
     for(const event of this.presentation.events)width=Math.max(width,measure(event.title,16*s),measure(eventWhen(event,this.tick||Date.now())+(event.location?' · '+event.location:''),11*s));
-    return Math.min((this.contentWidth+8)*this.scaleFactor,Math.ceil(width)+8*s);
+    return Math.min((this.contentWidth+8)*this.scaleFactor,Math.ceil(width)+2*compositionPadding(this.cap.readingBlend??'')*s);
   }
-  @Builder private readingBackground() {if(this.contentBackingEnabled){ReadingBacking({blend:this.cap.readingBlend??'feather',ink:this.ink,radius:8*this.s(),scaleFactor:this.scaleFactor})}}
+  @Builder private readingBackground() {if(this.contentBackingEnabled){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,ink:this.ink,radius:8*this.s(),scaleFactor:this.scaleFactor})}}
   build() {
     Column() {
     Column({space:8*this.s()}) {
@@ -45,7 +47,7 @@ export struct SummaryCapability {
           Text(eventWhen(e,this.tick||Date.now())+(e.location?' · '+e.location:'')).fontSize(11*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.s(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
         }.width('100%').height(this.contentBackingEnabled?undefined:40*this.s()).alignItems(HorizontalAlign.Start)
       },(e:AgendaItem)=>e.id)
-    }.width(this.contentBackingEnabled?this.backingWidth():'100%').height(this.contentBackingEnabled?undefined:'100%').padding(this.contentBackingEnabled?4*this.s():0)
+    }.width(this.contentBackingEnabled?this.backingWidth():'100%').height(this.contentBackingEnabled?undefined:'100%').padding(this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0)
       .background(this.readingBackground).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Start)
     }.width('100%').height('100%').justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
   }

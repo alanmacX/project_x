@@ -182,3 +182,17 @@ const ringMask=batteryPaper.batteryPaperMask(100,30);assert.ok(ringMask.includes
 console.log('PASS content-sized paper native measurement cache and hollow battery masking');
 
 assert.equal(batteryPaper.batteryPaperArcMask(100,40,126,0),'');assert.ok(batteryPaper.batteryPaperArcMask(100,40,126,288).includes('0 1 1'));assert.ok(batteryPaper.batteryPaperArcMask(100,30,70,40).includes('0 0 0'),'number backing uses only its local arc');
+const compositions=load('ReadingComposition');
+assert.equal(compositions.READING_COMPOSITIONS.length,6);
+for(const kind of s.CAPABILITIES.filter(k=>k!=='album')) for(const blend of compositions.READING_COMPOSITIONS){
+ const card=new s.FridgeCard();card.id=kind+'-'+blend;card.capability={k:kind,readingBlend:blend,readingTint:'#F8CF32'};card.capFree=true;card.capBox.x=-.35;card.capBox.y=.6;card.capBox.w=.65;card.capBox.h=.5;card.capBox.rot=-12;
+ const restored=s.normalizeState({...s.defaultState(),cards:[card]}).cards[0];assert.equal(restored.capability.readingBlend,blend);assert.equal(restored.capability.readingTint,'#F8CF32');assert.equal(restored.capBox.x,-.35);assert.equal(restored.capBox.rot,-12);
+ const drag=g.constrainCapabilityDrag(restored,{...restored.capBox,x:-100,y:100},restored.capBox);assert.ok(drag.x+drag.w>0&&drag.y<1);assert.equal(drag.rot,-12);
+ assert.equal(p.readingSurface(restored.capability,true,false),blend!=='bare');
+}
+for(const blend of ['space','sticker'])for(const [w,h] of [[1,1],[100,40],[40,150]]){const path=compositions.compositionPath(blend,w,h);assert.ok(path.endsWith('Z'));assert.ok(!/NaN|Infinity/.test(path));assert.equal((path.match(/ C /g)||[]).length,6);}
+assert.equal(compositions.compositionPath('sticker',0,20),'');
+console.log('PASS six compositions: all non-album capabilities, material/position/rotation persistence, bounded external drag, finite fixed-complexity silhouettes and bare-text contract');
+const external=new s.FridgeCard();external.capFree=true;external.capability={k:'worldclock',readingBlend:'space'};external.capBox={x:-.35,y:.6,w:.65,h:.5,rot:25,opacity:1};
+const fringe=compositions.compositionOverflow(external,2);assert.ok(fringe.left>0&&fringe.bottom>0);assert.equal(compositions.compositionOverflow({...external,capFree:false},2).left,0);
+console.log('PASS external composition cache includes rotated attachment overflow without changing artwork bounds');

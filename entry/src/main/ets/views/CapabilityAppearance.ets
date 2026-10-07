@@ -1,3 +1,4 @@
+import { READING_COMPOSITIONS, READING_COMPOSITION_LABELS, READING_COMPOSITION_NOTES, compositionSuggestion, isReadingComposition } from '../model/ReadingComposition';
 import { settingsDialogOpen, settingsReveal } from '../model/SettingsMotion';
 import { FridgeCard, materialColors } from '../model/CardSchema';
 import { readingWarning } from '../model/CapabilityPresentation';
@@ -12,7 +13,7 @@ import { SettingsSelect } from './SettingsSelect';
 export struct CapabilityAppearance {
   @Prop card:FridgeCard=new FridgeCard();
   @Prop appDark:boolean=false;
-  @State readingExpanded:boolean=false;
+  @State readingExpanded:boolean=true;
   onChoose:()=>void=()=>{};
   onCompare:()=>void=()=>{};
   onBlend:(blend:string)=>void=()=>{};
@@ -33,7 +34,7 @@ export struct CapabilityAppearance {
       ColorSetting({label:'内容颜色',color:this.ink(),automatic:!this.card.ink,sourceKey:this.card.id+':ink:',appDark:this.appDark,
         onPick:(color:string,key:string)=>this.onColorPick(color,key),onFallback:()=>this.onColor()})
       if(this.card.capability?.k!=='album') {Text('在预览中拖动内容，用角落手柄放大；手动摆放可覆盖整张卡片，位置预设会回到形状内部。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
-      Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
+      if(this.card.capability?.k!=='album') {Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
         Row(){Text('排版与可读性').fontSize(14).maxLines(1).layoutWeight(1).fontColor(AppDesign.text(this.appDark));Blank();SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([AppDesign.muted(this.appDark)]).rotate({angle:this.readingExpanded?180:0})}.width('100%').padding({left:12,right:12})
       }.width('100%').height(44).padding(0).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.getUIContext().animateTo(settingsDialogOpen(),()=>this.readingExpanded=!this.readingExpanded))
       if(this.readingExpanded) {
@@ -43,19 +44,22 @@ export struct CapabilityAppearance {
         SettingsSelect({labels:['靠上','居中','靠下'],selectedIndex:-1,valueLabel:'位置预设',appDark:this.appDark,
           onSelect:(index:number)=>this.onArrange(['top','center','bottom'][index])}).layoutWeight(1)
       }.width('100%')
-      Row({space:12}) {
+      if(!isReadingComposition(this.card.capability?.readingBlend??'')) {Row({space:12}) {
         Text('衬底').fontSize(14).fontColor(AppDesign.text(this.appDark)).width(48)
         SettingsSelect({labels:['自动','融入底板','始终显示'],selectedIndex:Math.max(0,['auto','plain','surface'].indexOf(this.card.capability?.readingStyle??'auto')),appDark:this.appDark,
           onSelect:(index:number)=>this.onStyle(['auto','plain','surface'][index])}).layoutWeight(1)
-      }.width('100%')
+      }.width('100%')}
       Row({space:12}) {
-        Text('融合').fontSize(14).fontColor(AppDesign.text(this.appDark)).width(48)
-        SettingsSelect({labels:['薄纸标签','柔光','衬光','描光'],selectedIndex:Math.max(0,['paper','feather','scrim','halo'].indexOf(this.card.capability?.readingBlend??'feather')),appDark:this.appDark,
-          onSelect:(index:number)=>this.onBlend(['paper','feather','scrim','halo'][index])}).layoutWeight(1)
+        Text('样式').fontSize(14).fontColor(AppDesign.text(this.appDark)).width(48)
+        SettingsSelect({labels:READING_COMPOSITION_LABELS,selectedIndex:READING_COMPOSITIONS.indexOf(this.card.capability?.readingBlend??''),valueLabel:READING_COMPOSITIONS.includes(this.card.capability?.readingBlend??'')?'':'选择融合方式',appDark:this.appDark,
+          onSelect:(index:number)=>this.onBlend(READING_COMPOSITIONS[index])}).layoutWeight(1)
       }.width('100%')
+      Text('建议：'+READING_COMPOSITION_LABELS[READING_COMPOSITIONS.indexOf(compositionSuggestion(this.card.capability?.k??''))]+' · 六种均可尝试').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+      Text(READING_COMPOSITION_NOTES[Math.max(0,READING_COMPOSITIONS.indexOf(this.card.capability?.readingBlend??''))]).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       Button('对比融合方案',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).width('100%').fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.onCompare())
       }.width('100%').transition(settingsReveal())
       }
+      } else {Text('专辑保留专用封面与智能多色底板，不叠加信息衬底。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
       if(readingWarning(this.card)) {Text(readingWarning(this.card)).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
     }.width('100%').padding(16).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(AppDesign.sectionRadius)
   }

@@ -58,5 +58,5 @@ export struct EditorLayerHandles {
       .gesture(PanGesture({distance:2}).onActionStart((e)=>this.onStart(e)).onActionUpdate((e)=>{if(resize)this.onResize(e);else this.onRotate(e);})
         .onActionEnd((e)=>{if(resize)this.onResize(e);else this.onRotate(e);this.onEnd();}).onActionCancel(()=>this.onCancel()))
   }
-  build() {Stack({alignContent:Alignment.TopStart}) {this.handle(true);if(this.targetId!=='capability')this.handle(false)}.width('100%').height('100%').hitTestBehavior(HitTestMode.Transparent)}
+  build() {Stack({alignContent:Alignment.TopStart}) {this.handle(true);this.handle(false)}.width('100%').height('100%').hitTestBehavior(HitTestMode.Transparent)}
 }

@@ -45,7 +45,7 @@ struct CanvasElementLayer {
     Column() {ElementView({element:this.element,ink:this.ink,scaleFactor:this.scaleFactor,widget:this.widget})}
       .width(this.box().w*100+'%').height(this.box().h*100+'%')
       .position({x:this.box().x*100+'%',y:this.box().y*100+'%'})
-      .rotate({angle:this.box().rot}).opacity(this.box().opacity).renderGroup(!this.element.animated)
+      .rotate({angle:this.box().rot}).rotate({angle:this.box().rot}).opacity(this.box().opacity).renderGroup(!this.element.animated)
   }
 }
 
@@ -63,16 +63,16 @@ struct CapabilityContentLayer {
   }
   private capabilityInk():string { return this.card.shape==='subject'&&this.card.subjectPhoto&&this.card.ink.length===0?this.card.subjectInk:materialColors(this.card.material,this.card.paper,this.card.ink)[1]; }
   private hasReadingSurface():boolean { return readingSurface(this.card.capability,this.card.shape==='subject'&&this.card.subjectPhoto,capabilityObstructed(this.card)); }
-  private paperLabel():boolean {return this.hasReadingSurface()&&this.card.capability?.readingBlend==='paper';}
+  private paperLabel():boolean {return this.hasReadingSurface()&&['paper','badge','sticker','space','tag','dock'].includes(this.card.capability?.readingBlend??'');}
   build() {
     Stack() {
-      Column() { CapabilityView({cap:this.card.capability!,ink:this.paperLabel()?paperReadingInk(this.capabilityInk()):this.capabilityInk(),readingHaloEnabled:this.hasReadingSurface()&&!this.paperLabel(),contentBackingEnabled:this.hasReadingSurface(),scaleFactor:this.scaleFactor,
+      Column() { CapabilityView({cap:this.card.capability!,ink:this.paperLabel()?paperReadingInk(this.capabilityInk()):this.capabilityInk(),readingHaloEnabled:(this.hasReadingSurface()&&!this.paperLabel())||this.card.capability?.readingBlend==='bare',contentBackingEnabled:this.hasReadingSurface(),backingTint:this.card.capability?.readingTint||materialColors(this.card.material,this.card.paper,this.card.ink)[0],scaleFactor:this.scaleFactor,
         contentWidth:this.card.w*this.box().w-2*capabilityInset(this.card),contentHeight:this.card.h*this.box().h-2*capabilityInset(this.card),tick:this.tick}) }
         .padding(0).width('100%').height('100%')
     }.width((this.capSurfaceBox().w*100)+'%').height((this.capSurfaceBox().h*100)+'%')
       .position({x:(this.capSurfaceBox().x*100)+'%',y:(this.capSurfaceBox().y*100)+'%'})
 
-      .opacity(this.box().opacity)
+      .rotate({angle:this.box().rot}).opacity(this.box().opacity)
   }
 }
 

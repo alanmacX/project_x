@@ -1,3 +1,4 @@
+import { compositionPadding } from '../model/ReadingComposition';
 import { ReadingBacking } from './ReadingBacking';
 import { paperTextWidth } from '../model/PaperTextWidth';
 import { holidayKnown, dateKey } from '../model/HolidayCalendar';
@@ -13,6 +14,7 @@ export struct TimetableCapability {
   @Prop ink: string = '#262824';
   @Prop readingHaloEnabled: boolean = false;
   @Prop contentBackingEnabled:boolean=false;
+  @Prop backingTint:string='#E8D6B0';
   @Prop contentWidth: number = 192;
   @Prop contentHeight: number = 150;
   @Prop scaleFactor: number = 1;
@@ -34,7 +36,7 @@ export struct TimetableCapability {
       let cell=0;for(const lesson of this.display.lessons)cell=Math.max(cell,measure(lesson.title,14*s),measure(lesson.location||'地点待定',11*s));
       width=Math.max(width,(cell+8*s)*this.columns());
     } else {const lesson=this.display.lessons[0];width=Math.max(width,measure(lesson.title,(this.compactUpcoming()?16:20)*s),measure(timeText(lesson.start)+'–'+timeText(lesson.end),11*s),measure(lesson.location||'地点待定',12*s));}
-    return Math.min((this.contentWidth+8)*this.scaleFactor,Math.ceil(width)+8*s);
+    return Math.min((this.contentWidth+8)*this.scaleFactor,Math.ceil(width)+2*compositionPadding(this.cap.readingBlend??'')*s);
   }
   private dayTitleHeight():number {
     if(!this.contentBackingEnabled)return 34*this.s();
@@ -43,7 +45,7 @@ export struct TimetableCapability {
     return 14*1.35*this.s()*(wraps?2:1);
   }
   private dayCellHeight():number {return this.contentBackingEnabled?this.dayTitleHeight()+(11*1.35+3+4)*this.s():LESSON_CELL_HEIGHT*this.s();}
-  @Builder private readingBackground() {if(this.contentBackingEnabled){ReadingBacking({blend:this.cap.readingBlend??'feather',ink:this.ink,radius:8*this.s(),scaleFactor:this.scaleFactor})}}
+  @Builder private readingBackground() {if(this.contentBackingEnabled){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,ink:this.ink,radius:8*this.s(),scaleFactor:this.scaleFactor})}}
   @Builder
   heading() {
     Row({space:4*this.s()}) {
@@ -83,7 +85,7 @@ export struct TimetableCapability {
           Text(this.display.lessons[0].location||'地点待定').fontSize(12*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.75).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
         }.width('100%').layoutWeight(this.contentBackingEnabled?0:1).alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Center)
       }
-    }.width(this.contentBackingEnabled?this.backingWidth():'100%').height(this.contentBackingEnabled?undefined:'100%').padding(this.contentBackingEnabled?4*this.s():0)
+    }.width(this.contentBackingEnabled?this.backingWidth():'100%').height(this.contentBackingEnabled?undefined:'100%').padding(this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0)
       .background(this.readingBackground).alignItems(HorizontalAlign.Start)
     }.width('100%').height('100%').justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
   }

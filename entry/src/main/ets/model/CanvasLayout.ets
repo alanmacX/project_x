@@ -1,3 +1,4 @@
+import { isReadingComposition } from './ReadingComposition';
 import { readingSurface } from './CapabilityPresentation';
 import { cardOutline } from './RenderContours';
 import { FridgeCard, ElementBox, ShapePoint, BOARD_W, BOARD_H, MIN_CARD_EDGE, MIN_SUBJECT_EDGE } from './CardSchema';
@@ -144,7 +145,7 @@ export function fitCapabilityPosition(card:FridgeCard,requested:ElementBox):Elem
 }
 /** Gesture path uses constant-time mask queries, never a contour scan or nearest-position search. */
 export function constrainCapabilityDrag(card:FridgeCard,requested:ElementBox,previous:ElementBox):ElementBox {
-  if(card.capFree)return freeCapabilityBox(requested);
+  if(card.capFree)return freeCapabilityBox(requested,isReadingComposition(card.capability?.readingBlend??''));
   if(card.shape==='subject'&&cardOutline(card).length===0)return fitContentBox(requested,safeContentBox(card));
   const f=subjectSurfaceFactor(card),inset=(1-f)/2,mask=card.shape==='subject'?interiorMask(card):undefined;
   const valid=(x:number,y:number):boolean=>{const box=new ElementBox();box.x=(x-inset)/f;box.y=(y-inset)/f;box.w=requested.w/f;box.h=requested.h/f;return mask!==undefined?maskContains(mask,box):regularContains(card,box);};
@@ -158,9 +159,9 @@ export function constrainCapabilityDrag(card:FridgeCard,requested:ElementBox,pre
   return result;
 }
 /** Foreground movement stays continuous across concavities and transparent holes. */
-export function freeCapabilityBox(requested:ElementBox):ElementBox {
+export function freeCapabilityBox(requested:ElementBox,outside:boolean=false):ElementBox {
   const box=new ElementBox();box.w=Math.min(1,Math.max(.01,requested.w));box.h=Math.min(1,Math.max(.01,requested.h));
-  box.x=Math.max(0,Math.min(1-box.w,requested.x));box.y=Math.max(0,Math.min(1-box.h,requested.y));box.opacity=requested.opacity;return box;
+  box.x=Math.max(outside?-box.w*.8:0,Math.min(outside?1-box.w*.2:1-box.w,requested.x));box.y=Math.max(outside?-box.h*.8:0,Math.min(outside?1-box.h*.2:1-box.h,requested.y));box.rot=outside?requested.rot:0;box.opacity=requested.opacity;return box;
 }
 export function capabilityObstructed(card:FridgeCard):boolean {
   return card.elements.some((el)=>!el.behindCapability && (el.kind==='text'||el.kind==='image') && card.capBox.x<el.x+el.w && card.capBox.x+card.capBox.w>el.x && card.capBox.y<el.y+el.h && card.capBox.y+card.capBox.h>el.y);
@@ -168,11 +169,11 @@ export function capabilityObstructed(card:FridgeCard):boolean {
 export function capabilityBox(card: FridgeCard): ElementBox {
   if(card.capability?.k==='album') {const box=new ElementBox();box.x=0;box.y=0;box.w=1;box.h=1;return box;}
   const minimum=cardCapabilityMinimum(card,true,card.w*card.capBox.w);
-  const key=minimum.w+':'+minimum.h+':'+card.shape+':'+outlineIdentity(card)+':'+card.subjectBorder+':'+card.capFree+':'+card.w+':'+card.h+':'+JSON.stringify(card.capBox);
+  const key=(card.capability?.readingBlend??'')+':'+minimum.w+':'+minimum.h+':'+card.shape+':'+outlineIdentity(card)+':'+card.subjectBorder+':'+card.capFree+':'+card.w+':'+card.h+':'+JSON.stringify(card.capBox);
   const cached=layoutCache.get(key);if(cached!==undefined)return cached;
-  const requested=new ElementBox();requested.x=card.capBox.x;requested.y=card.capBox.y;requested.opacity=card.capBox.opacity;
+  const requested=new ElementBox();requested.x=card.capBox.x;requested.y=card.capBox.y;requested.opacity=card.capBox.opacity;requested.rot=card.capBox.rot;
   requested.w=Math.max(card.capBox.w,minimum.w/card.w);requested.h=Math.max(card.capBox.h,minimum.h/card.h);
-  const result=card.capFree?freeCapabilityBox(requested):fitCapabilityPosition(card,requested);
+  const result=card.capFree?freeCapabilityBox(requested,isReadingComposition(card.capability?.readingBlend??'')):fitCapabilityPosition(card,requested);
   if(layoutCache.size>128)layoutCache.clear();layoutCache.set(key,result);return result;
 }
 export function resizeFactor(w: number, h: number, dx: number, dy: number, angle: number): number {

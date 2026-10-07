@@ -19,6 +19,8 @@ export function summaryPresentation(cap: CapBlock, height: number, now: number):
   return out;
 }
 export function readingSurface(cap: CapBlock | null, photograph: boolean, obstructed: boolean): boolean {
+  if(cap?.readingBlend==='bare')return false;
+  if(cap&&['badge','sticker','space','tag','dock'].includes(cap.readingBlend??''))return true;
   return cap !== null && (obstructed || cap.readingStyle === 'surface' || cap.readingStyle !== 'plain' && photograph);
 }
 function luminance(color:string):number {

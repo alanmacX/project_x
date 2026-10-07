@@ -34,7 +34,9 @@ export interface CapBlock {
   albumCover?: string;
   albumBackground?: string;
   albumSource?: string;
-  readingBlend?: string; // paper | feather | scrim | halo; identical app/widget/export rendering
+  readingBlend?: string; // bare | badge | sticker | space | tag | dock; legacy paper/feather/scrim/halo retained
+  readingTintKey?: string;
+  readingTint?: string; // local photo palette, persisted; never sampled while moving
   readingStyle?: string; // auto | plain | surface; photo subjects receive a readable backing
   parcelPlace?: string; // user's default local pickup location
   title?: string;
@@ -275,6 +277,11 @@ export function normalizeState(raw: FridgeState): FridgeState {
       if (CAPABILITIES.includes(cap.k)) {
         if (card.capability === null) {
           card.capability = normalizeCapability(cap);
+          if(card.capFree&&['bare','badge','sticker','space','tag','dock'].includes(card.capability.readingBlend??'')) {
+            card.capBox.x=bounded(source.capBox?.x,-card.capBox.w*.8,1-card.capBox.w*.2,.1);
+            card.capBox.y=bounded(source.capBox?.y,-card.capBox.h*.8,1-card.capBox.h*.2,.12);
+            card.capBox.rot=bounded(source.capBox?.rot,-180,180,0);
+          }
           if (cap.k === 'calendar') card.capability.calendarOffset = Math.round(bounded(cap.calendarOffset ?? 0, -120, 120, 0));
           if (raw.schemaVersion !== 2) {
             card.capBox.y = i / caps.length; card.capBox.h = 1 / caps.length;
@@ -325,7 +332,9 @@ export function normalizeCapability(raw: CapBlock): CapBlock {
   }
   if (raw.k === 'worldclock') cap.zone = clockZone(typeof raw.zone === 'string' ? raw.zone : '');
   cap.readingStyle = ['plain','surface'].includes(raw.readingStyle ?? '') ? raw.readingStyle : 'auto';
-  cap.readingBlend=['paper','feather','scrim','halo'].includes(raw.readingBlend??'')?raw.readingBlend:'feather';
+  cap.readingTintKey=typeof raw.readingTintKey==='string'?raw.readingTintKey.slice(0,64):'';
+  cap.readingTint=/^#[0-9a-fA-F]{6}$/.test(raw.readingTint??'')?raw.readingTint:'';
+  cap.readingBlend=['bare','badge','sticker','space','tag','dock','paper','feather','scrim','halo'].includes(raw.readingBlend??'')?raw.readingBlend:'feather';
   cap.parcelPlace = typeof raw.parcelPlace === 'string' ? raw.parcelPlace.slice(0,80) : '';
   cap.title = typeof raw.title === 'string' ? raw.title.slice(0,160) : '';
   cap.interval = Math.round(bounded(raw.interval ?? 60,30,1440,60));

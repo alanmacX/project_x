@@ -1,3 +1,4 @@
+import { READING_COMPOSITIONS, READING_COMPOSITION_LABELS, READING_COMPOSITION_NOTES, compositionPlacement, compositionOverflow } from '../model/ReadingComposition';
 import { prepareSubjectDepth } from '../model/SubjectDepthCache';
 import { common } from '@kit.AbilityKit';
 import { FridgeCard } from '../model/CardSchema';
@@ -22,7 +23,7 @@ struct ReadingDemo {
   aboutToAppear():void {
     const source=AppStorage.get<FridgeCard>('readingDemoCard');
     if(!source?.capability)return;
-    this.pending=['paper','feather','scrim','halo'].map((blend:string)=>{const c=cardViewSnapshot(source);c.outline=[];c.renderContourKey=source.renderContourKey;c.capability!.readingStyle='surface';c.capability!.readingBlend=blend;return cardRenderSnapshot(c);});
+    this.pending=READING_COMPOSITIONS.map((blend:string)=>{const c=cardViewSnapshot(source);c.outline=[];c.renderContourKey=source.renderContourKey;c.capability!.readingStyle='surface';c.capability!.readingBlend=blend;c.capFree=true;c.capBox=compositionPlacement(c,c.capBox,blend);return cardRenderSnapshot(c);});
     this.timer=setTimeout(()=>{this.timer=-1;this.prepare();},400);
     AppStorage.delete('readingDemoCard');
   }
@@ -41,14 +42,14 @@ struct ReadingDemo {
   private landscape():boolean {return this.pageWidth>this.pageHeight;}
   private sampleWidth():number {return this.landscape()?(this.pageWidth-80)/4:this.pageWidth-32;}
   private previewHeight():number {return this.landscape()?Math.max(200,this.pageHeight-this.safeTop-this.safeBottom-230):230;}
-  private sampleScale(card:FridgeCard):number {return Math.min((this.sampleWidth()-48)/card.w,(this.previewHeight()-40)/card.h);}
+  private sampleScale(card:FridgeCard):number {const o=compositionOverflow(card,1);return Math.min((this.sampleWidth()-48)/(card.w+o.left+o.right),(this.previewHeight()-40)/(card.h+o.top+o.bottom));}
   @Builder
   sample(card:FridgeCard,index:number) {
     Column({space:12}) {
-      Stack() {CardFace({card:card,scaleFactor:this.sampleScale(card),tick:this.tick}).width(card.w*this.sampleScale(card)).height(card.h*this.sampleScale(card))}
+      Stack() {CardFace({card:card,scaleFactor:this.sampleScale(card),tick:this.tick}).width(card.w*this.sampleScale(card)).height(card.h*this.sampleScale(card)).translate({x:(compositionOverflow(card,1).left-compositionOverflow(card,1).right)*this.sampleScale(card)/2,y:(compositionOverflow(card,1).top-compositionOverflow(card,1).bottom)*this.sampleScale(card)/2})}
         .width('100%').height(this.previewHeight()).renderGroup(true).backgroundColor(AppDesign.background(this.dark)).borderRadius(16)
-      Text(['01 · 薄纸标签','02 · 柔光渐隐','03 · 局部衬光','04 · 文字描光'][index]).fontSize(17).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.dark)).width('100%')
-      Text(['半透米白纸面与静态纸纹；保留底图，无文字光晕','保留较多底图，柔化文字周围的纹理','文字附近对比更强，适合杂乱照片与小字','底图完整保留，用细描光托住文字'][index]).fontSize(13).fontColor(AppDesign.muted(this.dark)).width('100%')
+      Text(READING_COMPOSITION_LABELS[index]).fontSize(17).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.dark)).width('100%')
+      Text(READING_COMPOSITION_NOTES[index]).fontSize(13).fontColor(AppDesign.muted(this.dark)).width('100%')
     }.width(this.sampleWidth()).padding(16).backgroundColor(AppDesign.surface(this.dark)).borderRadius(20)
   }
   build() {
@@ -61,7 +62,7 @@ struct ReadingDemo {
       Scroll() {
         if(this.landscape()) {Row({space:16}) {ForEach(this.samples,(c:FridgeCard,i:number)=>{this.sample(c,i)},(_c:FridgeCard,i:number)=>String(i))}.padding({left:16,right:16,bottom:16})}
         else {Column({space:16}) {ForEach(this.samples,(c:FridgeCard,i:number)=>{this.sample(c,i)},(_c:FridgeCard,i:number)=>String(i))}.padding({left:16,right:16,bottom:16})}
-      }.layoutWeight(1).width('100%').scrollBar(BarState.Off)
+      }.layoutWeight(1).width('100%').scrollBar(BarState.Off).scrollable(this.landscape()?ScrollDirection.Horizontal:ScrollDirection.Vertical)
     }.width('100%').height('100%').padding({top:this.safeTop+12,bottom:this.safeBottom}).backgroundColor(AppDesign.background(this.dark))
       .expandSafeArea([SafeAreaType.SYSTEM],[SafeAreaEdge.TOP,SafeAreaEdge.BOTTOM]).onAreaChange((_old:Area,a:Area)=>{this.pageWidth=Number(a.width);this.pageHeight=Number(a.height);})
   }
