@@ -23,3 +23,17 @@ export function batteryRingPath(diameter:number,percent:number=100):string {
   const x=center+radius*Math.cos(start),y=center+radius*Math.sin(start);
   return 'M '+x.toFixed(3)+' '+y.toFixed(3)+' A '+radius.toFixed(3)+' '+radius.toFixed(3)+' 0 '+(sweep>180?'1':'0')+' 1 '+(center+radius*Math.cos(end)).toFixed(3)+' '+(center+radius*Math.sin(end)).toFixed(3);
 }
+
+export class BatteryArcGlyph {
+  character:string='';x:number=0;y:number=0;angle:number=0;
+}
+/** Read left to right through the bottom gap, with each glyph tangent to the same circle. */
+export function batteryArcLabel(diameter:number,label:string,font:number):BatteryArcGlyph[] {
+  const radius=diameter*.44,advance=font*.62,step=advance/radius;
+  return Array.from(label).map((character:string,index:number)=>{
+    const point=new BatteryArcGlyph(),offset=(index-(label.length-1)/2)*step;
+    point.character=character;point.x=diameter*.5+radius*Math.sin(offset);
+    point.y=diameter*.5+radius*Math.cos(offset);point.angle=-offset*180/Math.PI;
+    return point;
+  });
+}

@@ -22,3 +22,17 @@ assert.notEqual(p.batteryTint({percent:10},'#262824'),'#262824');
 assert.equal(p.batteryTint({percent:10,charging:true},'#262824'),p.batteryTint({percent:100,chargeState:'full'},'#262824'));
 assert.equal(p.batteryTint({percent:10,refreshState:'failed'},'#262824'),'#262824','stale readings never imply live charging');
 console.log('PASS battery ring: bottom 72-degree gap, sweep flags, finite scaled coordinates, zero/unknown level and charge/low/stale states');
+for(const diameter of [38.4,48,72,144]) {
+ for(const label of ['—','0%','18%','67%','100%']) {
+  const glyphs=p.batteryArcLabel(diameter,label,diameter/5);
+  assert.equal(glyphs.length,label.length);
+  for(const glyph of glyphs) {
+   assert.ok(Math.abs(Math.hypot(glyph.x-diameter/2,glyph.y-diameter/2)-diameter*.44)<.001,'text centres remain on the ring radius');
+   assert.ok(glyph.y>diameter*.8,'label belongs to the bottom gap');
+   assert.ok(Number.isFinite(glyph.angle));
+  }
+  assert.ok(Math.abs(glyphs[0].x+glyphs.at(-1).x-diameter)<.001,'label stays centred');
+  assert.ok(Math.abs(glyphs[0].angle+glyphs.at(-1).angle)<.001,'rotations mirror across the centre');
+ }
+}
+console.log('PASS battery arc lettering: same-circle positions, tangent rotations, symmetric centring and zero/unknown/three-digit labels');

@@ -1,6 +1,6 @@
 import { readingHalo } from '../model/CapabilityPresentation';
 import { CapBlock } from '../model/CardSchema';
-import { batteryLevel, batteryStatus, batteryTint, batteryRingPath } from '../model/BatteryPresentation';
+import { batteryLevel, batteryStatus, batteryTint, batteryRingPath, batteryArcLabel, BatteryArcGlyph } from '../model/BatteryPresentation';
 @Component
 export struct BatteryCapability {
   @Prop cap:CapBlock={k:'battery'};
@@ -9,7 +9,8 @@ export struct BatteryCapability {
   @Prop unit:number=1;
   @Prop compact:boolean=false;
   private diameter():number {return (this.compact?48:72)*this.unit;}
-  private symbolSize():number {return (this.compact?15:22)*this.unit;}
+  private labelFont():number {return (this.compact?10:14)*this.unit;}
+  private label():string {return batteryLevel(this.cap)<0?'—':String(batteryLevel(this.cap))+'%';}
   build() {
     Column({space:2*this.unit}) {
       Stack({alignContent:Alignment.TopStart}) {
@@ -21,13 +22,18 @@ export struct BatteryCapability {
             .strokeWidth((this.compact?3.5:5)*this.unit).strokeLineCap(LineCapStyle.Round).opacity(this.cap.refreshState==='failed'?.45:1)
             .width(this.diameter()).height(this.diameter())
         }
-        SymbolGlyph($r('sys.symbol.bolt_fill')).fontSize((this.compact?15:22)*this.unit).fontColor([batteryTint(this.cap,this.ink)])
-          .visibility(this.cap.charging||this.cap.chargeState==='full'?Visibility.Visible:Visibility.Hidden)
-          .width(this.symbolSize()).height(this.symbolSize()).position({x:(this.diameter()-this.symbolSize())/2,y:this.diameter()*.34-this.symbolSize()/2}).hitTestBehavior(HitTestMode.None)
-        Text(batteryLevel(this.cap)<0?'—':String(batteryLevel(this.cap))+'%').fontSize((this.compact?12:17)*this.unit).fontWeight(FontWeight.Medium)
-          .fontColor(this.ink).textShadow(readingHalo(this.ink,this.unit,this.readingHaloEnabled,this.cap.readingBlend))
-          .maxLines(1).width(this.diameter()).textAlign(TextAlign.Center).position({x:0,y:this.diameter()*.75})
-      }.width(this.diameter()).height(this.diameter()+3*this.unit)
+        Stack() {
+          SymbolGlyph($r('sys.symbol.bolt_fill')).fontSize((this.compact?15:22)*this.unit).fontColor([batteryTint(this.cap,this.ink)])
+            .visibility(this.cap.charging||this.cap.chargeState==='full'?Visibility.Visible:Visibility.Hidden)
+        }.width(this.diameter()).height(this.diameter()).hitTestBehavior(HitTestMode.None)
+        ForEach(batteryArcLabel(this.diameter(),this.label(),this.labelFont()),(glyph:BatteryArcGlyph)=>{
+          Text(glyph.character).fontSize(this.labelFont()).fontWeight(FontWeight.Medium).fontColor(this.ink)
+            .textShadow(readingHalo(this.ink,this.unit,this.readingHaloEnabled,this.cap.readingBlend)).maxLines(1)
+            .width(this.labelFont()*1.1).height(this.labelFont()*1.25).textAlign(TextAlign.Center)
+            .rotate({angle:glyph.angle}).position({x:glyph.x-this.labelFont()*.55,y:glyph.y-this.labelFont()*.625})
+            .accessibilityLevel('no')
+        },(glyph:BatteryArcGlyph,index:number)=>String(index)+glyph.character)
+      }.width(this.diameter()).height(this.diameter()+8*this.unit)
       if(!this.compact) {
         Text(batteryStatus(this.cap)).fontSize(11*this.unit).fontColor(this.ink)
           .textShadow(readingHalo(this.ink,this.unit,this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.65).maxLines(1)
