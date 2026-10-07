@@ -6,6 +6,7 @@ import { chromeMaterial } from '../model/ChromeMaterial';
 import { AppDesign } from '../model/AppDesign';
 import { ColorSetting } from './ColorSetting';
 import { SettingsSegmented } from './SettingsSegmented';
+import { SettingsSelect } from './SettingsSelect';
 /** All capabilities use this inspector. Data-specific controls never redefine appearance or gestures. */
 @Component
 export struct CapabilityAppearance {
@@ -36,15 +37,21 @@ export struct CapabilityAppearance {
       }.width('100%').height(44).padding(0).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.getUIContext().animateTo(settingsDialogOpen(),()=>this.readingExpanded=!this.readingExpanded))
       if(this.readingExpanded) {
       Column({space:12}) {
-      Button('位置预设',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).width('100%').fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>{
-        this.getUIContext().getPromptAction().showActionMenu({systemMaterial:chromeMaterial(),title:'内容位置',buttons:[{text:'靠上',color:AppDesign.text(this.appDark)},{text:'居中',color:AppDesign.text(this.appDark)},{text:'靠下',color:AppDesign.text(this.appDark)}]})
-          .then((result)=>this.onArrange(['top','center','bottom'][result.index])).catch(()=>{});
-      })
-      Text('阅读衬底').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
-      SettingsSegmented({labels:['自动','融入底板','始终显示'],selectedIndex:Math.max(0,['auto','plain','surface'].indexOf(this.card.capability?.readingStyle??'auto')),appDark:this.appDark,
-        onSelect:(index:number)=>this.onStyle(['auto','plain','surface'][index])})
-      SettingsSegmented({labels:['柔光','衬光','描光'],selectedIndex:Math.max(0,['feather','scrim','halo'].indexOf(this.card.capability?.readingBlend??'feather')),appDark:this.appDark,
-        onSelect:(index:number)=>this.onBlend(['feather','scrim','halo'][index])})
+      Row({space:12}) {
+        Text('位置').fontSize(14).fontColor(AppDesign.text(this.appDark)).width(48)
+        SettingsSelect({labels:['靠上','居中','靠下'],selectedIndex:-1,valueLabel:'位置预设',appDark:this.appDark,
+          onSelect:(index:number)=>this.onArrange(['top','center','bottom'][index])}).layoutWeight(1)
+      }.width('100%')
+      Row({space:12}) {
+        Text('衬底').fontSize(14).fontColor(AppDesign.text(this.appDark)).width(48)
+        SettingsSelect({labels:['自动','融入底板','始终显示'],selectedIndex:Math.max(0,['auto','plain','surface'].indexOf(this.card.capability?.readingStyle??'auto')),appDark:this.appDark,
+          onSelect:(index:number)=>this.onStyle(['auto','plain','surface'][index])}).layoutWeight(1)
+      }.width('100%')
+      Row({space:12}) {
+        Text('融合').fontSize(14).fontColor(AppDesign.text(this.appDark)).width(48)
+        SettingsSelect({labels:['柔光','衬光','描光'],selectedIndex:Math.max(0,['feather','scrim','halo'].indexOf(this.card.capability?.readingBlend??'feather')),appDark:this.appDark,
+          onSelect:(index:number)=>this.onBlend(['feather','scrim','halo'][index])}).layoutWeight(1)
+      }.width('100%')
       Button('对比融合方案',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).width('100%').fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.onCompare())
       }.width('100%').transition(settingsReveal())
       }

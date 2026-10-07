@@ -1,3 +1,4 @@
+import lazy { ReadingComparison } from '../views/ReadingComparison';
 import { CardDeletionFlight } from '../views/CardDeletionFlight';
 import lazy { enhanceImageJob, supportsSuperResolution } from '../model/SuperResolution';
 import { EnhancementPreview } from '../views/EnhancementPreview';
@@ -105,7 +106,7 @@ struct Index {
   private deletionTimer:number=-1;
   private enhancementDialog: CustomDialogController | null = null;
   private enhancementOpen: boolean = false;
-  private readingComparisonOpen: boolean = false;
+  @State readingComparisonOpen: boolean = false;
   @State enhancingSubject: boolean = false;
   @State enhancingBackground: boolean = false;
   private photoCropDialog: CustomDialogController | null = null;
@@ -566,6 +567,9 @@ struct Index {
   onBackPress(): boolean {
     if(this.deletionId)return true;
     if(this.homeToolsOpen){this.homeToolsOpen=false;return true;}
+    if(this.showBackgroundOptions){this.showBackgroundOptions=false;return true;}
+    if(this.showLayerOptions){this.showLayerOptions=false;return true;}
+    if(this.readingComparisonOpen){this.readingComparisonOpen=false;return true;}
     if(this.capabilityPickerOpen){this.capabilityPickerOpen=false;return true;}
     if (this.heroActive) return true;
     if (this.viewing) { this.viewing = false; this.selectedId = ''; this.incomingTemplateChanged(); return true; }
@@ -1039,14 +1043,20 @@ struct Index {
       }
     });
   }
-  onPageHide(): void { if(this.readingComparisonOpen)return; if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); }
+  onPageHide(): void { if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); }
   private compareReading():void {
-    const card=this.current();if(!card?.capability||this.readingComparisonOpen)return;this.readingComparisonOpen=true;
-    if(this.foregroundRefreshTimer>=0){clearTimeout(this.foregroundRefreshTimer);this.foregroundRefreshTimer=-1;}
-    AppStorage.setOrCreate('readingDemoCard',cardRenderSnapshot(card));
-    this.getUIContext().getRouter().pushUrl({url:'pages/ReadingDemo'}).catch(()=>{this.readingComparisonOpen=false;AppStorage.delete('readingDemoCard');if(this.alive)this.getUIContext().getPromptAction().showToast({message:'暂时无法打开对比，请重试'});});
+    if(!this.current()?.capability||this.readingComparisonOpen||this.capabilityPickerOpen)return;
+    this.readingComparisonOpen=true;
   }
-  onPageShow(): void { if(this.readingComparisonOpen){this.readingComparisonOpen=false;return;} if(this.ready)this.scheduleForegroundRefresh(); }
+  onPageShow(): void { if(this.ready)this.scheduleForegroundRefresh(); }
+  private taskSheetHeight(expanded:boolean=false):number {
+    return Math.min(expanded?720:560,this.screenHeight*(expanded?.88:.70));
+  }
+  @Builder
+  editorTaskSheet() {
+    if(this.readingComparisonOpen){ReadingComparison({card:this.preview,appDark:this.appDark})}
+    else{this.capabilityPickerSheet()}
+  }
   private updateExtraCapability(id:string,next:CapBlock):void {
     const card=this.store.findCard(id);if(!card||card.capability?.k!==next.k)return;
     card.capability=next;this.syncFields();this.change();
@@ -1119,7 +1129,7 @@ struct Index {
         }
       }
     }.width('100%').height('100%').backgroundColor(this.appBackground())
-      .bindSheet(this.backgroundOpen||this.scheduleOpen,this.homeTaskSheet,{height:SheetSize.LARGE,showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>{this.backgroundOpen=false;this.backgroundPreviewReady=false;this.backgroundPreviewGeneration++;this.scheduleOpen=false;this.updateScheduledScene(true);}})
+      .bindSheet(this.backgroundOpen||this.scheduleOpen,this.homeTaskSheet,{height:this.taskSheetHeight(),detents:[this.taskSheetHeight(),this.taskSheetHeight(true)],preferType:this.screenWidth>=600?SheetType.CENTER:SheetType.BOTTOM,width:Math.min(620,this.screenWidth-24),showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>{this.backgroundOpen=false;this.backgroundPreviewReady=false;this.backgroundPreviewGeneration++;this.scheduleOpen=false;this.updateScheduledScene(true);}})
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_: Area, area: Area) => {
         const width = Number(area.width), height = Number(area.height);
@@ -1760,7 +1770,7 @@ struct Index {
               contentStyle: { menuStyle: {backgroundColor:this.appSurface(),textColor:this.appText(),iconColor:this.appText()}, backIconStyle: {backgroundColor:this.appSurface(),textColor:this.appText(),iconColor:this.appText()} } }
           }
         })
-        .bindSheet(this.capabilityPickerOpen,this.capabilityPickerSheet,{height:SheetSize.LARGE,showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>this.capabilityPickerOpen=false})
+        .bindSheet(this.capabilityPickerOpen||this.readingComparisonOpen,this.editorTaskSheet,{height:this.taskSheetHeight(),detents:[this.taskSheetHeight(),this.taskSheetHeight(true)],preferType:this.screenWidth>=600?SheetType.CENTER:SheetType.BOTTOM,width:Math.min(560,this.screenWidth-24),showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>{this.capabilityPickerOpen=false;this.readingComparisonOpen=false;}})
         .id('editorMotionChrome').bindToScrollable([this.scroller]).hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).width('100%').height('100%').backgroundColor(Color.Transparent)
     }.width('100%').height('100%').padding({ top: this.safeTop + EDITOR_SAFE_GAP }).opacity(this.editorOpacity)
       .hitTestBehavior(!this.editing || this.heroActive ? HitTestMode.None : HitTestMode.Default)
@@ -1828,10 +1838,10 @@ struct Index {
               Text('底板').fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
             this.colorRow('底色', 'paper')
             Row({ space: 8 }) {
-              Button(this.showBackgroundOptions ? '收起底板设置' : '底板形状与边缘', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).height(AppDesign.controlHeight).fontSize(14).fontColor(this.appText()).backgroundColor(this.appControl())
-                .onClick(() => { this.getUIContext().animateTo(settingsDialogOpen(), () => { this.showBackgroundOptions = !this.showBackgroundOptions; }); })
+              Button('底板形状与边缘', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).height(AppDesign.controlHeight).fontSize(14).fontColor(this.appText()).backgroundColor(this.appControl())
+                .onClick(() => { this.showBackgroundOptions = true; })
+                .bindSheet(this.showBackgroundOptions,this.appearanceSheet,{height:this.appearanceSheetHeight(),detents:[this.appearanceSheetHeight(),this.taskSheetHeight(true)],preferType:this.screenWidth>=600?SheetType.CENTER:SheetType.BOTTOM,width:Math.min(560,this.screenWidth-24),showClose:true,backgroundColor:this.appSurface(),onDisappear:()=>this.showBackgroundOptions=false})
             }.width('100%')
-            if (this.showBackgroundOptions) {Column(){this.appearancePanel()}.width('100%').transition(settingsReveal())}
             }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
           } else if (this.settingsTab === 1 && (this.layerId === 'capability' || this.layerId.length === 0)) {
             if(this.preview.capability===null){Column({space:16}) {this.capabilityPanel()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)}
@@ -2055,7 +2065,7 @@ struct Index {
       Column({ space: 12 }) {
         Text('元素样式').fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
         if (this.elementPreview.kind === 'text') {
-          TextArea({ text: this.textValue, placeholder: '文字内容' }).height(96).fontSize(16).fontColor(this.appText()).placeholderColor(this.appMuted()).backgroundColor(this.appControl()).borderRadius(12).border({ width: .5, color: AppDesign.border(this.appDark) })
+          TextArea({ text: this.textValue, placeholder: '文字内容' }).height(72).fontSize(16).fontColor(this.appText()).placeholderColor(this.appMuted()).backgroundColor(this.appControl()).borderRadius(12).border({ width: .5, color: AppDesign.border(this.appDark) })
             .onChange((v: string) => { this.textValue = v; const el = this.currentElement(); if (el !== null) { el.text = v; this.change('typing_' + el.id); } })
           SettingsCounter({value:this.elementPreview.fs,onChange:(value:number)=>{const el=this.currentElement();if(el!==null&&el.fs!==value){el.fs=value;this.change();}}})
           SettingsSegmented({labels:['左对齐','居中','右对齐'],selectedIndex:Math.max(0,['left','center','right'].indexOf(this.elementPreview.align)),appDark:this.appDark,
@@ -2077,10 +2087,29 @@ struct Index {
     if (this.layerId.length > 0) {
       Column({ space: 12 }) {
         Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
-          Row(){Text('布局与图层').fontSize(14).maxLines(1).layoutWeight(1).fontColor(this.appText());Blank();SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appMuted()]).rotate({angle:this.showLayerOptions?180:0})}.width('100%').padding({left:12,right:12})
-        }.width('100%').height(44).padding(0).backgroundColor(this.appControl()).onClick(()=>this.getUIContext().animateTo(settingsDialogOpen(),()=>this.showLayerOptions=!this.showLayerOptions))
-        if(this.showLayerOptions) {
-        Column({space:12}) {
+          Row(){Text('布局与图层').fontSize(14).maxLines(1).layoutWeight(1).fontColor(this.appText());Blank();SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appMuted()])}.width('100%').padding({left:12,right:12})
+        }.width('100%').height(44).padding(0).backgroundColor(this.appControl()).onClick(()=>this.showLayerOptions=true)
+          .bindSheet(this.showLayerOptions,this.layerLayoutSheet,{height:Math.min(340,this.screenHeight*.70),detents:[Math.min(340,this.screenHeight*.70),this.taskSheetHeight(true)],preferType:this.screenWidth>=600?SheetType.CENTER:SheetType.BOTTOM,width:Math.min(560,this.screenWidth-24),showClose:true,backgroundColor:this.appSurface(),onDisappear:()=>this.showLayerOptions=false})
+
+      }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
+    }
+  }
+  private appearanceSheetHeight():number {
+    return Math.min(this.preview.cutout.length>0?500:340,this.screenHeight*.78);
+  }
+  @Builder
+  appearanceSheet() {
+    Column({space:12}) {
+      Text('底板形状与边缘').fontSize(20).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%').padding({right:40})
+      Scroll(){this.appearancePanel()}.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Off)
+    }.width('100%').height('100%').padding(20)
+  }
+  @Builder
+  layerLayoutSheet() {
+    Column({space:12}) {
+      Text('布局与图层').fontSize(20).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%').padding({right:40})
+      Scroll(){Column({space:12}) {
+
         if (this.layerId !== 'capability') {
           if (this.settingsTab === 0) {
             Button('铺满底板', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).width('100%').height(AppDesign.controlHeight).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText())
@@ -2115,10 +2144,9 @@ struct Index {
             } })
           }
         }
-        }.width('100%').transition(settingsReveal())
-        }
-      }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
-    }
+
+      }.width('100%')}.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Off)
+    }.width('100%').height('100%').padding(20)
   }
   private chooseCapability(): void {
     this.capabilityPickerOpen=true;
@@ -2188,13 +2216,17 @@ struct Index {
   @Builder
   appearancePanel() {
     Column({ space: 12 }) {
-      Text('底板配色').fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
+      Row({space:12}) {
+      Text('配色').fontSize(14).fontColor(this.appText()).width(48)
       SettingsSelect({labels:['白','米色','牛皮纸','绿','蓝','粉','黑'],selectedIndex:Math.max(0,THEMES.indexOf(this.preview.material)),appDark:this.appDark,
-        onSelect:(index:number)=>{const card=this.current();if(card!==null&&THEMES[index]){card.material=THEMES[index];card.paper='';this.paperValue='';this.change();}}})
-      Text('形状').fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%').margin({ top: 8 })
+        onSelect:(index:number)=>{const card=this.current();if(card!==null&&THEMES[index]){card.material=THEMES[index];card.paper='';this.paperValue='';this.change();}}}).layoutWeight(1)
+      }.width('100%')
+      Row({space:12}) {
+      Text('形状').fontSize(14).fontColor(this.appText()).width(48)
       SettingsSelect({labels:this.preview.cutout.length>0?['方形','椭圆','胶囊','自由边角','照片主体']:['方形','椭圆','胶囊','自由边角'],
         selectedIndex:this.preview.shape==='subject'?4:Math.max(0,SHAPES.indexOf(this.preview.shape)),appDark:this.appDark,
-        onSelect:(index:number)=>{const card=this.current();if(card!==null){if(index===4&&card.cutout.length>0){card.shape='subject';card.h=card.w/card.subjectAspect;}else if(SHAPES[index])card.shape=SHAPES[index];else return;this.change();}}})
+        onSelect:(index:number)=>{const card=this.current();if(card!==null){if(index===4&&card.cutout.length>0){card.shape='subject';card.h=card.w/card.subjectAspect;}else if(SHAPES[index])card.shape=SHAPES[index];else return;this.change();}}}).layoutWeight(1)
+      }.width('100%')
       Button(this.busy ? '正在处理照片' : '用照片主体作为形状', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).width('100%').fontSize(14)
         .fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.busy).onClick(() => this.pickImage(true))
       if (this.preview.cutout.length > 0 && this.preview.shape !== 'subject') {

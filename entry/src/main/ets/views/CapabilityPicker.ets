@@ -14,7 +14,7 @@ export struct CapabilityPicker {
   aboutToAppear():void { this.group = CAPABILITY_CATALOG.find((item)=>item.key===this.selected)?.group ?? '时间'; }
   private choose(key:string):void { this.onChoose(key); this.onClose(); }
   build() {
-    Column({space:16}) {
+    Column({space:12}) {
       Row() {
         Text('选择卡片能力').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).layoutWeight(1)
         Blank().width(48)
@@ -32,13 +32,13 @@ export struct CapabilityPicker {
                   if(this.selected===item.key) {Text(item.source).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%').maxLines(2)}
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
                 if(this.selected===item.key){SymbolGlyph($r('sys.symbol.checkmark')).fontSize(18).fontColor([AppDesign.text(this.appDark)])}else{SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([AppDesign.muted(this.appDark)])}
-              }.width('100%').padding(14)
+              }.width('100%').padding({left:12,right:12,top:10,bottom:10})
             }.width('100%').backgroundColor(AppDesign.surface(this.appDark)).borderRadius(AppDesign.sectionRadius).onClick(()=>this.choose(item.key)).transition(this.query.trim().length===0?settingsReveal():TransitionEffect.IDENTITY)
           },(item:CapabilityDescriptor)=>item.key)
           if(this.items().length===0) {Text('没有匹配的能力，试试其他关键词').fontSize(14).fontColor(AppDesign.muted(this.appDark)).padding(24).width('100%').textAlign(TextAlign.Center)}
         }.width('100%')
       }.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Off)
       Button('纯创作 · 不添加能力',{type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).width('100%').height(48).fontSize(14).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.choose('none'))
-    }.padding({left:20,right:20,top:24,bottom:24}).width('100%').height('100%').constraintSize({maxWidth:640}).backgroundColor(AppDesign.background(this.appDark))
+    }.padding({left:20,right:20,top:16,bottom:16}).width('100%').height('100%').constraintSize({maxWidth:640}).backgroundColor(AppDesign.background(this.appDark))
   }
 }

@@ -34,10 +34,10 @@ export struct ColorSetting {
   }
   @Builder
   description() {
-    Column({ space: 3 }) {
-      Text(this.label).fontSize(14).fontColor(AppDesign.text(this.appDark)).maxLines(1)
+    Row({ space: 8 }) {
+      Text(this.label).fontSize(14).fontColor(AppDesign.text(this.appDark)).maxLines(1).layoutWeight(1)
       Text(this.automatic ? '自动' : '自定义').fontSize(12).fontColor(AppDesign.muted(this.appDark)).maxLines(1)
-    }.alignItems(HorizontalAlign.Start).layoutWeight(1).hitTestBehavior(HitTestMode.None)
+    }.layoutWeight(1).hitTestBehavior(HitTestMode.None)
   }
   build() {
     Row({ space: 8 }) {
@@ -65,7 +65,7 @@ export struct ColorSetting {
         }.width(44).height(44).backgroundColor(Color.Transparent).enabled(!this.automatic)
           .accessibilityText(this.label + '恢复默认').onClick(() => { if (this.alive) this.onPick('', this.sourceKey); })
       }
-    }.width('100%').constraintSize({ minHeight: 52 }).padding({ left: 12, right: 8, top: 4, bottom: 4 })
+    }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 12, right: 8, top: 4, bottom: 4 })
       .backgroundColor(AppDesign.control(this.appDark)).borderRadius(AppDesign.controlRadius).clip(true)
   }
 }

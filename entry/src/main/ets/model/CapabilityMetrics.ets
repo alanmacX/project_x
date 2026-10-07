@@ -20,7 +20,7 @@ export function capabilityMinimum(cap: CapBlock | null, compact: boolean = false
     if (cap.k === 'calendar') { size.w = 112; size.h = 62; }
     if (cap.k === 'countdown' || cap.k === 'anniversary') { const date=new Date((cap.date??'')+'T00:00:00'),days=isNaN(date.getTime())?0:Math.abs(Math.round((date.getTime()-Date.now())/86400000));size.w = Math.max(72,Math.ceil(String(days).length*9.6+32)); size.h = 46; }
     if (cap.k === 'dayprogress' || cap.k === 'yearprogress') { size.w = 72; size.h = 52; }
-    if (cap.k === 'battery') { size.w=88; size.h=44; }
+    if (cap.k === 'battery') { size.w=64; size.h=56; }
     if (['agenda'].includes(cap.k)) { size.w=120; size.h=82; }
     return size;
   }
@@ -30,7 +30,7 @@ export function capabilityMinimum(cap: CapBlock | null, compact: boolean = false
   if (cap.k === 'calendar') { size.w = 168; size.h = 202; }
   if (cap.k === 'countdown' || cap.k === 'anniversary') { size.w = 144; size.h = 110; }
   if (cap.k === 'dayprogress' || cap.k === 'yearprogress') { size.w = 132; size.h = 92; }
-  if (cap.k === 'battery') { size.w=132; size.h=96; }
+  if (cap.k === 'battery') { size.w=96; size.h=96; }
   if (['agenda'].includes(cap.k)) { size.w=164; size.h=136; }
   return size;
 }
