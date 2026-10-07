@@ -1592,12 +1592,12 @@ struct Index {
       }.width(this.shareWidth).height(this.shareCanvasHeight).backgroundColor(this.shareOpaque ? Color.White : Color.Transparent).clip(true)
       if (!this.shareSingle) {
         Row({space:2}) {
-          Image($r('app.media.foreground')).width(52).height(52).objectFit(ImageFit.Contain).accessibilityText('冰箱贴 logo')
+          Image($r('app.media.foreground')).width(36).height(36).objectFit(ImageFit.Contain).accessibilityText('冰箱贴 logo')
           Stack() {
-            Image($rawfile('share/signature.png')).width(170).height(170 / 3).objectFit(ImageFit.Contain)
+            Image($rawfile('share/signature.png')).width(138).height(138 / 3).objectFit(ImageFit.Contain)
               .accessibilityText('created by 冰箱贴')
-          }.width(170).height(56)
-        }.width('100%').height(56).justifyContent(FlexAlign.Center).backgroundColor('#F7F5EF')
+          }.width(138).height(38)
+        }.width('100%').height(38).justifyContent(FlexAlign.Center).backgroundColor('#F7F5EF')
       }
     }.width(this.shareWidth).height(this.shareHeight)
   }
@@ -1689,7 +1689,7 @@ struct Index {
         this.shareWidth = Math.max(...xs)-Math.min(...xs)+48; this.shareHeight = Math.max(...ys)-Math.min(...ys)+48;
       } else { this.shareWidth = BOARD_W; this.shareHeight = BOARD_W/source.canvasAspect; }
       this.shareCanvasHeight = this.shareHeight;
-      if (!single) this.shareHeight += 56;
+      if (!single) this.shareHeight += 38;
       const scale = Math.min(3, 1280/this.getUIContext().vp2px(Math.max(this.shareWidth,this.shareHeight)));
       const pixel = await this.getUIContext().getComponentSnapshot().createFromBuilder(() => { this.shareScene(); }, 350, true, { scale: scale, waitUntilRenderFinished: true });
       try { await sharePixelMap(this.context as common.UIAbilityContext, pixel, single && this.shareOpaque, single ? 'shareCard' : 'shareCanvas'); }
