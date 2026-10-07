@@ -44,6 +44,17 @@ export function captureSceneLayout(state:FridgeState,id:string,name:string):Save
   const layout=new SavedSceneLayout();layout.id=id;layout.name=name;
   layout.placements=state.cards.map((c:FridgeCard):ScenePlacement=>({id:c.id,x:c.x,y:c.y,w:c.w,h:c.h,rot:c.rot,z:c.z}));return layout;
 }
+/** A named normal layout becomes the editable base, never a temporary scheduled projection. */
+export function setNormalSceneLayout(state:FridgeState,id:string):boolean {
+  const layout=state.sceneLayouts.find(s=>s.id===id);
+  if(id.length>0&&!layout)return false;
+  if(layout)state.cards.forEach((card)=>{const p=layout.placements.find(item=>item.id===card.id);if(p){card.x=p.x;card.y=p.y;card.w=p.w;card.h=p.h;card.rot=p.rot;card.z=p.z;}});
+  state.sceneBaseLayoutId=id;return true;
+}
+export function refreshNormalSceneLayout(state:FridgeState):void {
+  const layout=state.sceneLayouts.find(s=>s.id===state.sceneBaseLayoutId);
+  if(!layout || layout.placements.length!==state.cards.length || state.cards.some(c=>{const p=layout.placements.find(item=>item.id===c.id);return !p || p.x!==c.x || p.y!==c.y || p.w!==c.w || p.h!==c.h || p.rot!==c.rot || p.z!==c.z;}))state.sceneBaseLayoutId='';
+}
 /** Rotation pivot matches app/widget: bottom left, in physical board units. */
 function bounds(card:FridgeCard,height:number):ScenePlacement {
   const r=card.rot*Math.PI/180,s=Math.sin(r),c=Math.cos(r),ys=height/BOARD_H;

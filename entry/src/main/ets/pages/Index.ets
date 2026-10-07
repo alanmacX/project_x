@@ -9,7 +9,7 @@ import { workspaceLayout } from '../model/WorkspaceLayout';
 import { cardContainsPoint } from '../model/CardHitTest';
 import lazy { SceneSchedulePanel } from '../views/SceneSchedulePanel';
 import { SceneRule, SavedSceneLayout, normalizeSceneRules } from '../model/SceneScheduleSchema';
-import { ScheduledScene, SceneOccurrence, activeSceneRule, nextSceneBoundary, projectScheduledScene, resolveScheduledScene, captureSceneLayout, dismissScene } from '../model/SceneSchedule';
+import { ScheduledScene, SceneOccurrence, activeSceneRule, nextSceneBoundary, projectScheduledScene, resolveScheduledScene, captureSceneLayout, dismissScene, setNormalSceneLayout, refreshNormalSceneLayout } from '../model/SceneSchedule';
 import { EditorLayerMotion } from '../model/EditorLayerMotion';
 import lazy { EditorLayerTarget, EditorLayerHandles } from '../views/EditorLayerControls';
 import { startupMark } from '../model/StartupTrace';
@@ -127,6 +127,7 @@ struct Index {
   @State scheduleOpen:boolean=false;
   @State scheduleRules:SceneRule[]=[];
   @State savedLayouts:SavedSceneLayout[]=[];
+  @State normalLayoutId:string='';
   @State scheduledName:string='';
   @State scheduledFocusId:string='';
   @State scheduleTransition:boolean=false;
@@ -149,6 +150,7 @@ struct Index {
   private clockTimer: number = -1;
   private layerStartX: number = 0;
   private layerStartY: number = 0;
+  private layerFreeStart:boolean=false;
   private scroller: Scroller = new Scroller();
   private detailScroller: Scroller = new Scroller();
   private history: CardEditHistory = new CardEditHistory();
@@ -329,6 +331,7 @@ struct Index {
     },350);
   }
   private syncSchedules():void {
+    this.normalLayoutId=this.store.state.sceneBaseLayoutId;
     if(this.scheduleRules.length>0||this.store.state.sceneRules.length>0)this.scheduleRules=this.store.state.sceneRules.slice();
     if(this.savedLayouts.length>0||this.store.state.sceneLayouts.length>0)this.savedLayouts=this.store.state.sceneLayouts.slice();
   }
@@ -390,9 +393,10 @@ struct Index {
   }
   @Builder
   scheduleEditor() {
-    SceneSchedulePanel({layouts:this.savedLayouts,rules:this.scheduleRules,canvases:this.canvasEntries.filter(c=>c.id!==this.store.state.canvasId),cards:this.store.state.cards.map((c:FridgeCard):CanvasEntry=>({id:c.id,name:layerLabel(c).slice(0,24)})),appDark:this.appDark,
+    SceneSchedulePanel({layouts:this.savedLayouts,normalLayoutId:this.normalLayoutId,rules:this.scheduleRules,canvases:this.canvasEntries.filter(c=>c.id!==this.store.state.canvasId),cards:this.store.state.cards.map((c:FridgeCard):CanvasEntry=>({id:c.id,name:layerLabel(c).slice(0,24)})),appDark:this.appDark,
+      onNormalLayout:(id)=>{if(!setNormalSceneLayout(this.store.state,id))return;this.syncSchedules();this.renderBoard();this.persist(true);this.updateScheduledScene(true);},
       onCapture:(name)=>{if(this.store.state.sceneLayouts.length>=8)return;this.store.state.sceneLayouts.push(captureSceneLayout(this.store.state,this.store.newId(),name));this.syncSchedules();this.persist(true);},
-      onRemoveLayout:(id)=>{this.store.state.sceneLayouts=this.store.state.sceneLayouts.filter(s=>s.id!==id);this.store.state.sceneRules=this.store.state.sceneRules.filter(r=>r.kind!=='layout'||r.targetId!==id);this.syncSchedules();this.persist(true);},
+      onRemoveLayout:(id)=>{if(this.store.state.sceneBaseLayoutId===id)this.store.state.sceneBaseLayoutId='';this.store.state.sceneLayouts=this.store.state.sceneLayouts.filter(s=>s.id!==id);this.store.state.sceneRules=this.store.state.sceneRules.filter(r=>r.kind!=='layout'||r.targetId!==id);this.syncSchedules();this.persist(true);},
       onSave:(source)=>{const draft=JSON.parse(JSON.stringify(source)) as SceneRule;if(!draft.id){draft.id=this.store.newId();draft.createdAt=Date.now();}const rule=normalizeSceneRules([draft])[0];if(!rule)return;rule.dismissed='';const i=this.store.state.sceneRules.findIndex(r=>r.id===rule.id);if(i>=0)this.store.state.sceneRules[i]=rule;else if(this.store.state.sceneRules.length<12)this.store.state.sceneRules.push(rule);this.syncSchedules();this.persist(true);},
       onToggle:(id,value)=>{const rule=this.store.state.sceneRules.find(r=>r.id===id);if(rule){rule.enabled=value;rule.dismissed='';if(value)rule.createdAt=Date.now();this.syncSchedules();this.persist(true);}},
       onRemove:(id)=>{this.store.state.sceneRules=this.store.state.sceneRules.filter(r=>r.id!==id);this.syncSchedules();this.persist(true);},
@@ -840,6 +844,8 @@ struct Index {
   private persist(syncWidgets: boolean = true): void {
     if (!this.ready || this.activeBoardId.length > 0) return;
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer); this.saveTimer = -1;
+    refreshNormalSceneLayout(this.store.state);
+    this.normalLayoutId=this.store.state.sceneBaseLayoutId;
     this.store.state.canvasAspect = this.canvasAspect; this.store.state.canvasDimension = this.canvasDimension;
     this.store.save(syncWidgets).catch((e: Error) => { this.error = e.message === '桌面组件同步未完成' ? '桌面同步暂未完成，点此重试' : '保存失败，点此重试'; });
   }
@@ -1895,7 +1901,7 @@ struct Index {
     box.w = element.w * f; box.h = element.h * f; box.rot = element.rot; return box;
   }
   private finishLayerDrag(cancelled: boolean = false): void {
-    if (cancelled) { const box = this.currentBox(); if (box !== null) { box.x = this.layerStartX; box.y = this.layerStartY; } }
+    if (cancelled) { const box = this.currentBox(); if (box !== null) { box.x = this.layerStartX; box.y = this.layerStartY; } if(this.layerId==='capability'&&this.current()!==null)this.current()!.capFree=this.layerFreeStart; }
     this.syncFields(); this.change(); this.layerMotion.clear(); this.layerDrag = ''; this.layerDX = 0; this.layerDY = 0; this.gestureGroup = '';
   }
   private beginFinger(e: GestureEvent, degrees: number): void {
@@ -1917,7 +1923,8 @@ struct Index {
   private startTransform(id: string, e: GestureEvent): void {
     this.layerId = id; this.beginFinger(e, 0);
     const card = this.current();
-    if (id === 'capability' && card !== null) card.capBox = JSON.parse(JSON.stringify(capabilityPlacement(card))) as ElementBox;
+    this.layerFreeStart=card?.capFree??false;
+    if (id === 'capability' && card !== null) {card.capBox = JSON.parse(JSON.stringify(capabilityPlacement(card))) as ElementBox;card.capFree=true;}
     const box = this.currentBox(); if (box === null) return;
     this.resizeStart = JSON.parse(JSON.stringify(box)) as ElementBox;
     this.rotateStart = box.rot;
@@ -1945,6 +1952,8 @@ struct Index {
       const minFactor = Math.max(.04 / this.resizeStart.w, .04 / this.resizeStart.h);
       const factor = Math.max(minFactor, Math.min(nextW / this.resizeStart.w, (1 - this.resizeStart.x) / this.resizeStart.w, (1 - this.resizeStart.y) / this.resizeStart.h));
       box.w = this.resizeStart.w * factor; box.h = this.resizeStart.h * factor;
+    } else if(this.layerId==='capability') {
+      box.w=Math.min(1,Math.max(minW,nextW));box.h=Math.min(1,Math.max(minH,nextH));
     } else {
       box.w = Math.max(minW, Math.min(1 - box.x, nextW)); box.h = Math.max(minH, Math.min(1 - box.y, nextH));
     }
@@ -1982,6 +1991,7 @@ struct Index {
   }
   private cancelTransform(): void {
     const box = this.currentBox(); if (box !== null) { box.x = this.resizeStart.x; box.y = this.resizeStart.y; box.w = this.resizeStart.w; box.h = this.resizeStart.h; box.rot = this.resizeStart.rot; }
+    if(this.layerId==='capability'&&this.current()!==null)this.current()!.capFree=this.layerFreeStart;
     this.flushPreview();
   }
   private touchBox(id: string): ElementBox {
@@ -1994,7 +2004,8 @@ struct Index {
       factor:id==='capability'?1:subjectSurfaceFactor(this.preview),selected:this.layerId===id,
       onSelect:()=>{this.layerId=id;this.syncFields();},onStart:(e)=>{
         this.layerId=id;this.beginFinger(e,this.editingAngle()+(this.currentBox()?.rot??0));this.layerDrag=id;const card=this.current();
-        if(id==='capability'&&card!==null)card.capBox=JSON.parse(JSON.stringify(capabilityPlacement(card))) as ElementBox;
+        this.layerFreeStart=card?.capFree??false;
+        if(id==='capability'&&card!==null){card.capBox=JSON.parse(JSON.stringify(capabilityPlacement(card))) as ElementBox;card.capFree=true;}
         const live=this.currentBox();this.layerStartX=live?.x??0;this.layerStartY=live?.y??0;if(live)this.layerMotion.update(id,live);this.syncFields();
       },onUpdate:(e)=>this.moveElement(e),onEnd:(e)=>{this.moveElement(e);this.finishLayerDrag();},onCancel:()=>this.finishLayerDrag(true)})
   }
@@ -2187,7 +2198,7 @@ struct Index {
   }
   private arrangeCapability(anchor:string):void {
     const card=this.current();if(card===null || card.capability===null)return;
-    card.capBox=capabilityPreset(card,anchor);this.change();
+    card.capFree=false;card.capBox=capabilityPreset(card,anchor);this.change();
   }
   private cardColorKey(target: string): string { return this.preview.id + ':' + target + ':' + (target === 'element' ? this.layerId : ''); }
   private setCardColor(target: string, color: string, key: string): void {

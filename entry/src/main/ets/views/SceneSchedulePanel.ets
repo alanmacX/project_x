@@ -6,11 +6,13 @@ import { SettingsSelect } from './SettingsSelect';
 @Component
 export struct SceneSchedulePanel {
   @Prop layouts:SavedSceneLayout[]=[];
+  @Prop normalLayoutId:string='';
   @Prop rules:SceneRule[]=[];
   @Prop canvases:CanvasEntry[]=[];
   @Prop cards:CanvasEntry[]=[];
   @Prop appDark:boolean=false;
   onCapture:(name:string)=>void=()=>{};
+  onNormalLayout:(id:string)=>void=()=>{};
   onRemoveLayout:(id:string)=>void=()=>{};
   onSave:(rule:SceneRule)=>void=()=>{};
   onRemove:(id:string)=>void=()=>{};
@@ -19,11 +21,15 @@ export struct SceneSchedulePanel {
   @State draft:SceneRule=new SceneRule();
   @State editingRule:boolean=false;
   @State layoutName:string='';
-  private targets():CanvasEntry[] {return this.draft.kind==='layout'?this.layouts.map((s):CanvasEntry=>({id:s.id,name:s.name})):this.draft.kind==='canvas'?this.canvases:this.cards;}
+  private scroller:Scroller=new Scroller();
+  private targets():CanvasEntry[] {return this.draft.kind==='layout'?this.layouts.filter(s=>s.id!==this.normalLayoutId).map((s):CanvasEntry=>({id:s.id,name:s.name})):this.draft.kind==='canvas'?this.canvases:this.cards;}
+  private normalName():string {return this.layouts.find(s=>s.id===this.normalLayoutId)?.name??'首页当前摆放';}
+  private targetName(rule:SceneRule):string {return (rule.kind==='layout'?this.layouts:rule.kind==='canvas'?this.canvases:this.cards).find(t=>t.id===rule.targetId)?.name??'目标已移除';}
   private edit(rule:SceneRule|null=null):void {
     this.draft=rule?JSON.parse(JSON.stringify(rule)) as SceneRule:new SceneRule();
     if(!rule){this.draft.name='新场景';this.draft.date=sceneDay(new Date());this.draft.start=(new Date().getHours()*60+new Date().getMinutes()+5)%1440;this.draft.end=(this.draft.start+60)%1440;this.draft.targetId=this.targets()[0]?.id??'';}
     this.editingRule=true;
+    this.scroller.scrollTo({xOffset:0,yOffset:0});
   }
   private pickTime(start:boolean):void {
     const minute=start?this.draft.start:this.draft.end,date=new Date();date.setHours(Math.floor(minute/60),minute%60,0,0);
@@ -41,9 +47,11 @@ export struct SceneSchedulePanel {
       Row(){Text(this.draft.id?'编辑场景':'添加场景').fontSize(18).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark));Blank();this.textButton('返回',()=>this.editingRule=false)}.width('100%')
       Column({space:16}) {
         TextInput({text:this.draft.name,placeholder:'场景名称'}).maxLength(30).height(44).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(12).onChange((v)=>this.draft.name=v)
+        Text('常态 · '+this.normalName()).fontSize(14).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
         SettingsSegmented({labels:['切换摆放','切换画布','中央展示'],selectedIndex:['layout','canvas','focus'].indexOf(this.draft.kind),appDark:this.appDark,onSelect:(i)=>{this.draft.kind=['layout','canvas','focus'][i];this.draft.targetId=this.targets()[0]?.id??'';}})
         Text(this.draft.kind==='layout'?'使用同一组卡片，改变摆放、大小和角度':this.draft.kind==='canvas'?'进入另一张画布；区间结束后返回原画布':'卡片扫到边缘，中央展示你选的卡片').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
-        SettingsSelect({labels:this.targets().map(t=>t.name),selectedIndex:this.targets().findIndex(t=>t.id===this.draft.targetId),placeholder:'请先准备布局或卡片',appDark:this.appDark,onSelect:(i)=>this.draft.targetId=this.targets()[i].id})
+        Text('触发后状态').fontSize(14).fontColor(AppDesign.text(this.appDark)).width('100%')
+        SettingsSelect({labels:this.targets().map(t=>t.name),selectedIndex:this.targets().findIndex(t=>t.id===this.draft.targetId),placeholder:'请选择不同于常态的布局或卡片',appDark:this.appDark,onSelect:(i)=>this.draft.targetId=this.targets()[i].id})
       }.padding(16).width('100%').backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
       Column({space:16}) {
         Text('时间').fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
@@ -55,19 +63,25 @@ export struct SceneSchedulePanel {
         Row({space:12}) {this.textButton('开始 '+sceneClock(this.draft.start),()=>this.pickTime(true));this.textButton('结束 '+sceneClock(this.draft.end),()=>this.pickTime(false))}.width('100%')
         if(this.draft.end<=this.draft.start) {Text('结束时间在次日；起止相同表示整天。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
         if(this.draft.kind==='focus') {Row(){Text('点击后才恢复').fontSize(14).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:this.draft.untilDismissed}).onChange((v)=>this.draft.untilDismissed=v)}.width('100%')}
+        Text('平时：'+this.normalName()+'\n'+sceneClock(this.draft.start)+' 开始：'+this.targetName(this.draft)+'\n'+(this.draft.kind==='focus'&&this.draft.untilDismissed?'点击中央卡片后':sceneClock(this.draft.end)+' 结束后')+'：恢复常态；若有其他生效的场景，则按优先级显示。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
       }.padding(16).width('100%').backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
       Button('保存场景',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.EMPHASIZED}).height(48).width('100%').fontColor(AppDesign.onSelected(this.appDark)).backgroundColor(AppDesign.selected(this.appDark)).enabled(this.draft.name.trim().length>0&&this.targets().some(t=>t.id===this.draft.targetId)&&(this.draft.repeat==='once'||this.draft.weekdays.length>0)).onClick(()=>{this.onSave(this.draft);this.editingRule=false;})
     }.width('100%')
   }
   build() {
-    Scroll() {
+    Scroll(this.scroller) {
       Column({space:20}) {
         Text('定时场景').fontSize(22).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
         if(this.editingRule){this.ruleEditor()}
         else {
           Column({space:12}) {
+            Text('常态').fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
+            SettingsSelect({labels:['首页当前摆放'].concat(this.layouts.map(s=>s.name)),selectedIndex:this.normalLayoutId.length>0?this.layouts.findIndex(s=>s.id===this.normalLayoutId)+1:0,appDark:this.appDark,onSelect:(i)=>this.onNormalLayout(i===0?'':this.layouts[i-1].id)})
+            Text('没有定时场景生效时显示的状态。选择布局会应用到首页；修改首页后以新摆放作为常态，已保存的布局保留原样。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
+          }.padding(16).width('100%').backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
+          Column({space:12}) {
             Text('保存摆放').fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
-            Text('调整首页卡片后保存为布局。内容仍使用原卡片，自动切换不会改动原始排版。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
+            Text('先保存常态摆放，再调整首页、保存触发后的摆放，最后在上方选回常态。定时场景只改变展示，不会改写两份布局。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
             Row({space:8}) {TextInput({text:this.layoutName,placeholder:'例如：晚间布局'}).layoutWeight(1).height(44).maxLength(30).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(12).onChange((v)=>this.layoutName=v);this.textButton('保存当前摆放',()=>{this.onCapture(this.layoutName.trim()||'布局 '+(this.layouts.length+1));this.layoutName='';})}.width('100%').enabled(this.layouts.length<8)
             ForEach(this.layouts,(s:SavedSceneLayout)=>{Row(){Text(s.name).fontSize(14).fontColor(AppDesign.text(this.appDark)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1);Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}){SymbolGlyph($r('sys.symbol.trash')).fontSize(18).fontColor(['#C43A35'])}.width(44).height(44).backgroundColor(Color.Transparent).accessibilityText('删除布局 '+s.name).onClick(()=>this.onRemoveLayout(s.id))}.width('100%')},(s:SavedSceneLayout)=>s.id)
           }.width('100%').padding(16).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
@@ -75,7 +89,7 @@ export struct SceneSchedulePanel {
             Column({space:12}) {
               Row(){Text(r.name).fontSize(17).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:r.enabled}).onChange((v)=>this.onToggle(r.id,v))}.width('100%')
               Text((r.repeat==='once'?r.date:'每周 '+r.weekdays.map(d=>['日','一','二','三','四','五','六'][d]).join('、'))+' · '+sceneClock(r.start)+'–'+sceneClock(r.end)).fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
-              Text((r.kind==='layout'?'切换摆放':r.kind==='canvas'?'切换画布':'中央展示')+' · '+((r.kind==='layout'?this.layouts:r.kind==='canvas'?this.canvases:this.cards).find(t=>t.id===r.targetId)?.name??'目标已移除')).maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis}).fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
+              Text('常态 · '+this.normalName()+'\n触发后 · '+this.targetName(r)+'\n'+(r.kind==='focus'&&r.untilDismissed?'点击中央卡片后恢复常态':'时间段结束后恢复常态')).maxLines(3).fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
               Row({space:8}) {this.textButton('预览',()=>this.onPreview(r));this.textButton('编辑',()=>this.edit(r));Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}){SymbolGlyph($r('sys.symbol.trash')).fontSize(18).fontColor(['#C43A35'])}.width(44).height(44).backgroundColor(Color.Transparent).accessibilityText('删除场景 '+r.name).onClick(()=>this.onRemove(r.id))}.width('100%')
             }.padding(16).width('100%').backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
           },(r:SceneRule)=>r.id)

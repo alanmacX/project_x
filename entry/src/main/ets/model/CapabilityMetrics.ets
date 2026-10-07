@@ -51,8 +51,9 @@ export function capabilityReadableMinimum(cap: CapBlock | null, width: number = 
   min.w*=MIN_CAPABILITY_SCALE; min.h*=MIN_CAPABILITY_SCALE; return min;
 }
 export function capabilityContentScale(cap: CapBlock, width: number, height: number): number {
-  const min=capabilityMinimum(cap,true,width/MIN_CAPABILITY_SCALE);
-  return Math.min(1,width/min.w,height/min.h);
+  const compact=compactCapability(cap,width,height);
+  const min=capabilityMinimum(cap,compact,compact?width/MIN_CAPABILITY_SCALE:width);
+  return Math.min(2,width/min.w,height/min.h);
 }
 
 /** Fit a fixed-format readout before native layout; TextClock has no single-line adaptive sizing. */

@@ -27,6 +27,7 @@ export function cardViewSnapshot(source: FridgeCard): FridgeCard {
   copy.renderContourKey = ''; 
   copy.capability = source.capability === null ? null : JSON.parse(JSON.stringify(source.capability)) as CapBlock;
   copy.capBox = JSON.parse(JSON.stringify(source.capBox)) as ElementBox;
+  copy.capFree = source.capFree;
   copy.elements = source.elements.map((element: CanvasElement) => JSON.parse(JSON.stringify(element)) as CanvasElement);
   return copy;
 }
@@ -41,7 +42,7 @@ export function cardRenderSnapshot(source: FridgeCard, prepared: boolean = false
   // not deep-copy every unchanged capability, course list and background layer.
   const signature = JSON.stringify([source.id, source.groupId, source.x, source.y, source.w, source.h, source.rot, source.z,
     source.shape, source.frame, source.material, source.paper, source.ink, source.subjectPhoto, source.subjectAspect,
-    source.subjectInk, source.subjectVersion, source.cutout, source.inDoor, contourKey, source.capability, source.capBox, source.elements]);
+    source.subjectInk, source.subjectVersion, source.cutout, source.inDoor, contourKey, source.capability, source.capBox, source.capFree, source.elements]);
   const previous = renderSnapshots.get(source.id);
   if (previous !== undefined && renderSignatures.get(source.id) === signature) return previous;
   const copy = cardViewSnapshot(source); copy.renderContourKey = contourKey; copy.outline = [];

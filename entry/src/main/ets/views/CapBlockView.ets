@@ -41,7 +41,7 @@ export struct CapabilityView {
   private now(): Date { return new Date(this.tick > 0 ? this.tick : Date.now()); }
   private unit(): number {
     const min = capabilityMinimum(this.cap, this.compact(), this.contentWidth);
-    return Math.min(1, this.contentWidth / min.w, this.contentHeight / min.h) * this.scaleFactor;
+    return Math.min(2, this.contentWidth / min.w, this.contentHeight / min.h) * this.scaleFactor;
   }
   private clockFont(world: boolean = false): number {
     const nominal = world ? (this.compact()?28:40) : (this.compact()?24:42);

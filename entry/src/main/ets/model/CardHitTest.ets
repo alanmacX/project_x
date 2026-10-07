@@ -1,11 +1,15 @@
 import { cardOutline } from './RenderContours';
 import { FridgeCard } from './CardSchema';
-import { subjectSurfaceFactor } from './CanvasLayout';
+import { subjectSurfaceFactor, capabilityPlacement } from './CanvasLayout';
 
 /** Local face coordinates, after ArkUI has inverted the card's display transform. */
 export function cardContainsPoint(card: FridgeCard, x: number, y: number, scale: number): boolean {
   const w = card.w * scale, h = card.h * scale;
   if (w <= 0 || h <= 0 || x < 0 || y < 0 || x > w || y > h) return false;
+  if(card.capFree && card.capability!==null) {
+    const box=capabilityPlacement(card);
+    if(x>=box.x*w && x<=(box.x+box.w)*w && y>=box.y*h && y<=(box.y+box.h)*h)return true;
+  }
   if (card.shape === 'subject' && cardOutline(card).length > 0) {
     const f = subjectSurfaceFactor(card), ox = (1 - f) * w / 2, oy = (1 - f) * h / 2;
     let inside = false;

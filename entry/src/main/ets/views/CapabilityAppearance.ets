@@ -32,6 +32,7 @@ export struct CapabilityAppearance {
       }.width('100%')
       ColorSetting({label:'内容颜色',color:this.ink(),automatic:!this.card.ink,sourceKey:this.card.id+':ink:',appDark:this.appDark,
         onPick:(color:string,key:string)=>this.onColorPick(color,key),onFallback:()=>this.onColor()})
+      if(this.card.capability?.k!=='album') {Text('在预览中拖动内容，用角落手柄放大；手动摆放可覆盖整张卡片，位置预设会回到形状内部。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
       Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
         Row(){Text('排版与可读性').fontSize(14).maxLines(1).layoutWeight(1).fontColor(AppDesign.text(this.appDark));Blank();SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([AppDesign.muted(this.appDark)]).rotate({angle:this.readingExpanded?180:0})}.width('100%').padding({left:12,right:12})
       }.width('100%').height(44).padding(0).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.getUIContext().animateTo(settingsDialogOpen(),()=>this.readingExpanded=!this.readingExpanded))

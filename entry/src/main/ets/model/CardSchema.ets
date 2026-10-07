@@ -107,6 +107,7 @@ export class FridgeCard {
   ink: string = '';
   capability: CapBlock | null = null;
   capBox: ElementBox = new ElementBox();
+  capFree: boolean = false; // Manual foreground placement uses the whole card box, not its silhouette.
   elements: CanvasElement[] = [];
   subjectPhoto: boolean = false;
   subjectBorder: boolean = true;
@@ -138,6 +139,7 @@ export function normalizeBackground(raw: CanvasBackground | undefined): CanvasBa
 export class FridgeState {
   sceneLayouts:SavedSceneLayout[]=[];
   sceneRules:SceneRule[]=[];
+  sceneBaseLayoutId:string=''; // Empty = current homepage; selecting a saved normal layout applies its geometry.
   schemaVersion: number = 2;
   canvasId: string = 'canvas_main';
   background: CanvasBackground = new CanvasBackground();
@@ -215,6 +217,7 @@ export function normalizeState(raw: FridgeState): FridgeState {
   state.canvasDimension = ['2*4', '4*4', '6*4'].includes(raw.canvasDimension) ? raw.canvasDimension : '4*4';
   state.canvasAspect = bounded(raw.canvasAspect, .3, 3, 1);
   state.sceneLayouts=normalizeSceneLayouts(raw.sceneLayouts);state.sceneRules=normalizeSceneRules(raw.sceneRules);
+  state.sceneBaseLayoutId=state.sceneLayouts.some(s=>s.id===raw.sceneBaseLayoutId)?raw.sceneBaseLayoutId:'';
   state.maxZ = bounded(raw.maxZ, 0, Number.MAX_SAFE_INTEGER, 10);
   for (const source of (Array.isArray(raw.cards) ? raw.cards : [])) {
     if (source === null || typeof source.id !== 'string') continue;
@@ -234,7 +237,7 @@ export function normalizeState(raw: FridgeState): FridgeState {
     card.cutout = (source.cutout ?? '').startsWith('file://') || (source.cutout ?? '').startsWith('memory://') ? source.cutout : '';
     card.subjectBorder = true; card.subjectPhoto = source.subjectPhoto ?? false; card.subjectVersion = source.subjectVersion ?? 0; card.subjectInk = source.subjectInk ?? '#262824'; card.subjectAspect = source.subjectAspect ?? 1;
     card.outline = Array.isArray(source.outline) ? source.outline : [];
-    card.capBox = normalizeBox(source.capBox); card.capBox.rot = 0;
+    card.capBox = normalizeBox(source.capBox); card.capBox.rot = 0; card.capFree = source.capFree === true;
     card.elements = Array.isArray(source.elements) ? source.elements.filter((el: CanvasElement) => el !== null && typeof el.id === 'string').map((el: CanvasElement) => normalizeElement(el, card.shape === 'subject')) : [];
     const caps: CapBlock[] = raw.schemaVersion === 2 ? (source.capability !== null && source.capability !== undefined ? [source.capability] : []) : (source.caps ?? []);
     state.cards.push(card);

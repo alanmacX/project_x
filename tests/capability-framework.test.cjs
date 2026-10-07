@@ -151,3 +151,15 @@ console.log('PASS small artwork persistence/group floor; compact clock and upcom
 
 const depth=load("CardDepth");
 for(const factor of [.25,.5,1,2,3]) {assert.equal(depth.cardDepthScale(factor)/factor,1,"desktop relief follows the same normalized artwork proportions as app");assert.equal(s.shapeRadius("rect",factor)/factor,16,"rounded substrate corners scale with the same scene");}
+
+// Manual capability placement is a separate foreground, free of silhouette snapping.
+const free={...shape,capFree:true,capBox:{x:.65,y:.65,w:.28,h:.14,rot:0,opacity:.7}};
+const freeBox=g.capabilityPlacement(free);assert.equal(freeBox.x,.65);assert.equal(freeBox.y,.65);assert.equal(freeBox.opacity,.7);
+const freeDrag=g.constrainCapabilityDrag(free,{...freeBox,x:.6,y:.5},freeBox);assert.equal(freeDrag.x,.6);assert.equal(freeDrag.y,.5);
+const freeEdge=g.constrainCapabilityDrag(free,{...freeBox,x:2,y:-1},freeBox);assert.equal(freeEdge.x,1-freeBox.w);assert.equal(freeEdge.y,0);
+assert.ok(g.minimumCardSize(free).w<g.minimumCardSize(shape).w,'free foreground does not require a large interior rectangle');
+const freeState=new s.FridgeState();freeState.cards=[free];assert.equal(s.normalizeState(JSON.parse(JSON.stringify(freeState))).cards[0].capFree,true);assert.equal(snap.cardViewSnapshot(free).capFree,true);
+for(const k of ['clock','date','battery','agenda','timetable']){const cap={k};const full=m.capabilityMinimum(cap,false);assert.ok(m.capabilityContentScale(cap,full.w*1.5,full.h*1.5)>1,'larger boxes enlarge content '+k);assert.ok(m.capabilityContentScale(cap,full.w*10,full.h*10)<=2,'readout enlargement stays bounded '+k);}
+console.log('PASS free foreground placement, edge recovery, readable size, storage/snapshot roundtrip and enlarged content');
+
+const cardHit=load('CardHitTest');assert.equal(cardHit.cardContainsPoint(free,.7*free.w,.7*free.h,1),true,'foreground over a transparent silhouette is selectable');assert.equal(cardHit.cardContainsPoint(free,.98*free.w,.98*free.h,1),false,'remaining transparent space stays inert');

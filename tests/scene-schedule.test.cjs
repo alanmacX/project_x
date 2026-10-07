@@ -57,3 +57,17 @@ assert.equal(widgetHit([focusArtwork],10,10,schema.BOARD_W,schema.BOARD_H,0,'art
 const t=performance.now();for(let i=0;i<500;i++)engine.projectScheduledScene(state,{rule:newer,token:'2026-10-05',start:0,end:1});console.log('500 focus projections × 32 cards:',(performance.now()-t).toFixed(2),'ms (host CPU only)');
 console.log('PASS timed scenes: weekly/one-off/overnight, exact boundaries, latched focus, stale acknowledgement, overlap restore, source isolation, rotated edge slivers, missing targets, limits and persisted geometry');
 (async()=>{const resolved=await engine.resolveScheduledScene(state,at('2026-10-05T18:00:00'),async id=>id==='other'?target:null);assert.equal(resolved.state,target);assert.equal(JSON.parse(engine.sceneWidgetContext(resolved)).baseId,state.canvasId);console.log('PASS async one-level canvas resolution and base-owned widget acknowledgement context');})().catch(e=>{console.error(e);process.exitCode=1;});
+
+// Explicit normal layout is editable base; temporary scenes must always return to it.
+const normalState=new schema.FridgeState();const normalCard=new schema.FridgeCard();normalCard.id='normal-card';normalCard.x=12;normalState.cards=[normalCard];
+const normalLayout=engine.captureSceneLayout(normalState,'normal','日常');normalCard.x=180;const triggeredLayout=engine.captureSceneLayout(normalState,'triggered','晚间');normalState.sceneLayouts=[normalLayout,triggeredLayout];
+assert.ok(engine.setNormalSceneLayout(normalState,'normal'));assert.equal(normalCard.x,12);assert.equal(normalState.sceneBaseLayoutId,'normal');
+const interval={...new rules.SceneRule(),id:'interval',targetId:'triggered',start:20*60,end:22*60,createdAt:0};normalState.sceneRules=[interval];
+assert.equal(engine.projectScheduledScene(normalState,engine.activeSceneRule(normalState,at('2026-10-05T20:00:00'))).state.cards[0].x,180);
+assert.equal(engine.projectScheduledScene(normalState,engine.activeSceneRule(normalState,at('2026-10-05T22:00:00'))).state.cards[0].x,12,'end restores explicitly chosen normal layout');
+assert.equal(schema.normalizeState(JSON.parse(storage.storageSnapshot(normalState))).sceneBaseLayoutId,'normal','normal selection survives storage');
+assert.equal(engine.setNormalSceneLayout(normalState,'missing'),false);assert.equal(normalState.sceneBaseLayoutId,'normal');
+normalCard.x=30;engine.refreshNormalSceneLayout(normalState);assert.equal(normalState.sceneBaseLayoutId,'');assert.equal(normalLayout.placements[0].x,12,'editing base never overwrites saved normal/target states');
+console.log('PASS explicit normal layout selection, restoration, persistence, missing-target protection and immutable saved layouts');
+
+const templates=load('TemplatePackage');engine.setNormalSceneLayout(normalState,'normal');const shared=templates.packageScene(storage.storageSnapshot(normalState),'');let serial=0;const sharedCards=templates.importedCards(shared.state,()=> 'shared_'+(++serial));templates.remapSceneSchedules(shared.state,sharedCards,()=> 'shared_'+(++serial),shared.state.canvasAspect);assert.ok(shared.state.sceneLayouts.some(l=>l.id===shared.state.sceneBaseLayoutId),'canvas import remaps the normal-state reference');assert.equal(templates.packageScene(storage.storageSnapshot(normalState),'normal-card').state.sceneBaseLayoutId,'','single-card export has no canvas normal-state reference');

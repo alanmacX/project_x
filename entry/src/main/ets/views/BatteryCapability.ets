@@ -11,6 +11,7 @@ export struct BatteryCapability {
   private diameter():number {return (this.compact?48:72)*this.unit;}
   private labelFont():number {return (this.compact?10:14)*this.unit;}
   private label():string {return batteryLevel(this.cap)<0?'—':String(batteryLevel(this.cap));}
+  private glyph(index:number):BatteryArcGlyph {return batteryArcLabel(this.diameter(),this.label(),this.labelFont())[index];}
   build() {
     Column({space:2*this.unit}) {
       Stack({alignContent:Alignment.TopStart}) {
@@ -26,13 +27,15 @@ export struct BatteryCapability {
           SymbolGlyph($r('sys.symbol.bolt_fill')).fontSize((this.compact?15:22)*this.unit).fontColor([batteryTint(this.cap,this.ink)])
             .visibility(this.cap.charging||this.cap.chargeState==='full'?Visibility.Visible:Visibility.Hidden)
         }.width(this.diameter()).height(this.diameter()).hitTestBehavior(HitTestMode.None)
-        ForEach(batteryArcLabel(this.diameter(),this.label(),this.labelFont()),(glyph:BatteryArcGlyph)=>{
-          Text(glyph.character).fontSize(this.labelFont()).fontWeight(FontWeight.Medium).fontColor(this.ink)
+        ForEach([0,1,2],(index:number)=>{
+          if(index<this.label().length) {
+          Text(this.label().charAt(index)).fontSize(this.labelFont()).fontWeight(FontWeight.Medium).fontColor(this.ink)
             .textShadow(readingHalo(this.ink,this.unit,this.readingHaloEnabled,this.cap.readingBlend)).maxLines(1)
             .width(this.labelFont()*1.1).height(this.labelFont()*1.25).textAlign(TextAlign.Center)
-            .rotate({angle:glyph.angle}).position({x:glyph.x-this.labelFont()*.55,y:glyph.y-this.labelFont()*.625})
+            .rotate({angle:this.glyph(index).angle}).position({x:this.glyph(index).x-this.labelFont()*.55,y:this.glyph(index).y-this.labelFont()*.625})
             .accessibilityLevel('no')
-        },(glyph:BatteryArcGlyph,index:number)=>String(index)+glyph.character)
+          }
+        },(index:number)=>String(index))
       }.width(this.diameter()).height(this.diameter()+8*this.unit)
       if(!this.compact) {
         Text(batteryStatus(this.cap)).fontSize(11*this.unit).fontColor(this.ink)

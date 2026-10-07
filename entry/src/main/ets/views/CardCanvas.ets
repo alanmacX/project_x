@@ -100,8 +100,10 @@ export struct CardCanvas {
   @Prop movingLayerId: string = '';
   @Prop moveX: number = 0;
   @Prop moveY: number = 0;
+  private freeCapability():boolean {return this.card.capFree || this.layerMotion.id==='capability';}
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
+      Stack({ alignContent: Alignment.TopStart }) {
       if(this.card.capability?.k==='album') {
         AlbumCapability({cap:this.card.capability!,cardWidth:this.card.w,cardHeight:this.card.h,scaleFactor:this.scaleFactor})
       } else {
@@ -110,9 +112,9 @@ export struct CardCanvas {
         Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
       }
       this.canvasElements(true)
-      if (!this.hideContent && this.card.capability !== null && !capabilityObstructed(this.card)) { CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}) }
+      if (!this.freeCapability() && !this.hideContent && this.card.capability !== null && !capabilityObstructed(this.card)) { CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}) }
       if (!this.hideContent) { this.canvasElements(false) }
-      if (!this.hideContent && this.card.capability !== null && capabilityObstructed(this.card)) { CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}) }
+      if (!this.freeCapability() && !this.hideContent && this.card.capability !== null && capabilityObstructed(this.card)) { CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}) }
       if (this.card.shape === 'subject' && this.card.cutout.length > 0) {
         Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
           .blendMode(BlendMode.DST_IN, BlendApplyType.OFFSCREEN)
@@ -120,6 +122,10 @@ export struct CardCanvas {
       }
     }.width('100%').height('100%').borderRadius(shapeRadius(this.card.shape,this.scaleFactor)).clip(true)
       .blendMode(BlendMode.SRC_OVER, this.card.shape === 'subject' ? BlendApplyType.OFFSCREEN : BlendApplyType.FAST)
+      if(this.freeCapability() && !this.hideContent && this.card.capability!==null && this.card.capability.k!=='album') {
+        CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick})
+      }
+    }.width('100%').height('100%')
   }
   private elementFor(id: string): CanvasElement { return this.card.elements.find((el: CanvasElement) => el.id === id) ?? new CanvasElement(); }
   @Builder
