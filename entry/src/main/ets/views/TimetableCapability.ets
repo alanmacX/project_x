@@ -40,8 +40,8 @@ export struct TimetableCapability {
     let width=measure(this.calendarPending()?'假期待确认':this.display.heading,11*s)+measure(this.dateLabel(),10*s)+4*s;
     if(!this.display.lessons.length)width=Math.max(width,measure(this.display.empty,(this.compactUpcoming()?15:17)*s),measure((this.cap.courses??[]).length?(this.cap.timetableMode==='day'?'查看周课表安排':'开课前一晚显示下一课'):'导入或添加你的课程',11*s));
     else if(this.cap.timetableMode==='day') {
-      let cell=0;for(const lesson of this.display.lessons)cell=Math.max(cell,measure(lesson.title,14*s),measure(lesson.location||'地点待定',11*s));
-      width=Math.max(width,(cell+58*s)*this.columns());
+      let cell=0;for(const lesson of this.display.lessons)cell=Math.max(cell,measure(lesson.title,13*s),measure(lesson.location||'地点待定',9*s));
+      width=Math.max(width,(cell+46*s)*this.columns());
     } else {const lesson=this.display.lessons[0];width=Math.max(width,measure(lesson.title,(this.compactUpcoming()?16:20)*s),measure(timeText(lesson.start)+'–'+timeText(lesson.end),11*s),measure(lesson.location||'地点待定',12*s));}
     return Math.min((this.contentWidth+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,Math.ceil(width)+2*compositionPadding(this.cap.readingBlend??'')*s);
   }
@@ -51,10 +51,10 @@ export struct TimetableCapability {
   @Builder
   heading() {
     Row({space:6*this.s()}) {
-      Text(this.calendarPending()?'假期待确认':'课程表').fontSize(14*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(1)
-      Text(this.dateLabel()).fontSize(12*this.s()).fontColor(this.ink).opacity(.6).maxLines(1)
+      Text(this.calendarPending()?'假期待确认':'课程表').fontSize(13*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(1)
+      Text(this.dateLabel()).fontSize(10*this.s()).fontColor(this.ink).opacity(.6).maxLines(1)
       Blank()
-      SymbolGlyph($r('sys.symbol.calendar')).fontSize(14*this.s()).fontColor([this.ink]).accessibilityLevel('no')
+      SymbolGlyph($r('sys.symbol.calendar')).fontSize(12*this.s()).fontColor([this.ink]).accessibilityLevel('no')
     }.width('100%').height(BRIEF_HEADER_HEIGHT*this.s())
   }
   @Builder private readingHook() {if(this.contentBackingEnabled&&['tag','dock'].includes(this.cap.readingBlend??'')){ReadingHook({hook:this.cap.readingHook??.2,scaleFactor:this.s()})}}
@@ -77,13 +77,13 @@ export struct TimetableCapability {
         Grid() {
           ForEach(this.display.lessons,(e:AgendaItem)=>{
             GridItem() {
-              Row({space:8*this.s()}) {
-                Text(timeText(e.start)).fontSize(13*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).width(38*this.s()).maxLines(1)
-                Column({space:2*this.s()}) {
-                  Text(e.title).fontSize(14*this.s()).minFontSize(12*this.s()).maxFontSize(14*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
-                  if(e.location){Text(e.location).fontSize(10*this.s()).fontColor(this.ink).opacity(.6).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')}
+              Row({space:5*this.s()}) {
+                Text(timeText(e.start)).fontSize(12*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).width(32*this.s()).maxLines(1)
+                Column({space:1*this.s()}) {
+                  Text(e.title).fontSize(13*this.s()).minFontSize(12*this.s()).maxFontSize(13*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
+                  if(e.location){Text(e.location).fontSize(9*this.s()).fontColor(this.ink).opacity(.6).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')}
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-              }.width('100%').height(this.dayCellHeight()-4*this.s()).padding({left:8*this.s(),right:8*this.s()}).backgroundColor(this.highlighted(e)?'#45F5C94B':'#16A69A7C').borderRadius(10*this.s())
+              }.width('100%').height(this.dayCellHeight()-4*this.s()).padding({left:6*this.s(),right:6*this.s()}).backgroundColor(this.highlighted(e)?'#45F5C94B':'#16A69A7C').borderRadius(8*this.s())
 
             }
           },(e:AgendaItem)=>e.id)

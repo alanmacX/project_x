@@ -1,8 +1,8 @@
 import { CapBlock, CourseItem, AgendaItem, TeachingDay, CourseChange } from './CardSchema';
 import { HolidayDate } from './HolidayCalendar';
 import { coursesOnDay, courseInWeek } from './CapabilityData';
-export const LESSON_CELL_HEIGHT: number = 52;
-export const BRIEF_HEADER_HEIGHT: number = 30;
+export const LESSON_CELL_HEIGHT: number = 38;
+export const BRIEF_HEADER_HEIGHT: number = 24;
 const counts = new Map<string, number>();
 class CapacityRecord {
   semester: string = '';
@@ -34,7 +34,7 @@ export function timetableCapacity(cap: CapBlock): number {
   for (const date of Array.from(new Set<string>(dates))) maximum = Math.max(maximum, coursesOnDay(cap, new Date(date + 'T12:00:00').getTime()).length);
   if (counts.size >= 64) counts.clear(); counts.set(key, maximum); return remember(cap,maximum);
 }
-export function briefColumns(width: number): number { return width >= 480 ? 3 : width >= 320 ? 2 : 1; }
+export function briefColumns(width: number): number { return width >= 360 ? 3 : width >= 240 ? 2 : 1; }
 export function briefHeight(count: number, columns: number): number { return BRIEF_HEADER_HEIGHT + Math.ceil(Math.max(1, count) / columns) * LESSON_CELL_HEIGHT; }
 export class WeekLesson {
   event: AgendaItem = {id: '', title: '', start: 0, end: 0, location: '', allDay: false};
