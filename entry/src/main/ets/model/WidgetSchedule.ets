@@ -27,9 +27,13 @@ export async function scheduleWidget(prefs:preferences.Preferences,formId:string
     if(!Number.isFinite(deadline)||deadline<=now||deadline-now>=60*60000)return;
     const key='fridge_next_refresh_'+formId;
     const previous=await prefs.get(key,0) as number;
-    if(previous===deadline&&previous>now)return;
     const minutes=Math.max(5,Math.ceil((deadline-now)/60000));
-    try {await formProvider.setFormNextRefreshTime(formId,minutes);await prefs.put(key,deadline);await prefs.flush();}catch(_){ /* The hourly fallback survives rejected/quota-limited requests. */ }
+    const requestedAt=now+minutes*60000;
+    // Persist the actual requested wake-up, including the system's minimum delay.
+    // Later edits reuse an earlier pending request rather than spending quota and
+    // resetting the timer before that wake-up has happened.
+    if(previous>now&&previous<=requestedAt)return;
+    try {await formProvider.setFormNextRefreshTime(formId,minutes);await prefs.put(key,requestedAt);await prefs.flush();}catch(_){ /* The hourly fallback survives rejected/quota-limited requests. */ }
   });
   requests.set(formId,pending);
   try{await pending;}finally{if(requests.get(formId)===pending)requests.delete(formId);}

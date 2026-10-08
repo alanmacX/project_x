@@ -80,6 +80,11 @@ export class FridgeStore {
   async deleteCanvas(id: string): Promise<void> {
     if (this.catalog.canvases.length <= 1 || !this.catalog.canvases.some((c)=>c.id===id)) return;
     await this.saveQueue.catch(()=>{});
+    // Retain legacy course data before deleting the only document that owns it.
+    // Await the durable write: a failed flush must leave the canvas intact.
+    const removed=await this.canvasSnapshot(id);
+    const timetable=removed.cards.map((c)=>c.capability).find((cap)=>cap?.k==='timetable'&&(cap.courses??[]).length>0);
+    if(timetable)await this.timetableStorage().save(timetable,true);
     // A publisher already resolving the deleted binding must finish before rebinding.
     await Promise.all(Object.values(this.widgetQueues).map((queue)=>queue.waitForIdle().catch(()=>{})));
     if (this.catalog.activeId === id) await this.openCanvas(this.catalog.canvases.find((c)=>c.id!==id)!.id);
@@ -136,8 +141,11 @@ export class FridgeStore {
   async savedTimetable():Promise<TimetableData|null> {
     const library=this.timetableStorage(),saved=await library.read();if(saved)return saved;
     for(const id of [this.state.canvasId,...this.catalog.canvases.filter((c)=>c.id!==this.state.canvasId).map((c)=>c.id)]) {
-      const canvas=await this.canvasSnapshot(id),cap=canvas.cards.map((c)=>c.capability).find((c)=>c?.k==='timetable'&&(c.courses??[]).length>0);
-      if(cap){await library.save(cap);return await library.read();}
+      let canvas:FridgeState;
+      try{canvas=await this.canvasSnapshot(id);}catch(_){hilog.warn(0,'Timetable','skipping unreadable legacy canvas');continue;}
+      const cap=canvas.cards.map((c)=>c.capability).find((c)=>c?.k==='timetable'&&(c.courses??[]).length>0);
+      // Another editor operation may have saved a newer timetable during the scan.
+      if(cap){await library.save(cap,true);return await library.read();}
     }
     return null;
   }

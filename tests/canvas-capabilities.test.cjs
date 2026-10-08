@@ -171,6 +171,40 @@ function load(name) {
  imported.sceneRules.push({...sceneRule,id:'import-focus',kind:'focus',targetId:'center'});const importedCards=imported.cards.map((c,i)=>({...c,id:'new-'+i}));let sequence=0;
  load('TemplatePackage').remapSceneSchedules(imported,importedCards,()=> 'import-'+(++sequence),.8);
  assert.equal(imported.sceneRules.length,2,'external canvas links are excluded from a single shared document');assert.ok(imported.sceneRules.every(r=>!r.enabled&&!r.dismissed));assert.equal(imported.sceneLayouts[0].placements[0].id,'new-0');assert.equal(imported.sceneRules.find(r=>r.kind==='focus').targetId,'new-0');
+ // A delivery straddling album rotation must use one identity set for both
+ // its acknowledged manifest and the actual IPC file descriptors.
+ const {prepareWidgetPayload}=load('WidgetPayload');
+ const rotating=defaultState(),rotatingCard=new FridgeCard();rotatingCard.capability={k:'album',albumId:'one',albumCover:'file:///one.png',albumBackground:'file:///one-bg.png',albumRotationStart:60000,albumRotationMinutes:60,albumItems:[{id:'one',cover:'file:///one.png',background:'file:///one-bg.png',title:'One',artist:''},{id:'two',cover:'file:///two.png',background:'file:///two-bg.png',title:'Two',artist:''}]};rotating.cards=[rotatingCard];
+ const rotation=load('AlbumRotation'),realAlbum=rotation.activeAlbum;let albumReads=0;rotation.activeAlbum=(cap,now)=>realAlbum(cap,now===undefined?(albumReads++===0?3659999:3660001):now);
+ try{const delivery=await prepareWidgetPayload(JSON.stringify(rotating));assert.deepEqual(JSON.parse(delivery.manifest),Object.keys(delivery.images).sort(),'rotation boundary cannot acknowledge a different image cache than the delivered artwork');}
+ finally{rotation.activeAlbum=realAlbum;}
+ // Corrupt artwork bound to another form does not interrupt delivery of this canvas.
+ source.sceneRules=[];disk.set(canvasKey(source.canvasId),JSON.stringify(source));disk.set(canvasKey(destination.canvasId),'{broken');disk.set('fridge_form_dims_json',JSON.stringify({scene:'4*4',brokenForm:'4*4'}));disk.set('fridge_form_bindings_json',JSON.stringify({scene:source.canvasId,brokenForm:destination.canvasId}));const beforeIsolated=updates.length;
+ await pushWidgets(ctx,JSON.stringify(source));assert(updates.length>beforeIsolated,'healthy bound canvas still delivers');assert.equal(disk.get(canvasKey(destination.canvasId)),'{broken');
+ assert(updates.slice(beforeIsolated).every(u=>u.id==='scene'),'corrupt form retains its last artwork rather than receiving a blank fallback');
+ disk.set(canvasKey(destination.canvasId),JSON.stringify({cards:null}));const beforeMalformed=updates.length;await pushWidgets(ctx,JSON.stringify(source));assert(updates.slice(beforeMalformed).every(u=>u.id==='scene'));
+ // Reusable timetable migration must tolerate one damaged inactive canvas and
+ // never overwrite a newer edit while an asynchronous legacy scan is pending.
+ disk.clear();
+ const legacyStore=new FridgeStore(),legacy=defaultState(),legacyCard=new FridgeCard();
+ legacyCard.capability={k:'timetable',semester:'2026-09-07',courses:[{id:'legacy',name:'旧课表',room:'A',day:1,start:'08:00',end:'09:00',firstWeek:1,lastWeek:16,parity:0}]};legacy.cards=[legacyCard];legacy.canvasId='legacy';
+ legacyStore.state=defaultState();legacyStore.prefs=prefs;
+ legacyStore.catalog={version:1,activeId:legacyStore.state.canvasId,canvases:[{id:legacyStore.state.canvasId,name:'Empty'},{id:'broken',name:'Broken'},{id:'legacy',name:'Legacy'}]};
+ disk.set(canvasKey('broken'),'{broken');disk.set(canvasKey('legacy'),JSON.stringify(legacy));
+ assert.equal((await legacyStore.savedTimetable()).courses[0].name,'旧课表','damaged unrelated canvas cannot hide an intact saved timetable');
+ disk.delete('fridge_saved_timetable_v1');legacyStore.timetableLibrary=null;
+ let releaseScan,started;const scanStarted=new Promise(r=>started=r),gate=new Promise(r=>releaseScan=r),snapshot=legacyStore.canvasSnapshot.bind(legacyStore);
+ legacyStore.canvasSnapshot=async id=>{if(id==='legacy'){started();await gate;}return snapshot(id);};
+ const migration=legacyStore.savedTimetable();await scanStarted;
+ await legacyStore.rememberTimetable({...legacyCard.capability,courses:[{...legacyCard.capability.courses[0],name:'新课表'}]});releaseScan();
+ assert.equal((await migration).courses[0].name,'新课表','pending legacy migration cannot replace a freshly saved timetable');
+ // Deleting an entire inactive canvas retains legacy courses before unlinking it.
+ disk.delete('fridge_saved_timetable_v1');legacyStore.timetableLibrary=null;legacyStore.canvasSnapshot=snapshot;
+ failWrite=true;await assert.rejects(legacyStore.deleteCanvas('legacy'),/disk failure/);
+ assert(legacyStore.catalog.canvases.some(c=>c.id==='legacy')&&disk.has(canvasKey('legacy')),'failed course retention leaves original canvas intact');
+ await legacyStore.deleteCanvas('legacy');
+ assert.equal(JSON.parse(disk.get('fridge_saved_timetable_v1')).courses[0].name,'旧课表');assert(!disk.has(canvasKey('legacy')));
+ console.log('PASS timetable migration: damaged inactive record, concurrent newer edit and complete canvas deletion retention.');
  console.log('PASS timed delivery: atomic packet, bound-source ownership, target fanout, original geometry during battery updates, persisted acknowledgement and foreground merge, refresh minimum/quota, imported schedule remapping and opt-in.');
  console.log('PASS: legacy migration, lazy multi-canvas storage, independent duplication, widget bindings/deletion and removed-form cleanup, preserved corruption, movement-stable palette, offline refresh guard, live battery/Form refresh, conservative pickup OCR, course week/parity/boundaries, bounded ICS/JSON imports with recurrence exceptions and calendar ACL gate.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

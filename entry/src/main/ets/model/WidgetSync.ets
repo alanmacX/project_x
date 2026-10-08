@@ -50,7 +50,18 @@ export async function pushWidgets(context: Context, json: string): Promise<void>
   const failures: string[] = [], removed: string[] = [];
   await Promise.all(Object.keys(dims).map(async (id: string) => {
     const baseId=catalogJson?boundCanvas(bindings,id,catalog):canvasId;
-    const base=normalizeState(JSON.parse(baseId===canvasId?json:await prefs.get(canvasKey(baseId),'') as string||'{}') as FridgeState);
+    let base:FridgeState;
+    try {
+      const source=baseId===canvasId?json:await prefs.get(canvasKey(baseId),'') as string;
+      const raw=JSON.parse(source) as FridgeState;
+      if(!Array.isArray(raw.cards))throw new Error('画布数据损坏');
+      base=normalizeState(raw);
+    }catch(e) {
+      // An unrelated damaged canvas must not reject this edit's healthy deliveries
+      // or replace its own last displayed artwork with an empty default scene.
+      if(baseId!==canvasId){hilog.warn(0,'WidgetSync','skipping unreadable bound canvas');return;}
+      throw e as Error;
+    }
     if(baseId!==canvasId) {const current=activeSceneRule(base,Date.now());if(current?.rule.kind!=='canvas'||current.rule.targetId!==canvasId)return;}
     const scene=await resolveScheduledScene(base,Date.now(),async(targetId:string):Promise<FridgeState|null>=>{
       if(!catalog.canvases.some(c=>c.id===targetId))return null;

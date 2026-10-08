@@ -10,6 +10,7 @@ export interface WidgetPayload {
 /** Parse/normalize/serialize large masks and prepare file descriptors away from the UI thread. */
 @Concurrent
 export async function prepareWidgetPayload(json: string, contourCache: string = '', previousManifest: string = ''): Promise<WidgetPayload> {
+  const frameTime=Date.now();
   const state: FridgeState = normalizeState(JSON.parse(json) as FridgeState), payload: WidgetPayload = { background: '{}', cards: '[]', images: {}, descriptors: [], manifest: '' };
   // Prepare the complete identity set before opening anything. A partial formImages map
   // replaces the system image cache; reuse is therefore all-or-nothing.
@@ -18,7 +19,7 @@ export async function prepareWidgetPayload(json: string, contourCache: string = 
     if(card.cutout.startsWith('file://'))keys.push(widgetImageKey(card.id+'_subject',card.cutout));
     for(const element of card.elements)if(element.kind==='image'&&element.src.startsWith('file://'))keys.push(widgetImageKey(card.id+'_'+element.id,element.src));
     if(card.capability?.k==='album') {
-      const album=activeAlbum(card.capability);
+      const album=activeAlbum(card.capability,frameTime);
       if(album.cover.startsWith('file://'))keys.push(widgetImageKey(card.id+'_albumCover',album.cover));
       if(album.background.startsWith('file://'))keys.push(widgetImageKey(card.id+'_albumBackground',album.background));
     }
@@ -38,7 +39,7 @@ export async function prepareWidgetPayload(json: string, contourCache: string = 
       card.outline = valid ? cached : compactContours(card.outline);
       const cap=card.capability;
       if(cap?.k==='album') {
-        const album=activeAlbum(cap);cap.albumCover=album.cover;cap.albumBackground=album.background;cap.title=album.title;cap.artist=album.artist;cap.albumId=album.id;cap.albumItems=[];cap.albumRotationMinutes=0;
+        const album=activeAlbum(cap,frameTime);cap.albumCover=album.cover;cap.albumBackground=album.background;cap.title=album.title;cap.artist=album.artist;cap.albumId=album.id;cap.albumItems=[];cap.albumRotationMinutes=0;
         for(const field of ['albumCover','albumBackground']) {
           const src=field==='albumCover'?cap.albumCover??'':cap.albumBackground??'';
           if(!src.startsWith('file://'))continue;

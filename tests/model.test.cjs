@@ -497,7 +497,12 @@ function load(name) {
   kits['@kit.FormKit'].formProvider.setFormNextRefreshTime=async(id,minutes)=>{schedules++;assert.equal(minutes,5);};
   await Promise.all([scheduleWidget(prefs,'schedule-test',boundaryNow+60000,boundaryNow),scheduleWidget(prefs,'schedule-test',boundaryNow+60000,boundaryNow)]);
   assert.equal(schedules,1,'repeated edits/extension requests share the acknowledged deadline');
+  await scheduleWidget(prefs,'schedule-test',boundaryNow+3*60000,boundaryNow);
+  assert.equal(schedules,1,'a later event does not postpone an already requested wake-up');
+  await scheduleWidget(prefs,'schedule-test',boundaryNow+3*60000,boundaryNow+2*60000);
+  assert.equal(schedules,1,'five-minute system minimum remains acknowledged after the logical event deadline');
   await scheduleWidget(prefs,'schedule-test',Infinity,boundaryNow);assert.equal(schedules,1);
+  await scheduleWidget(prefs,'schedule-test',boundaryNow+7*60000,boundaryNow+6*60000);assert.equal(schedules,2,'expired wake-up permits a fresh request');
   kits['@kit.FormKit'].formProvider.setFormNextRefreshTime=scheduler;
   assert.equal(formConfig.forms[0].updateDuration,2,'hourly fallback reserves quota for actual content boundaries');
   const FormAbility=load('../form/FridgeFormAbility').default, formAbility=new FormAbility();
