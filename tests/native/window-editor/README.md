@@ -25,7 +25,7 @@ Native hitrace categories: ace, app, graphic. UI task duration is **not** a comp
 | Native button-count mutation | SegmentButton update 63.33 ms; outer click callback 76.25 ms |
 | Keyed native option groups | Sample UI-task maximum 14.89 ms; touch callback 3.83 ms; prior button-count update spike absent |
 
-Initial inspector creation had a 42.88 ms frame in one trace; exit samples reached 24.16 ms. Cold-start total timing was not demonstrably improved. Therefore this is not evidence of sustained 120 FPS or complete elimination of all startup costs.
+Initial inspector creation had a 42.88 ms frame in one trace; exit samples reached 24.16 ms. A final warm widget round-trip also contained a 44.81 ms UI task during scene reconciliation, despite avoiding the redundant full reload. Cold-start total timing was not demonstrably improved. Therefore this is not evidence of sustained 120 FPS or complete elimination of all startup costs.
 
 ## Native acceptance
 
