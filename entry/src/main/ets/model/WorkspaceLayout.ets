@@ -24,8 +24,8 @@ export function workspaceLayout(width:number,height:number,top:number,bottom:num
   if(out.floating){out.panelW=Math.min(360,width-32);out.panelX=(width-out.panelW)/2;out.panelY=height-bottom-68;out.panelH=52;}
   const body=Math.max(120,height-top-bottom-76);
   out.previewW=out.wide?width-Math.min(400,Math.max(300,width*.4)):width;
-  out.layersH=64;
-  const stackedPreview=width>=600?Math.min(520,body*.42,width*.72):Math.min(220,body*.27);
-  out.previewH=out.wide?Math.max(80,body-96):Math.max(100,Math.min(stackedPreview,body-64-12-56-180));
+  out.layersH=100;
+  const stackedPreview=width>=600?Math.min(520,body*.52,width*.72):Math.min(430,body*.56);
+  out.previewH=out.wide?Math.max(64,body-124):Math.max(100,Math.min(stackedPreview,body-100-60-120));
   out.inspectorW=out.wide?width-out.previewW:width;return out;
 }

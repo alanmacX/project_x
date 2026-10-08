@@ -183,7 +183,7 @@ export function constrainCapabilityDrag(card:FridgeCard,requested:ElementBox,pre
 }
 /** Foreground movement stays continuous across concavities and transparent holes. */
 export function freeCapabilityBox(requested:ElementBox,outside:boolean=false,wide:boolean=false):ElementBox {
-  const box=new ElementBox();box.w=Math.min(wide?3:1,Math.max(.01,requested.w));box.h=Math.min(1,Math.max(.01,requested.h));
+  const box=new ElementBox();box.w=Math.min(outside||wide?3:1,Math.max(.01,requested.w));box.h=Math.min(outside?3:1,Math.max(.01,requested.h));
   box.x=Math.max(outside?-2:0,Math.min(outside?2:1-box.w,requested.x));box.y=Math.max(outside?-2:0,Math.min(outside?2:1-box.h,requested.y));box.rot=outside?requested.rot:0;box.opacity=requested.opacity;return box;
 }
 export function capabilityObstructed(card:FridgeCard):boolean {

@@ -1,8 +1,11 @@
+import lazy { HookPlacement } from '../views/HookPlacement';
+import lazy { EditorVisualChoices } from '../views/EditorVisualChoices';
+import { editorReadingPlacement } from '../model/EditorVisualChoices';
 import { sameTimetable, useSavedTimetable } from '../model/TimetableLibrary';
 import { edgeAttachment } from '../model/EdgeAttachment';
 import { capabilityAttachmentEdges } from '../model/CanvasLayout';
 import { preferredReadingStyle, defaultReadingStyle } from '../model/ReadingStylePolicy';
-import { compositionPlacement, isReadingComposition, snapComposition, readingStyles } from '../model/ReadingComposition';
+import { compositionOverflow, isReadingComposition, snapComposition, readingStyles } from '../model/ReadingComposition';
 import { CenterGuides } from '../views/CenterGuides';
 import lazy { ReadingComparison } from '../views/ReadingComparison';
 import { CardDeletionFlight } from '../views/CardDeletionFlight';
@@ -28,7 +31,6 @@ import lazy { SettingsSelect } from '../views/SettingsSelect';
 import lazy { SettingsSegmented } from '../views/SettingsSegmented';
 import lazy { SettingsCounter } from '../views/SettingsCounter';
 import { canvasToolsMotion, canvasToolsTransition, settingsReveal, settingsDialogOpen, settingsDialogClose } from '../model/SettingsMotion';
-import lazy { CapabilityAppearance } from '../views/CapabilityAppearance';
 import lazy { CapabilityDetails } from '../views/CapabilityDetails';
 import lazy { WeekTimetable } from '../views/WeekTimetable';
 import lazy { CapabilityPicker } from '../views/CapabilityPicker';
@@ -191,10 +193,13 @@ struct Index {
   @State activeBoardId: string = '';
   @State editing: boolean = false;
   @State settingsTab: number = 0;
-  @State @Watch('editorTabChanged') editorTabs: number[] = [0];
   @State scatter: number = 0;
   @State showBackgroundOptions: boolean = false;
   @State showLayerOptions: boolean = false;
+  @State editorSectionOpen:boolean=false;
+  @State editorPreviewCompressed:boolean=false;
+  @State editorSection:number=0;
+  @State editorSheetTab:number=0;
   @State @Watch('homeToolsChanged') homeToolsOpen:boolean=false;
   @State homeToolsMoving:boolean=false;
   private homeToolsMotionGeneration:number=0;
@@ -585,6 +590,7 @@ struct Index {
     if(this.navMenuOpen){this.finishNavMenu(-1);return true;}
     if(this.deletionId)return true;
     if(this.homeToolsOpen){this.homeToolsOpen=false;return true;}
+    if(this.editorSectionOpen){this.editorSectionOpen=false;return true;}
     if(this.showBackgroundOptions){this.showBackgroundOptions=false;return true;}
     if(this.showLayerOptions){this.showLayerOptions=false;return true;}
     if(this.readingComparisonOpen){this.readingComparisonOpen=false;return true;}
@@ -626,11 +632,15 @@ struct Index {
 
   private editorLandscape(): boolean { return workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).wide; }
   private editorViewportWidth(): number { return workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).previewW; }
-  private previewPaneHeight(): number { return workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).previewH; }
+  private previewPaneHeight(): number {
+    const normal=workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).previewH;
+    return this.editorPreviewCompressed&&!this.editorLandscape()?Math.min(normal,Math.max(96,this.screenHeight-this.editorSheetHeight()-this.safeTop-this.safeBottom-76)):normal;
+  }
   private editingAngle(): number { return this.preview.rot; }
   private previewViewport(): EditorViewport {
+    const overflow=compositionOverflow(this.preview,1);
     return editorViewport(this.preview.w, this.preview.h, this.editingAngle(), this.editorViewportWidth(),
-      this.screenHeight, this.safeTop, this.safeBottom, this.editorLandscape(), this.previewPaneHeight());
+      this.screenHeight, this.safeTop, this.safeBottom, this.editorLandscape(), this.previewPaneHeight(),[overflow.left,overflow.top,overflow.right,overflow.bottom]);
   }
   private editorScale(): number { return this.previewViewport().scale; }
   private editorRect(): SceneRect {
@@ -645,13 +655,13 @@ struct Index {
   private openEditor(id: string, created: boolean = false): void {
     if(this.scheduledName||this.scheduleTransition){this.getUIContext().getPromptAction().showToast({message:'请先恢复原始画布再编辑'});return;}
     if (this.heroActive || this.arriving) return;
-    this.heroHideContent = false; this.select(id, true); this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false; this.settingsTab = 0; this.editorTabs = [0];
+    this.heroHideContent = false; this.select(id, true); this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false; this.editorSectionOpen=false;this.editorPreviewCompressed=false;this.editorSection=0;this.editorSheetTab=0;this.settingsTab=this.preview.capability!==null?1:0;
     this.heroRect = this.boardRect();
     if (created) {
       const rect = new SceneRect(); rect.w = 28; rect.h = 28 * this.preview.h / this.preview.w;
       rect.x = this.panelLeft + this.panelWidth - 38; rect.y = this.panelTop + 22 - rect.h / 2; this.heroRect = rect;
     }
-    this.layerId = this.preview.elements.find((el: CanvasElement) => el.behindCapability)?.id ?? ''; this.syncFields();
+    this.layerId=this.preview.capability!==null?'capability':(this.preview.elements.find((el:CanvasElement)=>el.behindCapability)?.id??'');this.syncFields();
     this.creatingTransition = created; this.heroBase = this.editorRect(); this.setHeroPose(this.heroRect); this.setTransitionClip(true);
     this.editorMounted = true; this.editorReady = true; this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.editorOpacity = 0; this.boardOpacity = 1; this.heroActive = true; this.editing = true;this.homeToolsOpen=false;
     this.prepareEditorMotion(() => {
@@ -717,7 +727,7 @@ struct Index {
   private closeEditor(): void {
     if (this.heroActive || !this.editing) return;
     if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview();
-    this.creatingTransition = false; this.heroHideContent = this.settingsTab === 0;
+    this.editorSectionOpen=false;this.editorPreviewCompressed=false;this.creatingTransition = false; this.heroHideContent = this.settingsTab === 0;
     this.heroBase = this.editorRect(); this.setHeroPose(this.heroBase); this.setTransitionClip(false); this.heroActive = true;
     // Publish the edited card to the board once, before it fades back in.
     this.renderBoard();
@@ -881,7 +891,7 @@ struct Index {
   private async setCapability(k: string): Promise<void> {
     const selection=++this.capabilitySelection;
     const card = this.current(); if (card === null) return;
-    if (card.capability?.k === k) { this.layerId = 'capability'; this.syncFields(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); return; }
+    if (card.capability?.k === k) { this.capabilityPickerOpen=false;this.settingsTab=1;this.layerId = 'capability'; this.syncFields(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); return; }
     if (k === 'none') { card.capability = null; this.layerId = ''; }
     else {
       let cap: CapBlock = { k:k,readingBlend:k==='album'?undefined:preferredReadingStyle(k),readingStyle:'surface' };
@@ -898,10 +908,10 @@ struct Index {
         }catch(e){this.getUIContext().getPromptAction().showToast({message:(e as Error).message});return;}
       }
       if (k === 'worldclock') cap.zone = 'Asia/Shanghai';
-      if(k==='album') {card.html=undefined;card.shape='rect';card.frame=false;this.editorTabs=[1];this.settingsTab=1;}
-      card.capability = cap; card.capBox = capabilityPreset(card,'center'); this.layerId = 'capability';
+      if(k==='album') {card.html=undefined;card.shape='rect';card.frame=false;this.settingsTab=1;}
+      this.settingsTab=1;card.capability = cap; card.capBox = capabilityPreset(card,'center'); this.layerId = 'capability';
     }
-    this.syncFields(); this.change(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.refreshCapabilities();
+    this.capabilityPickerOpen=false;this.editorSection=3;this.editorSheetTab=0;this.syncFields(); this.change(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.refreshCapabilities();
   }
   private addElement(kind: string): void {
     const card = this.current(); if (card === null || card.capability?.k==='album') return;
@@ -1794,20 +1804,20 @@ struct Index {
                 this.canvasEditor()
                 this.editorLayers()
               }.width(this.editorViewportWidth()).height('100%')
-              Column() { this.editorControls(); this.editorInspector() }.layoutWeight(1).height('100%')
+              Column() { this.editorInspector() }.layoutWeight(1).height('100%').justifyContent(FlexAlign.End)
             }.width('100%').layoutWeight(1)
           } else {
             this.canvasEditor()
-            this.editorControls(); this.editorLayers(); this.editorInspector()
+            this.editorLayers(); this.editorInspector()
           }
         }.width('100%').height('100%').padding({ top: EDITOR_NAV_INSET }).backgroundColor(Color.Transparent)
       }.titleMode(HdsNavigationTitleMode.MINI)
         .titleBar({
           content: {
-            backIcon: { icon:new SymbolGlyphModifier($r('sys.symbol.arrow_counterclockwise')).fontColor([this.appText()]),label: '撤销', type: IconStyleMode.NORMAL, isEnabled: this.undoAvailable && !this.heroActive, action: () => this.restoreHistory(false) },
+            backIcon: { icon:new SymbolGlyphModifier($r('sys.symbol.chevron_left')).fontColor([this.appText()]),label:'返回画布',type:IconStyleMode.NORMAL,isEnabled:!this.heroActive,action:()=>this.closeEditor() },
             menu: { maxCount: 4, value: [
               { content: { icon: new SymbolGlyphModifier($r('sys.symbol.rectangle_and_arrowshape_turn_up_right')).fontColor([this.appText()]), label: '分享卡片', type: IconStyleMode.NORMAL, componentId: 'shareCard', isEnabled: !this.sharing && !this.heroActive, action: () => this.shareMenu(true) } },
-              { content: { icon:new SymbolGlyphModifier($r('sys.symbol.plus')).fontColor([this.appText()]),label: '添加', type: IconStyleMode.NORMAL, componentId:'editorAdd', isEnabled: !this.heroActive && this.preview.capability?.k!=='album', action: () => this.showAddMenu() } },
+              { content: { icon:new SymbolGlyphModifier($r('sys.symbol.arrow_counterclockwise')).fontColor([this.appText()]),label:'撤销',type:IconStyleMode.NORMAL,isEnabled:this.undoAvailable&&!this.heroActive,action:()=>this.restoreHistory(false) } },
               { content: { icon:new SymbolGlyphModifier($r('sys.symbol.ellipsis_circle')).fontColor([this.appText()]),label: '更多操作', type: IconStyleMode.NORMAL, componentId:'editorMore', isEnabled: !this.heroActive, action: () => this.showEditorActions() } },
               { content: { label: '完成', type: TextStyleMode.NORMAL, isEnabled: !this.heroActive, action: () => this.closeEditor() } }
             ] }
@@ -1822,7 +1832,7 @@ struct Index {
               contentStyle: { menuStyle: {backgroundColor:this.appSurface(),textColor:this.appText(),iconColor:this.appText()}, backIconStyle: {backgroundColor:this.appSurface(),textColor:this.appText(),iconColor:this.appText()} } }
           }
         })
-        .bindSheet(this.capabilityPickerOpen||this.readingComparisonOpen,this.editorTaskSheet,{height:this.taskSheetHeight(),detents:[this.taskSheetHeight(),this.taskSheetHeight(true)],preferType:this.screenWidth>=600?SheetType.CENTER:SheetType.BOTTOM,width:Math.min(560,this.screenWidth-24),showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>{this.capabilityPickerOpen=false;this.readingComparisonOpen=false;}})
+        .bindSheet(this.editorSectionOpen||this.capabilityPickerOpen||this.readingComparisonOpen,this.editorCombinedSheet,{height:this.editorSheetHeight(),detents:[this.editorSheetHeight(),this.taskSheetHeight(true)],preferType:this.screenWidth>=600?SheetType.CENTER:SheetType.BOTTOM,width:Math.min(560,this.screenWidth-24),showClose:true,dragBar:true,backgroundColor:this.appBackground(),blurStyle:BlurStyle.COMPONENT_THIN,onWillDismiss:(action:DismissSheetAction)=>{this.getUIContext().animateTo(settingsDialogClose(),()=>this.editorPreviewCompressed=false);action.dismiss();},onDisappear:()=>{this.editorSectionOpen=false;this.capabilityPickerOpen=false;this.readingComparisonOpen=false;this.getUIContext().animateTo(settingsDialogClose(),()=>this.editorPreviewCompressed=false);}})
         .id('editorMotionChrome').bindToScrollable([this.scroller]).hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).width('100%').height('100%').backgroundColor(Color.Transparent)
     }.width('100%').height('100%').padding({ top: this.safeTop + EDITOR_SAFE_GAP }).opacity(this.editorOpacity)
       .hitTestBehavior(!this.editing || this.heroActive ? HitTestMode.None : HitTestMode.Default)
@@ -1851,84 +1861,109 @@ struct Index {
     if(redo&&index===0)this.restoreHistory(true);else this.duplicate();
   }
   private async showAddMenu():Promise<void> {
-    const id=this.selectedId,index=await this.navChoice('添加到当前图层',['文字','本地图片 / GIF','形状'],'editorAdd');
-    if(index>=0&&this.alive&&this.editing&&!this.heroActive&&id===this.selectedId)this.addElement(['text','image','shape'][index]);
-  }
-  private editorControlsWidth(): number {
-    return (this.editorLandscape() ? this.screenWidth - this.editorViewportWidth() : this.screenWidth) - 32;
-  }
-  private editorTabChanged(): void {
-    const apply=():void=>{
-      this.settingsTab = this.editorTabs[0] ?? 0;
-      this.layerId = this.settingsTab === 0 ? (this.preview.elements.find((el: CanvasElement) => el.behindCapability)?.id ?? '') : (this.preview.capability!==null?'capability':'');
-      this.showLayerOptions = false; this.showBackgroundOptions=false; this.syncFields();
-    };
-    this.scroller.scrollTo({ xOffset: 0, yOffset: 0 });
-    if(this.editing&&!this.heroActive)this.getUIContext().animateTo(settingsDialogOpen(),apply);else apply();
-  }
-  @Builder
-  editorControls() {
-    if(this.preview.capability?.k==='album') {
-      Text('专辑封面与背景').fontSize(14).fontColor(this.appMuted()).width(this.editorControlsWidth()).margin({top:4,bottom:12})
-    } else {
-    SettingsSegmented({labels:['背景创作','上层内容'],selectedIndex:this.settingsTab,appDark:this.appDark,onSelect:(index:number)=>{this.editorTabs=[index];}})
-      .width(this.editorControlsWidth()).margin({top:4,bottom:12})
-  }
-  }
-  private hasEditorLayers():boolean {
-    if(this.preview.capability?.k==='album')return false;
-    return this.preview.elements.filter((el:CanvasElement)=>el.behindCapability===(this.settingsTab===0)).length>0 || this.settingsTab===1&&this.preview.capability!==null;
+    const id=this.selectedId,index=await this.navChoice('添加到卡片',this.preview.capability===null?['文字','本地图片 / GIF','形状','能力']:['文字','本地图片 / GIF','形状'],'editorLayerAdd');
+    if(index>=0&&this.alive&&this.editing&&!this.heroActive&&id===this.selectedId){if(index===3)this.chooseCapability();else this.addElement(['text','image','shape'][index]);}
   }
   @Builder
   editorLayers() {
-    if(this.hasEditorLayers()) {
-      Scroll() { Row({space:6}) {this.layerEntries()}.padding(4) }
-        .width(this.editorViewportWidth()-32).height(56).scrollable(ScrollDirection.Horizontal).align(Alignment.Start).scrollBar(BarState.Off)
-        .backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).margin({left:16,right:16,bottom:8})
-    }
+    Scroll() { Row({space:10}) {this.layerEntries()}.padding(3) }
+      .id('editorLayerStrip').width(this.editorViewportWidth()-32).height(100).scrollable(ScrollDirection.Horizontal).align(Alignment.Start).scrollBar(BarState.Off)
+      .margin({left:16,right:16,top:8,bottom:8})
+  }
+  private editorTools():string[] {
+    return this.preview.capability?.k==='album'?['样式','封面与资料']:this.layerId==='capability'?['样式','位置','颜色','数据']:this.layerId.length?(this.elementPreview.kind==='image'?['图片','位置']:['外观','位置','颜色']):['形状','底色'];
+  }
+  private openEditorSection(index:number):void {
+    if(this.heroActive)return;this.editorSection=index;this.editorSheetTab=0;this.getUIContext().animateTo(settingsDialogOpen(),()=>{this.editorPreviewCompressed=true;this.editorSectionOpen=true;});
+  }
+  @Builder
+  editorToolSymbol(index:number) {
+    if(index===0) {SymbolGlyph($r('sys.symbol.paintpalette')).fontSize(23).fontColor([this.appText()])}
+    else if(index===1 && this.layerId!=='') {SymbolGlyph($r('sys.symbol.square_stack_3d')).fontSize(23).fontColor([this.appText()])}
+    else if(index===2 || index===1 && !this.layerId) {SymbolGlyph($r('sys.symbol.drop')).fontSize(23).fontColor([this.appText()])}
+    else {SymbolGlyph($r('sys.symbol.calendar')).fontSize(23).fontColor([this.appText()])}
   }
   @Builder
   editorInspector() {
+    Column({space:12}) {
+      Text(this.layerId==='capability'?'拖动内容，使用角落手柄调整大小':this.layerId?'拖动图层，使用角落手柄调整大小与角度':'选择图层，或添加文字、图片和形状')
+        .fontSize(12).fontColor(this.appMuted()).maxLines(2).width('100%').textAlign(TextAlign.Center)
+      Row({space:10}) {
+        ForEach(this.editorTools(),(label:string,index:number)=>{
+          Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {
+            Column({space:7}) {this.editorToolSymbol(index);Text(label).fontSize(12).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontColor(this.appText())}.width('100%').hitTestBehavior(HitTestMode.None)
+          }.id('editorTool_'+index).layoutWeight(1).height(76).padding(4).borderRadius(20).backgroundColor(this.appSurface()).attributeModifier(immersiveChrome(this.appDark)).borderRadius(20).clip(true)
+            .accessibilityText(label+'设置').onClick(()=>this.openEditorSection(index))
+        },(label:string)=>label)
+      }.width('100%')
+    }.width('100%').padding({left:16,right:16,top:12,bottom:this.safeBottom+16}).layoutWeight(1).justifyContent(FlexAlign.End)
+  }
+  private editorSheetHeight():number {return Math.min(520,Math.max(300,this.screenHeight*.52),this.screenHeight-this.safeTop-80);}
+  private sectionTabs():string[] {return this.preview.capability?.k==='album'?['封面库','资料','轮换']:this.preview.capability?.k==='timetable'?['显示','课表','校历']:[];}
+  @Builder
+  editorCombinedSheet() {
+    if(this.capabilityPickerOpen||this.readingComparisonOpen) {this.editorTaskSheet()} else {this.editorSectionSheet()}
+  }
+  @Builder
+  editorSectionSheet() {
+    Column({space:16}) {
+      Text(this.editorTools()[this.editorSection]??'设置').fontSize(20).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%').padding({right:40})
+      if(this.layerId==='capability'&&this.preview.capability?.k!=='album') {
+        SettingsSegmented({labels:['样式','位置','颜色','数据'],selectedIndex:this.editorSection,appDark:this.appDark,onSelect:(i:number)=>{this.editorSection=i;this.editorSheetTab=0;this.scroller.scrollTo({xOffset:0,yOffset:0});}})
+      }
+      if(this.sectionTabs().length>0 && (this.preview.capability?.k==='album'&&this.editorSection===1 || this.layerId==='capability'&&this.editorSection===3)) {SettingsSegmented({labels:this.sectionTabs(),selectedIndex:this.editorSheetTab,appDark:this.appDark,onSelect:(i:number)=>{this.editorSheetTab=i;this.scroller.scrollTo({xOffset:0,yOffset:0});}})}
       Scroll(this.scroller) {
-        Column() {
-        ForEach([this.settingsTab+':'+this.layerId+':'+(this.preview.capability?.k??'none')],(_key:string)=>{
-        Column({ space: 12 }) {
+        Column({space:16}) {
           if(this.preview.capability?.k==='album') {
-            Column({space:16}) {this.capabilityPanel();this.capabilityDataPanel()}
-              .width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
+            if(this.editorSection===0) {this.albumStyleChoices()}
+            else {Column() {this.capabilityDataPanel()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(20)}
+          } else if(this.layerId==='capability'&&this.preview.capability!==null) {
+            if(this.editorSection===0) {this.capabilityStyleChoices()}
+            else if(this.editorSection===1) {this.layerLayoutContents()}
+            else if(this.editorSection===2) {Column() {this.colorRow('内容颜色','ink')}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(20)}
+            else {Column() {this.capabilityDataPanel()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(20)}
+          } else if(this.layerId.length>0) {
+            if(this.editorSection===0) {this.elementFields()}
+            else if(this.editorSection===1) {this.layerLayoutContents()}
+            else if(this.elementPreview.kind==='image') {Text('照片保留原始颜色').fontSize(14).fontColor(this.appMuted())}
+            else {this.colorRow('元素颜色','element')}
           } else {
-          if (this.layerId.length > 0 && this.layerId !== 'capability') {
-            this.elementFields()
+            if(this.editorSection===0) {this.appearancePanel()}
+            else {Column({space:16}) {this.colorRow('底色','paper');this.paperPresets()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(20)}
           }
-          if (this.settingsTab === 0 && this.layerId.length === 0) {
-            Column({ space: 16 }) {
-              Text('底板').fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
-            this.colorRow('底色', 'paper')
-            Row({ space: 8 }) {
-              Button('底板形状与边缘', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).height(AppDesign.controlHeight).fontSize(14).fontColor(this.appText()).backgroundColor(this.appControl())
-                .onClick(() => { this.showBackgroundOptions = true; })
-                .bindSheet(this.showBackgroundOptions,this.appearanceSheet,{height:this.appearanceSheetHeight(),detents:[this.appearanceSheetHeight(),this.taskSheetHeight(true)],preferType:this.screenWidth>=600?SheetType.CENTER:SheetType.BOTTOM,width:Math.min(560,this.screenWidth-24),showClose:true,backgroundColor:this.appSurface(),onDisappear:()=>this.showBackgroundOptions=false})
-            }.width('100%')
-            }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
-          } else if (this.settingsTab === 1 && (this.layerId === 'capability' || this.layerId.length === 0)) {
-            if(this.preview.capability===null){Column({space:16}) {this.capabilityPanel()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)}
-            if(this.preview.capability!==null) {
-              CapabilityAppearance({card:this.preview,appDark:this.appDark,onChoose:()=>this.chooseCapability(),onCompare:()=>this.compareReading(),onBlend:(blend)=>this.chooseReadingComposition(blend),onHook:(position:number)=>{const card=this.current();if(card?.capability){card.capability.readingHook=position;this.change();}},onAttachment:(side:string,outer:boolean)=>{const c=this.current();if(c?.capability){c.capability.readingEdge=side;c.capability.readingOutside=outer;const a=edgeAttachment(c,c.capBox,side,outer);c.capBox.x=a.box.x;c.capBox.y=a.box.y;c.capBox.rot=0;this.change();}},onArrange:(anchor:string)=>this.arrangeCapability(anchor),onColor:()=>this.chooseColor('ink'),onColorPick:(color:string,key:string)=>this.setCardColor('ink',color,key),onStyle:(style:string)=>{
-                const card=this.current();if(card?.capability){card.capability.readingStyle=style;this.change();}
-              }})
-            }
-            if(this.preview.capability!==null && ['countdown','anniversary','battery','agenda','timetable','worldclock'].includes(this.preview.capability!.k)) {
-              Column() { this.capabilityDataPanel() }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)
-            }
-          }
-
-          if (this.settingsTab === 1 && this.preview.capability !== null && capabilityBox(this.preview).w === 0) { Text('内容空间不足，请调整文字大小或位置').fontSize(12).fontColor('#846339').width('100%') }
-          }
-        }.width('100%').padding({ left: 16, right: 16, top: 4, bottom: this.safeBottom + 16 }).transition(settingsReveal())
-        },(key:string)=>key)
-        }.width('100%')
-      }.width('100%').layoutWeight(1).scrollable(ScrollDirection.Vertical).align(Alignment.Top).scrollBar(BarState.Off).backgroundColor(this.appPanel()).renderGroup(this.heroActive)
-        .onAppear(() => this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }))
+        }.width('100%').padding({bottom:24})
+      }.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Off)
+    }.width('100%').height('100%').padding({left:20,right:20,top:12,bottom:12}).backgroundColor(this.appBackground()).borderRadius(24).clip(true)
+  }
+  @Builder
+  albumStyleChoices() {
+    EditorVisualChoices({card:this.preview,mode:'album',selected:this.preview.capability?.albumPresentation??'cover',appDark:this.appDark,onChoose:(key:string)=>{const cap=this.current()?.capability;if(cap){const next=JSON.parse(JSON.stringify(cap)) as CapBlock;next.albumPresentation=key;this.updateExtraCapability(this.preview.id,next);}}})
+    Text('封面固定为正方形；信息款显示专辑名与歌手，超出行数自动省略。').fontSize(12).fontColor(this.appMuted()).width('100%')
+  }
+  @Builder
+  capabilityStyleChoices() {
+    EditorVisualChoices({card:this.preview,selected:this.preview.capability?.readingBlend??'',appDark:this.appDark,onChoose:(key:string)=>this.chooseReadingComposition(key)})
+    if(this.preview.capability?.readingBlend==='sticker') {
+      Text('贴合方式').fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
+      SettingsSegmented({labels:['左侧','右侧'],selectedIndex:this.preview.capability.readingEdge==='right'?1:0,appDark:this.appDark,onSelect:(i:number)=>this.setCapabilityAttachment(i===0?'left':'right',this.preview.capability?.readingOutside===true)})
+      SettingsSegmented({labels:['内贴合','外贴合'],selectedIndex:this.preview.capability.readingOutside?1:0,appDark:this.appDark,onSelect:(i:number)=>this.setCapabilityAttachment(this.preview.capability?.readingEdge||'left',i===1)})
+    }
+    if(this.preview.capability?.readingBlend==='tag') {HookPlacement({hookLocation:this.preview.capability.readingHook??.2,appDark:this.appDark,onChoose:(p:number)=>{const cap=this.current()?.capability;if(cap){cap.readingHook=p;this.change();}}})}
+    Text('大小与位置在预览中直接调整；内容会随时间变化，衬底自动适应。').fontSize(12).fontColor(this.appMuted()).width('100%')
+    Column() {this.capabilityPanel()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(20)
+  }
+  private setCapabilityAttachment(side:string,outer:boolean):void {
+    const c=this.current();if(!c?.capability)return;c.capability.readingEdge=side;c.capability.readingOutside=outer;
+    const a=edgeAttachment(c,c.capBox,side,outer);c.capBox.x=a.box.x;c.capBox.y=a.box.y;c.capBox.rot=0;this.change();
+  }
+  @Builder
+  paperPresets() {
+    Scroll() {Row({space:8}) {
+      ForEach(THEMES,(theme:string)=>{
+        Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {}.width(44).height(44).backgroundColor(materialColors(theme,'','')[0]).border({width:this.preview.material===theme&&!this.preview.paper?2:.5,color:this.preview.material===theme&&!this.preview.paper?this.appText():AppDesign.border(this.appDark)})
+          .accessibilityText(['白色','米色','牛皮纸','绿色','蓝色','粉色','黑色'][THEMES.indexOf(theme)]).onClick(()=>{const card=this.current();if(card){card.material=theme;card.paper='';this.change();}})
+      },(theme:string)=>theme)
+    }}.width('100%').height(48).scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).align(Alignment.Start)
   }
   private editorCanvasHeight(): number { return this.previewViewport().height; }
   private selectionGeometry(): SelectionHandles {
@@ -1938,7 +1973,7 @@ struct Index {
   @Builder
   canvasEditor() {
     Stack({ alignContent: Alignment.TopStart }) {
-      Column().width('100%').height('100%').backgroundColor(Color.Transparent).onClick(() => { this.layerId = ''; this.syncFields(); })
+      Column().width('100%').height('100%').backgroundColor(Color.Transparent).onClick(() => this.chooseLayer(''))
       Stack({ alignContent: Alignment.TopStart }) {
         ForEach(this.preview.elements.filter((el: CanvasElement) => this.preview.capability?.k!=='album' && el.behindCapability && this.settingsTab === 0), (el: CanvasElement) => { this.layerTouch(el.id) }, (el: CanvasElement) => el.id)
         if (this.settingsTab === 1 && this.preview.capability !== null && this.preview.capability.k!=='album') { this.layerTouch('capability') }
@@ -2015,7 +2050,8 @@ struct Index {
       const factor = Math.max(minFactor, Math.min(nextW / this.resizeStart.w, (1 - this.resizeStart.x) / this.resizeStart.w, (1 - this.resizeStart.y) / this.resizeStart.h));
       box.w = this.resizeStart.w * factor; box.h = this.resizeStart.h * factor;
     } else if(this.layerId==='capability') {
-      box.w=Math.min(this.preview.capability?.readingBlend==='sticker'?3:1,Math.max(minW,nextW));box.h=Math.min(1,Math.max(minH,nextH));
+      const limit=isReadingComposition(this.preview.capability?.readingBlend??'')?3:1;
+      box.w=Math.min(limit,Math.max(minW,nextW));box.h=Math.min(limit,Math.max(minH,nextH));
     } else {
       box.w = Math.max(minW, Math.min(1 - box.x, nextW)); box.h = Math.max(minH, Math.min(1 - box.y, nextH));
     }
@@ -2087,19 +2123,19 @@ struct Index {
     if(this.layerId===id)return;
     this.scroller.scrollTo({ xOffset: 0, yOffset: 0 });
     this.getUIContext().animateTo(settingsDialogOpen(),()=>{
-      this.layerId=id;this.showLayerOptions=false;this.showBackgroundOptions=false;this.syncFields();
+      this.layerId=id;this.settingsTab=id==='capability'||this.layerElement(id)?.behindCapability===false?1:0;this.showLayerOptions=false;this.showBackgroundOptions=false;this.syncFields();
     });
   }
   private layerElement(id: string): CanvasElement | null { return this.preview.elements.find((el: CanvasElement) => el.id === id) ?? null; }
   private layerTitle(id:string):string {
     if(id==='capability')return typeLabel(this.preview.capability?.k??'');
-    if(id.length===0)return this.settingsTab===0?'背景底板':'添加能力';
+    if(id.length===0)return '主体底板';
     return this.layerElement(id)?.kind==='image'?'图片':this.layerElement(id)?.kind==='shape'?'形状':'文字';
   }
   @Builder
   layerThumbnail(id:string) {
     Stack() {
-      if(id.length===0 && this.settingsTab===0) {
+      if(id.length===0) {
         if(this.preview.shape==='subject' && this.preview.subjectPhoto && this.preview.cutout) {
           Image(this.preview.cutout).width(32).height(32).objectFit(ImageFit.Contain).draggable(false)
         } else {Column().width(26).height(26).borderRadius(6).backgroundColor(materialColors(this.preview.material,this.preview.paper,this.preview.ink)[0]).border({width:.5,color:AppDesign.border(this.appDark)})}
@@ -2109,38 +2145,38 @@ struct Index {
         Image(this.layerElement(id)?.src??'').width(32).height(32).objectFit(ImageFit.Contain).draggable(false)
       } else if(this.layerElement(id)?.kind==='shape') {
         Column().width(24).height(this.layerElement(id)?.primitive==='line'?3:24).borderRadius(this.layerElement(id)?.primitive==='circle'?12:4).backgroundColor(this.layerElement(id)?.color||this.appText())
-      } else if(id==='capability' && ['clock','worldclock','date','lunar','calendar'].includes(this.preview.capability?.k??'')) {SymbolGlyph($r('sys.symbol.clock')).fontSize(20).fontColor([this.appText()])}
+      } else if(id==='capability' && this.preview.capability!==null) {CapabilityView({cap:this.preview.capability!,contentWidth:200,contentHeight:150,scaleFactor:.32,tick:this.tick,ink:this.appText()}).width(64).height(48).renderGroup(true)}
       else if(id.length===0) {SymbolGlyph($r('sys.symbol.plus')).fontSize(18).fontColor([this.appText()])}
       else {Text(id==='capability'?typeLabel(this.preview.capability?.k??'').slice(0,2):'A').fontSize(id==='capability'?12:18).fontWeight(FontWeight.Medium).fontColor(this.appText())}
-    }.width(36).height(36).hitTestBehavior(HitTestMode.None)
+    }.width(72).height(48).hitTestBehavior(HitTestMode.None)
   }
   @Builder
   layerEntry(id:string) {
     Row({space:2}) {
       Button({type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
-        Row({space:6}) {
+        Column({space:6}) {
           this.layerThumbnail(id)
-          Text(this.layerTitle(id)).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
+          Text(this.layerTitle(id)).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
         }.width('100%').padding({left:6,right:6})
-      }.layoutWeight(1).height(48).backgroundColor(Color.Transparent)
+      }.layoutWeight(1).height(88).backgroundColor(Color.Transparent)
         .accessibilityText('选择图层 '+this.layerTitle(id)).onClick(()=>this.chooseLayer(id))
       if(id.length>0 && this.layerId===id) {
         Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL,role:ButtonRole.ERROR}) {
           SymbolGlyph($r('sys.symbol.trash')).fontSize(17).fontColor(['#C43A35']).hitTestBehavior(HitTestMode.None)
         }.width(44).height(44).backgroundColor(Color.Transparent).accessibilityText('删除图层 '+this.layerTitle(id)).onClick(()=>{if(this.layerId===id)this.removeElement();})
       }
-    }.width(this.layerId===id&&id.length>0?160:112).height(48).borderRadius(16)
-      .backgroundColor(this.layerId===id?this.appControl():Color.Transparent)
+    }.width(this.layerId===id&&id.length>0?144:104).height(88).borderRadius(18)
+      .backgroundColor(this.appSurface()).border({width:this.layerId===id?2:0,color:this.appDark?'#E6D3A2':'#B29A64'})
   }
   @Builder
   layerEntries() {
     if(this.preview.capability?.k==='album') {this.layerEntry('capability')} else {
-    ForEach(this.preview.elements.filter((el: CanvasElement) => this.preview.capability?.k!=='album' && el.behindCapability === (this.settingsTab === 0)).slice().reverse(), (el: CanvasElement) => {
-      this.layerEntry(el.id)
-    }, (el: CanvasElement) => el.id)
-    if (this.settingsTab === 1 && this.preview.capability !== null) { this.layerEntry('capability') }
-    if(this.settingsTab===0 && this.preview.capability?.k!=='album') {this.layerEntry('')}
-    else if(this.preview.capability===null) {this.layerEntry('')}
+      this.layerEntry('')
+      ForEach(this.preview.elements.slice().reverse(),(el:CanvasElement)=>{this.layerEntry(el.id)},(el:CanvasElement)=>el.id)
+      if(this.preview.capability!==null) {this.layerEntry('capability')}
+      Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {
+        Column({space:8}) {SymbolGlyph($r('sys.symbol.plus')).fontSize(24).fontColor([this.appText()]);Text('添加图层').fontSize(12).fontColor(this.appText())}.hitTestBehavior(HitTestMode.None)
+      }.id('editorLayerAdd').width(104).height(88).padding(8).backgroundColor(this.appSurface()).borderRadius(18).onClick(()=>this.showAddMenu())
     }
   }
   @Builder
@@ -2165,16 +2201,6 @@ struct Index {
           SettingsSegmented({labels:['矩形','圆形','线条'],selectedIndex:Math.max(0,['rect','circle','line'].indexOf(this.elementPreview.primitive)),appDark:this.appDark,
             onSelect:(index:number)=>{const el=this.currentElement();if(el!==null){el.primitive=['rect','circle','line'][index];this.change();}}})
         }
-        if (this.elementPreview.kind !== 'image') { this.colorRow('元素颜色', 'element') }
-      }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
-    }
-    if (this.layerId.length > 0) {
-      Column({ space: 12 }) {
-        Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
-          Row(){Text('布局与图层').fontSize(14).maxLines(1).layoutWeight(1).fontColor(this.appText());Blank();SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appMuted()])}.width('100%').padding({left:12,right:12})
-        }.width('100%').height(44).padding(0).backgroundColor(this.appControl()).onClick(()=>this.showLayerOptions=true)
-          .bindSheet(this.showLayerOptions,this.layerLayoutSheet,{height:Math.min(340,this.screenHeight*.70),detents:[Math.min(340,this.screenHeight*.70),this.taskSheetHeight(true)],preferType:this.screenWidth>=600?SheetType.CENTER:SheetType.BOTTOM,width:Math.min(560,this.screenWidth-24),showClose:true,backgroundColor:this.appSurface(),onDisappear:()=>this.showLayerOptions=false})
-
       }.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
     }
   }
@@ -2189,11 +2215,10 @@ struct Index {
     }.width('100%').height('100%').padding(20)
   }
   @Builder
-  layerLayoutSheet() {
+  layerLayoutSheet() {this.layerLayoutContents()}
+  @Builder
+  layerLayoutContents() {
     Column({space:12}) {
-      Text('布局与图层').fontSize(20).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%').padding({right:40})
-      Scroll(){Column({space:12}) {
-
         if (this.layerId !== 'capability') {
           if (this.settingsTab === 0) {
             Button('铺满底板', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).width('100%').height(AppDesign.controlHeight).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText())
@@ -2221,19 +2246,18 @@ struct Index {
         Flex({ wrap: FlexWrap.Wrap }) {
           if (this.layerId.length > 0 && this.layerId !== 'capability') {
           Button(this.settingsTab === 0 ? '移到内容层' : '移到最上层', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).margin({ right: 8, bottom: 8 }).height(AppDesign.controlHeight).fontSize(13).fontColor(this.appText()).backgroundColor(this.appControl())
-            .onClick(() => { const card = this.current(), el = this.currentElement(); if (card !== null && el !== null) { el.behindCapability = false; this.settingsTab = 1; this.editorTabs = [1]; card.elements = card.elements.filter((e: CanvasElement) => e.id !== el.id).concat([el]); this.change(); } })
+            .onClick(() => { const card = this.current(), el = this.currentElement(); if (card !== null && el !== null) { el.behindCapability = false; this.settingsTab = 1;  card.elements = card.elements.filter((e: CanvasElement) => e.id !== el.id).concat([el]); this.change(); } })
           Button(this.settingsTab === 1 ? '移到背景层' : '移到最下层', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).margin({ right: 8, bottom: 8 }).height(AppDesign.controlHeight).fontSize(13).fontColor(this.appText()).backgroundColor(this.appControl())
             .onClick(() => { const card = this.current(), el = this.currentElement(); if (card !== null && el !== null) {
-              el.behindCapability = true; this.settingsTab = 0; this.editorTabs = [0]; card.elements = [el].concat(card.elements.filter((e: CanvasElement) => e.id !== el.id)); this.change();
+              el.behindCapability = true; this.settingsTab = 0;  card.elements = [el].concat(card.elements.filter((e: CanvasElement) => e.id !== el.id)); this.change();
             } })
           }
         }
 
-      }.width('100%')}.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Off)
-    }.width('100%').height('100%').padding(20)
+    }.width('100%').padding(16).backgroundColor(this.appControl()).borderRadius(20)
   }
   private chooseCapability(): void {
-    this.capabilityPickerOpen=true;
+    this.getUIContext().animateTo(settingsDialogOpen(),()=>{this.editorPreviewCompressed=true;this.capabilityPickerOpen=true;});
   }
   @Builder
   capabilityPickerSheet() {
@@ -2253,8 +2277,7 @@ struct Index {
   @Builder
   capabilityDataPanel() {
     Column({space:12}) {
-      Text('内容与来源').fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
-      Text(capabilityDescriptor(this.preview.capability?.k??'none').source).fontSize(12).fontColor(this.appMuted()).width('100%')
+
       if (this.preview.capability?.k === 'countdown' || this.preview.capability?.k === 'anniversary') {
         TextInput({ text: this.titleValue, placeholder: '名称' }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(16).fontColor(this.appText()).placeholderColor(this.appMuted()).backgroundColor(this.appControl())
           .onChange((v: string) => { this.titleValue = v; const cap = this.current()?.capability; if (cap !== null && cap !== undefined) { cap.title = v; this.change(); } })
@@ -2265,15 +2288,15 @@ struct Index {
       }
 
       if(this.preview.capability!==null && ['album','battery','agenda','timetable'].includes(this.preview.capability!.k)) {
-        CapabilitySettings({tick:this.tick,cap:this.preview.capability!,cardId:this.preview.id,appDark:this.appDark,onReuseTimetable:(id:string)=>this.reuseTimetable(id),onUpdate:(id:string,next:CapBlock)=>this.updateExtraCapability(id,next)})
+        CapabilitySettings({section:this.preview.capability?.k==='timetable'?['display','courses','calendar'][this.editorSheetTab]:this.preview.capability?.k==='album'?['library','metadata','rotation'][this.editorSheetTab]:'all',tick:this.tick,cap:this.preview.capability!,cardId:this.preview.id,appDark:this.appDark,onReuseTimetable:(id:string)=>this.reuseTimetable(id),onUpdate:(id:string,next:CapBlock)=>this.updateExtraCapability(id,next)})
       }
     }.width('100%')
   }
   private chooseReadingComposition(blend:string):void {
     const card=this.current();if(!card?.capability||!readingStyles(card.capability.k).includes(blend))return;
-    card.capability.readingBlend=blend;card.capability.readingStyle='surface';card.capability.readingEdge=blend==='sticker'?'left':'';
-    card.capBox=compositionPlacement(card,capabilityPlacement(card),blend);card.capFree=true;
-    if(blend==='sticker'){const a=edgeAttachment(card,card.capBox,'left',card.capability.readingOutside===true);card.capBox.x=a.box.x;card.capBox.y=a.box.y;card.capBox.rot=0;}
+    card.capability.readingBlend=blend;card.capability.readingStyle='surface';card.capability.readingEdge=blend==='sticker'?(card.capability.readingEdge||'left'):'';
+    card.capBox=editorReadingPlacement(card,blend);card.capFree=true;
+    if(blend==='sticker'){const a=edgeAttachment(card,card.capBox,card.capability.readingEdge||'left',card.capability.readingOutside===true);card.capBox.x=a.box.x;card.capBox.y=a.box.y;card.capBox.rot=0;}
     this.change();
 
   }
@@ -2308,17 +2331,7 @@ struct Index {
   @Builder
   appearancePanel() {
     Column({ space: 12 }) {
-      Row({space:12}) {
-      Text('配色').fontSize(14).fontColor(this.appText()).width(48)
-      SettingsSelect({labels:['白','米色','牛皮纸','绿','蓝','粉','黑'],selectedIndex:Math.max(0,THEMES.indexOf(this.preview.material)),appDark:this.appDark,
-        onSelect:(index:number)=>{const card=this.current();if(card!==null&&THEMES[index]){card.material=THEMES[index];card.paper='';this.paperValue='';this.change();}}}).layoutWeight(1)
-      }.width('100%')
-      Row({space:12}) {
-      Text('形状').fontSize(14).fontColor(this.appText()).width(48)
-      SettingsSelect({labels:this.preview.cutout.length>0?['方形','椭圆','胶囊','自由边角','照片主体']:['方形','椭圆','胶囊','自由边角'],
-        selectedIndex:this.preview.shape==='subject'?4:Math.max(0,SHAPES.indexOf(this.preview.shape)),appDark:this.appDark,
-        onSelect:(index:number)=>{const card=this.current();if(card!==null){if(index===4&&card.cutout.length>0){card.shape='subject';card.h=card.w/card.subjectAspect;}else if(SHAPES[index])card.shape=SHAPES[index];else return;this.change();}}}).layoutWeight(1)
-      }.width('100%')
+      EditorVisualChoices({card:this.preview,mode:'shape',selected:this.preview.shape,appDark:this.appDark,onChoose:(key:string)=>{const card=this.current();if(card){card.shape=key;if(key==='subject')card.h=card.w/card.subjectAspect;this.change();}}})
       Button(this.busy ? '正在处理照片' : '用照片主体作为形状', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).width('100%').fontSize(14)
         .fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.busy).onClick(() => this.pickImage(true))
       if (this.preview.cutout.length > 0 && this.preview.shape !== 'subject') {

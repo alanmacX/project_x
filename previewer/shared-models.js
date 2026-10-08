@@ -1545,8 +1545,8 @@ exports.constrainCapabilityDrag = constrainCapabilityDrag;
 /** Foreground movement stays continuous across concavities and transparent holes. */
 function freeCapabilityBox(requested, outside = false, wide = false) {
     const box = new CardSchema_1.ElementBox();
-    box.w = Math.min(wide ? 3 : 1, Math.max(.01, requested.w));
-    box.h = Math.min(1, Math.max(.01, requested.h));
+    box.w = Math.min(outside || wide ? 3 : 1, Math.max(.01, requested.w));
+    box.h = Math.min(outside ? 3 : 1, Math.max(.01, requested.h));
     box.x = Math.max(outside ? -2 : 0, Math.min(outside ? 2 : 1 - box.w, requested.x));
     box.y = Math.max(outside ? -2 : 0, Math.min(outside ? 2 : 1 - box.h, requested.y));
     box.rot = outside ? requested.rot : 0;
@@ -3354,4 +3354,4 @@ function traceMask(mask, width, height) {
 }
 exports.traceMask = traceMask;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"0f57941daa7e8a5cfc596ca75355e39cf5166014cf9d6ec0495b84bdd2960815"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"51e96e0d5ed73579860839501737e5acfc7802622c10bbd145e8077ebaee0eef"};})(globalThis);

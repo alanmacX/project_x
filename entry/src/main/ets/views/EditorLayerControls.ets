@@ -22,7 +22,7 @@ export struct EditorLayerTarget {
   build() {
     Stack().width(this.live().w*this.factor*100+'%').height(this.live().h*this.factor*100+'%')
       .position({x:(this.inset()+this.live().x*this.factor)*100+'%',y:(this.inset()+this.live().y*this.factor)*100+'%'})
-      .rotate({angle:this.live().rot}).border({width:this.selected?1:0,color:'#7A7A7A'}).zIndex(this.selected?10000:0)
+      .rotate({angle:this.live().rot}).borderRadius(12).border({width:this.selected?1:0,color:'#B29A64'}).zIndex(this.selected?10000:0)
       .onClick(()=>this.onSelect()).gesture(PanGesture({distance:3}).onActionStart((e)=>this.onStart(e)).onActionUpdate((e)=>this.onUpdate(e)).onActionEnd((e)=>this.onEnd(e)).onActionCancel(()=>this.onCancel()))
   }
 }

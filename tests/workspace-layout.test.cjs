@@ -16,7 +16,7 @@ for(const [w,h] of [[320,568],[360,640],[390,844],[424,900],[600,960],[768,1024]
   assert.equal(l.previewW+l.inspectorW,l.wide?w:w*2,'compact inspector is below, wide inspector beside');
   const body=h-28-24-76;
   if(l.wide){assert.ok(l.previewH+l.layersH+24<=body,'landscape artwork and native layer targets fit vertically');assert.ok(l.inspectorW>=300&&l.inspectorW<=400,'wide settings stay within a readable width');}
-  else {assert.equal(l.previewW,w);assert.ok(body-l.previewH-l.layersH-12-56>=180,'small phone retains a usable settings viewport');}
+  else {assert.equal(l.previewW,w);assert.ok(body-l.previewH-l.layersH>=120,'small phone retains room for contextual tools; detail controls live in the sheet');}
  }
 }
 assert.equal(workspaceLayout(600,960,28,24,1).wide,false);

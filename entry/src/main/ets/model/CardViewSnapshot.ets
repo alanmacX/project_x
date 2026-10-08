@@ -1,4 +1,4 @@
-import { registerRenderContour, cardOutline } from './RenderContours';
+import { registerRenderContour, cardOutline } from './ContourRegistry';
 import { FridgeCard, CapBlock, ElementBox, CanvasElement } from './CardSchema';
 
 /** Contours are immutable after extraction. Keep them shared while editable values are snapshots. */

@@ -14,6 +14,8 @@ export struct AlbumSettings {
   @Prop @Watch('cardChanged') cardId:string='';
   @Prop appDark:boolean=false;
   @Prop tick:number=0;
+  @Prop section:string='all';
+  @Prop showPresentation:boolean=true;
   onUpdate:(id:string,cap:CapBlock)=>void=()=>{};
   @State busy:boolean=false;
   @State message:string='';
@@ -66,11 +68,16 @@ export struct AlbumSettings {
   }
   build() {
     Column({space:12}) {
-      SettingsSegmented({labels:['纯封面','经典信息','横向信息'],selectedIndex:Math.max(0,['cover','classic','row'].indexOf(this.cap.albumPresentation??'cover')),appDark:this.appDark,onSelect:(i:number)=>this.setPresentation(i)})
+      if(this.showPresentation) {SettingsSegmented({labels:['纯封面','经典信息','横向信息'],selectedIndex:Math.max(0,['cover','classic','row'].indexOf(this.cap.albumPresentation??'cover')),appDark:this.appDark,onSelect:(i:number)=>this.setPresentation(i)})}
+      if(this.section==='all'||this.section==='library') {
       if(this.cap.albumCover) {Image(this.cap.albumCover).width(64).height(64).borderRadius(6).objectFit(ImageFit.Contain).draggable(false)}
       SettingsAction({label:this.busy?'处理中':this.cap.albumCover?'添加到封面库':'选择本地封面',appDark:this.appDark,fillWidth:true,isEnabled:!this.busy&&albumLibrary(this.cap).length<12,onPress:()=>this.choose()})
+      }
+      if(this.section==='all'||this.section==='metadata') {
       TextInput({text:this.currentAlbum().title,placeholder:'专辑名（可选）'}).height(44).maxLength(160).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(14).enabled(!this.busy).onChange((v:string)=>this.text(v,false))
       TextInput({text:this.currentAlbum().artist,placeholder:'歌手（可选）'}).height(44).maxLength(160).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(14).enabled(!this.busy).onChange((v:string)=>this.text(v,true))
+      }
+      if(this.section==='all'||this.section==='library') {
       if(albumLibrary(this.cap).length) {
         Text('封面库 · '+albumLibrary(this.cap).length+'/12').fontSize(14).fontColor(AppDesign.text(this.appDark)).width('100%')
         Grid() {
@@ -88,15 +95,20 @@ export struct AlbumSettings {
         }.columnsTemplate('1fr 1fr 1fr').columnsGap(10).rowsGap(12).width('100%').height(Math.ceil(albumLibrary(this.cap).length/3)*(Math.max(60,(this.libraryWidth-20)/3)+70)).onAreaChange((_,area:Area)=>{const width=Number(area.width);if(width>0&&Math.abs(width-this.libraryWidth)>1)this.libraryWidth=width;})
       }
       if(albumLibrary(this.cap).length>1) {SettingsAction({label:'下一张 · 预览切换',appDark:this.appDark,fillWidth:true,onPress:()=>{const items=albumLibrary(this.cap),index=items.findIndex(a=>a.id===this.currentAlbum().id);this.onUpdate(this.cardId,selectAlbum(this.cap,items[(index+1)%items.length]));}})}
+      }
+      if(this.section==='all'||this.section==='rotation') {
       Text('定时轮换').fontSize(14).fontColor(AppDesign.text(this.appDark)).width('100%')
       SettingsSegmented({labels:['关闭','1小时','3小时','6小时','每天'],selectedIndex:Math.max(0,[0,60,180,360,1440].indexOf(this.cap.albumRotationMinutes??0)),appDark:this.appDark,onSelect:(i:number)=>{if(i>0&&albumLibrary(this.cap).length<2){this.message='请先添加至少两张封面';return;}this.message='';this.setRotation(i);}})
       Text('按库内顺序轮换；桌面更新由系统调度，可能稍有延迟。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+      }
+      if(this.section==='all'||this.section==='library') {
       Text('仅支持正方形封面（1:1）；背景在本机自动生成，无需联网。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       SettingsAction({label:this.sources?'收起封面来源建议':'封面来源建议',appDark:this.appDark,fillWidth:true,onPress:()=>this.sources=!this.sources})
       if(this.sources) {
         SettingsAction({label:'iSearch · 中文封面搜索 ↗',appDark:this.appDark,fillWidth:true,onPress:()=>this.source('https://i.oppsu.cn/')})
         SettingsAction({label:'CoverBox · 备用搜索 ↗',appDark:this.appDark,fillWidth:true,onPress:()=>this.source('https://coverbox.henry-hu.com/')})
         Text('在浏览器搜索专辑或歌手，保存封面到相册后导入。外部网站需要联网，封面库和轮换在本机运行。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+      }
       }
       if(this.message) {Text(this.message).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
     }.width('100%').enabled(!this.busy)
