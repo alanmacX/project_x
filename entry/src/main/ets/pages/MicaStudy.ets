@@ -85,6 +85,7 @@ struct MicaStudy {
     Button('黄色异形底板',{type:ButtonType.Capsule}).fontColor(this.localPhoto?'#45443E':'#FFFFFF').backgroundColor(this.localPhoto?'#EFEADD':'#45443E').onClick(()=>this.localPhoto=false)
     Button('本地照片对照',{type:ButtonType.Capsule}).fontColor(this.localPhoto?'#FFFFFF':'#45443E').backgroundColor(this.localPhoto?'#45443E':'#EFEADD').onClick(()=>this.localPhoto=true)
    }.padding({left:16,right:16}).width('100%')
+   Button('试边缘轮廓',{type:ButtonType.Capsule}).fontColor(AppDesign.text(this.dark)).backgroundColor(AppDesign.surface(this.dark)).onClick(()=>this.getUIContext().getRouter().pushUrl({url:'pages/ReadingEdgeStudy'}))
    Scroll() {
     if(!this.localPhoto||this.source) {
      if(this.pageWidth>=720){Row({space:16}){ForEach([1,2,3],(i:number)=>{this.variant(i)},(i:number)=>String(i))}.padding(16)}

@@ -4,6 +4,7 @@
     "pages/SketchLab",
     "pages/ReadingDemo",
     "pages/ReceiveTemplate",
-    "pages/MicaStudy"
+    "pages/MicaStudy",
+    "pages/ReadingEdgeStudy"
   ]
 }
