@@ -1,3 +1,4 @@
+import { sameTimetable, useSavedTimetable } from '../model/TimetableLibrary';
 import { edgeAttachment } from '../model/EdgeAttachment';
 import { capabilityAttachmentEdges } from '../model/CanvasLayout';
 import { preferredReadingStyle, defaultReadingStyle } from '../model/ReadingStylePolicy';
@@ -876,17 +877,26 @@ struct Index {
     const offset = (this.cards.length % 6) * 20; card.x += offset; card.y += offset;
     this.clamp(card); this.store.addCard(card); this.select(card.id); this.change(); this.openEditor(card.id, true);
   }
-  private setCapability(k: string): void {
+  private capabilitySelection:number=0;
+  private async setCapability(k: string): Promise<void> {
+    const selection=++this.capabilitySelection;
     const card = this.current(); if (card === null) return;
     if (card.capability?.k === k) { this.layerId = 'capability'; this.syncFields(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); return; }
     if (k === 'none') { card.capability = null; this.layerId = ''; }
     else {
-      const cap: CapBlock = { k:k,readingBlend:k==='album'?undefined:preferredReadingStyle(k),readingStyle:'surface' };
+      let cap: CapBlock = { k:k,readingBlend:k==='album'?undefined:preferredReadingStyle(k),readingStyle:'surface' };
       if (k === 'countdown' || k === 'anniversary') {
         const date = new Date(); cap.date = date.getFullYear() + '-' + ('0' + (date.getMonth() + 1)).slice(-2) + '-' + ('0' + date.getDate()).slice(-2);
         cap.title = '';
       }
-      if(k==='timetable'){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));cap.semester=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);cap.courses=[];}
+      if(k==='timetable') {
+        try {
+          const saved=await this.store.savedTimetable();
+          if(!this.alive||selection!==this.capabilitySelection||this.current()!==card||this.store.findCard(card.id)!==card)return;
+          if(saved)cap=useSavedTimetable(cap,saved);
+          else {const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));cap.semester=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);cap.courses=[];}
+        }catch(e){this.getUIContext().getPromptAction().showToast({message:(e as Error).message});return;}
+      }
       if (k === 'worldclock') cap.zone = 'Asia/Shanghai';
       if(k==='album') {card.shape='rect';card.frame=false;this.editorTabs=[1];this.settingsTab=1;}
       card.capability = cap; card.capBox = capabilityPreset(card,'center'); this.layerId = 'capability';
@@ -1078,7 +1088,19 @@ struct Index {
   }
   private updateExtraCapability(id:string,next:CapBlock):void {
     const card=this.store.findCard(id);if(!card||card.capability?.k!==next.k)return;
+    const courseDataChanged=next.k==='timetable'&&!sameTimetable(card.capability,next);
     card.capability=next;this.syncFields();this.change();
+    if(courseDataChanged&&this.store.findCard(id)?.capability===next)this.store.rememberTimetable(next).catch(()=>{if(this.alive)this.getUIContext().getPromptAction().showToast({message:'课表未能保存，请重试修改；现有本地课表已保留'});});
+  }
+  private async reuseTimetable(id:string):Promise<void> {
+    const card=this.store.findCard(id);if(card?.capability?.k!=='timetable')return;
+    const previous=card.capability;
+    try {
+      const saved=await this.store.savedTimetable();
+      if(!this.alive||this.store.findCard(id)!==card||card.capability!==previous)return;
+      if(!saved){this.getUIContext().getPromptAction().showToast({message:'还没有已保存的课表，请先导入或添加课程'});return;}
+      this.updateExtraCapability(id,useSavedTimetable(previous,saved));
+    }catch(e){if(this.alive)this.getUIContext().getPromptAction().showToast({message:(e as Error).message});}
   }
   private async refreshCapabilities():Promise<void> {
     if(!this.ready||!this.alive||this.appBackgrounded||this.activeBoardId||this.gestureGroup.length>0||this.refreshingCapabilities||!this.context)return;
@@ -2236,7 +2258,7 @@ struct Index {
       }
 
       if(this.preview.capability!==null && ['album','battery','agenda','timetable'].includes(this.preview.capability!.k)) {
-        CapabilitySettings({tick:this.tick,cap:this.preview.capability!,cardId:this.preview.id,appDark:this.appDark,onUpdate:(id:string,next:CapBlock)=>this.updateExtraCapability(id,next)})
+        CapabilitySettings({tick:this.tick,cap:this.preview.capability!,cardId:this.preview.id,appDark:this.appDark,onReuseTimetable:(id:string)=>this.reuseTimetable(id),onUpdate:(id:string,next:CapBlock)=>this.updateExtraCapability(id,next)})
       }
     }.width('100%')
   }

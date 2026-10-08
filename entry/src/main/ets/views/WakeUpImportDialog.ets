@@ -68,7 +68,7 @@ export struct WakeUpImportDialog {
     Column({space:14}) {
       Text(this.stage?'确认课程表':'导入课程表').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
       if(!this.stage) {
-        Text('导入本地 ICS 课程日历，无需登录、联网或读取你的其他日程。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
+        Text('导入一次即可保存在本机，之后新建课程表卡片无需重复导入。支持本地 ICS 课程日历。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
         SettingsAction({label:'选择课程日历 .ics',onPress:()=>this.file(),appDark:this.appDark,isEnabled:!this.busy,emphasis:true})
         Column({space:8}) {
           Text('如何从 WakeUp 导入').fontSize(15).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark))

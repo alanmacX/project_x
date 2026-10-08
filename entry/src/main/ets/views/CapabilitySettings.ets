@@ -22,6 +22,7 @@ export struct CapabilitySettings {
   @Prop appDark:boolean=false;
   @Prop tick:number=0;
   onUpdate:(id:string,cap:CapBlock)=>void=()=>{};
+  onReuseTimetable:(id:string)=>void=()=>{};
   @State busy:boolean=false;
   @State wholeCalendarAccess:boolean=false;
   @State message:string='';
@@ -110,6 +111,7 @@ export struct CapabilitySettings {
         Text(this.cap.agendaSource==='system'?'系统日历' :this.cap.agendaSource==='imported'?'本地日历副本；原文件修改后需要重新导入':'显示接下来三项安排，缩小时保留下一项').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       }
       if(this.cap.k==='timetable') {
+        Text('课表保存在本机，新建课程表卡片自动使用最近保存的课表；每张卡片的课表副本可独立编辑。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
         Text('卡片展示').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
         SettingsSegmented({labels:['下一课','每日概览'],selectedIndex:this.cap.timetableMode==='day'?1:0,appDark:this.appDark,
           onSelect:(index:number)=>{const next=this.copy();next.timetableMode=index===1?'day':'next';this.change(next);}})
@@ -119,6 +121,7 @@ export struct CapabilitySettings {
           Text('学期课表').fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.text()).layoutWeight(1)
           Button('添加课程',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).fontSize(13).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.editCourse())
         }.width('100%')
+        SettingsAction({label:'使用已保存课表',onPress:()=>this.onReuseTimetable(this.cardId),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
         SettingsAction({label:'查看周课表 · '+(this.cap.courses??[]).length+' 条安排',onPress:()=>this.showTimetable(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
         Row({space:8}) {
           Button('导入课表',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).fontSize(14).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.importTimetable())

@@ -1,3 +1,4 @@
+import { TimetableLibrary, TimetableData } from './TimetableLibrary';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { restoreStartupLayouts } from './CanvasLayout';
 import { taskpool } from '@kit.ArkTS';
@@ -12,7 +13,7 @@ import { storageSnapshot } from './StorageSnapshot';
 import preferences from '@ohos.data.preferences';
 import { formProvider } from '@kit.FormKit';
 import { pushWidgets } from './WidgetSync';
-import { FridgeState, FridgeCard, defaultState, normalizeState, BOARD_W } from './CardSchema';
+import { FridgeState, FridgeCard, CapBlock, defaultState, normalizeState, BOARD_W } from './CardSchema';
 export { FridgeState, FridgeCard, CapBlock, CapType, CanvasElement, ElementBox, ShapePoint, BOARD_W, BOARD_H,
   CAPABILITIES, materialColors, shapeRadius, typeLabel, defaultState, normalizeState, serializeFaceCards, serializeDoorCards } from './CardSchema';
 
@@ -97,6 +98,7 @@ export class FridgeStore {
   }
   canvasSpecs: Record<string, number> = {};
   async init(context: Context): Promise<void> {
+    await this.timetableLibrary?.settled();this.timetableLibrary=null;
     this.context = context;
     await this.saveQueue.catch(() => {});
     await preferences.removePreferencesFromCache(context, 'fridge_store');
@@ -122,6 +124,24 @@ export class FridgeStore {
       this.cacheContours().catch(()=>{});
     } catch (e) { throw new Error('本地卡片数据无法读取，已保留原始记录'); }
   }
+  private timetableLibrary:TimetableLibrary|null=null;
+  private timetableStorage():TimetableLibrary {
+    if(this.timetableLibrary===null)this.timetableLibrary=new TimetableLibrary({
+      read:async():Promise<string>=>{if(!this.prefs)throw new Error('本地存储尚未就绪');return await this.prefs.get('fridge_saved_timetable_v1','') as string;},
+      write:async(json:string):Promise<void>=>{if(!this.prefs)throw new Error('本地存储尚未就绪');await this.prefs.put('fridge_saved_timetable_v1',json);await this.prefs.flush();}
+    });
+    return this.timetableLibrary;
+  }
+  /** Migrate existing timetable cards on first use, including inactive canvases, without startup work. */
+  async savedTimetable():Promise<TimetableData|null> {
+    const library=this.timetableStorage(),saved=await library.read();if(saved)return saved;
+    for(const id of [this.state.canvasId,...this.catalog.canvases.filter((c)=>c.id!==this.state.canvasId).map((c)=>c.id)]) {
+      const canvas=await this.canvasSnapshot(id),cap=canvas.cards.map((c)=>c.capability).find((c)=>c?.k==='timetable'&&(c.courses??[]).length>0);
+      if(cap){await library.save(cap);return await library.read();}
+    }
+    return null;
+  }
+  rememberTimetable(cap:CapBlock):Promise<void>{return this.timetableStorage().save(cap);}
   private contourCache: Record<string,string> = {};
   private async restoreContours(state:FridgeState):Promise<void> {
     if(this.prefs===null)return;
@@ -180,6 +200,9 @@ export class FridgeStore {
     assertCanvasCapacity(this.state.cards.length, cards.length);
     for (const card of cards) { card.z = this.nextZ(); this.state.cards.push(card); }
   }
-  removeCard(id: string): void {this.state.sceneRules=this.state.sceneRules.filter(r=>r.kind!=='focus'||r.targetId!==id);this.state.sceneLayouts.forEach(l=>l.placements=l.placements.filter(p=>p.id!==id)); this.state.cards = this.state.cards.filter((c: FridgeCard) => c.id !== id); }
+  removeCard(id: string): void {
+    const cap=this.findCard(id)?.capability;
+    if(cap?.k==='timetable'&&(cap.courses??[]).length)this.timetableStorage().save(cap,true).catch(()=>hilog.warn(0,'Timetable','unable to retain legacy timetable before deletion'));
+    this.state.sceneRules=this.state.sceneRules.filter(r=>r.kind!=='focus'||r.targetId!==id);this.state.sceneLayouts.forEach(l=>l.placements=l.placements.filter(p=>p.id!==id)); this.state.cards = this.state.cards.filter((c: FridgeCard) => c.id !== id); }
   newId(): string { return 'c' + Date.now() + '_' + (++this.sequence); }
 }
