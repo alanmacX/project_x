@@ -1,7 +1,7 @@
 {
   "UniformDataTypeDeclarations": [
     {
-      "TypeId": "com.fridgememo.template",
+      "TypeId": "com.fridgewidget.app.template",
       "BelongingToTypes": ["general.file"],
       "FilenameExtensions": [".fridge"],
       "MIMETypes": ["application/x-fridgememo"],

@@ -2,7 +2,9 @@ import { deferStartupReveal, revealStartup, cancelStartupReveal } from '../model
 import { startStartupTrace, startupMark } from '../model/StartupTrace';
 import { UIAbility, AbilityConstant, Want, Configuration, ConfigurationConstant } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { window } from '@kit.ArkUI';
+import { window, display } from '@kit.ArkUI';
+import { deviceInfo } from '@kit.BasicServicesKit';
+import { lockPhonePortrait } from '../model/DevicePolicy';
 import { taskpool } from '@kit.ArkTS';
 import { incomingTemplateUri, stageIncomingTemplate, removeStagedTemplate } from '../model/IncomingTemplate';
 
@@ -109,7 +111,7 @@ export default class EntryAbility extends UIAbility {
       this.windowReady = true;
       // Window properties and UIContext insets require loaded content on physical devices.
       try {
-        mainWindow.setPreferredOrientation(window.Orientation.AUTO_ROTATION_UNSPECIFIED)
+        mainWindow.setPreferredOrientation(lockPhonePortrait(deviceInfo.deviceType, display.isFoldable()) ? window.Orientation.PORTRAIT : window.Orientation.AUTO_ROTATION_UNSPECIFIED)
           .catch((e: Error) => hilog.warn(0x0000, TAG, 'orientation %{public}s', e.message));
         mainWindow.setImmersiveModeEnabledState(true);
         this.updateAppearance(this.context.config.colorMode);

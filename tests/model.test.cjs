@@ -161,6 +161,12 @@ function load(name) {
   assert.equal(originalStorage.cards[0].x,24);assert.equal(movedStorage.cards[0].x,123);assert.deepEqual(movedStorage.cards[0].outline,[[{x:.2,y:.3}]]);
   measured.outline=[[{x:.9,y:.8}]];assert.deepEqual(JSON.parse(storageSnapshot(snapState)).cards[0].outline,measured.outline,'replacing the subject invalidates only its contour serialization');
 
+  const snapshots=load('CardViewSnapshot');const detached=snapshots.cardViewSnapshot(measured);
+  const beforeSource=JSON.stringify(measured);const serialized=JSON.parse(storageSnapshot(snapState));
+  assert.equal(JSON.stringify(measured),beforeSource,'storage shell never mutates live card');
+  measured.elements[0].text='changed';assert.notEqual(detached.elements[0].text,measured.elements[0].text,'undo/render snapshots remain deeply detached');
+  assert.equal(serialized.cards[0].elements[0].text,JSON.parse(beforeSource).elements[0].text,'serialized data preserves values at capture time');
+
   const {dragBounds}=load('DragGeometry');
   const {arrivalOffset}=load('ArrivalGeometry');
   for (const angle of [-175,-90,-15,0,15,85,175]) {

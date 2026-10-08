@@ -1,3 +1,4 @@
+import { capabilityRenderTick } from '../model/CapabilityClock';
 import lazy { HookPlacement } from '../views/HookPlacement';
 import lazy { EditorVisualChoices } from '../views/EditorVisualChoices';
 import { editorWorkspace, EditorWorkspace } from '../model/EditorWorkspace';
@@ -1222,7 +1223,7 @@ struct Index {
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_: Area, area: Area) => {
         const width = Number(area.width), height = Number(area.height);
-        if (width > 0 && height > 0) { this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height);if(this.editing&&!this.heroActive)this.editorSheetOpen=!this.editorLandscape(); this.layoutBoard(); }
+        if (width > 0 && height > 0 && (width!==this.screenWidth || height!==this.screenHeight)) { this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height);if(this.editing&&!this.heroActive)this.editorSheetOpen=!this.editorLandscape(); this.layoutBoard(); }
       })
   }
   private sceneCard(id: string): FridgeCard { return this.editing && id === this.selectedId ? this.preview : this.cardMap[id]; }
@@ -1249,7 +1250,7 @@ struct Index {
               animateContent:this.editing&&!this.heroActive&&id===this.selectedId,
               hideContent: this.editing && id === this.selectedId && (this.heroActive ? this.heroHideContent : this.settingsTab === 0),
               movingLayerId: id === this.selectedId ? this.layerDrag : '',
-              moveX: id === this.selectedId && this.editing ? this.layerDX * this.boardScale / this.editorScale() : 0, moveY: id === this.selectedId && this.editing ? this.layerDY * this.boardScale / this.editorScale() : 0, tick: this.tick,
+              moveX: id === this.selectedId && this.editing ? this.layerDX * this.boardScale / this.editorScale() : 0, moveY: id === this.selectedId && this.editing ? this.layerDY * this.boardScale / this.editorScale() : 0, tick: capabilityRenderTick(this.sceneCard(id).capability,this.tick),
               getAlignmentAnchor:(card:FridgeCard)=>{const box=groupBox(groupMembers(this.store.state.cards,card),this.boardHeight/this.boardScale);return {x:box.x+box.w/2,y:box.y+box.h/2};},
               getMoveBounds: (card: FridgeCard) => groupDragBounds(this.store.state.cards, card, this.boardHeight/this.boardScale),
               onMove: (x: number, y: number) => { if (this.movingGroupIds.length > 0) { this.boardMotion.offset = { x: x, y: y }; } },
@@ -1371,7 +1372,7 @@ struct Index {
                       if(this.cardMap[id].shape==='subject'&&this.cardMap[id].subjectPhoto&&this.cardMap[id].cutout) {
                         Image(this.cardMap[id].cutout).width(44).height(44).objectFit(ImageFit.Contain).draggable(false)
                       } else {
-                      CardCanvas({card:this.cardMap[id],scaleFactor:Math.min(44/this.cardMap[id].w,44/this.cardMap[id].h),tick:this.tick})
+                      CardCanvas({card:this.cardMap[id],scaleFactor:Math.min(44/this.cardMap[id].w,44/this.cardMap[id].h),tick:capabilityRenderTick(this.cardMap[id].capability,this.tick)})
                         .width(this.cardMap[id].w*Math.min(44/this.cardMap[id].w,44/this.cardMap[id].h)).height(this.cardMap[id].h*Math.min(44/this.cardMap[id].w,44/this.cardMap[id].h))
                       }
                     }.width(44).height(44).hitTestBehavior(HitTestMode.None)
@@ -1590,7 +1591,7 @@ struct Index {
           CanvasBackdrop({ sceneBackground: this.canvasBackground }).width('100%').height('100%')
           Stack({alignContent:Alignment.TopStart}) {
           ForEach(this.cards.slice(0,this.backgroundPreviewCount), (card: FridgeCard) => {
-            CardFace({ card: card, scaleFactor: 240 / BOARD_W, tick: this.tick })
+            CardFace({ card: card, scaleFactor: 240 / BOARD_W, tick: capabilityRenderTick(card.capability,this.tick) })
               .width(card.w * 240 / BOARD_W).height(card.h * 240 / BOARD_W)
               .position({ x: card.x * 240 / BOARD_W, y: card.y * (240 / this.canvasAspect) / BOARD_H })
               .rotate({ angle: card.rot, centerX: 0, centerY: '100%' }).zIndex(card.z)
@@ -1794,7 +1795,7 @@ struct Index {
           } else if(this.preview.capability?.k==='timetable') {
             WeekTimetable({cap:this.preview.capability!,appDark:this.appDark,editable:false,heightLimit:Math.max(200,this.screenHeight-220)})
           } else {
-            CardFace({card:this.preview,scaleFactor:this.editorScale(),tick:this.tick})
+            CardFace({card:this.preview,scaleFactor:this.editorScale(),tick:capabilityRenderTick(this.preview.capability,this.tick)})
               .rotate({angle:this.preview.rot,centerX:0,centerY:'100%'}).width(this.preview.w*this.editorScale()).height(this.preview.h*this.editorScale()).margin({top:24,bottom:24})
           }
           if (this.preview.capability?.k === 'calendar') {
@@ -2167,7 +2168,7 @@ struct Index {
   layerThumbnail(id:string) {
     Stack() {
       if(id.length===0) {
-        Column() {CardFace({card:this.layerBaseCard(),scaleFactor:this.layerBaseScale(),tick:this.tick,hideContent:true})}
+        Column() {CardFace({card:this.layerBaseCard(),scaleFactor:this.layerBaseScale(),tick:0,hideContent:true})}
           .width(this.preview.w*this.layerBaseScale()).height(this.preview.h*this.layerBaseScale())
       } else if(id==='capability' && this.preview.capability?.k==='album' && this.preview.capability.albumCover) {
         Image(this.preview.capability.albumCover).width(48).height(48).objectFit(ImageFit.Contain).borderRadius(4).draggable(false)

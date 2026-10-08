@@ -1,9 +1,13 @@
 import { fileIo } from '@kit.CoreFileKit';
 
-export const TEMPLATE_UTD: string = 'com.fridgememo.template';
+export const TEMPLATE_UTD: string = 'com.fridgewidget.app.template';
 export const TEMPLATE_MIME: string = 'application/x-fridgememo';
 export function incomingTemplateUri(uri: string | undefined): string {
   return typeof uri === 'string' && uri.startsWith('file://') && uri.length <= 8192 ? uri : '';
+}
+/** Match only the declared file type. Anonymous granted URIs need not expose a suffix. */
+export function sharedTemplateUri(utd: string, uri: string | undefined): string {
+  return utd === TEMPLATE_UTD ? incomingTemplateUri(uri) : '';
 }
 /** Take ownership while the external grant is alive. Do not retain a sender's URI. */
 @Concurrent

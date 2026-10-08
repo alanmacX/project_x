@@ -10,7 +10,7 @@ function load(name){if(cache.has(name))return cache.get(name);const module={expo
  files.set('/private/subject.png',Buffer.from([137,80,78,71,0,255]));files.set('/private/anim.gif',Buffer.from('GIF89a\0\xff','latin1'));
  const single=packageScene(JSON.stringify(scene),'a');assert.equal(single.state.cards.length,1);assert.equal(single.state.cards[0].groupId,'');assert.equal(single.state.background.src,'');assert.equal(scene.cards[0].groupId,'oldgroup');
  const out=await exportTemplate(JSON.stringify(scene),'','/private','/cache'),json=files.get(out).toString(),pack=readPackage(json);assert.equal(pack.assets.length,2,'shared image embedded once');assert.equal(pack.state.cards[0].cutout,'asset://0');assert.equal(pack.state.background.src,'asset://0');assert.ok(!json.includes('/private/'),'no sender sandbox paths');
- assert.deepEqual(JSON.parse(await inspectTemplate('file://'+out)),{kind:'canvas',count:2,images:2});
+ assert.deepEqual(JSON.parse(await inspectTemplate('file://'+out)),{kind:'canvas',count:2,images:2,version:1});
  const beforeRejected=files.size;
  await assert.rejects(()=>materializeTemplateUri('file://'+out,'/recipient',1),/最多 16/);
  assert.equal(files.size,beforeRejected,'capacity checked before extracting image files');

@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
+const source=fs.readFileSync('entry/src/main/ets/views/BoardCard.ets','utf8');let scans=0,copies=0;
+const methods=source.slice(source.indexOf('  private overflowValue:'),source.indexOf('  build() {',source.indexOf('  private overflowValue:')));
+const context={exports:{},CompositionOverflow:class{},compositionOverflow:(card,scale)=>{scans++;return {width:card.w*scale};}};
+vm.runInNewContext(ts.transpileModule(`class Fixture{card={w:120,h:160};scaleFactor=2;resizing=false;liveW=120;liveH=160;w(){return this.resizing?this.liveW:this.card.w;}h(){return this.resizing?this.liveH:this.card.h;}copyCard(){return {...this.card};}${methods}}exports.Fixture=Fixture;`,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,context);
+const f=new context.exports.Fixture();for(let i=0;i<8;i++)f.attachmentOverflow();assert.equal(scans,1,'one contour/attachment calculation per geometry');
+f.resizing=true;const a=f.faceCard();for(let i=0;i<8;i++)assert.equal(f.faceCard(),a,'one shared resize shell per frame');
+f.liveW=130;assert.notEqual(f.faceCard(),a);f.attachmentOverflow();assert.equal(scans,2);
+f.invalidateGeometry();f.attachmentOverflow();assert.equal(scans,3,'new capability or shape invalidates cached fringe');
+f.scaleFactor=3;f.attachmentOverflow();assert.equal(scans,4,'viewport changes refresh bounds');
+console.log('PASS immutable frame geometry reuse, resize identity, capability/shape and viewport invalidation');

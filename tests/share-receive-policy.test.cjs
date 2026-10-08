@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
+function load(name){const module={exports:{}};const source=fs.readFileSync('entry/src/main/ets/model/'+name+'.ets','utf8');vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{module,exports:module.exports,require:()=>({fileIo:{}})});return module.exports;}
+const p=load('IncomingTemplate'),o=load('DevicePolicy');
+assert.equal(p.sharedTemplateUri(p.TEMPLATE_UTD,'file://grant/anonymous'),'file://grant/anonymous');
+for(const type of ['general.file','general.png','general.pdf','general.text'])assert.equal(p.sharedTemplateUri(type,'file://grant/test.fridge'),'');
+for(const uri of ['https://host/file.fridge','content://file','file://'+'x'.repeat(8200),undefined])assert.equal(p.sharedTemplateUri(p.TEMPLATE_UTD,uri),'');
+assert.equal(o.lockPhonePortrait('phone',false),true);assert.equal(o.lockPhonePortrait('phone',true),false);assert.equal(o.lockPhonePortrait('tablet',false),false);
+const config=JSON.parse(fs.readFileSync('entry/src/main/module.json5','utf8').replace(/\/\/[^\n]*/g,''));
+const skill=config.module.extensionAbilities.find(a=>a.name==='TemplateShareAbility').skills[0];
+assert.equal(skill.uris.length,1);assert.equal(skill.uris[0].utd,p.TEMPLATE_UTD);assert.equal(skill.uris[0].maxFileSupported,1);
+const utd=JSON.parse(fs.readFileSync('entry/src/main/resources/rawfile/arkdata/utd/utd.json5','utf8')).UniformDataTypeDeclarations[0];
+assert.equal(utd.TypeId,p.TEMPLATE_UTD);assert.ok(utd.TypeId.startsWith('com.fridgewidget.app.'),'custom UTD must belong to the actual application bundle');assert.deepEqual(utd.FilenameExtensions,['.fridge']);
+const clock=load('CapabilityClock'),now=new Date(2026,9,9,14,0).getTime();
+assert.equal(clock.capabilityRenderTick({k:'battery'},now),0);assert.equal(clock.capabilityRenderTick(null,now),0);
+assert.equal(clock.capabilityRenderTick({k:'date'},now),clock.capabilityRenderTick({k:'date'},now+60000));
+assert.notEqual(clock.capabilityRenderTick({k:'date'},now),clock.capabilityRenderTick({k:'date'},now+86400000));
+assert.equal(clock.capabilityRenderTick({k:'clock'},now),now);
+const album={k:'album',albumRotationMinutes:5,albumRotationStart:now};
+assert.equal(clock.capabilityRenderTick(album,now),clock.capabilityRenderTick(album,now+60000));assert.notEqual(clock.capabilityRenderTick(album,now),clock.capabilityRenderTick(album,now+300000));
+assert.equal(clock.capabilityRenderTick({k:'album'},now),0);
+console.log('PASS exact share UTD, non-file rejection, single-record declarations and ordinary-phone-only portrait policy');

@@ -52,7 +52,7 @@ export struct BoardCard {
     const next=this.copyCard(),shift=this.rotationShift();next.x+=shift.x/this.scaleFactor;next.y+=shift.y/this.yScaleFactor;
     next.rot=((this.liveAngle+180)%360+360)%360-180;this.onCommit(next);this.rotating=false;this.onInteraction(false);
   }
-  @Prop card: FridgeCard = new FridgeCard();
+  @Prop @Watch('invalidateGeometry') card: FridgeCard = new FridgeCard();
   @Prop @Watch('syncHandles') selected: boolean = false;
   @Prop heroHidden: boolean = false;
   @Prop localCoordinates: boolean = false;
@@ -255,10 +255,24 @@ export struct BoardCard {
     if (this.atMinimum) this.getUIContext().getPromptAction().showToast({ message: this.card.capability === null ? '已到最小尺寸' : '已到最小可读尺寸；移除能力后可继续缩小' });
     this.atMinimum = false;
   }
-  private attachmentOverflow():CompositionOverflow {return compositionOverflow(this.faceCard(),this.scaleFactor);}
+  private overflowValue: CompositionOverflow = new CompositionOverflow();
+  private overflowKey: string = '';
+  private resizeFace: FridgeCard | null = null;
+  private resizeFaceW: number = -1;
+  private resizeFaceH: number = -1;
+  private invalidateGeometry(): void { this.overflowKey='';this.resizeFace=null; }
+  private attachmentOverflow():CompositionOverflow {
+    const key=[this.w(),this.h(),this.scaleFactor,this.resizing].join(':');
+    if(key!==this.overflowKey){this.overflowValue=compositionOverflow(this.faceCard(),this.scaleFactor);this.overflowKey=key;}
+    return this.overflowValue;
+  }
   private faceCard(): FridgeCard {
     if (!this.resizing) return this.card;
-    const card = this.copyCard(); card.w = this.liveW; card.h = this.liveH; return card;
+    if(this.resizeFace===null || this.resizeFaceW!==this.liveW || this.resizeFaceH!==this.liveH) {
+      this.resizeFace=this.copyCard();this.resizeFace.w=this.liveW;this.resizeFace.h=this.liveH;
+      this.resizeFaceW=this.liveW;this.resizeFaceH=this.liveH;
+    }
+    return this.resizeFace;
   }
   build() {
     Stack({ alignContent: Alignment.TopStart }) {

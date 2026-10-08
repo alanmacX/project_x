@@ -2,7 +2,10 @@ import { registerRenderContour, cardOutline } from './ContourRegistry';
 import { FridgeCard, CapBlock, ElementBox, CanvasElement } from './CardSchema';
 
 /** Contours are immutable after extraction. Keep them shared while editable values are snapshots. */
-export function cardViewSnapshot(source: FridgeCard): FridgeCard {
+export function cardViewSnapshot(source: FridgeCard): FridgeCard { return snapshotCard(source,true); }
+/** Synchronously serialize this shell; its nested references must never escape into UI or undo. */
+export function cardStorageShell(source: FridgeCard): FridgeCard { return snapshotCard(source,false); }
+function snapshotCard(source: FridgeCard, detached: boolean): FridgeCard {
   const copy = new FridgeCard();
   copy.id = source.id; copy.groupId = source.groupId;
   copy.x = source.x;
@@ -25,10 +28,10 @@ export function cardViewSnapshot(source: FridgeCard): FridgeCard {
   copy.inDoor = source.inDoor;
   copy.outline = cardOutline(source);
   copy.renderContourKey = ''; 
-  copy.capability = source.capability === null ? null : JSON.parse(JSON.stringify(source.capability)) as CapBlock;
-  copy.capBox = JSON.parse(JSON.stringify(source.capBox)) as ElementBox;
+  copy.capability = !detached || source.capability === null ? source.capability : JSON.parse(JSON.stringify(source.capability)) as CapBlock;
+  copy.capBox = detached ? JSON.parse(JSON.stringify(source.capBox)) as ElementBox : source.capBox;
   copy.capFree = source.capFree;
-  copy.elements = source.elements.map((element: CanvasElement) => JSON.parse(JSON.stringify(element)) as CanvasElement);
+  copy.elements = detached ? source.elements.map((element: CanvasElement) => JSON.parse(JSON.stringify(element)) as CanvasElement) : source.elements;
   return copy;
 }
 

@@ -1,11 +1,11 @@
 import { FridgeState, FridgeCard, ShapePoint } from './CardSchema';
-import { cardViewSnapshot } from './CardViewSnapshot';
+import { cardStorageShell } from './CardViewSnapshot';
 
 // Extracted contours are immutable. Reuse their serialized representation for geometry edits.
 const contours = new WeakMap<ShapePoint[][], string>();
 export function storageSnapshot(state: FridgeState): string {
   const cards = state.cards.map((source: FridgeCard): string => {
-    const card = cardViewSnapshot(source), outline = card.outline;
+    const card = cardStorageShell(source), outline = card.outline;
     let encoded = contours.get(outline);
     if (encoded === undefined) { encoded = JSON.stringify(outline); contours.set(outline, encoded); }
     card.outline = [];
