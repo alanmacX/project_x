@@ -1,0 +1,4 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>冰箱贴 · 异形素材检查</title><link rel="stylesheet" href="previewer.css"></head><body>
+<header><div><strong>异形素材检查</strong><p>读取真实透明 Alpha，直接使用 App 的轮廓算法；源图不改写</p></div><label class="button">打开透明 PNG<input id="source" type="file" accept="image/png" hidden></label></header>
+<main><section class="workspace"><div id="preview"></div></section><div class="toolbar"><button id="save" disabled>导出素材与轮廓</button></div><aside><strong id="status">准备已抠好的主体或原创异形 PNG</strong><ul id="warnings"></ul><p class="note">这里不做 AI 抠图。主体图、孔洞、轮廓共用原始图片坐标；导出的是作者辅助 JSON，不是可直接导入的 .fridge。白边与厚度由 App 绘制。</p></aside></main>
+<script src="shared-models.js"></script><script src="subject-authoring.js"></script><script src="subject-tool.js"></script></body></html>

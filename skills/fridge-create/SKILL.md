@@ -5,7 +5,7 @@ description: Generate or refine editable offline 冰箱贴 .fridge card or canva
 
 # Fridge Create
 
-Create editable works, not flattened screenshots of a whole canvas. Respond in the user's language.
+Create editable works with deliberate art direction, not flattened screenshots or a default grid of labelled rectangles. Respond in the user's language.
 
 Read [current-format.md](references/current-format.md) before writing any package. Use the included [native example](examples/native-canvas.fridge) as a format baseline, not as a mandatory composition.
 
@@ -15,15 +15,21 @@ Read the generated [design-contract.json](references/design-contract.json) first
 
 The shipped reader supports only `fridgememo-template`, version 1, `card`/`canvas`, state schema 2. HTML templates are not implemented. Never place invented `html`, `slots`, providers or script assets in a v1 `.fridge` and claim it works. For an HTML request, deliver clearly labelled `.draft.json` and a local HTML prototype, explain that integration is pending, and follow [html-draft.md](references/html-draft.md). Do not downgrade HTML silently into an image or native approximation.
 
+## Creative direction and assets
+
+For a themed or visually ambitious work, read [art-direction.md](references/art-direction.md). Research the visual world, actively look for appropriate source imagery when it would strengthen the design, and consider original image generation for missing motifs. Build a distinctive hierarchy and silhouette composition before filling slots with capabilities. The examples are structural baselines, not designs to copy. Don't prematurely fall back to zero assets because that is easier to validate.
+
+Use [subject-tool.html](../../../previewer/subject-tool.html) for actual alpha-derived subject geometry. It preserves PNG bytes and exports production-derived contours plus diagnostics; both photo cutouts and intentionally designed original silhouettes are valid subject cards. Never guess a subject outline or flatten the whole canvas to fake its appearance. Keep a source/attribution sidecar for acquired or generated assets and inspect the complete rendered work before delivery.
+
 ## Authoring
 
 Infer a coherent visual direction, target widget aspect, and necessary data from the request. Ask only for information that affects the result. If unspecified, use square 4×4 and a compact 3–6-card composition; keep the current 16-card limit. Preserve useful negative space and readable hierarchy. Aesthetic freedom belongs to artwork; app controls and behavior belong to the host.
 
 Each card has at most one capability. Decorative text/photo/shape elements are not extra data sources. Keep native fields dynamic rather than painting fake current time, battery or courses onto an image. Battery has no status caption or percent sign; its host renderer supplies the ring and numeric reading. Album geometry belongs to the host (use current tokens in design-contract.json), with square local cover images.
 
-For generated native cards, prefer `cream` material or deliberate artwork colors, dark readable ink, and a small consistent palette. Use the host reading surfaces (`cloud`, `bare`, `tag`, `sticker`; `badge` for battery only), not a homemade duplicate backing or guessed glass blur. Rectangular card corners, cutout white border, thickness and shadows are host-owned.
+Use a theme-appropriate palette with readable contrast; `cream` is available, not mandatory. Use the host reading surfaces (`cloud`, `bare`, `tag`, `sticker`; `badge` for battery only), not a homemade duplicate backing or guessed glass blur. Rectangular card corners, cutout white border, thickness and shadows are host-owned.
 
-Images must be explicitly supplied or lawfully generated/obtained and embedded. Do not invent a cutout contour, fake a user photo, ship online image URLs, or reference agent filesystem paths. Without usable images, use native text/shapes rather than claiming a photo-based result.
+Images must be explicitly supplied or lawfully generated/obtained and embedded. Do not invent a cutout contour, fake a user photo, ship online image URLs, or reference agent filesystem paths. If source acquisition fails, try an appropriate alternative or original generation before a deliberate native-only fallback. Explain the actual gap rather than claiming a photo-based result.
 
 Use explicit unique card/element IDs, preserve group relations, and order z values intentionally. Whole-card transforms are separate from card-internal element positions. Do not normalize x/y/w/h all using the same scale; read the coordinate contract.
 

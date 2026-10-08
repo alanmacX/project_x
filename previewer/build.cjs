@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 let ts;
 try{ts=require('typescript');}catch{ts=require(process.env.FRIDGE_TYPESCRIPT||'/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');}
 const root=path.resolve(__dirname,'../entry/src/main/ets/model'),modules=new Map();
-const entries=['TemplatePackage','AlbumLayout','AlbumRotation','CardDepth','ContourPath','CloudReadingGeometry','CanvasLayout','ContourRegistry','EdgeAttachment','CapabilityData','BatteryPresentation','MicaGeometry','MicaMaterialStudy','PaperTextWidth','CapabilityCalendar'];
+const entries=['TemplatePackage','AlbumLayout','AlbumRotation','CardDepth','ContourPath','CloudReadingGeometry','CanvasLayout','ContourRegistry','EdgeAttachment','CapabilityData','BatteryPresentation','MicaGeometry','MicaMaterialStudy','PaperTextWidth','CapabilityCalendar','SubjectGeometry'];
 function collect(name){
  if(modules.has(name))return;
  if(!/^[A-Za-z][A-Za-z0-9]*$/.test(name))throw Error('Invalid dependency');
@@ -38,7 +38,7 @@ const nativeViews=['CardFace','CardCanvas','CapBlockView','ReadingBacking','Read
 const schemaSource=modules.get('CardSchema').source;
 function fields(declaration){const body=schemaSource.split(declaration)[1]?.split('\n}')[0];if(!body)throw Error('Authoring declaration changed: '+declaration);return [...body.matchAll(/^\s*([a-zA-Z][\w]*)\??\s*:/gm)].map(match=>match[1]);}
 const contract={
- contractVersion:1,skillContractVersion:1,app:JSON.parse(fs.readFileSync(path.join(repository,'AppScope/app.json5'),'utf8')).app,
+ contractVersion:1,skillContractVersion:2,app:JSON.parse(fs.readFileSync(path.join(repository,'AppScope/app.json5'),'utf8')).app,
  package:{format:'fridgememo-template',version:1,schemaVersion:2,kinds:['card','canvas'],htmlSupported:false},
  identity:{models:fingerprint,materials:crypto.createHash('sha256').update(materialBundle).digest('hex'),browserAdapter:hashFiles(['previewer/renderer.js','previewer/capabilities.js']),nativeViews:hashFiles(nativeViews.map(name=>'entry/src/main/ets/views/'+name+'.ets'))},
  coordinates:{boardWidth:schema.BOARD_W,legacyPositionHeight:schema.BOARD_H,cardSizeUnits:'board_width',elementUnits:'card_fraction',rotationUnits:'degrees'},

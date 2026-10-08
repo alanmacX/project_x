@@ -61,3 +61,9 @@ const layers = FridgeWeb.renderLayers(pack, 900, fixedTick, {namespace: 'profile
 同一页面多幅作品必须指定不同 namespace，以免 SVG 素材/滤镜 ID 相互覆盖。`width/height` 是逻辑画布单位，`pivot` 为该单位下整卡中心；不包括阴影与外贴 capability 的溢出范围，不可用它裁掉内容。SVG 根保留 `font-family="system-ui,sans-serif"`，挂钩/能力在同一 card 内，不拆散。
 
 先渲染/解码一次并保留节点，再只更新 transform 等合成属性；不要在动画每帧调用 readPackage/renderLayers 或复制 Base64。改变作品设计或数据时重新渲染相应静态帧。素材本身是离线嵌入数据，不会让外部动画获得系统权限或读取当前设备电量。GIF、宿主交互、HTML card 仍按前述限制处理。
+
+## 异形素材准备
+
+[subject-tool.html](subject-tool.html) 是独立离线作者工具，导入已透明的 PNG，读取原始 alpha，用生产 SubjectGeometry.traceMask 输出轮廓；保留 PNG 字节、孔洞与完整坐标空间。支持原创异形底板以及真实照片/插画主体。导出包含素材 asset、cardFields、源文件校验和、透明边界/碎片诊断的辅助 JSON，供作者组装 `.fridge`；不是成品文件，也不做 AI 分割或修改图片。
+
+大留白先裁紧源图并重新提取，不能单改轮廓；不要对照片编造 polygon。异常碎片在建立轮廓图之前限流，1024px 长边/24MB 及当前轮廓限制用于避免准备工具卡死。真实输入和整张作品仍要目视检查。主题创作的素材搜寻、原创生成和异形组合方法见 skill 的 art-direction.md；下载来源、使用范围与加工过程放在作品旁的 `.sources.json`，不塞进 v1 包。
