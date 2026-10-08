@@ -3,6 +3,7 @@
     "pages/Index",
     "pages/SketchLab",
     "pages/ReadingDemo",
-    "pages/ReceiveTemplate"
+    "pages/ReceiveTemplate",
+    "pages/MicaStudy"
   ]
 }

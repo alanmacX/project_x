@@ -39,6 +39,7 @@ export interface CapBlock {
   readingEdge?: string;
   readingOutside?: boolean;
   readingHook?: number;
+  readingMaterialStudy?: number; // read-only preview; intentionally not restored from saved cards
   readingTintKey?: string;
   readingTint?: string; // local photo palette, persisted; never sampled while moving
   readingStyle?: string; // auto | plain | surface; photo subjects receive a readable backing

@@ -47,7 +47,7 @@ export struct TimetableCapability {
   }
   private dayCellHeight():number {return LESSON_CELL_HEIGHT*this.s();}
   private highlighted(e:AgendaItem):boolean {return e.id===this.display.lessons.find(lesson=>lesson.end>(this.tick||Date.now()))?.id;}
-  @Builder private readingBackground() {if(this.contentBackingEnabled){ReadingBacking({blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,profile:this.backingProfile,contactLeft:this.backingLeft,surfaceWidth:this.backingWidth(),surfaceHeight:(this.contentHeight+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,hook:this.cap.readingHook??.2,ink:this.ink,radius:8*this.s(),scaleFactor:this.s()})}}
+  @Builder private readingBackground() {if(this.contentBackingEnabled){ReadingBacking({study:this.cap.readingMaterialStudy??0,blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,profile:this.backingProfile,contactLeft:this.backingLeft,surfaceWidth:this.backingWidth(),surfaceHeight:(this.contentHeight+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,hook:this.cap.readingHook??.2,ink:this.ink,radius:8*this.s(),scaleFactor:this.s()})}}
   @Builder
   heading() {
     Row({space:3*this.s()}) {

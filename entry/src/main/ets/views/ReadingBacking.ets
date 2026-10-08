@@ -2,11 +2,13 @@ import { attachedPath } from '../model/EdgeAttachment';
 import { readingSurfaceColor } from '../model/CapabilityPresentation';
 import { isReadingComposition, compositionPadding } from '../model/ReadingComposition';
 import { hookCenter, hookReserve, micaPath } from '../model/MicaGeometry';
+import { micaStudyFill } from '../model/MicaMaterialStudy';
 import { PaperBacking } from './PaperBacking';
 /** Shared native material paths; translating a card never clears a bitmap surface. */
 @Component
 export struct ReadingBacking {
  @Prop blend:string='paper';
+ @Prop study:number=0;
  @Prop ink:string='#262824';
  @Prop tint:string='#E8D6B0';
  @Prop edge:string='';
@@ -28,7 +30,7 @@ export struct ReadingBacking {
   if(w<=0||h<=0)return '';
   let path=this.profile.length?attachedPath(w,h,this.profile,this.contactLeft,6*s):micaPath(this.blend,w,h,s,this.edge);
   if(hookReserve(this.blend)>0) {
-   const x=vp2px(hookCenter(this.hook,this.w(),this.scaleFactor)),y=10*s,r=3.3*s;
+   const x=vp2px(hookCenter(this.hook,this.w(),this.scaleFactor)-inset),y=10*s-vp2px(inset),r=3.3*s;
    // Counter-clockwise subpath punches a real transparent hole using nonzero winding.
    path+=` M ${x+r} ${y} A ${r} ${r} 0 1 0 ${x-r} ${y} A ${r} ${r} 0 1 0 ${x+r} ${y} Z`;
   }
@@ -48,7 +50,18 @@ export struct ReadingBacking {
  build() {
   Stack() {
    if(isReadingComposition(this.blend)) {
-    if(this.blend==='bare') {
+    if(this.study>0) {
+     Path().commands(this.path()).fill(micaStudyFill(this.tint,this.study)).stroke('#40FFFCF2').strokeWidth(.45*this.scaleFactor).antiAlias(true).width('100%').height('100%')
+     ForEach([1,2],(pass:number)=>{
+      Path().commands(this.path(compositionPadding(this.blend)*this.scaleFactor*.12*pass)).fill(pass===1?'#10FFFFFF':'#0CFFFFFF').stroke(Color.Transparent).antiAlias(true)
+       .width('100%').height('100%').translate({x:compositionPadding(this.blend)*this.scaleFactor*.12*pass,y:compositionPadding(this.blend)*this.scaleFactor*.12*pass})
+     },(pass:number)=>String(pass))
+     if(this.blend==='bare') {
+      ForEach([2,5,8,11,14,17,20,23],(index:number)=>{
+       Path().commands(this.fibre(index)).fill(Color.Transparent).stroke('#15FFFFFF').strokeWidth(.3*this.scaleFactor).width('100%').height('100%')
+      },(index:number)=>String(index))
+     }
+    } else if(this.blend==='bare') {
      ForEach([0,1,2,3,4,5,6,7],(pass:number)=>{
       Path().commands(this.path(compositionPadding(this.blend)*this.scaleFactor*.35*pass/7)).fill('#18F7F9FC').stroke(Color.Transparent).antiAlias(true)
        .width('100%').height('100%').translate({x:compositionPadding(this.blend)*this.scaleFactor*.35*pass/7,y:compositionPadding(this.blend)*this.scaleFactor*.35*pass/7})
