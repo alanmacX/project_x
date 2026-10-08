@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
 const source=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
-const methods=source.slice(source.indexOf('  private finishNavMenu('),source.indexOf('  private async showEditorActions('));
+const methods=source.slice(source.indexOf('  private finishNavMenu('),source.indexOf('  private async showAddMenu('));
 const env={exports:{}};vm.runInNewContext(ts.transpileModule('export class Harness {'+methods+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,env);
 (async()=>{
 const view=new env.exports.Harness();Object.assign(view,{screenWidth:400,safeTop:24,navMenuResolve:null,getUIContext:()=>({px2vp:p=>p/2,getComponentUtils:()=>({getRectangleById:()=>({size:{width:80,height:88},windowOffset:{x:600,y:60}})})})});

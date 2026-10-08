@@ -1,5 +1,6 @@
 import lazy { HookPlacement } from '../views/HookPlacement';
 import lazy { EditorVisualChoices } from '../views/EditorVisualChoices';
+import { editorWorkspace, EditorWorkspace } from '../model/EditorWorkspace';
 import { editorReadingPlacement } from '../model/EditorVisualChoices';
 import { sameTimetable, useSavedTimetable } from '../model/TimetableLibrary';
 import { edgeAttachment } from '../model/EdgeAttachment';
@@ -102,7 +103,6 @@ class PreparedTransition extends FrameCallback {
 struct Index {
   @State navMenuOpen:boolean=false;
   @State navMenuItems:MenuElement[]=[];
-  @State navMenuTitle:string='';
   @State navMenuX:number=0;
   @State navMenuY:number=0;
   private navMenuResult:number=-1;
@@ -196,10 +196,9 @@ struct Index {
   @State scatter: number = 0;
   @State showBackgroundOptions: boolean = false;
   @State showLayerOptions: boolean = false;
-  @State editorSectionOpen:boolean=false;
-  @State editorPreviewCompressed:boolean=false;
   @State editorSection:number=0;
   @State editorSheetTab:number=0;
+  @State editorExpanded:boolean=false;
   @State @Watch('homeToolsChanged') homeToolsOpen:boolean=false;
   @State homeToolsMoving:boolean=false;
   private homeToolsMotionGeneration:number=0;
@@ -590,7 +589,7 @@ struct Index {
     if(this.navMenuOpen){this.finishNavMenu(-1);return true;}
     if(this.deletionId)return true;
     if(this.homeToolsOpen){this.homeToolsOpen=false;return true;}
-    if(this.editorSectionOpen){this.editorSectionOpen=false;return true;}
+    if(this.editing&&this.editorExpanded){this.expandEditor(false);return true;}
     if(this.showBackgroundOptions){this.showBackgroundOptions=false;return true;}
     if(this.showLayerOptions){this.showLayerOptions=false;return true;}
     if(this.readingComparisonOpen){this.readingComparisonOpen=false;return true;}
@@ -630,11 +629,11 @@ struct Index {
     return (horizontal ? dx : dy) / length * Math.max(BOARD_W * this.boardScale, this.boardHeight) * 1.2 * this.scatter;
   }
 
-  private editorLandscape(): boolean { return workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).wide; }
-  private editorViewportWidth(): number { return workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).previewW; }
+  private editorWorkspace():EditorWorkspace {return editorWorkspace(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom);}
+  private editorLandscape(): boolean { return this.editorWorkspace().wide; }
+  private editorViewportWidth(): number { return this.editorWorkspace().previewW; }
   private previewPaneHeight(): number {
-    const normal=workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).previewH;
-    return this.editorPreviewCompressed&&!this.editorLandscape()?Math.min(normal,Math.max(96,this.screenHeight-this.editorSheetHeight()-this.safeTop-this.safeBottom-76)):normal;
+    return this.editorWorkspace().stageH;
   }
   private editingAngle(): number { return this.preview.rot; }
   private previewViewport(): EditorViewport {
@@ -655,7 +654,8 @@ struct Index {
   private openEditor(id: string, created: boolean = false): void {
     if(this.scheduledName||this.scheduleTransition){this.getUIContext().getPromptAction().showToast({message:'请先恢复原始画布再编辑'});return;}
     if (this.heroActive || this.arriving) return;
-    this.heroHideContent = false; this.select(id, true); this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false; this.editorSectionOpen=false;this.editorPreviewCompressed=false;this.editorSection=0;this.editorSheetTab=0;this.settingsTab=this.preview.capability!==null?1:0;
+    this.editorExpanded=false;
+    this.heroHideContent = false; this.select(id, true); this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false;this.editorSection=0;this.editorSheetTab=0;this.settingsTab=this.preview.capability!==null?1:0;
     this.heroRect = this.boardRect();
     if (created) {
       const rect = new SceneRect(); rect.w = 28; rect.h = 28 * this.preview.h / this.preview.w;
@@ -727,7 +727,8 @@ struct Index {
   private closeEditor(): void {
     if (this.heroActive || !this.editing) return;
     if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview();
-    this.editorSectionOpen=false;this.editorPreviewCompressed=false;this.creatingTransition = false; this.heroHideContent = this.settingsTab === 0;
+    this.editorExpanded=false;
+    this.creatingTransition = false; this.heroHideContent = this.settingsTab === 0;
     this.heroBase = this.editorRect(); this.setHeroPose(this.heroBase); this.setTransitionClip(false); this.heroActive = true;
     // Publish the edited card to the board once, before it fades back in.
     this.renderBoard();
@@ -791,6 +792,7 @@ struct Index {
     if (!this.editing) this.renderBoard();
     const card = this.current(); if (card !== null) this.preview = cardRenderSnapshot(card);
     this.revision += 1; this.syncPreviewFields();
+    if(this.editing)this.editorSection=Math.min(this.editorSection,this.editorTools().length-1);
   }
   private continuousChange(mode: SliderChangeMode): void {
     if (this.gestureGroup.length === 0) {
@@ -1178,7 +1180,7 @@ struct Index {
         }
         if (this.viewing) { this.detail() }
         Column().width(1).height(1).position({x:this.navMenuX,y:this.navMenuY}).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
-          .bindMenu(this.navMenuOpen,this.navMenuItems,{title:this.navMenuTitle,placement:Placement.BottomRight,systemMaterial:chromeMaterial(),backgroundColor:AppDesign.popup(this.appDark),onDisappear:()=>this.finishNavMenu(this.navMenuResult)})
+          .bindMenu(this.navMenuOpen,this.navMenuItems,{placement:Placement.BottomRight,systemMaterial:chromeMaterial(),backgroundColor:AppDesign.popup(this.appDark),onDisappear:()=>this.finishNavMenu(this.navMenuResult)})
         if(this.deletionId){
           Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.Block).zIndex(200000)
           if(this.deletionBitmap!==undefined){CardDeletionFlight({bitmap:this.deletionBitmap,faceWidth:this.deletionW,faceHeight:this.deletionH,originX:this.deletionX,originY:this.deletionY,angle:this.deletionAngle,viewportWidth:this.screenWidth,viewportHeight:this.screenHeight,onDone:()=>this.finishCardDeletion()}).zIndex(200001)}
@@ -1227,6 +1229,7 @@ struct Index {
             .position({ x: 0, y: 0 })
             .translate({ x: this.sceneX(id) - 24 - this.creationClipX(id) + this.arrivalX(id) + this.scheduleOffset(id,true),
               y: this.sceneY(id) - 24 - this.creationClipY(id) + this.arrivalY(id) + this.scheduleOffset(id,false) })
+            .opacity(this.editing&&this.editorExpanded&&!this.heroActive?0:1)
             .hitTestBehavior(this.editing || this.arriving || this.homeToolsMoving || this.scheduledName.length>0 || this.scheduleTransition ? HitTestMode.None : HitTestMode.Transparent)
           }.width(this.creationClip(id) ? this.transitionClipW : this.screenWidth)
             .height(this.creationClip(id) ? this.transitionClipH : this.screenHeight)
@@ -1407,6 +1410,8 @@ struct Index {
           Row({ space: 12 }) {
             Button('上移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).padding({left:6,right:6}).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(() => this.moveCardLayer(this.selectedId, true))
             Button('下移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).padding({left:6,right:6}).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(() => this.moveCardLayer(this.selectedId, false))
+            Button('复制',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL})
+              .height(44).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).attributeModifier(immersiveChrome(this.appDark)).accessibilityText('复制卡片').onClick(()=>this.duplicate())
             if((this.cardMap[this.selectedId]?.groupId??'').length>0) { Button('取消组合',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(()=>this.releaseGroup()) }
             Blank()
           }.width('100%')
@@ -1800,25 +1805,22 @@ struct Index {
         Column() {
           if (this.editorLandscape()) {
             Row() {
-              Column({ space: 12 }) {
-                this.canvasEditor()
-                this.editorLayers()
-              }.width(this.editorViewportWidth()).height('100%')
-              Column() { this.editorInspector() }.layoutWeight(1).height('100%').justifyContent(FlexAlign.End)
+              this.editorStage()
+              this.editorSectionSheet()
             }.width('100%').layoutWeight(1)
           } else {
-            this.canvasEditor()
-            this.editorLayers(); this.editorInspector()
+            this.editorStage()
+            this.editorSectionSheet()
           }
         }.width('100%').height('100%').padding({ top: EDITOR_NAV_INSET }).backgroundColor(Color.Transparent)
       }.titleMode(HdsNavigationTitleMode.MINI)
         .titleBar({
           content: {
-            backIcon: { icon:new SymbolGlyphModifier($r('sys.symbol.chevron_left')).fontColor([this.appText()]),label:'返回画布',type:IconStyleMode.NORMAL,isEnabled:!this.heroActive,action:()=>this.closeEditor() },
+            backIcon: { icon:new SymbolGlyphModifier($r('sys.symbol.arrow_left')).fontSize(20).fontColor([this.appText()]),label:'返回画布',type:IconStyleMode.NORMAL,isEnabled:!this.heroActive,action:()=>this.closeEditor() },
             menu: { maxCount: 4, value: [
               { content: { icon: new SymbolGlyphModifier($r('sys.symbol.rectangle_and_arrowshape_turn_up_right')).fontColor([this.appText()]), label: '分享卡片', type: IconStyleMode.NORMAL, componentId: 'shareCard', isEnabled: !this.sharing && !this.heroActive, action: () => this.shareMenu(true) } },
               { content: { icon:new SymbolGlyphModifier($r('sys.symbol.arrow_counterclockwise')).fontColor([this.appText()]),label:'撤销',type:IconStyleMode.NORMAL,isEnabled:this.undoAvailable&&!this.heroActive,action:()=>this.restoreHistory(false) } },
-              { content: { icon:new SymbolGlyphModifier($r('sys.symbol.ellipsis_circle')).fontColor([this.appText()]),label: '更多操作', type: IconStyleMode.NORMAL, componentId:'editorMore', isEnabled: !this.heroActive, action: () => this.showEditorActions() } },
+              { content: { icon:new SymbolGlyphModifier($r('sys.symbol.arrow_clockwise')).fontColor([this.appText()]),label:'重做',type:IconStyleMode.NORMAL,isEnabled:this.redoAvailable&&!this.heroActive,action:()=>this.restoreHistory(true) } },
               { content: { label: '完成', type: TextStyleMode.NORMAL, isEnabled: !this.heroActive, action: () => this.closeEditor() } }
             ] }
           },
@@ -1832,7 +1834,7 @@ struct Index {
               contentStyle: { menuStyle: {backgroundColor:this.appSurface(),textColor:this.appText(),iconColor:this.appText()}, backIconStyle: {backgroundColor:this.appSurface(),textColor:this.appText(),iconColor:this.appText()} } }
           }
         })
-        .bindSheet(this.editorSectionOpen||this.capabilityPickerOpen||this.readingComparisonOpen,this.editorCombinedSheet,{height:this.editorSheetHeight(),detents:[this.editorSheetHeight(),this.taskSheetHeight(true)],preferType:this.screenWidth>=600?SheetType.CENTER:SheetType.BOTTOM,width:Math.min(560,this.screenWidth-24),showClose:true,dragBar:true,backgroundColor:this.appBackground(),blurStyle:BlurStyle.COMPONENT_THIN,onWillDismiss:(action:DismissSheetAction)=>{this.getUIContext().animateTo(settingsDialogClose(),()=>this.editorPreviewCompressed=false);action.dismiss();},onDisappear:()=>{this.editorSectionOpen=false;this.capabilityPickerOpen=false;this.readingComparisonOpen=false;this.getUIContext().animateTo(settingsDialogClose(),()=>this.editorPreviewCompressed=false);}})
+        .bindSheet(this.capabilityPickerOpen||this.readingComparisonOpen,this.editorTaskSheet,{height:this.editorSheetHeight(),detents:[this.editorSheetHeight(),this.taskSheetHeight(true)],preferType:this.screenWidth>=600?SheetType.CENTER:SheetType.BOTTOM,width:Math.min(560,this.screenWidth-24),showClose:true,dragBar:true,backgroundColor:this.appBackground(),blurStyle:BlurStyle.COMPONENT_THIN,onDisappear:()=>{this.capabilityPickerOpen=false;this.readingComparisonOpen=false;}})
         .id('editorMotionChrome').bindToScrollable([this.scroller]).hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).width('100%').height('100%').backgroundColor(Color.Transparent)
     }.width('100%').height('100%').padding({ top: this.safeTop + EDITOR_SAFE_GAP }).opacity(this.editorOpacity)
       .hitTestBehavior(!this.editing || this.heroActive ? HitTestMode.None : HitTestMode.Default)
@@ -1844,7 +1846,7 @@ struct Index {
   }
   private navChoice(title:string,labels:string[],anchor:string):Promise<number> {
     if(this.navMenuResolve)return Promise.resolve(-1);
-    this.navMenuResult=-1;this.navMenuTitle=title;
+    this.navMenuResult=-1;
     this.navMenuX=this.screenWidth-72;this.navMenuY=this.safeTop+64;
     try {
       const rect=this.getUIContext().getComponentUtils().getRectangleById(anchor);
@@ -1854,28 +1856,30 @@ struct Index {
       this.navMenuResolve=resolve;this.navMenuItems=labels.map((value:string,index:number):MenuElement=>({value:value,action:()=>{this.navMenuResult=index;this.navMenuOpen=false;}}));this.navMenuOpen=true;
     });
   }
-  private async showEditorActions():Promise<void> {
-    const redo=this.redoAvailable,id=this.selectedId;
-    const index=await this.navChoice('卡片操作',redo?['重做','复制卡片']:['复制卡片'],'editorMore');
-    if(index<0||!this.alive||!this.editing||this.heroActive||id!==this.selectedId)return;
-    if(redo&&index===0)this.restoreHistory(true);else this.duplicate();
-  }
   private async showAddMenu():Promise<void> {
     const id=this.selectedId,index=await this.navChoice('添加到卡片',this.preview.capability===null?['文字','本地图片 / GIF','形状','能力']:['文字','本地图片 / GIF','形状'],'editorLayerAdd');
     if(index>=0&&this.alive&&this.editing&&!this.heroActive&&id===this.selectedId){if(index===3)this.chooseCapability();else this.addElement(['text','image','shape'][index]);}
   }
   @Builder
+  editorStage() {
+    Row({space:12}) {
+      this.canvasEditor()
+      this.editorLayers()
+    }.width(this.editorExpanded?0:this.editorWorkspace().stageW).height(this.editorExpanded?0:this.editorWorkspace().stageH)
+      .opacity(this.editorExpanded?0:1).clip(true)
+  }
+  @Builder
   editorLayers() {
-    Scroll() { Row({space:10}) {this.layerEntries()}.padding(3) }
-      .id('editorLayerStrip').width(this.editorViewportWidth()-32).height(100).scrollable(ScrollDirection.Horizontal).align(Alignment.Start).scrollBar(BarState.Off)
-      .margin({left:16,right:16,top:8,bottom:8})
+    Scroll() {Column({space:8}) {this.layerEntries()}.width('100%').padding({top:8,bottom:8,right:4})}
+      .id('editorLayerStrip').width(this.editorWorkspace().layersW).height(this.editorWorkspace().stageH).scrollable(ScrollDirection.Vertical).align(Alignment.Top).scrollBar(BarState.Off)
   }
   private editorTools():string[] {
     return this.preview.capability?.k==='album'?['样式','封面与资料']:this.layerId==='capability'?['样式','位置','颜色','数据']:this.layerId.length?(this.elementPreview.kind==='image'?['图片','位置']:['外观','位置','颜色']):['形状','底色'];
   }
   private openEditorSection(index:number):void {
-    if(this.heroActive)return;this.editorSection=index;this.editorSheetTab=0;this.getUIContext().animateTo(settingsDialogOpen(),()=>{this.editorPreviewCompressed=true;this.editorSectionOpen=true;});
+    if(this.heroActive)return;this.editorSection=index;this.editorSheetTab=0;this.scroller.scrollTo({xOffset:0,yOffset:0});
   }
+  private expandEditor(value:boolean):void {if(this.heroActive)return;this.getUIContext().animateTo(settingsDialogOpen(),()=>this.editorExpanded=value);}
   @Builder
   editorToolSymbol(index:number) {
     if(index===0) {SymbolGlyph($r('sys.symbol.paintpalette')).fontSize(23).fontColor([this.appText()])}
@@ -1885,32 +1889,28 @@ struct Index {
   }
   @Builder
   editorInspector() {
-    Column({space:12}) {
-      Text(this.layerId==='capability'?'拖动内容，使用角落手柄调整大小':this.layerId?'拖动图层，使用角落手柄调整大小与角度':'选择图层，或添加文字、图片和形状')
-        .fontSize(12).fontColor(this.appMuted()).maxLines(2).width('100%').textAlign(TextAlign.Center)
-      Row({space:10}) {
-        ForEach(this.editorTools(),(label:string,index:number)=>{
+      Row({space:6}) {
+        ForEach([0,1,2,3],(index:number)=>{
           Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {
-            Column({space:7}) {this.editorToolSymbol(index);Text(label).fontSize(12).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontColor(this.appText())}.width('100%').hitTestBehavior(HitTestMode.None)
-          }.id('editorTool_'+index).layoutWeight(1).height(76).padding(4).borderRadius(20).backgroundColor(this.appSurface()).attributeModifier(immersiveChrome(this.appDark)).borderRadius(20).clip(true)
-            .accessibilityText(label+'设置').onClick(()=>this.openEditorSection(index))
-        },(label:string)=>label)
-      }.width('100%')
-    }.width('100%').padding({left:16,right:16,top:12,bottom:this.safeBottom+16}).layoutWeight(1).justifyContent(FlexAlign.End)
+            Row({space:5}) {this.editorToolSymbol(index);Text(this.editorTools()[index]??'').fontSize(12).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontColor(this.appText())}.hitTestBehavior(HitTestMode.None)
+          }.id('editorTool_'+index).layoutWeight(1).height(44).padding(4).borderRadius(16)
+            .backgroundColor(this.editorSection===index?this.appControl():Color.Transparent)
+            .border({width:this.editorSection===index?1:0,color:AppDesign.border(this.appDark)})
+            .visibility(index<this.editorTools().length?Visibility.Visible:Visibility.None)
+            .accessibilityText((this.editorTools()[index]??'')+'设置').onClick(()=>this.openEditorSection(index))
+        },(index:number)=>String(index))
+      }.width('100%').padding(3).backgroundColor(this.appSurface()).borderRadius(20)
   }
   private editorSheetHeight():number {return Math.min(520,Math.max(300,this.screenHeight*.52),this.screenHeight-this.safeTop-80);}
   private sectionTabs():string[] {return this.preview.capability?.k==='album'?['封面库','资料','轮换']:this.preview.capability?.k==='timetable'?['显示','课表','校历']:[];}
   @Builder
-  editorCombinedSheet() {
-    if(this.capabilityPickerOpen||this.readingComparisonOpen) {this.editorTaskSheet()} else {this.editorSectionSheet()}
-  }
-  @Builder
   editorSectionSheet() {
-    Column({space:16}) {
-      Text(this.editorTools()[this.editorSection]??'设置').fontSize(20).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%').padding({right:40})
-      if(this.layerId==='capability'&&this.preview.capability?.k!=='album') {
-        SettingsSegmented({labels:['样式','位置','颜色','数据'],selectedIndex:this.editorSection,appDark:this.appDark,onSelect:(i:number)=>{this.editorSection=i;this.editorSheetTab=0;this.scroller.scrollTo({xOffset:0,yOffset:0});}})
-      }
+    Column({space:10}) {
+      Row() {Blank();Column().width(42).height(4).borderRadius(2).backgroundColor(this.appMuted());Blank()}
+        .id('editorPanelHandle').height(24).width('100%').accessibilityText(this.editorExpanded?'收起设置':'展开设置')
+        .onClick(()=>this.expandEditor(!this.editorExpanded))
+        .gesture(PanGesture({distance:8}).onActionEnd((e:GestureEvent)=>{if(e.offsetY<-24)this.expandEditor(true);else if(e.offsetY>24)this.expandEditor(false);}))
+      this.editorInspector()
       if(this.sectionTabs().length>0 && (this.preview.capability?.k==='album'&&this.editorSection===1 || this.layerId==='capability'&&this.editorSection===3)) {SettingsSegmented({labels:this.sectionTabs(),selectedIndex:this.editorSheetTab,appDark:this.appDark,onSelect:(i:number)=>{this.editorSheetTab=i;this.scroller.scrollTo({xOffset:0,yOffset:0});}})}
       Scroll(this.scroller) {
         Column({space:16}) {
@@ -1933,7 +1933,9 @@ struct Index {
           }
         }.width('100%').padding({bottom:24})
       }.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Off)
-    }.width('100%').height('100%').padding({left:20,right:20,top:12,bottom:12}).backgroundColor(this.appBackground()).borderRadius(24).clip(true)
+    }.width(this.editorExpanded?this.screenWidth:this.editorWorkspace().panelW)
+      .height(this.editorExpanded?this.editorWorkspace().body:this.editorWorkspace().panelH)
+      .padding({left:12,right:12,top:0,bottom:4}).backgroundColor(this.appBackground()).borderRadius({topLeft:24,topRight:24}).clip(true)
   }
   @Builder
   albumStyleChoices() {
@@ -1988,7 +1990,7 @@ struct Index {
           left:this.previewViewport().left,top:this.previewViewport().top,appDark:this.appDark,onStart:(e)=>this.startTransform(this.layerId,e),onResize:(e)=>this.resizeElement(e),onRotate:(e)=>this.rotateElement(e),onEnd:()=>this.flushPreview(),onCancel:()=>this.cancelTransform()})
       }
 
-    }.width('100%').height(this.editorCanvasHeight())
+    }.width(this.editorViewportWidth()).height(this.editorCanvasHeight())
 
   }
   private elementTouchBox(element: CanvasElement): ElementBox {
@@ -2122,9 +2124,8 @@ struct Index {
   private chooseLayer(id: string): void {
     if(this.layerId===id)return;
     this.scroller.scrollTo({ xOffset: 0, yOffset: 0 });
-    this.getUIContext().animateTo(settingsDialogOpen(),()=>{
-      this.layerId=id;this.settingsTab=id==='capability'||this.layerElement(id)?.behindCapability===false?1:0;this.showLayerOptions=false;this.showBackgroundOptions=false;this.syncFields();
-    });
+    this.layerId=id;this.settingsTab=id==='capability'||this.layerElement(id)?.behindCapability===false?1:0;this.showLayerOptions=false;this.showBackgroundOptions=false;this.syncFields();
+    this.editorSection=Math.min(this.editorSection,this.editorTools().length-1);this.editorSheetTab=0;
   }
   private layerElement(id: string): CanvasElement | null { return this.preview.elements.find((el: CanvasElement) => el.id === id) ?? null; }
   private layerTitle(id:string):string {
@@ -2152,20 +2153,20 @@ struct Index {
   }
   @Builder
   layerEntry(id:string) {
-    Row({space:2}) {
+    Stack({alignContent:Alignment.TopEnd}) {
       Button({type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
         Column({space:6}) {
           this.layerThumbnail(id)
           Text(this.layerTitle(id)).fontSize(12).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
         }.width('100%').padding({left:6,right:6})
-      }.layoutWeight(1).height(88).backgroundColor(Color.Transparent)
+      }.width('100%').height(88).backgroundColor(Color.Transparent)
         .accessibilityText('选择图层 '+this.layerTitle(id)).onClick(()=>this.chooseLayer(id))
       if(id.length>0 && this.layerId===id) {
         Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL,role:ButtonRole.ERROR}) {
           SymbolGlyph($r('sys.symbol.trash')).fontSize(17).fontColor(['#C43A35']).hitTestBehavior(HitTestMode.None)
         }.width(44).height(44).backgroundColor(Color.Transparent).accessibilityText('删除图层 '+this.layerTitle(id)).onClick(()=>{if(this.layerId===id)this.removeElement();})
       }
-    }.width(this.layerId===id&&id.length>0?144:104).height(88).borderRadius(18)
+    }.width(this.editorWorkspace().layersW-4).height(88).borderRadius(18)
       .backgroundColor(this.appSurface()).border({width:this.layerId===id?2:0,color:this.appDark?'#E6D3A2':'#B29A64'})
   }
   @Builder
@@ -2176,7 +2177,7 @@ struct Index {
       if(this.preview.capability!==null) {this.layerEntry('capability')}
       Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {
         Column({space:8}) {SymbolGlyph($r('sys.symbol.plus')).fontSize(24).fontColor([this.appText()]);Text('添加图层').fontSize(12).fontColor(this.appText())}.hitTestBehavior(HitTestMode.None)
-      }.id('editorLayerAdd').width(104).height(88).padding(8).backgroundColor(this.appSurface()).borderRadius(18).onClick(()=>this.showAddMenu())
+      }.id('editorLayerAdd').width(this.editorWorkspace().layersW-4).height(80).padding(8).backgroundColor(this.appSurface()).borderRadius(18).onClick(()=>this.showAddMenu())
     }
   }
   @Builder
@@ -2257,7 +2258,7 @@ struct Index {
     }.width('100%').padding(16).backgroundColor(this.appControl()).borderRadius(20)
   }
   private chooseCapability(): void {
-    this.getUIContext().animateTo(settingsDialogOpen(),()=>{this.editorPreviewCompressed=true;this.capabilityPickerOpen=true;});
+    this.capabilityPickerOpen=true;
   }
   @Builder
   capabilityPickerSheet() {
