@@ -15,6 +15,7 @@ export struct CardFace {
   @Prop lifted: boolean = false;
   @Prop widget: boolean = false;
   @Prop hideContent: boolean = false;
+  @Prop animateContent: boolean = false;
   @State layerMotion: EditorLayerMotion = new EditorLayerMotion();
   @Prop movingLayerId: string = '';
   @Prop moveX: number = 0;
@@ -77,7 +78,7 @@ export struct CardFace {
       this.backing(this.card.shape==='subject'&&this.card.subjectPhoto?'#FFFFFF':this.paper(),0,0,'#00000000',0)
       }.width('100%').height('100%')
       }
-      CardCanvas({ layerMotion:this.layerMotion, card: this.card, scaleFactor: this.scaleFactor, tick: this.tick, widget: this.widget, hideContent: this.hideContent,
+      CardCanvas({ layerMotion:this.layerMotion, card: this.card, scaleFactor: this.scaleFactor, tick: this.tick, widget: this.widget, hideContent: this.hideContent, animateContent:this.animateContent,
         movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
         .width((subjectSurfaceFactor(this.card) * 100) + '%').height((subjectSurfaceFactor(this.card) * 100) + '%')
         .borderRadius(cardCornerRadius(this.card,this.scaleFactor)).border({ width: this.card.frame && this.card.shape !== 'subject' ? 3 * this.scaleFactor : 0, color: '#FFFFFF' })

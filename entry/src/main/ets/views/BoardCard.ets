@@ -59,6 +59,7 @@ export struct BoardCard {
   private frameRate: ExpectedFrameRateRange = motionFrameRate();
   @Prop @Watch('syncHandles') editingSurface: boolean = false;
   @Prop hideContent: boolean = false;
+  @Prop animateContent: boolean = false;
   @State layerMotion: EditorLayerMotion = new EditorLayerMotion();
   @Prop movingLayerId: string = '';
   @Prop moveX: number = 0;
@@ -264,7 +265,7 @@ export struct BoardCard {
       Stack() {
         // Shadow fringe stays in the texture; rotation and translation stay outside it.
         Stack({ alignContent: Alignment.TopStart }) {
-          CardFace({ layerMotion:this.layerMotion, card: this.faceCard(), scaleFactor: this.scaleFactor, tick: this.tick, lifted: this.moving || this.motion.ids.includes(this.card.id), hideContent: this.hideContent, movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
+          CardFace({ layerMotion:this.layerMotion, card: this.faceCard(), scaleFactor: this.scaleFactor, tick: this.tick, lifted: this.moving || this.motion.ids.includes(this.card.id), hideContent: this.hideContent, animateContent:this.animateContent, movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
             .width(this.w()).height(this.h()).position({ x: 24+this.attachmentOverflow().left, y: 24+this.attachmentOverflow().top }).hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS)
         }.width(this.w()+48+this.attachmentOverflow().left+this.attachmentOverflow().right).height(this.h()+48+this.attachmentOverflow().top+this.attachmentOverflow().bottom).position({ x: -24-this.attachmentOverflow().left, y: -24-this.attachmentOverflow().top })
           .id('deleteFace_'+this.card.id).renderGroup(this.moving || this.motion.ids.includes(this.card.id) || (this.movingLayerId.length === 0 && this.card.elements.every(el => !el.animated))).hitTestBehavior(HitTestMode.None)

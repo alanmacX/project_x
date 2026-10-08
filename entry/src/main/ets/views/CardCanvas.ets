@@ -1,3 +1,4 @@
+import { settingsReveal } from '../model/SettingsMotion';
 import { isReadingComposition } from '../model/ReadingComposition';
 import { edgeAttachment, EdgeAttachment } from '../model/EdgeAttachment';
 import { hookReserve } from '../model/MicaGeometry';
@@ -95,6 +96,7 @@ export struct CardCanvas {
   @Prop scaleFactor: number = 1;
   @Prop widget: boolean = false;
   @Prop hideContent: boolean = false;
+  @Prop animateContent: boolean = false;
   @Prop tick: number = 0;
   @State layerMotion: EditorLayerMotion = new EditorLayerMotion();
   @Prop movingLayerId: string = '';
@@ -112,9 +114,9 @@ export struct CardCanvas {
         Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
       }
       this.canvasElements(true)
-      if (!this.freeCapability() && !this.hideContent && this.card.capability !== null && !capabilityObstructed(this.card)) { CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}) }
-      if (!this.hideContent) { this.canvasElements(false) }
-      if (!this.freeCapability() && !this.hideContent && this.card.capability !== null && capabilityObstructed(this.card)) { CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}) }
+      if (!this.freeCapability() && !this.hideContent && this.card.capability !== null && !capabilityObstructed(this.card)) { CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}).transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY) }
+      if (!this.hideContent) {Stack({alignContent:Alignment.TopStart}){this.canvasElements(false)}.width('100%').height('100%').transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY)}
+      if (!this.freeCapability() && !this.hideContent && this.card.capability !== null && capabilityObstructed(this.card)) { CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}).transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY) }
       if (this.card.shape === 'subject' && this.card.cutout.length > 0) {
         Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
           .blendMode(BlendMode.DST_IN, BlendApplyType.OFFSCREEN)
@@ -123,7 +125,7 @@ export struct CardCanvas {
     }.width('100%').height('100%').borderRadius(cardCornerRadius(this.card,this.scaleFactor)).clip(true)
       .blendMode(BlendMode.SRC_OVER, this.card.shape === 'subject' ? BlendApplyType.OFFSCREEN : BlendApplyType.FAST)
       if(this.freeCapability() && !this.hideContent && this.card.capability!==null && this.card.capability.k!=='album') {
-        CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick})
+        CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}).transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY)
       }
     }.width('100%').height('100%')
   }

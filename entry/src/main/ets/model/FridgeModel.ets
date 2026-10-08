@@ -32,6 +32,7 @@ export class FridgeStore {
   documents: CanvasDocument[] = [];
   private lastCatalog: string = '';
   private savedScenes: Record<string,string> = {};
+  private contourSnapshot:string='';
   get activeName(): string { return this.catalog.canvases.find((c) => c.id === this.catalog.activeId)?.name ?? '画布'; }
   switchCanvas(id: string): boolean {
     const doc = this.documents.find((c) => c.id === id); if (doc === undefined) return false;
@@ -59,11 +60,12 @@ export class FridgeStore {
   }
   /** Merge acknowledgements from FormExtension without overwriting editor geometry or history. */
   async reloadSceneAcknowledgements():Promise<void> {
-    if(this.prefs===null||this.context===null)return;await this.saveQueue.catch(()=>{});const id=this.state.canvasId;
+    if(this.prefs===null||this.context===null||this.state.sceneRules.length===0)return;await this.saveQueue.catch(()=>{});const id=this.state.canvasId;
     await preferences.removePreferencesFromCache(this.context,'fridge_store');this.prefs=await preferences.getPreferences(this.context,'fridge_store');
     const json=await this.prefs.get(canvasKey(id),'') as string;if(!json||this.state.canvasId!==id)return;
-    const stored=normalizeState(JSON.parse(json) as FridgeState);
-    for(const rule of this.state.sceneRules){const other=stored.sceneRules.find(r=>r.id===rule.id);if(other&&other.createdAt===rule.createdAt&&other.start===rule.start&&other.end===rule.end&&other.kind===rule.kind&&other.targetId===rule.targetId)rule.dismissed=other.dismissed;}
+    const stored=JSON.parse(json) as FridgeState;
+    if(!stored||!Array.isArray(stored.sceneRules))return;
+    for(const rule of this.state.sceneRules){const other=stored.sceneRules.find(r=>r!==null&&r.id===rule.id);if(other&&typeof other.dismissed==='string'&&other.dismissed.length<=200&&other.createdAt===rule.createdAt&&other.start===rule.start&&other.end===rule.end&&other.kind===rule.kind&&other.targetId===rule.targetId)rule.dismissed=other.dismissed;}
   }
   createCanvas(name: string, source?: FridgeState): string {
     assertCanvasCapacity(0, source?.cards.length ?? 0);
@@ -190,7 +192,7 @@ export class FridgeStore {
       if (catalogJson !== this.lastCatalog) await this.prefs.put('fridge_canvases_json',catalogJson);
       if (snapshot !== this.savedScenes[id] || catalogJson !== this.lastCatalog) await this.prefs.flush();
       this.savedScenes[id] = snapshot; this.lastCatalog = catalogJson;
-      await this.cacheContours().catch(()=>{});
+      if(snapshot!==this.contourSnapshot){try{await this.cacheContours();this.contourSnapshot=snapshot;}catch(_) {}}
     });
     this.saveQueue = pending;
     return pending.then(async () => {

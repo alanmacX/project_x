@@ -199,6 +199,8 @@ struct Index {
   @State editorSection:number=0;
   @State editorSheetTab:number=0;
   @State editorExpanded:boolean=false;
+  @State editorPreviewExpanded:boolean=false;
+  @State editorSheetOpen:boolean=false;
   @State @Watch('homeToolsChanged') homeToolsOpen:boolean=false;
   @State homeToolsMoving:boolean=false;
   private homeToolsMotionGeneration:number=0;
@@ -229,6 +231,7 @@ struct Index {
   @State canvasAspect: number = 1;
   @State canvasDimension: string = '4*4';
   @State heroActive: boolean = false;
+  private editorBackPending:boolean=false;
   @State creatingTransition: boolean = false;
   @State transitionClipX: number = 0;
   @State transitionClipY: number = 0;
@@ -289,7 +292,7 @@ struct Index {
     const materialReady=prepareChromeMaterial();
     this.store.init(this.context).then(async () => {
       await materialReady; startupMark('material-ready');
-      if (this.routeCanvasId) await this.store.openCanvas(this.routeCanvasId);
+      if (this.routeCanvasId && this.routeCanvasId!==this.store.state.canvasId) await this.store.openCanvas(this.routeCanvasId);
       this.refreshCanvasList();
       // Refresh host geometry for the next launch without changing the visible arrival aspect.
       // Cached host geometry is enough for first paint. System IPC must not hold the screen blank.
@@ -309,6 +312,7 @@ struct Index {
       this.ready = true; this.render(); startupMark('scene-ready');
       this.getUIContext().postFrameCallback(new PreparedTransition(()=>startupMark('scene-idle'),true));
       this.scheduleBackground(); this.routeChanged(); this.viewRouteChanged(); this.incomingTemplateChanged();
+      if(!this.viewRouteId && this.routeCanvasId===this.store.state.canvasId)AppStorage.setOrCreate('routeCanvasId','');
       if (!routedLaunch && this.cardIds.length > 0) this.startArrival();
       else this.getUIContext().postFrameCallback(new PreparedTransition(() => { revealStartup(); }));
       this.scheduleMaintenance();
@@ -341,7 +345,7 @@ struct Index {
     if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer);
     this.foregroundRefreshTimer=setTimeout(()=>{
       this.foregroundRefreshTimer=-1;if(!this.alive||this.appBackgrounded)return;
-      if(this.deletionId||this.arriving||this.heroActive||this.activeBoardId||this.gestureGroup){this.scheduleForegroundRefresh();return;}
+      if(this.deletionId||this.arriving||this.heroActive||this.activeBoardId||this.layerDrag||this.gestureGroup){this.scheduleForegroundRefresh();return;}
       // Resume/PageShow arrive together. Reconcile once after the system's
       // window entrance, instead of invalidating the entire scene twice in it.
       this.tick=Math.floor(Date.now()/60000)*60000;this.foregroundSchedules();
@@ -594,7 +598,7 @@ struct Index {
     if(this.showLayerOptions){this.showLayerOptions=false;return true;}
     if(this.readingComparisonOpen){this.readingComparisonOpen=false;return true;}
     if(this.capabilityPickerOpen){this.capabilityPickerOpen=false;return true;}
-    if (this.heroActive) return true;
+    if (this.heroActive) {if(this.editing)this.editorBackPending=true;return true;}
     if (this.viewing) { this.viewing = false; this.selectedId = ''; this.incomingTemplateChanged(); return true; }
     if (this.editing) { this.closeEditor(); return true; }
     if (this.selectedId.length > 0) { this.selectedId = ''; return true; }
@@ -634,7 +638,7 @@ struct Index {
   private editorViewportWidth(): number { return this.editorWorkspace().previewW; }
   private previewPaneHeight(): number {
     const workspace=this.editorWorkspace();
-    return workspace.wide?workspace.body:workspace.body-this.editorControlHeight();
+    return workspace.wide?workspace.body:workspace.body*(this.editorPreviewExpanded?.22:.60);
   }
   private editorControlHeight():number {return this.editorWorkspace().body*(this.editorExpanded?.78:.40);}
   private editingAngle(): number { return this.preview.rot; }
@@ -657,7 +661,7 @@ struct Index {
   private openEditor(id: string, created: boolean = false): void {
     if(this.scheduledName||this.scheduleTransition){this.getUIContext().getPromptAction().showToast({message:'请先恢复原始画布再编辑'});return;}
     if (this.heroActive || this.arriving) return;
-    this.editorExpanded=false;
+    this.editorExpanded=false;this.editorPreviewExpanded=false;this.editorBackPending=false;
     this.heroHideContent = false; this.select(id, true); this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false;this.editorSection=0;this.editorSheetTab=0;this.settingsTab=this.preview.capability!==null?1:0;
     this.heroRect = this.boardRect();
     if (created) {
@@ -666,10 +670,10 @@ struct Index {
     }
     this.layerId=this.preview.capability!==null?'capability':(this.preview.elements.find((el:CanvasElement)=>el.behindCapability)?.id??'');this.syncFields();
     this.creatingTransition = created; this.heroBase = this.editorRect(); this.setHeroPose(this.heroRect); this.setTransitionClip(true);
-    this.editorMounted = true; this.editorReady = true; this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.editorOpacity = 0; this.boardOpacity = 1; this.heroActive = true; this.editing = true;this.homeToolsOpen=false;
+    this.editorMounted = true; this.editorReady = true; this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.editorOpacity = 0; this.boardOpacity = 1; this.heroActive = true; this.editing = true;this.editorSheetOpen=!this.editorLandscape();this.homeToolsOpen=false;
     this.prepareEditorMotion(() => {
       if (!this.alive || !this.editing || !this.heroActive) return;
-      this.getUIContext().animateTo({ duration: 380, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: () => { if (this.alive) { this.heroActive = false; this.creatingTransition = false; this.retireChrome();this.layoutBoard(); } } }, () => {
+      this.getUIContext().animateTo({ duration: 380, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: () => { if (this.alive) { this.heroActive = false; this.creatingTransition = false; this.retireChrome();this.layoutBoard();if(this.editorBackPending){this.editorBackPending=false;this.closeEditor();} } } }, () => {
         this.setHeroPose(this.editorRect()); this.setTransitionClip(false); this.scatter = 1; this.boardOpacity = 0; this.editorOpacity = 1;
       });
     });
@@ -730,13 +734,13 @@ struct Index {
   private closeEditor(): void {
     if (this.heroActive || !this.editing) return;
     if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview();
-    this.editorExpanded=false;
+    const origin=this.editorRect();this.editorSheetOpen=false;this.editorExpanded=false;this.editorPreviewExpanded=false;
     this.creatingTransition = false; this.heroHideContent = this.settingsTab === 0;
-    this.heroBase = this.editorRect(); this.setHeroPose(this.heroBase); this.setTransitionClip(false); this.heroActive = true;
+    this.heroBase = origin; this.setHeroPose(this.heroBase); this.setTransitionClip(false); this.heroActive = true;
     // Publish the edited card to the board once, before it fades back in.
     this.renderBoard();
     this.prepareEditorMotion(() => { this.getUIContext().animateTo({ duration: 340, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: () => {
-      if (this.alive) { this.editing = false; this.editorReady = false; this.heroActive = false; this.retireChrome(); this.selectedId = ''; this.persist(true); this.scheduleBackground(); this.incomingTemplateChanged(); }
+      if (this.alive) { this.editing = false; this.editorReady = false; this.heroActive = false; this.editorBackPending=false; this.retireChrome(); this.selectedId = ''; this.persist(true); this.scheduleBackground(); this.incomingTemplateChanged(); }
     } }, () => { this.setHeroPose(this.boardRect()); this.setTransitionClip(true); this.editorOpacity = 0; this.boardOpacity = 1; this.scatter = 0; }); });
   }
   private orderedCards(): FridgeCard[] { return this.cards.slice().sort((a: FridgeCard, b: FridgeCard) => b.z - a.z); }
@@ -763,6 +767,10 @@ struct Index {
     if(!this.context || !this.alive)return;
     const canvas=this.routeCanvasId,id=this.viewRouteId;
     try {
+      // A desktop tap is navigation, not an instruction to rebuild the same canvas.
+      if(canvas===this.store.state.canvasId && !id && !this.routedId){
+        AppStorage.setOrCreate('routeCanvasId','');this.scheduleForegroundRefresh();return;
+      }
       this.backgroundGeneration++;
       await this.store.init(this.context);if(canvas)await this.store.openCanvas(canvas);
       await primeRenderContours(this.store.state.cards,storageSnapshot(this.store.state));
@@ -1121,18 +1129,26 @@ struct Index {
     }catch(e){if(this.alive)this.getUIContext().getPromptAction().showToast({message:(e as Error).message});}
   }
   private async refreshCapabilities():Promise<void> {
-    if(!this.ready||!this.alive||this.appBackgrounded||this.activeBoardId||this.gestureGroup.length>0||this.refreshingCapabilities||!this.context)return;
+    if(!this.ready||!this.alive||this.appBackgrounded||this.arriving||this.heroActive||this.activeBoardId||this.layerDrag||this.gestureGroup.length>0||this.refreshingCapabilities||!this.context)return;
     this.refreshingCapabilities=true;const canvasId=this.store.state.canvasId;
+    const sources:FridgeCard[]=[],previous:CapBlock[]=[],results:CapBlock[]=[],keys:string[]=[];
     try {
       for(const card of this.store.state.cards.slice()) {
         const cap=card.capability;if(!needsDataRefresh(cap)||!cap)continue;
         const key=capabilityRequestKey(cap),next=await readCapability(cap,this.context);
-        if(this.gestureGroup.length>0||this.layerDrag.length>0||this.heroActive||this.appBackgrounded)break;
-        if(!this.alive||this.store.state.canvasId!==canvasId||this.store.findCard(card.id)!==card||card.capability!==cap||capabilityRequestKey(cap)!==key)continue;
-        if(cap.k==='battery'&&cap.percent===next.percent&&cap.charging===next.charging&&cap.chargeState===next.chargeState&&cap.refreshState===next.refreshState)continue;
-        if(JSON.stringify(next)===JSON.stringify(cap))continue;card.capability=next;
-        this.render();this.persist(true);this.updateScheduledScene(true);
+        if(!this.alive||this.store.state.canvasId!==canvasId)return;
+        sources.push(card);previous.push(cap);results.push(next);keys.push(key);
       }
+      if(this.gestureGroup||this.layerDrag||this.activeBoardId||this.arriving||this.heroActive||this.appBackgrounded){this.scheduleForegroundRefresh();return;}
+      let changed=false;
+      sources.forEach((card:FridgeCard,index:number)=>{
+        const cap=previous[index],next=results[index];
+        if(this.store.findCard(card.id)!==card||card.capability!==cap||capabilityRequestKey(cap)!==keys[index])return;
+        if(cap.k==='battery'&&cap.percent===next.percent&&cap.charging===next.charging&&cap.chargeState===next.chargeState&&cap.refreshState===next.refreshState)return;
+        if(JSON.stringify(next)===JSON.stringify(cap))return;
+        card.capability=next;changed=true;
+      });
+      if(changed){this.render();this.persist(true);this.updateScheduledScene(true);}
     }finally{this.refreshingCapabilities=false;}
   }
 
@@ -1176,6 +1192,18 @@ struct Index {
             onBegin:()=>this.beginGroupTransform(),onFinish:(scale:number,angle:number)=>this.finishGroupTransform(scale,angle),onCancel:()=>this.cancelGroupTransform()})
             .position({x:this.boardLeft,y:this.boardTop}).zIndex(100003).hitTestBehavior(this.homeToolsMoving?HitTestMode.None:HitTestMode.Transparent)
         }
+          // The embedded sheet belongs to the stable window root, not a rebuilding navigation body.
+          Column().width(1).height(1).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
+            .bindSheet($$this.editorSheetOpen,this.editorSectionSheet,{
+              mode:SheetMode.EMBEDDED,preferType:SheetType.BOTTOM,
+              detents:[this.editorWorkspace().body*.40+this.safeBottom,this.editorWorkspace().body*.78+this.safeBottom],
+              detentSelection:this.editorControlHeight()+this.safeBottom,
+              showClose:false,dragBar:true,enableOutsideInteractive:true,maskColor:Color.Transparent,
+              backgroundColor:Color.Transparent,blurStyle:BlurStyle.NONE,scrollSizeMode:ScrollSizeMode.CONTINUOUS,
+              onHeightDidChange:(height:number)=>this.editorSheetHeightChanged(height),
+              onDetentsDidChange:(height:number)=>{const expanded=this.getUIContext().px2vp(height)>this.editorWorkspace().body*.60;if(expanded!==this.editorExpanded||expanded!==this.editorPreviewExpanded)this.expandEditor(expanded);},
+              onWillDismiss:(action:DismissSheetAction)=>this.dismissEditorSheet(action),onWillSpringBackWhenDismiss:(action:SpringBackAction)=>action.springBack()
+            })
         if (this.editorMounted) { this.editor() }
         if (this.chromeSnapshot !== undefined) {
           Image(this.chromeSnapshot).width(this.screenWidth).height(this.screenHeight - this.safeTop - EDITOR_SAFE_GAP)
@@ -1194,7 +1222,7 @@ struct Index {
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_: Area, area: Area) => {
         const width = Number(area.width), height = Number(area.height);
-        if (width > 0 && height > 0) { this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height); this.layoutBoard(); }
+        if (width > 0 && height > 0) { this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height);if(this.editing&&!this.heroActive)this.editorSheetOpen=!this.editorLandscape(); this.layoutBoard(); }
       })
   }
   private sceneCard(id: string): FridgeCard { return this.editing && id === this.selectedId ? this.preview : this.cardMap[id]; }
@@ -1218,6 +1246,7 @@ struct Index {
             BoardCard({ layerMotion:this.layerMotion, controlViewportWidth: BOARD_W * this.boardScale, controlViewportHeight: this.boardHeight, motion: this.boardMotion, card: this.sceneCard(id), localCoordinates: true, scatterAngle: 0, editingSurface: this.editing,
               displayAngle: id === this.selectedId ? this.surfaceAngle() : this.cardMap[id].rot + this.scatter * (this.cardMap[id].z % 2 === 0 ? 9 : -9),
               selected: this.selectedId === id && !this.editing && !this.groupSelecting && this.selectedGroup().length < 2, scaleFactor: this.boardScale, yScaleFactor: this.boardHeight / BOARD_H,
+              animateContent:this.editing&&!this.heroActive&&id===this.selectedId,
               hideContent: this.editing && id === this.selectedId && (this.heroActive ? this.heroHideContent : this.settingsTab === 0),
               movingLayerId: id === this.selectedId ? this.layerDrag : '',
               moveX: id === this.selectedId && this.editing ? this.layerDX * this.boardScale / this.editorScale() : 0, moveY: id === this.selectedId && this.editing ? this.layerDY * this.boardScale / this.editorScale() : 0, tick: this.tick,
@@ -1811,17 +1840,6 @@ struct Index {
               this.editorSectionSheet()
             }.width('100%').layoutWeight(1)
           } else {this.editorStage()}
-          // A stable sheet anchor survives portrait/landscape branch replacement.
-          Column().width(1).height(1).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
-            .bindSheet(this.editing&&!this.heroActive&&!this.editorLandscape(),this.editorSectionSheet,{
-              mode:SheetMode.EMBEDDED,preferType:SheetType.BOTTOM,
-              detents:[this.editorWorkspace().body*.40+this.safeBottom,this.editorWorkspace().body*.78+this.safeBottom],
-              detentSelection:this.editorControlHeight()+this.safeBottom,
-              showClose:false,dragBar:true,enableOutsideInteractive:true,maskColor:Color.Transparent,
-              backgroundColor:this.appSurface(),blurStyle:BlurStyle.NONE,scrollSizeMode:ScrollSizeMode.CONTINUOUS,
-              onDetentsDidChange:(height:number)=>{const expanded=this.getUIContext().px2vp(height)>this.editorWorkspace().body*.60;if(expanded!==this.editorExpanded)this.expandEditor(expanded);},
-              onWillDismiss:()=>{this.expandEditor(false);},onWillSpringBackWhenDismiss:(action:SpringBackAction)=>action.springBack()
-            })
         }.width('100%').height('100%').padding({ top: EDITOR_NAV_INSET }).backgroundColor(Color.Transparent)
       }.titleMode(HdsNavigationTitleMode.MINI)
         .titleBar({
@@ -1886,12 +1904,26 @@ struct Index {
     return this.preview.capability?.k==='album'?['样式','封面与资料']:this.layerId==='capability'?['样式','位置','颜色','数据']:this.layerId.length?(this.elementPreview.kind==='image'?['图片','位置']:['外观','位置','颜色']):['形状','底色'];
   }
   private openEditorSection(index:number):void {
-    if(this.heroActive)return;this.editorSection=index;this.editorSheetTab=0;this.scroller.scrollTo({xOffset:0,yOffset:0});
+    if(this.heroActive||this.editorSection===index)return;this.editorSection=index;this.editorSheetTab=0;this.scroller.scrollTo({xOffset:0,yOffset:0});
   }
-  private expandEditor(value:boolean):void {if(this.heroActive)return;this.getUIContext().animateTo(settingsDialogOpen(),()=>this.editorExpanded=value);}
+  private dismissEditorSheet(action:DismissSheetAction):void {
+    if(action.reason===DismissReason.PRESS_BACK){this.editorSheetOpen=false;action.dismiss();if(this.heroActive)this.editorBackPending=true;else this.closeEditor();}else this.expandEditor(false);
+  }
+  private editorSheetHeightChanged(height:number):void {
+    if(!this.editing||this.heroActive||this.editorLandscape())return;
+    const fraction=this.getUIContext().px2vp(height)/this.editorWorkspace().body;
+    const expanded=this.editorPreviewExpanded?fraction>.54:fraction>.62;
+    // Hysteresis: update the compositor pose once per detent crossing, not artwork on every pan frame.
+    if(expanded!==this.editorPreviewExpanded)this.getUIContext().animateTo(settingsDialogOpen(),()=>this.editorPreviewExpanded=expanded);
+  }
+  private expandEditor(value:boolean):void {if(this.heroActive)return;this.getUIContext().animateTo(settingsDialogOpen(),()=>{this.editorExpanded=value;this.editorPreviewExpanded=value;});}
   @Builder
   editorInspector() {
-    SettingsSegmented({labels:this.editorTools(),selectedIndex:this.editorSection,appDark:this.appDark,onSelect:(index:number)=>this.openEditorSection(index)})
+    // Native SegmentButton is inexpensive to select, but changing its button count forces a synchronous layout flush.
+    Stack() {ForEach([this.editorTools().join('|')],(toolsKey:string)=>{
+      SettingsSegmented({labels:this.editorTools(),selectedIndex:this.editorSection,appDark:this.appDark,onSelect:(index:number)=>this.openEditorSection(index)})
+        .transition(settingsReveal())
+    },(toolsKey:string)=>toolsKey)}.width('100%').height(48)
   }
   private editorSheetHeight():number {return Math.min(520,Math.max(300,this.screenHeight*.52),this.screenHeight-this.safeTop-80);}
   private sectionTabs():string[] {return this.preview.capability?.k==='album'?['封面库','资料','轮换']:this.preview.capability?.k==='timetable'?['显示','课表','校历']:[];}
@@ -1901,7 +1933,7 @@ struct Index {
       this.editorInspector()
       if(this.sectionTabs().length>0 && (this.preview.capability?.k==='album'&&this.editorSection===1 || this.layerId==='capability'&&this.editorSection===3)) {SettingsSegmented({labels:this.sectionTabs(),selectedIndex:this.editorSheetTab,appDark:this.appDark,onSelect:(i:number)=>{this.editorSheetTab=i;this.scroller.scrollTo({xOffset:0,yOffset:0});}})}
       Scroll(this.scroller) {
-        Column({space:16}) {
+        Column() {ForEach([this.layerId+':'+this.editorSection+':'+this.editorSheetTab],(sectionKey:string)=>{Column({space:16}) {
           if(this.preview.capability?.k==='album') {
             if(this.editorSection===0) {this.albumStyleChoices()}
             else {Column() {this.capabilityDataPanel()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(20)}
@@ -1919,7 +1951,7 @@ struct Index {
             if(this.editorSection===0) {this.appearancePanel()}
             else {this.baseColorPanel()}
           }
-        }.width('100%').padding({bottom:24})
+        }.width('100%').padding({bottom:24}).transition(settingsReveal())},(sectionKey:string)=>sectionKey)}.width('100%')
       }.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Off)
     }.width(this.editorLandscape()?this.editorWorkspace().panelW:this.screenWidth)
       .height(this.editorLandscape()?this.editorWorkspace().body:'100%')
@@ -2112,6 +2144,8 @@ struct Index {
   private chooseLayer(id: string): void {
     if(this.layerId===id)return;
     this.scroller.scrollTo({ xOffset: 0, yOffset: 0 });
+    // Each inserted inspector/content node owns its native TransitionEffect.
+    // An outer animateTo forces native SegmentButton option changes to flush the whole page synchronously.
     this.layerId=id;this.settingsTab=id==='capability'||this.layerElement(id)?.behindCapability===false?1:0;this.showLayerOptions=false;this.showBackgroundOptions=false;this.syncFields();
     this.editorSection=Math.min(this.editorSection,this.editorTools().length-1);this.editorSheetTab=0;
   }
