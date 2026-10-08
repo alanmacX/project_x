@@ -15,7 +15,7 @@ export function editorViewport(cardWidth: number, cardHeight: number, angle: num
   const boundsW=Math.max(...xs)-Math.min(...xs),boundsH=Math.max(...ys)-Math.min(...ys);
   const available = Math.max(32, screenHeight - safeTop - safeBottom - (landscape ? 124 : 240));
   const maxHeight = paneHeight > 0 ? Math.max(24, paneHeight - 48) : Math.min(330, available * (landscape ? 1 : .5));
-  result.scale = Math.min(440 / cardWidth, maxHeight / boundsH, Math.max(32, viewportWidth - (paneHeight > 0 ? 56 : 96)) / boundsW);
+  result.scale = Math.min(maxHeight / boundsH, Math.max(32, viewportWidth - (paneHeight > 0 ? 56 : 96)) / boundsW);
   result.left = (viewportWidth - boundsW * result.scale) / 2 - Math.min(...xs)*result.scale;
   result.top = 24 - Math.min(...ys)*result.scale;
   result.top += paneHeight > 0 ? Math.max(0, (paneHeight - boundsH * result.scale - 48) / 2) : 0;

@@ -22,7 +22,7 @@ export function editorVisualChoices(source:FridgeCard,mode:string):EditorVisualC
   return keys.map((key:string):EditorVisualChoice=>{
     const choice=new EditorVisualChoice(),card=cardViewSnapshot(source);choice.key=key;card.rot=0;
     if(mode==='album'&&card.capability){card.capability.albumPresentation=key;card.w=key==='row'?300:180;card.h=key==='row'?150:180;choice.label=['纯封面','经典信息','横向信息'][keys.indexOf(key)];}
-    else if(mode==='shape'){card.shape=key;if(key==='subject')card.h=card.w/card.subjectAspect;choice.label=['圆角矩形','椭圆','胶囊','自由边角','照片主体'][keys.indexOf(key)];}
+    else if(mode==='shape'){card.capability=null;card.capFree=false;card.elements=[];card.shape=key;if(key==='subject')card.h=card.w/card.subjectAspect;choice.label=['圆角矩形','椭圆','胶囊','自由边角','照片主体'][keys.indexOf(key)];}
     else if(card.capability){card.capability.readingBlend=key;card.capability.readingStyle='surface';card.capBox=editorReadingPlacement(card,key);card.capFree=true;card.capability.readingEdge=key==='sticker'?(source.capability?.readingEdge||'left'):'';
       if(key==='sticker'){const attached=edgeAttachment(card,card.capBox,card.capability.readingEdge,card.capability.readingOutside===true);card.capBox=attached.box;card.capBox.rot=0;}
       choice.label=READING_COMPOSITION_LABELS[READING_COMPOSITIONS.indexOf(key)];

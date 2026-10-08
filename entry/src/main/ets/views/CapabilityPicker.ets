@@ -19,12 +19,11 @@ export struct CapabilityPicker {
         Text('选择卡片能力').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).layoutWeight(1)
         Blank().width(48)
       }.width('100%')
-      TextInput({placeholder:'搜索能力',text:this.query}).height(44).fontSize(15).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(12).cancelButton({style:CancelButtonStyle.INPUT}).onChange((value:string)=>this.query=value)
+      Search({placeholder:'搜索能力',value:this.query}).height(44).textFont({size:15}).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(12).cancelButton({style:CancelButtonStyle.INPUT}).onChange((value:string)=>this.query=value)
       SettingsSegmented({labels:CAPABILITY_GROUPS,selectedIndex:CAPABILITY_GROUPS.indexOf(this.group),appDark:this.appDark,onSelect:(index:number)=>{this.group=CAPABILITY_GROUPS[index];this.query='';}})
-      Scroll() {
-        Column({space:8}) {
+      List({space:8}) {
           ForEach(this.items(),(item:CapabilityDescriptor)=>{
-            Button({type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
+            ListItem() {Button({type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
               Row({space:12}) {
                 Column({space:4}) {
                   Text(item.name).fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
@@ -33,12 +32,11 @@ export struct CapabilityPicker {
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
                 if(this.selected===item.key){SymbolGlyph($r('sys.symbol.checkmark')).fontSize(18).fontColor([AppDesign.text(this.appDark)])}else{SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([AppDesign.muted(this.appDark)])}
               }.width('100%').padding({left:12,right:12,top:10,bottom:10})
-            }.width('100%').backgroundColor(AppDesign.surface(this.appDark)).borderRadius(AppDesign.sectionRadius).onClick(()=>this.choose(item.key)).transition(this.query.trim().length===0?settingsReveal():TransitionEffect.IDENTITY)
+            }.width('100%').constraintSize({minHeight:72}).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(AppDesign.sectionRadius).onClick(()=>this.choose(item.key))}.width('100%')
           },(item:CapabilityDescriptor)=>item.key)
-          if(this.items().length===0) {Text('没有匹配的能力，试试其他关键词').fontSize(14).fontColor(AppDesign.muted(this.appDark)).padding(24).width('100%').textAlign(TextAlign.Center)}
-        }.width('100%')
-      }.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Off)
+          if(this.items().length===0) {ListItem(){Text('没有匹配的能力，试试其他关键词').fontSize(14).fontColor(AppDesign.muted(this.appDark)).padding(24).width('100%').textAlign(TextAlign.Center)}}
+      }.width('100%').layoutWeight(1).scrollBar(BarState.Auto)
       Button('纯创作 · 不添加能力',{type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).width('100%').height(48).fontSize(14).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.choose('none'))
-    }.padding({left:20,right:20,top:16,bottom:16}).width('100%').height('100%').constraintSize({maxWidth:640}).backgroundColor(AppDesign.background(this.appDark))
+    }.padding({left:20,right:20,top:16,bottom:16}).width('100%').height('100%').backgroundColor(AppDesign.background(this.appDark))
   }
 }

@@ -50,7 +50,7 @@
   const {blend,contact,b,bw,bh,inset,cw,ch}=readoutGeometry(c);
   let ink=c.shape==='subject'&&c.subjectPhoto&&!c.ink?c.subjectInk:schema.materialColors(c.material,c.paper,c.ink)[1];
   const surface=present.readingSurface(cap,c.shape==='subject'&&c.subjectPhoto,layout.capabilityObstructed(c));
-  if(surface&&['paper','cloud','bare','badge','sticker','space','tag','dock'].includes(blend))ink=present.paperReadingInk(ink);
+  if(surface&&!c.ink&&['paper','cloud','bare','badge','sticker','space','tag','dock'].includes(blend))ink=present.paperReadingInk(ink);
   const tint=cap.readingTint||schema.materialColors(c.material,c.paper,c.ink)[0],compact=metrics.compactCapability(cap,cw,ch),min=metrics.capabilityMinimum(cap,compact,cw),u=Math.max(.001,Math.min(2,cw/min.w,ch/min.h)),now=new Date(tick),pad=surface?composition.compositionPadding(blend)*u:0;
   const text=(v,x,y,fs,width=cw,anchor='start',weight=400,opacity=1)=>txt(v,x,y,fs,ink,width,anchor,weight,opacity);
   let body='',width=cw,height=0,s=u;

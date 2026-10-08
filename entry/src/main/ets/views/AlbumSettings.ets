@@ -87,7 +87,7 @@ export struct AlbumSettings {
                 Button({type:ButtonType.Normal}) {Image(album.cover).width('100%').aspectRatio(1).objectFit(ImageFit.Contain).borderRadius(4).draggable(false)}
                   .width('100%').padding(4).borderRadius(12).backgroundColor(album.id===this.currentAlbum().id?AppDesign.selected(this.appDark):AppDesign.control(this.appDark))
                   .onClick(()=>this.onUpdate(this.cardId,selectAlbum(this.cap,album)))
-                Text(album.title||'未命名专辑').fontSize(11).fontColor(AppDesign.text(this.appDark)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
+                Text(album.title||'添加专辑资料').fontSize(11).fontColor(AppDesign.text(this.appDark)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
                 Button('移除',{type:ButtonType.Capsule}).fontSize(11).fontColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).height(28).onClick(()=>this.remove(album))
               }.width('100%').enabled(!this.busy)
             }

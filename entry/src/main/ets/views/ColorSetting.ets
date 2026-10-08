@@ -6,6 +6,7 @@ import { AppDesign } from '../model/AppDesign';
 @Component
 export struct ColorSetting {
   @Prop label: string = '';
+  @Prop compact:boolean=false;
   @Prop @Watch('syncColor') color: string = '#FFFFFF';
   @Prop automatic: boolean = false;
   @Prop canReset: boolean = true;
@@ -42,7 +43,7 @@ export struct ColorSetting {
   build() {
     Row({ space: 8 }) {
       if (deviceInfo.sdkApiVersion >= 26 && canIUse('SystemCapability.UIDesign.HDSPattern.Standard')) {
-        this.description()
+        if(!this.compact){this.description()}
         ForEach([this.instanceKey()], (key: string) => {
           HdsColorPicker({ initialColor: this.color, options: { circleRadius: 22 },
             onColorSelected: (color: string) => this.picked(color, key) })
@@ -51,10 +52,10 @@ export struct ColorSetting {
       } else {
         Button({ type: ButtonType.ROUNDED_RECTANGLE, buttonStyle: ButtonStyleMode.NORMAL, role: ButtonRole.NORMAL }) {
           Row({ space: 12 }) {
-            this.description()
-            Column().width(28).height(28).borderRadius(8).backgroundColor(this.color)
-              .border({ width: .5, color: AppDesign.border(this.appDark) }).hitTestBehavior(HitTestMode.None)
-          }.width('100%')
+            if(!this.compact){this.description()}
+            if(this.compact){SymbolGlyph($r('sys.symbol.paintpalette')).fontSize(24).fontColor([AppDesign.text(this.appDark)]).hitTestBehavior(HitTestMode.None)}
+            else {Column().width(28).height(28).borderRadius(8).backgroundColor(this.color).border({width:.5,color:AppDesign.border(this.appDark)}).hitTestBehavior(HitTestMode.None)}
+          }.width('100%').justifyContent(FlexAlign.Center)
         }.height(48).padding({left:0,right:0}).layoutWeight(1).backgroundColor(Color.Transparent)
           .accessibilityText('选择' + this.label).onClick(() => this.onFallback())
       }
@@ -65,7 +66,7 @@ export struct ColorSetting {
         }.width(44).height(44).backgroundColor(Color.Transparent).enabled(!this.automatic)
           .accessibilityText(this.label + '恢复默认').onClick(() => { if (this.alive) this.onPick('', this.sourceKey); })
       }
-    }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 12, right: 8, top: 4, bottom: 4 })
+    }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: this.compact?0:12, right:this.compact?0:8, top: 4, bottom: 4 })
       .backgroundColor(AppDesign.control(this.appDark)).borderRadius(AppDesign.controlRadius).clip(true)
   }
 }

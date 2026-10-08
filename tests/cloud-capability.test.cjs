@@ -16,6 +16,7 @@ for(const kind of schema.CAPABILITIES){
   assert(composition.isReadingComposition('cloud'));
  }
 }
+assert.deepEqual(styles.readingStyles('battery'),['badge','cloud','bare']);assert.equal(styles.validReadingStyle('battery','tag'),'badge');assert.equal(styles.validReadingStyle('battery','sticker'),'badge');
 assert.equal(styles.preferredReadingStyle('battery'),'badge');assert.equal(styles.preferredReadingStyle('album'),'');assert.equal(styles.defaultReadingStyle('clock'),'bare','legacy migration is unchanged');
 const c=fixtures.cloudAcceptanceCard('clock',true);c.capFree=false;c.capBox.x=0;c.capBox.y=0;assert(composition.compositionOverflow(c,1).left>=cloud.CLOUD_READING_FRINGE,'auto placement caches include cloud fringe');
 function polygon(path){

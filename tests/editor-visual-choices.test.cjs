@@ -25,3 +25,8 @@ for(const angle of [-145,-45,0,30,145])for(const [vw,pane] of [[320,260],[540,45
  }
 }
 console.log('PASS rotated external content fits both phone and wide editor previews.');
+
+const external=new FridgeCard();external.cutout='file:///subject.png';external.capability={k:'timetable',readingBlend:'tag'};external.capFree=true;external.capBox.x=-2;external.capBox.w=3;external.capBox.h=2;
+for(const c of editorVisualChoices(external,'shape')){assert.equal(c.card.capability,null,'hidden content cannot offset the shape thumbnail');assert.equal(c.offsetX,0);assert.equal(c.offsetY,0);assert.ok(Math.abs(Math.max(c.card.w*c.scale/82,c.card.h*c.scale/92)-1)<.00001,'shape fills the fitted thumbnail frame');}
+const large=editorViewport(40,80,0,400,900,36,24,false,700);assert.ok(large.scale*80>600,'small source artwork still uses available editor height');
+console.log('PASS shape choices ignore hidden/external data and small cards fill the preview.');

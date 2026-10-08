@@ -39,7 +39,7 @@
    while(chars.length){const c=chars[0];if(line&&measure&&measure.measureText(line+c).width>g.textWidth){if(result.length===lines-1){result.push(fitted(line+chars.join(''),size,g.textWidth));return result;}result.push(line);line='';}else{line+=chars.shift();}}
    if(line)result.push(line);return result;
   }
-  const titles=wrap(album.title||'未命名专辑',g.titleSize,g.titleLines),artists=wrap(album.artist,g.artistSize,g.artistLines);
+  const titles=wrap(album.title||'',g.titleSize,g.titleLines),artists=wrap(album.artist,g.artistSize,g.artistLines);
   const textHeight=titles.length*g.titleSize*1.15+(artists.length?g.artistGap+artists.length*g.artistSize*1.15:0);
   let cursor=g.textY-(g.centerText?textHeight/2:0);
   for(const line of titles){out+=textLine(line,g.textX,cursor+g.titleSize*.9,g.titleSize,g.textWidth);cursor+=g.titleSize*1.15;}

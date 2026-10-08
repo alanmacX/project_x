@@ -200,7 +200,7 @@ console.log('PASS external composition cache includes rotated attachment overflo
 
 const policy=load('ReadingStylePolicy');
 for(const k of s.CAPABILITIES.filter(k=>k!=='album'&&k!=='battery'))assert.deepEqual(policy.readingStyles(k),['cloud','bare','tag','sticker']);
-assert.deepEqual(policy.readingStyles('battery'),['badge','cloud','bare','tag','sticker']);assert.deepEqual(policy.readingStyles('album'),[]);
+assert.deepEqual(policy.readingStyles('battery'),['badge','cloud','bare']);assert.deepEqual(policy.readingStyles('album'),[]);
 assert.equal(policy.validReadingStyle('clock','dock'),'tag');assert.equal(policy.validReadingStyle('calendar','space'),'sticker');
 for(const k of s.CAPABILITIES.filter(k=>k!=='album'))for(const style of compositions.READING_COMPOSITIONS)assert.ok(policy.readingStyles(k).includes(s.normalizeState({...s.defaultState(),cards:[{...new s.FridgeCard(),capability:{k,readingBlend:style}}]}).cards[0].capability.readingBlend));
 for(const scale of [.5,1,2]){

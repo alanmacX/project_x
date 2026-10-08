@@ -1,7 +1,7 @@
 export const COMPOSITION_KEYS:string[]=['cloud','bare','badge','sticker','tag'];
 export function readingStyles(kind:string):string[] {
  if(kind==='album')return [];
- return kind==='battery'?['badge','cloud','bare','tag','sticker']:['cloud','bare','tag','sticker'];
+ return kind==='battery'?['badge','cloud','bare']:['cloud','bare','tag','sticker'];
 }
 export function defaultReadingStyle(kind:string):string {
  if(kind==='battery')return 'badge';if(kind==='agenda'||kind==='timetable'||kind==='countdown'||kind==='anniversary'||kind.endsWith('progress'))return 'tag';

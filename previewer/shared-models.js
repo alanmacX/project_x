@@ -691,7 +691,7 @@ exports.COMPOSITION_KEYS = ['cloud', 'bare', 'badge', 'sticker', 'tag'];
 function readingStyles(kind) {
     if (kind === 'album')
         return [];
-    return kind === 'battery' ? ['badge', 'cloud', 'bare', 'tag', 'sticker'] : ['cloud', 'bare', 'tag', 'sticker'];
+    return kind === 'battery' ? ['badge', 'cloud', 'bare'] : ['cloud', 'bare', 'tag', 'sticker'];
 }
 exports.readingStyles = readingStyles;
 function defaultReadingStyle(kind) {
@@ -3354,4 +3354,4 @@ function traceMask(mask, width, height) {
 }
 exports.traceMask = traceMask;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"51e96e0d5ed73579860839501737e5acfc7802622c10bbd145e8077ebaee0eef"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"aeb0da8eb44a619d83247e44248cf1bf23510505493e422f69a6c60f1d2a5fd2"};})(globalThis);

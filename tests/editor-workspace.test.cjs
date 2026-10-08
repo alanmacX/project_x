@@ -7,6 +7,6 @@ for(const [w,h] of [[320,568],[360,640],[390,844],[460,672],[768,1024],[940,665]
  assert.equal(v.previewW+v.layersW+12,v.stageW,'layers share preview stage without stealing another row');
  assert.ok(v.panelH>0&&v.stageH>0);
  if(v.wide){assert.equal(v.stageW+v.panelW,w);assert.equal(v.panelH,v.body);assert.equal(v.stageH,v.body);}
- else {assert.equal(v.stageW,w);assert.equal(v.stageH+v.panelH,v.body);assert.ok(v.stageH<=260);assert.ok(v.panelH>=Math.min(148,v.body-48));}
+ else {assert.equal(v.stageW,w);assert.equal(v.stageH+v.panelH,v.body);assert.ok(v.stageH>=v.body*.59,'default prioritizes preview');assert.ok(v.panelH>=v.body*.39);}
 }
 console.log('PASS embedded editor: preview + layers share height, inspector fills remaining phone/wide space, short-window budgets.');

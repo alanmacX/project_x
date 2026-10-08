@@ -54,7 +54,7 @@ export struct AlbumCapability {
           .shadow({radius:10*this.scaleFactor,color:'#28000000',offsetY:4*this.scaleFactor})
           .onComplete(()=>{if(incoming)this.ready(album.cover,false)}).onError(()=>{if(incoming)this.ready(album.cover,false)})
         Column({space:albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).artistGap*this.scaleFactor}) {
-          Text(album.title||'未命名专辑').fontSize(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).titleSize*this.scaleFactor).fontWeight(FontWeight.Medium).lineHeight(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).titleSize*1.15*this.scaleFactor).fontColor('#FFFFFF').maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
+          if(album.title){Text(album.title).fontSize(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).titleSize*this.scaleFactor).fontWeight(FontWeight.Medium).lineHeight(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).titleSize*1.15*this.scaleFactor).fontColor('#FFFFFF').maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')}
           if(album.artist) {Text(album.artist).fontSize(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).artistSize*this.scaleFactor).lineHeight(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).artistSize*1.15*this.scaleFactor).fontColor('#DDFFFFFF').maxLines(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).artistLines).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')}
         }.alignItems(HorizontalAlign.Start)
           .width(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).textWidth*this.scaleFactor)
