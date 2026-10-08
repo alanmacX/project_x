@@ -27,6 +27,13 @@ export struct ReadingBacking {
  @State private actualHeight:number=0;
  private w():number {return this.actualWidth||this.surfaceWidth;}
  private h():number {return this.actualHeight||this.surfaceHeight;}
+ private cloudKey:string='';
+ private cloudValue:string='';
+ private cloudPath():string {
+  const w=vp2px(this.w()),h=vp2px(this.h()),scale=vp2px(this.scaleFactor),key=[w,h,scale].join(':');
+  if(key!==this.cloudKey){this.cloudKey=key;this.cloudValue=cloudReadingPath(w,h,scale);}
+  return this.cloudValue;
+ }
  private path(inset:number=0):string {
   const w=vp2px(Math.max(0,this.w()-2*inset)),h=vp2px(Math.max(0,this.h()-2*inset)),s=vp2px(this.scaleFactor);
   if(w<=0||h<=0)return '';
@@ -58,10 +65,10 @@ export struct ReadingBacking {
    if(isReadingComposition(this.blend)) {
     if(this.blend==='cloud') {
      // Two native shapes, no blur/bitmap clear. Expanded bounds preserve the text core.
-     Path().commands(cloudReadingPath(vp2px(this.w()),vp2px(this.h()),vp2px(this.scaleFactor))).fill('#249C8B6C').stroke(Color.Transparent).antiAlias(true)
+     Path().commands(this.cloudPath()).fill('#249C8B6C').stroke(Color.Transparent).antiAlias(true)
       .width(this.w()+2*CLOUD_READING_OUTSET*this.scaleFactor).height(this.h()+2*CLOUD_READING_OUTSET*this.scaleFactor)
       .position({x:-CLOUD_READING_OUTSET*this.scaleFactor,y:-CLOUD_READING_OUTSET*this.scaleFactor+2*this.scaleFactor})
-     Path().commands(cloudReadingPath(vp2px(this.w()),vp2px(this.h()),vp2px(this.scaleFactor))).fill('#E6FAF4E3').stroke('#FFFDF6').strokeWidth(1.1*this.scaleFactor).antiAlias(true)
+     Path().commands(this.cloudPath()).fill('#E6FAF4E3').stroke('#FFFDF6').strokeWidth(1.1*this.scaleFactor).antiAlias(true)
       .width(this.w()+2*CLOUD_READING_OUTSET*this.scaleFactor).height(this.h()+2*CLOUD_READING_OUTSET*this.scaleFactor)
       .position({x:-CLOUD_READING_OUTSET*this.scaleFactor,y:-CLOUD_READING_OUTSET*this.scaleFactor})
     } else if(this.study>0) {
