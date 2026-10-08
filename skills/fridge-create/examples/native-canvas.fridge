@@ -1,0 +1,134 @@
+{
+  "format": "fridgememo-template",
+  "version": 1,
+  "kind": "canvas",
+  "state": {
+    "schemaVersion": 2,
+    "canvasId": "canvas_main",
+    "canvasAspect": 1,
+    "canvasDimension": "4*4",
+    "fridge": "board",
+    "background": {
+      "mode": "solid",
+      "color": "#F6F2E9",
+      "src": "",
+      "photo": "",
+      "palette": [],
+      "anchors": [],
+      "signature": ""
+    },
+    "maxZ": 3,
+    "sceneLayouts": [],
+    "sceneRules": [],
+    "sceneBaseLayoutId": "",
+    "cards": [
+      {
+        "id": "card_1",
+        "groupId": "",
+        "x": 22,
+        "y": 38,
+        "w": 180,
+        "h": 112,
+        "rot": 0,
+        "z": 1,
+        "shape": "rect",
+        "frame": false,
+        "material": "cream",
+        "paper": "",
+        "ink": "",
+        "capability": {
+          "k": "clock",
+          "readingStyle": "auto",
+          "readingBlend": "cloud"
+        },
+        "capBox": {
+          "x": 0.12,
+          "y": 0.12,
+          "w": 0.76,
+          "h": 0.76,
+          "rot": 0,
+          "opacity": 1
+        },
+        "capFree": false,
+        "elements": [],
+        "subjectPhoto": false,
+        "subjectBorder": true,
+        "cutout": "",
+        "outline": []
+      },
+      {
+        "id": "card_2",
+        "groupId": "",
+        "x": 22,
+        "y": 211,
+        "w": 180,
+        "h": 114,
+        "rot": 0,
+        "z": 2,
+        "shape": "rect",
+        "frame": false,
+        "material": "cream",
+        "paper": "",
+        "ink": "",
+        "capability": {
+          "k": "date",
+          "readingStyle": "auto",
+          "readingBlend": "cloud"
+        },
+        "capBox": {
+          "x": 0.12,
+          "y": 0.12,
+          "w": 0.76,
+          "h": 0.76,
+          "rot": 0,
+          "opacity": 1
+        },
+        "capFree": false,
+        "elements": [],
+        "subjectPhoto": false,
+        "subjectBorder": true,
+        "cutout": "",
+        "outline": []
+      },
+      {
+        "id": "card_3",
+        "groupId": "",
+        "x": 220,
+        "y": 120,
+        "w": 100,
+        "h": 100,
+        "rot": 0,
+        "z": 3,
+        "shape": "rect",
+        "frame": false,
+        "material": "cream",
+        "paper": "",
+        "ink": "",
+        "capability": {
+          "k": "battery",
+          "readingStyle": "auto",
+          "readingBlend": "badge",
+          "percent": -1,
+          "charging": false,
+          "updatedAt": 0,
+          "attemptedAt": 0
+        },
+        "capBox": {
+          "x": 0.12,
+          "y": 0.12,
+          "w": 0.76,
+          "h": 0.76,
+          "rot": 0,
+          "opacity": 1
+        },
+        "capFree": false,
+        "elements": [],
+        "subjectPhoto": false,
+        "subjectBorder": true,
+        "cutout": "",
+        "outline": []
+      }
+    ]
+  },
+  "assets": []
+}
