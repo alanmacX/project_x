@@ -1,8 +1,9 @@
+import { PathShape } from '@kit.ArkUI';
 import { attachedPath } from '../model/EdgeAttachment';
 import { readingSurfaceColor } from '../model/CapabilityPresentation';
 import { isReadingComposition, compositionPadding } from '../model/ReadingComposition';
 import { hookCenter, hookReserve, micaPath } from '../model/MicaGeometry';
-import { micaStudyFill } from '../model/MicaMaterialStudy';
+import { micaStudyFill, micaStudyPigment } from '../model/MicaMaterialStudy';
 import { PaperBacking } from './PaperBacking';
 /** Shared native material paths; translating a card never clears a bitmap surface. */
 @Component
@@ -29,6 +30,10 @@ export struct ReadingBacking {
   const w=vp2px(Math.max(0,this.w()-2*inset)),h=vp2px(Math.max(0,this.h()-2*inset)),s=vp2px(this.scaleFactor);
   if(w<=0||h<=0)return '';
   let path=this.profile.length?attachedPath(w,h,this.profile,this.contactLeft,6*s):micaPath(this.blend,w,h,s,this.edge);
+  if(this.study>0&&(this.blend==='tag'||this.blend==='dock')) {
+   const r=Math.min(18*s,w/4,h/4);
+   path=`M ${r} 0 L ${w-r} 0 Q ${w} 0 ${w} ${r} L ${w} ${h-r} Q ${w} ${h} ${w-r} ${h} L ${r} ${h} Q 0 ${h} 0 ${h-r} L 0 ${r} Q 0 0 ${r} 0 Z`;
+  }
   if(hookReserve(this.blend)>0) {
    const x=vp2px(hookCenter(this.hook,this.w(),this.scaleFactor)-inset),y=10*s-vp2px(inset),r=3.3*s;
    // Counter-clockwise subpath punches a real transparent hole using nonzero winding.
@@ -51,14 +56,30 @@ export struct ReadingBacking {
   Stack() {
    if(isReadingComposition(this.blend)) {
     if(this.study>0) {
-     Path().commands(this.path()).fill(micaStudyFill(this.tint,this.study)).stroke('#40FFFCF2').strokeWidth(.45*this.scaleFactor).antiAlias(true).width('100%').height('100%')
-     ForEach([1,2],(pass:number)=>{
-      Path().commands(this.path(compositionPadding(this.blend)*this.scaleFactor*.12*pass)).fill(pass===1?'#10FFFFFF':'#0CFFFFFF').stroke(Color.Transparent).antiAlias(true)
-       .width('100%').height('100%').translate({x:compositionPadding(this.blend)*this.scaleFactor*.12*pass,y:compositionPadding(this.blend)*this.scaleFactor*.12*pass})
-     },(pass:number)=>String(pass))
+     // Shape offset gives thickness without Path.shadow's rectangular layer bounds.
+     Path().commands(this.path()).fill('#28B29D74').stroke(Color.Transparent).antiAlias(true)
+      .width('100%').height('100%').translate({y:1.2*this.scaleFactor})
+     Stack() {
+      Column().width('100%').height('100%').backgroundColor(micaStudyFill(this.tint,this.study))
+      Image($r('app.media.reading_mica_cloud')).width('100%').height('100%').objectFit(ImageFit.Fill).opacity(.55).draggable(false)
+      // Broad, uneven colour pools rather than a uniformly coloured sheet.
+      Column().width('100%').height('100%')
+       .radialGradient({center:['86%','82%'],radius:'92%',colors:[[micaStudyPigment(this.tint,this.study),0],[micaStudyPigment(this.tint,this.study,.4),.46],['#00000000',1]]})
+      Column().width('100%').height('100%')
+       .radialGradient({center:['15%','22%'],radius:'80%',colors:[['#B8FFFFF8',0],['#50FFFFF8',.35],['#00FFFFF8',1]]})
+      Column().width('100%').height('100%')
+       .radialGradient({center:['58%','-10%'],radius:'74%',colors:[['#72FFFFFD',0],['#08FFFFFD',.7],['#00FFFFFD',1]]})
+      Column().width('100%').height('100%')
+       .linearGradient({angle:120,colors:[['#20FFFFFF',0],['#00FFFFFF',.35],['#16FFF3D8',.68],['#00FFFFFF',1]]})
+     }.width('100%').height('100%').clipShape(new PathShape().commands(this.path()))
+     // An outer cream lip and a finer inset highlight give a thin mica edge.
+     Path().commands(this.path()).fill(Color.Transparent).stroke(this.blend==='bare'?'#42FFFCF1':'#C8FFFDF6')
+      .strokeWidth((this.blend==='bare'?.6:1.5)*this.scaleFactor).antiAlias(true).width('100%').height('100%')
+     Path().commands(this.path(.9*this.scaleFactor)).fill(Color.Transparent).stroke('#42FFFFFF').strokeWidth(.4*this.scaleFactor)
+      .antiAlias(true).width('100%').height('100%').translate({x:.9*this.scaleFactor,y:.9*this.scaleFactor})
      if(this.blend==='bare') {
       ForEach([2,5,8,11,14,17,20,23],(index:number)=>{
-       Path().commands(this.fibre(index)).fill(Color.Transparent).stroke('#15FFFFFF').strokeWidth(.3*this.scaleFactor).width('100%').height('100%')
+       Path().commands(this.fibre(index)).fill(Color.Transparent).stroke('#18FFFFFF').strokeWidth(.45*this.scaleFactor).width('100%').height('100%')
       },(index:number)=>String(index))
      }
     } else if(this.blend==='bare') {

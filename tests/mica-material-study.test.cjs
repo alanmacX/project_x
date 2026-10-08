@@ -20,3 +20,15 @@ assert(!update.includes('taskpool')&&!update.includes('queueDepth'),'switching p
 const schema=fs.readFileSync('entry/src/main/ets/model/CardSchema.ets','utf8');
 assert(!schema.includes('cap.readingMaterialStudy='),'study selection never gets restored into user artwork');
 console.log('PASS mica study: distinct sampled hues, increasing opacity, preview-only choices and decode-free switching.');
+const backing=fs.readFileSync('entry/src/main/ets/views/ReadingBacking.ets','utf8');
+const study=backing.slice(backing.indexOf('if(this.study>0)'),backing.indexOf("} else if(this.blend==='bare')"));
+assert(study.includes('clipShape(new PathShape().commands(this.path()))'),'pigment/light share actual silhouette and punched hole');
+assert(!study.includes('.shadow(')&&!study.includes('.blur('),'material does not blur rectangular path layers or underlying content');
+assert.equal((study.match(/\.radialGradient\(/g)||[]).length,3,'local pigment and cloud light are separate native pools');
+for(const v of [1,2,3]) assert.match(env.exports.micaStudyPigment('#EDC03E',v),/^#[0-9a-f]{8}$/i);
+for(const tint of ['#000000','#0000FF','#FF0000','#EDC03E','#252525']) for(const v of [1,2,3]) {
+ const base=fill(tint,v),pigment=env.exports.micaStudyPigment(tint,v),a=parseInt(base.slice(1,3),16)/255,p=parseInt(pigment.slice(1,3),16)/255;
+ const rgb=[3,5,7].map(i=>(parseInt(base.slice(i,i+2),16)*a*(1-p)+parseInt(pigment.slice(i,i+2),16)*p)/255);
+ const lin=rgb.map(c=>c<=.04045?c/12.92:((c+.055)/1.055)**2.4);
+ assert((lin[0]*.2126+lin[1]*.7152+lin[2]*.0722+.05)/.055>=4.45,'darkest pigment pool keeps legible black text over a black photo');
+}
