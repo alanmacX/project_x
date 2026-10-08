@@ -1,6 +1,6 @@
 import { edgeAttachment } from '../model/EdgeAttachment';
 import { capabilityAttachmentEdges } from '../model/CanvasLayout';
-import { defaultReadingStyle } from '../model/ReadingStylePolicy';
+import { preferredReadingStyle, defaultReadingStyle } from '../model/ReadingStylePolicy';
 import { compositionPlacement, isReadingComposition, snapComposition, readingStyles } from '../model/ReadingComposition';
 import { CenterGuides } from '../views/CenterGuides';
 import lazy { ReadingComparison } from '../views/ReadingComparison';
@@ -881,7 +881,7 @@ struct Index {
     if (card.capability?.k === k) { this.layerId = 'capability'; this.syncFields(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); return; }
     if (k === 'none') { card.capability = null; this.layerId = ''; }
     else {
-      const cap: CapBlock = { k:k,readingBlend:k==='album'?undefined:defaultReadingStyle(k),readingStyle:'surface' };
+      const cap: CapBlock = { k:k,readingBlend:k==='album'?undefined:preferredReadingStyle(k),readingStyle:'surface' };
       if (k === 'countdown' || k === 'anniversary') {
         const date = new Date(); cap.date = date.getFullYear() + '-' + ('0' + (date.getMonth() + 1)).slice(-2) + '-' + ('0' + date.getDate()).slice(-2);
         cap.title = '';

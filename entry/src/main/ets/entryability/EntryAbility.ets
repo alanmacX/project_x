@@ -17,6 +17,7 @@ export default class EntryAbility extends UIAbility {
     this.routeCard(want);
     this.routeTemplate(want);
     if (want.parameters?.['demo'] === 'sketch') this.launchPage = 'pages/SketchLab';
+    if (want.parameters?.['demo'] === 'cloud') this.launchPage = 'pages/CloudAcceptance';
     if (want.parameters?.['demo'] === 'edges') this.launchPage = 'pages/ReadingEdgeStudy';
     if (want.parameters?.['demo'] === 'mica') this.launchPage = 'pages/MicaStudy';
   }

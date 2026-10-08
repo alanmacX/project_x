@@ -5,6 +5,7 @@
     "pages/ReadingDemo",
     "pages/ReceiveTemplate",
     "pages/MicaStudy",
-    "pages/ReadingEdgeStudy"
+    "pages/ReadingEdgeStudy",
+    "pages/CloudAcceptance"
   ]
 }

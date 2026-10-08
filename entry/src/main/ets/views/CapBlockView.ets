@@ -54,6 +54,11 @@ export struct CapabilityView {
     const min = capabilityMinimum(this.cap, this.compact(), this.contentWidth);
     return Math.min(2, this.contentWidth / min.w, this.contentHeight / min.h) * this.scaleFactor;
   }
+  private dateCaption():string {
+    const now=this.now(), holiday=holidayName(now);
+    if(holiday)return holiday;
+    return (this.compact()?'':now.getFullYear()+'年')+(now.getMonth()+1)+'月 · '+['周日','周一','周二','周三','周四','周五','周六'][now.getDay()]+(holidayMarker(now)==='班'?' · 班':'');
+  }
   private dateFont():number {return boundedReadoutFont((this.compact()?24:54)*this.unit(),this.contentWidth*this.scaleFactor,2.8);}
   private clockFont(world: boolean = false): number {
     const nominal = world ? (this.compact()?28:40) : (this.compact()?24:42);
@@ -77,7 +82,7 @@ export struct CapabilityView {
     if(this.cap.k==='clock')width=this.measured('88:88',this.clockFont(),500);
     else if(this.cap.k==='worldclock') {const city=cityReading(this.cap.zone??'',this.now().getTime());width=Math.max(this.measured(city.city,12*u),this.measured('88:88',this.clockFont(true),500),this.measured('12月31日 · 周三',11*u),this.compact()?0:this.measured(city.difference,11*u));}
     else if(this.cap.k==='lunar') {const lunar=lunarReading(this.now().getTime());width=Math.max(this.measured('农历',12*u),this.measured(lunar.date,this.lunarFont(),500),this.measured(lunar.year,12*u));}
-    else if(this.cap.k==='date')width=Math.max(this.measured('88日',this.dateFont(),500),this.measured(holidayName(this.now())||this.now().getFullYear()+'年'+(this.now().getMonth()+1)+'月 · 周三',12*u));
+    else if(this.cap.k==='date')width=Math.max(this.measured('88日',this.dateFont(),500),this.measured(this.dateCaption(),12*u));
     else if(this.cap.k==='calendar')width=7*(this.measured('88',12*u)+(this.compact()?3:7)*u);
     else if(this.cap.k==='countdown'||this.cap.k==='anniversary')width=Math.max(this.measured(this.cap.title||typeLabel(this.cap.k),12*u),this.measured(String(Math.abs(daysLeftOf(this.cap.date??''))),this.counterFont(),500)+this.measured(this.cap.k==='anniversary'?(daysLeftOf(this.cap.date??'')>0?'天后':'天'):(daysLeftOf(this.cap.date??'')<0?'天前':'天'),12*u)+3*u,this.compact()?0:this.measured(this.cap.date??'',10*u));
     else if(this.cap.k==='dayprogress'||this.cap.k==='yearprogress')width=Math.max(64*u,this.measured(typeLabel(this.cap.k),12*u),this.measured('100%',(this.compact()?24:38)*u));
@@ -111,7 +116,7 @@ export struct CapabilityView {
         Text(lunarReading(this.now().getTime()).year).fontSize((12*this.unit())+'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.65).maxLines(1)
       } else if (this.cap.k === 'date') {
         TextClock().format('dd').fontSize(this.dateFont() + 'vp').height(this.dateFont()*1.35).width(Math.min(this.contentWidth*this.scaleFactor,this.measured('88日',this.dateFont(),500))).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend))
-        Text(holidayName(this.now()) || (this.now().getFullYear()+'年'+(this.now().getMonth()+1)+'月 · '+['周日','周一','周二','周三','周四','周五','周六'][this.now().getDay()]+(holidayMarker(this.now())==='班'?' · 班':''))).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:0.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
+        Text(this.dateCaption()).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:0.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
       } else if (this.cap.k === 'calendar' && this.compact() && (this.cap.calendarOffset ?? 0) === 0) {
         Text((this.now().getMonth() + 1) + '月 · 本周').fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend))
         Row() {

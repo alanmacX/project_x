@@ -1,3 +1,4 @@
+import { CLOUD_READING_OUTSET, cloudReadingPath } from '../model/CloudReadingGeometry';
 import { PathShape } from '@kit.ArkUI';
 import { attachedPath } from '../model/EdgeAttachment';
 import { readingSurfaceColor } from '../model/CapabilityPresentation';
@@ -55,7 +56,15 @@ export struct ReadingBacking {
  build() {
   Stack() {
    if(isReadingComposition(this.blend)) {
-    if(this.study>0) {
+    if(this.blend==='cloud') {
+     // Two native shapes, no blur/bitmap clear. Expanded bounds preserve the text core.
+     Path().commands(cloudReadingPath(vp2px(this.w()),vp2px(this.h()),vp2px(this.scaleFactor))).fill('#249C8B6C').stroke(Color.Transparent).antiAlias(true)
+      .width(this.w()+2*CLOUD_READING_OUTSET*this.scaleFactor).height(this.h()+2*CLOUD_READING_OUTSET*this.scaleFactor)
+      .position({x:-CLOUD_READING_OUTSET*this.scaleFactor,y:-CLOUD_READING_OUTSET*this.scaleFactor+2*this.scaleFactor})
+     Path().commands(cloudReadingPath(vp2px(this.w()),vp2px(this.h()),vp2px(this.scaleFactor))).fill('#E6FAF4E3').stroke('#FFFDF6').strokeWidth(1.1*this.scaleFactor).antiAlias(true)
+      .width(this.w()+2*CLOUD_READING_OUTSET*this.scaleFactor).height(this.h()+2*CLOUD_READING_OUTSET*this.scaleFactor)
+      .position({x:-CLOUD_READING_OUTSET*this.scaleFactor,y:-CLOUD_READING_OUTSET*this.scaleFactor})
+    } else if(this.study>0) {
      // Shape offset gives thickness without Path.shadow's rectangular layer bounds.
      Path().commands(this.path()).fill('#28B29D74').stroke(Color.Transparent).antiAlias(true)
       .width('100%').height('100%').translate({y:1.2*this.scaleFactor})

@@ -184,7 +184,7 @@ console.log('PASS content-sized paper shared font advances and hollow battery ma
 
 assert.equal(batteryPaper.batteryPaperArcMask(100,40,126,0),'');assert.ok(batteryPaper.batteryPaperArcMask(100,40,126,288).includes('0 1 1'));assert.ok(batteryPaper.batteryPaperArcMask(100,30,70,40).includes('0 0 0'),'number backing uses only its local arc');
 const compositions=load('ReadingComposition');
-assert.equal(compositions.READING_COMPOSITIONS.length,4);
+assert.equal(compositions.READING_COMPOSITIONS.length,5);
 for(const kind of s.CAPABILITIES.filter(k=>k!=='album')) for(const blend of compositions.readingStyles(kind)){
  const card=new s.FridgeCard();card.id=kind+'-'+blend;card.capability={k:kind,readingBlend:blend,readingTint:'#F8CF32'};card.capFree=true;card.capBox.x=-.35;card.capBox.y=.6;card.capBox.w=.65;card.capBox.h=.5;card.capBox.rot=-12;
  const restored=s.normalizeState({...s.defaultState(),cards:[card]}).cards[0];assert.equal(restored.capability.readingBlend,blend);assert.equal(restored.capability.readingTint,'#F8CF32');assert.equal(restored.capBox.x,-.35);assert.equal(restored.capBox.rot,-12);
@@ -199,8 +199,8 @@ const fringe=compositions.compositionOverflow(external,2);assert.ok(fringe.left>
 console.log('PASS external composition cache includes rotated attachment overflow without changing artwork bounds');
 
 const policy=load('ReadingStylePolicy');
-for(const k of s.CAPABILITIES.filter(k=>k!=='album'&&k!=='battery'))assert.deepEqual(policy.readingStyles(k),['bare','tag','sticker']);
-assert.deepEqual(policy.readingStyles('battery'),['badge','bare','tag','sticker']);assert.deepEqual(policy.readingStyles('album'),[]);
+for(const k of s.CAPABILITIES.filter(k=>k!=='album'&&k!=='battery'))assert.deepEqual(policy.readingStyles(k),['cloud','bare','tag','sticker']);
+assert.deepEqual(policy.readingStyles('battery'),['badge','cloud','bare','tag','sticker']);assert.deepEqual(policy.readingStyles('album'),[]);
 assert.equal(policy.validReadingStyle('clock','dock'),'tag');assert.equal(policy.validReadingStyle('calendar','space'),'sticker');
 for(const k of s.CAPABILITIES.filter(k=>k!=='album'))for(const style of compositions.READING_COMPOSITIONS)assert.ok(policy.readingStyles(k).includes(s.normalizeState({...s.defaultState(),cards:[{...new s.FridgeCard(),capability:{k,readingBlend:style}}]}).cards[0].capability.readingBlend));
 for(const scale of [.5,1,2]){

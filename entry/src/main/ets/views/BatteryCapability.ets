@@ -35,7 +35,7 @@ export struct BatteryCapability {
       this.edgeBacking()
     Column() {
       Stack({alignContent:Alignment.TopStart}) {
-        if(this.contentBackingEnabled&&['badge','tag','dock'].includes(this.cap.readingBlend??'')) {
+        if(this.contentBackingEnabled&&['badge','cloud','tag','dock'].includes(this.cap.readingBlend??'')) {
           ReadingBacking({study:this.cap.readingMaterialStudy??0,surfaceWidth:this.labelPaperDiameter(),surfaceHeight:this.labelPaperDiameter()+hookReserve(this.cap.readingBlend??'')*this.unit,blend:this.cap.readingBlend??'badge',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,scaleFactor:this.unit}).width(this.labelPaperDiameter()).height(this.labelPaperDiameter()+hookReserve(this.cap.readingBlend??'')*this.unit).position({x:(this.diameter()-this.labelPaperDiameter())/2,y:(this.diameter()-this.labelPaperDiameter())/2-hookReserve(this.cap.readingBlend??'')*this.unit})
         } else if(this.contentBackingEnabled&&!this.backingProfile.length) {
           ReadingBacking({study:this.cap.readingMaterialStudy??0,blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,hook:this.cap.readingHook??.2,ink:this.ink,radius:999,scaleFactor:this.unit}).width(this.paperDiameter()).height(this.paperDiameter())
