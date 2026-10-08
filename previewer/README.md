@@ -34,3 +34,30 @@ const report = FridgeHarness.getReport();
 正式验收：结构校验 → 独立预览 → 同 fingerprint 的 App 对照 → 真实 Form/分享对照。不同版本的基准图保留，合法改版经人工批准再更新，不能自动用失败截图覆盖基准。
 
 专辑页可直接导入本地正方形封面和对应静态背景图。没有捆绑商业封面或调用在线音乐接口。
+
+## 发布契约与设计升级
+
+`design-contract.js` 和 skill 的 `references/design-contract.json` 由同一次 build 生成。内容来自 App：版本、能力/字段清单、阅读样式、容量、坐标、圆角与专辑参数；分别记录模型、素材、浏览器适配器、原生作品视图的身份。`--check` 会检查所有生成产物；发布前再检查浏览器支持清单与生产能力清单一致。App 版本号不变时也能发现上架前 polishing 的变化。
+
+归档每次通过人工验收的 contract、原始 `.fridge`、素材、时间/尺寸和截图。`scripts/fridge-contract-diff.cjs old.json new.json` 用于指出协议/能力移除及视觉实现变化，不自动批准迁移或替换基准。当前 v1 没有持久化 design profile，旧作品随宿主默认设计变化；要锁定旧视觉必须将来同时实现版本化 profile 与迁移，而非在文件里先造字段。
+
+`FridgeHarness.getDesignContract()` 读取契约，`getCardMetrics()` 查询每张卡片实际内容尺寸、最小尺寸、compact 模式与 fit。结果辅助排版，不能替代观察文字是否截断。
+
+## 单张卡片供外部前端使用
+
+无需视频 pipeline。`renderLayers` 与整画布使用同一个渲染过程：
+
+```js
+const pack = FridgeCore.load('TemplatePackage').readPackage(json);
+// 解码素材尺寸与 loadText 一样；也可直接取已加载页的 FridgeHarness.getLayers()。
+const layers = FridgeWeb.renderLayers(pack, 900, fixedTick, {namespace: 'profileA'});
+// layers.defs：素材/蒙版/滤镜，仅插入一次。
+// layers.background：背景 markup。
+// layers.cards：按 z 排序的 {id, groupId, x, y, width, height, rotation, pivot, markup}。
+```
+
+每张 card 保留 `data-fridge-card` 独立外层节点，内部已有位置与旋转、文字/图片层、能力衬底和自由溢出。外部前端可以用 Web Animations、GSAP 等给该外层加位移/缩放/透明度，或按 groupId 联动；不要覆盖里面原有的 transform。画布边界裁切由外部场景决定：卡片离场可暂时不裁切，正常静态作品仍按 previewer 裁切。透视、相机、时序由外部项目实现，本项目不加入时间轴，也不改 App 存储。
+
+同一页面多幅作品必须指定不同 namespace，以免 SVG 素材/滤镜 ID 相互覆盖。`width/height` 是逻辑画布单位，`pivot` 为该单位下整卡中心；不包括阴影与外贴 capability 的溢出范围，不可用它裁掉内容。SVG 根保留 `font-family="system-ui,sans-serif"`，挂钩/能力在同一 card 内，不拆散。
+
+先渲染/解码一次并保留节点，再只更新 transform 等合成属性；不要在动画每帧调用 readPackage/renderLayers 或复制 Base64。改变作品设计或数据时重新渲染相应静态帧。素材本身是离线嵌入数据，不会让外部动画获得系统权限或读取当前设备电量。GIF、宿主交互、HTML card 仍按前述限制处理。

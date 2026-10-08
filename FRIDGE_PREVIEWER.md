@@ -42,7 +42,7 @@ HDC 的 -b 使用可调试应用的沙箱通道；普通 file send 没有写 App
 
 布局或材质改版优先保持用户已选的尺寸、颜色和源数据。对旧设计需要重大视觉重排时保留旧 profile 或提供“升级样式”预览，由用户选择；bug 修复可以统一更新，但须做回归，不把修 bug 变成推翻全部作品风格。
 
-skill 不固定跟某版源码永久绑定：每次版本发布从 App 导出机器可读能力/设计契约与校验器版本，skill 据此生成。收到新契约不支持时停止生成可导入包，明确给草稿。HTML 包必须声明最低 reader、renderer、design profile 和 required providers。
+skill 不固定跟某版源码永久绑定：已由 previewer/build.cjs 从 App 生成机器可读设计契约，包含字段、能力、设计参数及模型/素材/两端视图身份。Node-only 校验器和 skill 使用同一产物，--check 检测过期；每次发布归档契约并用 fridge-contract-diff.cjs 标出变更，随后做兼容与视觉验收。收到新契约不支持时停止生成可导入包，明确给草稿。HTML 包必须声明最低 reader、renderer、design profile 和 required providers。
 
 ## 回归验收要求
 

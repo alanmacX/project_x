@@ -28,7 +28,34 @@ const materials={};
 for(const name of fs.readdirSync(mediaRoot).filter(n=>/^reading_.*\.png$/.test(n)).sort())materials[name.slice(0,-4)]='data:image/png;base64,'+fs.readFileSync(path.join(mediaRoot,name)).toString('base64');
 const materialBundle='// Generated from the same offline app materials.\nglobalThis.FridgeMaterials='+JSON.stringify(materials)+';\n';
 const materialTarget=path.join(__dirname,'shared-materials.js');
+// Authoring metadata is an external release artifact, never an invented v1 package field.
+const vm=require('node:vm'),context=vm.createContext({});vm.runInContext(bundle,context);
+vm.runInContext(fs.readFileSync(path.join(__dirname,'capabilities.js'),'utf8'),context);
+const schema=context.FridgeCore.load('CardSchema'),policy=context.FridgeCore.load('ReadingStylePolicy');
+const repository=path.resolve(__dirname,'..');
+const hashFiles=files=>{const hash=crypto.createHash('sha256');for(const file of files.sort())hash.update(file+'\0'+fs.readFileSync(path.join(repository,file))+'\0');return hash.digest('hex');};
+const nativeViews=['CardFace','CardCanvas','CapBlockView','ReadingBacking','ReadingEdgeBacking','ReadingHook','SummaryCapability','TimetableCapability','AlbumCapability','BatteryCapability','CanvasBackdrop'];
+const schemaSource=modules.get('CardSchema').source;
+function fields(declaration){const body=schemaSource.split(declaration)[1]?.split('\n}')[0];if(!body)throw Error('Authoring declaration changed: '+declaration);return [...body.matchAll(/^\s*([a-zA-Z][\w]*)\??\s*:/gm)].map(match=>match[1]);}
+const contract={
+ contractVersion:1,skillContractVersion:1,app:JSON.parse(fs.readFileSync(path.join(repository,'AppScope/app.json5'),'utf8')).app,
+ package:{format:'fridgememo-template',version:1,schemaVersion:2,kinds:['card','canvas'],htmlSupported:false},
+ identity:{models:fingerprint,materials:crypto.createHash('sha256').update(materialBundle).digest('hex'),browserAdapter:hashFiles(['previewer/renderer.js','previewer/capabilities.js']),nativeViews:hashFiles(nativeViews.map(name=>'entry/src/main/ets/views/'+name+'.ets'))},
+ coordinates:{boardWidth:schema.BOARD_W,legacyPositionHeight:schema.BOARD_H,cardSizeUnits:'board_width',elementUnits:'card_fraction',rotationUnits:'degrees'},
+ limits:{canvasCards:context.FridgeCore.load('CanvasCapacity').CANVAS_CARD_LIMIT},
+ design:{binding:'current-host',persistedProfileField:false,rectRadius:schema.RECT_CORNER_RADIUS,album:{inset:schema.ALBUM_INSET,coverRadius:schema.ALBUM_CORNER_RADIUS,cardRadius:schema.ALBUM_CARD_CORNER_RADIUS,squareCover:true}},
+ capabilities:Array.from(schema.CAPABILITIES,kind=>({kind,readingStyles:Array.from(policy.readingStyles(kind)),legacyDefault:policy.defaultReadingStyle(kind),preferredStyle:policy.preferredReadingStyle(kind)})),
+ fields:{state:fields('export class FridgeState {'),card:fields('export class FridgeCard {'),capability:fields('export interface CapBlock {'),element:[...fields('export class ElementBox {'),...fields('export class CanvasElement extends ElementBox {')]},
+ retiredCapabilityFields:['url','field','sourceConfigured','parcels','parcelPlace','temp','desc'],
+ preview:{supportedCapabilities:[...context.FridgeReadouts.supportedKinds,'album'],staticFrame:true,systemSymbols:'vector-substitutes',fontParity:false,actualFormVerified:false}
+};
+const contractJSON=JSON.stringify(contract,null,2)+'\n';
+const generated=[
+ [target,bundle],[nativeTarget,nativeSource],[materialTarget,materialBundle],
+ [path.join(__dirname,'design-contract.js'),'// Generated release contract. Do not hand-edit.\nglobalThis.FridgeDesignContract='+JSON.stringify(contract)+';\n'],
+ [path.join(repository,'skills/fridge-create/references/design-contract.json'),contractJSON]
+];
 if(process.argv.includes('--check')){
- if(!fs.existsSync(target)||fs.readFileSync(target,'utf8')!==bundle||!fs.existsSync(nativeTarget)||fs.readFileSync(nativeTarget,'utf8')!==nativeSource||!fs.existsSync(materialTarget)||fs.readFileSync(materialTarget,'utf8')!==materialBundle){console.error('Preview models/materials are stale. Run node previewer/build.cjs');process.exitCode=1;}
+ if(generated.some(([file,source])=>!fs.existsSync(file)||fs.readFileSync(file,'utf8')!==source)){console.error('Preview models/materials/design contract are stale. Run node previewer/build.cjs');process.exitCode=1;}
  else console.log('PASS preview bundle matches production models '+fingerprint.slice(0,12));
-}else{fs.writeFileSync(target,bundle);fs.writeFileSync(nativeTarget,nativeSource);fs.writeFileSync(materialTarget,materialBundle);console.log('Built '+modules.size+' pure production models '+fingerprint.slice(0,12));}
+}else{for(const [file,source] of generated)fs.writeFileSync(file,source);console.log('Built '+modules.size+' pure production models and release contract '+fingerprint.slice(0,12));}

@@ -10,7 +10,7 @@ function render(){
   const tick=new Date($('tick').value).getTime();if(!Number.isFinite(tick))throw Error('数据时间无效');
   output=FridgeWeb.renderPackage(pack,Number($('size').value),tick);$('artwork').innerHTML=output.svg;
   $('issues').replaceChildren(...output.issues.map(message=>{const li=document.createElement('li');li.textContent=message;return li;}));
-  report={previewVersion:2,adapter:'browser-svg-v2',sourceFingerprint:FridgeCore.sourceFingerprint,packageVersion:pack.version,schemaVersion:pack.state.schemaVersion,width:output.width,height:output.height,tick,timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone,cards:pack.state.cards.length,status:output.issues.length?'unsupported':'ready-for-review',issues:output.issues,actualFormVerified:false,pixelParityVerified:false};
+  report={previewVersion:2,adapter:'browser-svg-v2',sourceFingerprint:FridgeCore.sourceFingerprint,designContract:{contractVersion:FridgeDesignContract.contractVersion,skillContractVersion:FridgeDesignContract.skillContractVersion,identity:FridgeDesignContract.identity,appVersion:FridgeDesignContract.app.versionName},packageVersion:pack.version,schemaVersion:pack.state.schemaVersion,width:output.width,height:output.height,tick,timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone,cards:pack.state.cards.length,status:output.issues.length?'unsupported':'ready-for-review',issues:output.issues,actualFormVerified:false,pixelParityVerified:false};
   $('status').textContent=output.issues.length?'文件已读取，存在未支持能力，不能验收通过':'文件已读取，可以导出对照图';$('export').disabled=false;$('report').disabled=false;
  }catch(error){showError(error);}
 }
@@ -52,7 +52,7 @@ async function capture(){
  const url=URL.createObjectURL(new Blob([snapshot.svg],{type:'image/svg+xml'}));
  try{const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url;});const canvas=document.createElement('canvas');canvas.width=snapshot.width*2;canvas.height=snapshot.height*2;canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);return await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));}finally{URL.revokeObjectURL(url);}
 }
-window.FridgeHarness={loadText,capture,getReport:()=>structuredClone(report),setSize:(size)=>{if(![180,300,420].includes(size))throw Error('Unsupported size');$('size').value=String(size);render();},showAlbums:()=>tab('album')};
+window.FridgeHarness={loadText,capture,getReport:()=>structuredClone(report),getDesignContract:()=>structuredClone(FridgeDesignContract),getCardMetrics:()=>{if(!pack)throw Error('尚未读取作品');return structuredClone(pack.state.cards.map(FridgeReadouts.inspectCard));},getLayers:()=>{if(!output)throw Error('尚未读取作品');return structuredClone({width:output.width,height:output.height,issues:output.issues,...output.layers});},setSize:(size)=>{if(![180,300,420].includes(size))throw Error('Unsupported size');$('size').value=String(size);render();},showAlbums:()=>tab('album')};
 $('file').onchange=async event=>{try{const file=event.target.files[0];if(!file)return;await loadText(await file.text());tab('scene');}catch(error){/* loadText owns errors and ignores stale imports. */}};
 for(const id of ['size','tick'])$(id).onchange=render;
 $('content').onchange=study;$('sceneTab').onclick=()=>tab('scene');$('albumTab').onclick=()=>tab('album');

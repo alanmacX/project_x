@@ -34,3 +34,27 @@ for(const blend of ['bare','badge','sticker','tag','cloud']){
 if(process.argv[2]){
  const real=read(fs.readFileSync(process.argv[2],'utf8')),scene=ctx.FridgeWeb.renderPackage(real,300,1791429300000);assert.equal(scene.issues.length,0);assert.ok(!/[=\s(",]NaN(?:[\s)",]|$)/.test(scene.svg));assert.ok(!scene.svg.includes('未支持的渲染'));console.log('PASS supplied package:',real.state.cards.length,'cards,',real.assets.length,'assets');
 }
+// Frontend reuse must preserve the exact rendered card body, not approximate it.
+const segmented=ctx.FridgeWeb.renderPackage(example,420,1791439200000,{namespace:'profileA'});
+const layers=ctx.FridgeWeb.renderLayers(example,420,1791439200000,{namespace:'profileA'});
+assert.equal(layers.cards.length,example.state.cards.length);
+assert.equal(layers.height,420/example.state.canvasAspect);
+assert.deepEqual(Array.from(layers.cards,c=>c.id),Array.from(example.state.cards).sort((a,b)=>a.z-b.z).map(c=>c.id));
+for(const card of layers.cards){assert.ok(segmented.svg.includes(card.markup));assert.ok(card.markup.includes('data-fridge-card="'+card.id+'"'));assert.equal(card.pivot.x,card.x+card.width/2);}
+const second=ctx.FridgeWeb.renderLayers(example,420,1791439200000,{namespace:'profileB'});
+assert.ok(!second.defs.includes('id="profileA'));assert.throws(()=>ctx.FridgeWeb.renderLayers(example,420,1791439200000,{namespace:'bad"id'}));
+assert.equal(layers.cards[0].y,example.state.cards.find(c=>c.id===layers.cards[0].id).y*layers.height/470);
+for(const c of example.state.cards){const measured=ctx.FridgeReadouts.inspectCard(c);assert.equal(measured.id,c.id);assert.ok(Number.isFinite(measured.minimumCardSize.w));if(c.capability?.k!=='album'&&c.capability)assert.ok(Number.isFinite(measured.contentWidth));}
+const contract=JSON.parse(fs.readFileSync(path.join(root,'skills/fridge-create/references/design-contract.json'),'utf8'));
+assert.deepEqual(contract.capabilities.map(c=>c.kind).sort(),contract.preview.supportedCapabilities.slice().sort(),'New capabilities require actual renderer adaptation');
+assert.equal(contract.identity.models,ctx.FridgeCore.sourceFingerprint);
+const compare=require('../scripts/fridge-contract-diff.cjs').compare;
+const upgraded=structuredClone(contract);upgraded.identity.materials='changed';upgraded.capabilities=upgraded.capabilities.filter(c=>c.kind!=='clock');
+const delta=compare(contract,upgraded);assert.ok(delta.requiresVisualReview);assert.ok(delta.requiresCompatibilityReview);assert.ok(delta.removed.includes('capability:clock'));assert.equal(delta.canAutomaticallyApprove,false);
+console.log('PASS reusable layers, namespaces, native metric inspection and contract upgrade gates');
+
+const player=read(fs.readFileSync(path.join(root,'skills/fridge-create/examples/control-resonant.fridge'),'utf8'));
+assert.equal(player.state.cards.length,6);assert.equal(player.assets.length,0);
+for(const width of [180,300,420]){const rendered=ctx.FridgeWeb.renderPackage(player,width,1791439200000);assert.equal(rendered.issues.length,0);assert.ok(rendered.svg.includes('08日'));assert.equal(rendered.layers.cards.length,6);}
+for(const card of player.state.cards)if(card.capability)assert.equal(ctx.FridgeReadouts.inspectCard(card).fits,true,card.id+' player readout fits');
+console.log('PASS independent skill fixture: six editable cards, native readout fit and three preview widths');

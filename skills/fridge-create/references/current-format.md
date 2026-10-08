@@ -1,6 +1,6 @@
 # Current .fridge authoring contract
 
-Verified against FridgeMemo TemplatePackage.ets/CardSchema.ets on 2026-10-08. This reference is a snapshot; when working in the app repo, those source files and ReadingStylePolicy.ets are authoritative. If they differ, update the authoring reference before generation.
+Verified against FridgeMemo TemplatePackage.ets/CardSchema.ets on 2026-10-08. The generated design-contract.json is the release snapshot for fields, capabilities and design tokens. This prose explains semantics. When working in the app repo, production source files are authoritative: run previewer/build.cjs --check and update this reference if semantics changed.
 
 ## Container
 

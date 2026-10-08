@@ -4,27 +4,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
-const ts = require(process.env.FRIDGE_TYPESCRIPT || '/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
-const modelRoot = path.resolve(__dirname, '../entry/src/main/ets/model');
-const cache = new Map();
-function load(name) {
-  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(name)) throw Error('Unsupported model dependency');
-  if (cache.has(name)) return cache.get(name);
-  const module = {exports: {}};
-  const code = ts.transpileModule(fs.readFileSync(path.join(modelRoot, name + '.ets'), 'utf8'), {
-    compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020}
-  }).outputText;
-  vm.runInThisContext('(function(require,module,exports){' + code + '\n})', {filename: name})(
-    spec => { if (!spec.startsWith('./')) throw Error('Unsupported SDK dependency: ' + spec); return load(spec.slice(2)); },
-    module, module.exports
-  );
-  cache.set(name, module.exports);
-  return module.exports;
-}
-function fields(source, block) {
-  const body = source.split(block)[1]?.split('\n}')[0];
-  if (!body) throw Error('Model declaration changed; update the authoring checker');
-  return new Set(Array.from(body.matchAll(/^\s*([a-zA-Z][\w]*)\??\s*:/gm), m => m[1]));
+// Distributed checker runs with Node alone; the reader bundle is built from App sources.
+const repository=path.resolve(__dirname,'..');
+const contract=JSON.parse(fs.readFileSync(path.join(repository,'skills/fridge-create/references/design-contract.json'),'utf8'));
+if(contract.contractVersion!==1)throw Error('Unsupported design contract version; update the authoring checker');
+const context=vm.createContext({});
+vm.runInContext(fs.readFileSync(path.join(repository,'previewer/shared-models.js'),'utf8'),context);
+if(context.FridgeCore.sourceFingerprint!==contract.identity.models)throw Error('Reader and design contract differ; rebuild the preview release');
+function load(name){return context.FridgeCore.load(name);}
+function fields(_source, declaration){
+ const keys={'export class FridgeState {':'state','export class FridgeCard {':'card','export interface CapBlock {':'capability','export class CanvasElement extends ElementBox {':'element','export class ElementBox {':'element'};
+ const name=keys[declaration];if(!name)throw Error('Unknown authoring declaration');return new Set(contract.fields[name]);
 }
 function known(object, allowed, label) {
   if (!object || typeof object !== 'object' || Array.isArray(object)) throw Error(label + ' must be an object');
@@ -33,7 +23,7 @@ function known(object, allowed, label) {
 function validate(json) {
   const raw = JSON.parse(json);
   known(raw, new Set(['format','version','kind','state','assets']), 'package');
-  const source = fs.readFileSync(path.join(modelRoot, 'CardSchema.ets'), 'utf8');
+  const source = ''; // Field whitelist is the generated release contract.
   known(raw.state, fields(source, 'export class FridgeState {'), 'state');
   const schema = load('CardSchema');
   const ids = new Set();
@@ -50,7 +40,7 @@ function validate(json) {
     if (c.capability) {
       known(c.capability, fields(source, 'export interface CapBlock {'), 'capability');
       if (!schema.CAPABILITIES.includes(c.capability.k)) throw Error('Unsupported capability: ' + c.capability.k);
-      for (const key of ['url','field','sourceConfigured','parcels','parcelPlace','temp','desc'])
+      for (const key of contract.retiredCapabilityFields)
         if (c.capability[key] !== undefined) throw Error('Retired or network capability field: ' + key);
     }
     for (const el of c.elements || []) {

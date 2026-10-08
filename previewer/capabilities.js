@@ -31,12 +31,23 @@
   }
   return `<path d="${p}" fill="#F7F9FCBD" stroke="#FFFFFF57" stroke-width="${.6*s}"/>`;
  }
- function capability(c,tick,id){
-  const cap=c.capability;if(!cap||cap.k==='album')return '';
-  const blend=cap.readingBlend||'feather',isComposition=composition.isReadingComposition(blend),box=layout.capabilityPlacement(c);
+ function readoutGeometry(c){
+  const cap=c.capability;
+  const blend=cap.readingBlend||'feather',box=layout.capabilityPlacement(c);
   let contact={profile:[],gutter:0,left:true,box};
   if(blend==='sticker'){const result=edge.edgeAttachment(c,box,cap.readingEdge||'left',cap.readingOutside===true);contact={...result,left:(cap.readingEdge!=='right')!==(cap.readingOutside===true)};}
   const b=contact.box,bw=c.w*b.w,bh=c.h*b.h,inset=layout.capabilityInset(c),cw=Math.max(1,bw-2*inset-contact.gutter),ch=Math.max(1,c.h*box.h-2*inset-mica.hookReserve(blend));
+  return {blend,contact,b,bw,bh,inset,cw,ch};
+ }
+ function inspectCard(c){
+  const result={id:c.id,minimumCardSize:layout.minimumCardSize(c),requestedBox:c.capBox,placement:layout.capabilityPlacement(c)};
+  if(!c.capability||c.capability.k==='album')return result;
+  const g=readoutGeometry(c),compact=metrics.compactCapability(c.capability,g.cw,g.ch);
+  return {...result,contentWidth:g.cw,contentHeight:g.ch,compact,contentScale:metrics.capabilityContentScale(c.capability,g.cw,g.ch),readableMinimum:metrics.capabilityMinimum(c.capability,compact,g.cw),fits:metrics.capabilityFits(c.capability,g.cw,g.ch)};
+ }
+ function capability(c,tick,id){
+  const cap=c.capability;if(!cap||cap.k==='album')return '';
+  const {blend,contact,b,bw,bh,inset,cw,ch}=readoutGeometry(c);
   let ink=c.shape==='subject'&&c.subjectPhoto&&!c.ink?c.subjectInk:schema.materialColors(c.material,c.paper,c.ink)[1];
   const surface=present.readingSurface(cap,c.shape==='subject'&&c.subjectPhoto,layout.capabilityObstructed(c));
   if(surface&&['paper','cloud','bare','badge','sticker','space','tag','dock'].includes(blend))ink=present.paperReadingInk(ink);
@@ -95,7 +106,7 @@
    width=surface&&!contact.profile.length?Math.max(1,Math.min(cw+2*composition.compositionPadding(blend),Math.ceil(nominalWidth)+2*composition.compositionPadding(blend)*u)-2*composition.compositionPadding(blend)*u):cw;
    if(!metrics.capabilityFits(cap,cw,ch)){centerLine('放大卡片',12);}
    else if(cap.k==='clock')centerLine(('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2),clockFont,500,1,clockFont*1.35);
-   else if(cap.k==='date'){centerLine(('0'+now.getDate()).slice(-2),dateFont,500,1,dateFont*1.35);height+=4*u;centerLine(holidays.holidayName(now)||(compact?'':now.getFullYear()+'年')+(now.getMonth()+1)+'月 · '+['周日','周一','周二','周三','周四','周五','周六'][now.getDay()]+(holidays.holidayMarker(now)==='班'?' · 班':''),12*u,400,.65);}
+   else if(cap.k==='date'){centerLine(new Intl.DateTimeFormat('zh-CN',{day:'2-digit'}).format(now),dateFont,500,1,dateFont*1.35);height+=4*u;centerLine(holidays.holidayName(now)||(compact?'':now.getFullYear()+'年')+(now.getMonth()+1)+'月 · '+['周日','周一','周二','周三','周四','周五','周六'][now.getDay()]+(holidays.holidayMarker(now)==='班'?' · 班':''),12*u,400,.65);}
    else if(['countdown','anniversary'].includes(cap.k)){centerLine(cap.title||schema.typeLabel(cap.k),12*u);height+=4*u;const suffix=cap.k==='anniversary'?(days>0?'天后':'天'):(days<0?'天前':'天'),number=String(Math.abs(days)),nw=measure(number,counterFont,500),sw=measure(suffix,12*u),left=(width-nw-sw-3*u)/2;body+=text(number,left,height,counterFont,nw,'start',500)+text(suffix,left+nw+3*u,height+counterFont*1.2-12*u*1.2,12*u,sw);height+=counterFont*1.2;if(!compact){height+=4*u;centerLine(cap.date||'',10*u,400,.6);}}
    else if(cap.k==='calendar'){
     if(compact&&(cap.calendarOffset??0)!==0){const month=new Date(now.getFullYear(),now.getMonth()+(cap.calendarOffset??0),1);centerLine(month.getFullYear()+'年',12*u,400,.65);height+=4*u;centerLine(month.getMonth()+1+'月',28*u);height+=4*u;centerLine('点按查看月历',10*u,400,.6);}
@@ -116,5 +127,5 @@
   if(surface&&['tag','dock'].includes(blend))out+=hook(mica.hookCenter(cap.readingHook??.2,labelW,s),s);
   return out+'</g></g>';
  }
- global.FridgeReadouts={capability,backing};
+ global.FridgeReadouts={capability,backing,inspectCard,supportedKinds:Object.freeze(['clock','date','calendar','countdown','anniversary','dayprogress','yearprogress','battery','timetable','agenda','worldclock','lunar'])};
 })(globalThis);

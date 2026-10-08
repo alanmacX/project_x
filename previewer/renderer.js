@@ -56,6 +56,7 @@
   const issues=[];
   for(const c of pack.state.cards){
    if(c.capability&&!schema.CAPABILITIES.includes(c.capability.k))issues.push(c.id+'：未知能力，视觉验收阻断');
+   else if(c.capability&&c.capability.k!=='album'&&!FridgeReadouts.supportedKinds.includes(c.capability.k))issues.push(c.id+'：预览器尚未适配此能力，视觉验收阻断');
    if(c.shape==='subject'&&!c.cutout)issues.push(c.id+'：缺少主体蒙版，视觉验收阻断');
    if(c.shape==='subject'&&!c.outline.length)issues.push(c.id+'：缺少厚度轮廓，视觉验收阻断');
    for(const el of c.elements||[])if(!['text','image','shape'].includes(el.kind))issues.push(c.id+'：未知元素，视觉验收阻断');
@@ -76,24 +77,27 @@
   }
   return `<g data-element="${escape(el.id)}" transform="translate(${x} ${y}) rotate(${el.rot} ${ew/2} ${eh/2})" opacity="${el.opacity}">${body}</g>`;
  }
- function renderPackage(pack,width,tick){
+ function renderPackage(pack,width,tick,options={}){
+  const namespace=options.namespace||'fridge';if(!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(namespace))throw Error('Invalid SVG namespace');
+  if(!Number.isFinite(width)||width<=0||!Number.isFinite(tick))throw Error('Invalid render dimensions/time');
   const scene=pack.state,scale=width/schema.BOARD_W,height=width/scene.canvasAspect,assets=new Map();dimensions=new Map();
   const diagnostics=issuesFor(pack);
   let assetDefs='';for(const [index,a] of pack.assets.entries()){
    if(!/^[A-Za-z0-9+/]*={0,2}$/.test(a.data)||a.data.length%4!==0)throw Error('图片 Base64 编码无效');
    const mime=a.extension==='.jpg'||a.extension==='.jpeg'?'jpeg':a.extension.slice(1);
-   const key='#media'+index;assets.set(a.key,key);dimensions.set(key,pack.assetDimensions?.[a.key]||{width:1,height:1});
-   assetDefs+=`<image id="media${index}" href="data:image/${mime};base64,${a.data}" width="1" height="1" preserveAspectRatio="none"/>`;
+   const key='#'+namespace+'media'+index;assets.set(a.key,key);dimensions.set(key,pack.assetDimensions?.[a.key]||{width:1,height:1});
+   assetDefs+=`<image id="${key.slice(1)}" href="data:image/${mime};base64,${a.data}" width="1" height="1" preserveAspectRatio="none"/>`;
   }
   const media=ref=>assets.get(ref)||'';
   let defs=assetDefs,body=`<rect width="${width}" height="${height}" fill="${color(scene.background.color)}"/>`;
-  if(scene.background.src&&scene.background.mode!=='solid'&&scene.background.mode!=='smart')body+=image(media(scene.background.src),0,0,width,height,0,'backdrop','xMidYMid slice');
+  if(scene.background.src&&scene.background.mode!=='solid'&&scene.background.mode!=='smart')body+=image(media(scene.background.src),0,0,width,height,0,namespace+'backdrop','xMidYMid slice');
+  const background=body,cards=[];
   scene.cards.slice().sort((a,b)=>a.z-b.z).forEach((c,i)=>{
-   const id='c'+i,r=schema.cardCornerRadius(c),[paper,ink]=schema.materialColors(c.material,c.paper,c.ink),edge=depth.cardEdgeColor(paper,c.shape==='subject'&&c.subjectPhoto),f=canvas.subjectSurfaceFactor(c);
+   const start=body.length,id=namespace+'c'+i,r=schema.cardCornerRadius(c),[paper,ink]=schema.materialColors(c.material,c.paper,c.ink),edge=depth.cardEdgeColor(paper,c.shape==='subject'&&c.subjectPhoto),f=canvas.subjectSurfaceFactor(c);
    const content=c.capability?.k==='album'?rotation.activeAlbum(c.capability,tick):null;
    defs+=shadow(id)+shadow(id+'cast',5.5,4,48/255)+shadow(id+'contact',1.4,1.2,72/255)+`<clipPath id="${id}clip"><rect width="${c.w}" height="${c.h}" rx="${r}"/></clipPath>`;
    const x=c.x*scale,y=c.y*height/schema.BOARD_H;
-   body+=`<g transform="translate(${x} ${y}) scale(${scale})"><g transform="rotate(${c.rot} ${c.w/2} ${c.h/2})">`;
+   body+=`<g data-fridge-card="${escape(c.id)}"><g transform="translate(${x} ${y}) scale(${scale})"><g transform="rotate(${c.rot} ${c.w/2} ${c.h/2})">`;
    if(c.shape==='subject'&&c.outline.length){
     const commands=FridgeCore.load('ContourPath').contourPath(c.outline,c.w,c.h,f),border=c.subjectBorder?6:0;
     for(const [radius,y,alpha] of [[5.5,6,48/255],[1.4,3.2,72/255]])for(const [extra,opacity] of [[2*radius,.15],[radius,.25],[0,.6]])body+=`<path d="${commands}" transform="translate(0 ${y})" fill="black" stroke="black" stroke-width="${border+extra}" stroke-linejoin="round" opacity="${alpha*opacity}"/>`;
@@ -113,9 +117,12 @@
    body+='</g>';if(isFree)body+=readout;
    if(c.frame&&c.shape!=='subject')body+=`<rect x="1.5" y="1.5" width="${Math.max(0,c.w-3)}" height="${Math.max(0,c.h-3)}" rx="${Math.max(0,r-1.5)}" fill="none" stroke="white" stroke-width="3"/>`;
    if(c.shape!=='subject'){defs+=`<linearGradient id="${id}lip" x2="0" y2="1"><stop stop-color="#FFFFFF88"/><stop offset="1" stop-color="#00000020"/></linearGradient>`;body+=`<rect width="${c.w}" height="${c.h}" rx="${r}" fill="none" stroke="url(#${id}lip)" stroke-width=".6"/>`;}
-   body+='</g></g>';
+   body+='</g></g></g>';
+   cards.push({id:c.id,groupId:c.groupId,z:c.z,x,y,width:c.w*scale,height:c.h*scale,rotation:c.rot,pivot:{x:x+c.w*scale/2,y:y+c.h*scale/2},markup:body.slice(start)});
   });
-  return {svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="system-ui,sans-serif"><defs>${defs}<clipPath id="board"><rect width="${width}" height="${height}" rx="20"/></clipPath></defs><g clip-path="url(#board)">${body}</g></svg>`,issues:diagnostics,width,height};
+  return {svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="system-ui,sans-serif"><defs>${defs}<clipPath id="${namespace}board"><rect width="${width}" height="${height}" rx="20"/></clipPath></defs><g clip-path="url(#${namespace}board)">${body}</g></svg>`,issues:diagnostics,width,height,layers:{version:1,namespace,defs,background,cards}};
  }
- global.FridgeWeb={albumSVG,renderPackage,issuesFor};
+ // Same render pass, no second appearance implementation and no timeline in the app.
+ function renderLayers(pack,width,tick,options={}){const result=renderPackage(pack,width,tick,options);return {width:result.width,height:result.height,issues:result.issues,...result.layers};}
+ global.FridgeWeb={albumSVG,renderPackage,renderLayers,issuesFor};
 })(globalThis);

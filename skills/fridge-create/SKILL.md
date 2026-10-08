@@ -11,13 +11,15 @@ Read [current-format.md](references/current-format.md) before writing any packag
 
 ## Version gate
 
+Read the generated [design-contract.json](references/design-contract.json) first. It records the app version, supported capabilities/fields, current design tokens and identities for production models, materials and both renderers. In the app repository run `node previewer/build.cjs --check`; stale generated artifacts must be rebuilt and reviewed before authoring. App marketing version alone is insufficient during pre-release polishing: compare the implementation identities as well. Contract version 1 has no persisted design profile in a .fridge; do not invent one. See [upgrades.md](references/upgrades.md) when a release or design changes.
+
 The shipped reader supports only `fridgememo-template`, version 1, `card`/`canvas`, state schema 2. HTML templates are not implemented. Never place invented `html`, `slots`, providers or script assets in a v1 `.fridge` and claim it works. For an HTML request, deliver clearly labelled `.draft.json` and a local HTML prototype, explain that integration is pending, and follow [html-draft.md](references/html-draft.md). Do not downgrade HTML silently into an image or native approximation.
 
 ## Authoring
 
 Infer a coherent visual direction, target widget aspect, and necessary data from the request. Ask only for information that affects the result. If unspecified, use square 4×4 and a compact 3–6-card composition; keep the current 16-card limit. Preserve useful negative space and readable hierarchy. Aesthetic freedom belongs to artwork; app controls and behavior belong to the host.
 
-Each card has at most one capability. Decorative text/photo/shape elements are not extra data sources. Keep native fields dynamic rather than painting fake current time, battery or courses onto an image. Battery has no status caption or percent sign; its host renderer supplies the ring and numeric reading. Album geometry belongs to the host (4.9% inset per side, cover radius 14vp, card radius 20vp), with square local cover images.
+Each card has at most one capability. Decorative text/photo/shape elements are not extra data sources. Keep native fields dynamic rather than painting fake current time, battery or courses onto an image. Battery has no status caption or percent sign; its host renderer supplies the ring and numeric reading. Album geometry belongs to the host (use current tokens in design-contract.json), with square local cover images.
 
 For generated native cards, prefer `cream` material or deliberate artwork colors, dark readable ink, and a small consistent palette. Use the host reading surfaces (`cloud`, `bare`, `tag`, `sticker`; `badge` for battery only), not a homemade duplicate backing or guessed glass blur. Rectangular card corners, cutout white border, thickness and shadows are host-owned.
 
@@ -33,7 +35,7 @@ Importing a file into the offline app is the intended flow. Do not add a cloud A
 
 ## Verify and deliver
 
-If the FridgeMemo repository and DevEco TypeScript runtime are available, run:
+If the FridgeMemo repository is available, run this Node-only checker:
 
 `node /path/to/FridgeMemo/scripts/fridge-package-check.cjs /absolute/path/output.fridge`
 
@@ -44,3 +46,5 @@ Match the installed app contract before generation; app updates may change suppo
 Check target aspect, long text, overlap/z order, minimum size, empty data, missing assets and source permissions. Use the app's own renderer for preview if available. An HTML browser preview cannot prove native app/Form equality. If preview or native import has not been tested, state that plainly.
 
 Deliver the actual file, a concise explanation of editable layers and data binding, and any compatibility limitations. Do not share externally or install onto a device unless authorized by the user.
+
+For a generated work, save a separate `.qa.json` receipt alongside the `.fridge` with the contract identity, target dimensions/time, package checksum and actual validation/visual-review results. Keep renderer metadata out of the v1 package itself. Retain source assets and editable package; do not flatten the deliverable to avoid later design upgrades. A receipt records evidence, never guarantees future app or Form behavior.
