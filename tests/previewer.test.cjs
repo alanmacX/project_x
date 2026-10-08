@@ -1,0 +1,18 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const root=path.resolve(__dirname,'..'),ctx=vm.createContext({console});
+vm.runInContext(fs.readFileSync(path.join(root,'previewer/shared-models.js'),'utf8'),ctx);
+vm.runInContext(fs.readFileSync(path.join(root,'previewer/renderer.js'),'utf8'),ctx);
+const read=ctx.FridgeCore.load('TemplatePackage').readPackage;
+const example=read(fs.readFileSync(path.join(root,'skills/fridge-create/examples/native-canvas.fridge'),'utf8'));
+const preview=ctx.FridgeWeb.renderPackage(example,300,1791439200000);
+assert.equal(preview.issues.length,3,'Unimplemented capabilities must block QA instead of looking successful');
+assert.ok(preview.svg.includes('未支持的渲染'));
+assert.throws(()=>read(JSON.stringify({...example,version:99})),/支持/);
+const pack=JSON.parse(JSON.stringify(example));pack.state.cards=[pack.state.cards[0]];pack.state.cards[0].capability={k:'album',title:'<script>bad</script>',artist:'Artist',albumCover:'asset://0',albumBackground:''};pack.state.cards[0].w=180;pack.state.cards[0].h=180;pack.assets=[{key:'asset://0',extension:'.png',data:'iVBORw0KGgo='}];
+const actual=ctx.FridgeWeb.renderPackage(read(JSON.stringify(pack)),420,1791439200000);
+assert.equal(actual.issues.length,0);assert.ok(actual.svg.includes('data:image/png;base64,'));assert.ok(!actual.svg.includes('<script>'));
+const svg=ctx.FridgeWeb.albumSVG({cover:'data:image/png;base64,iVBORw0KGgo=',background:'',title:'<script>alert(1)</script>',artist:'A&B'},208,208,'classic');
+assert.ok(svg.includes('&lt;script&gt;'));assert.ok(svg.includes('A&amp;B'));assert.ok(!svg.includes('<script>'));
+assert.equal(ctx.FridgeCore.sourceFingerprint.length,64);
+assert.ok(fs.readFileSync(path.join(root,'entry/src/main/ets/model/PreviewDesignContract.ets'),'utf8').includes(ctx.FridgeCore.sourceFingerprint));
+console.log('PASS portable reader, asset embedding, QA blockers, safe metadata, native contract identity');

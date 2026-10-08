@@ -6,6 +6,8 @@
     "pages/ReceiveTemplate",
     "pages/MicaStudy",
     "pages/ReadingEdgeStudy",
-    "pages/CloudAcceptance"
+    "pages/CloudAcceptance",
+    "pages/AlbumStudy",
+    "pages/FridgePreviewer"
   ]
 }

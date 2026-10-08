@@ -34,3 +34,12 @@ const shared=defaultState();const album=new FridgeCard();album.id='playlist';alb
 const file=await exportTemplate(JSON.stringify(shared),'playlist','/saved','/cache');const raw=files.get(file).toString();assert.equal(JSON.parse(raw).assets.length,4);
 const imported=JSON.parse(await materializeTemplate(raw,'/received')).cards[0].capability;assert.equal(imported.albumItems.length,2);assert.equal(activeAlbum(imported,epoch+3600000).title,'B');assert.ok(imported.albumItems.every(a=>a.cover.startsWith('file:///received/')&&a.background.startsWith('file:///received/')));
 console.log('PASS: rotation boundaries, restart determinism, manual selection anchor, portable cover-library assets.');})().catch(e=>{console.error(e);process.exitCode=1;});
+
+const {albumInfoGeometry}=load('AlbumLayout');
+for(const style of ['classic','portrait','row'])for(const [w,h] of [[208,208],[280,180],[160,160],[244,148]]) {
+ const g=albumInfoGeometry(w,h,style);
+ assert.ok(g.coverSize>0&&g.coverX>=0&&g.coverY>=0);
+ assert.ok(g.coverX+g.coverSize<=w&&g.coverY+g.coverSize<=h,'square cover fits card');
+ assert.ok(g.textWidth>0&&g.textX+g.textWidth<=w+1e-8&&g.textY<h,'metadata stays within card');
+}
+console.log('PASS: album metadata candidates preserve square artwork and bounded metadata regions.');

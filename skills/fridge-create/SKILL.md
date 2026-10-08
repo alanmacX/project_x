@@ -39,6 +39,8 @@ If the FridgeMemo repository and DevEco TypeScript runtime are available, run:
 
 The helper runs the actual current reader and checks identifiers, supported capability types and geometry preservation. It is not a complete media decoder, visual validator or security boundary. Never claim visual acceptance based only on JSON validation.
 
+Match the installed app contract before generation; app updates may change supported capabilities and design profiles. Do not assume this reference supports newer fields. Start with the platform-independent browser previewer documented in previewer/README.md, which bundles the app's pure production models. An unsupported capability blocks visual acceptance, even if JSON import succeeds. Use the native FridgePreviewer QA route in FRIDGE_PREVIEWER.md as a comparison host; compare source fingerprints and PNG/version/dimension reports. Neither browser nor native QA routes replace real Form testing.
+
 Check target aspect, long text, overlap/z order, minimum size, empty data, missing assets and source permissions. Use the app's own renderer for preview if available. An HTML browser preview cannot prove native app/Form equality. If preview or native import has not been tested, state that plainly.
 
 Deliver the actual file, a concise explanation of editable layers and data binding, and any compatibility limitations. Do not share externally or install onto a device unless authorized by the user.

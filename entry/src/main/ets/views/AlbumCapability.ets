@@ -1,11 +1,12 @@
 import { AlbumCover, CapBlock } from '../model/CardSchema';
-import { albumCoverSize, albumCoverRadius } from '../model/AlbumLayout';
+import { albumCoverSize, albumCoverRadius, albumInfoGeometry } from '../model/AlbumLayout';
 import { activeAlbum } from '../model/AlbumRotation';
 @Component
 export struct AlbumCapability {
   @Prop @Watch('refresh') cap:CapBlock={k:'album'};
   @Prop @Watch('refresh') tick:number=0;
   @Prop widget:boolean=false;
+  @Prop presentation:string='cover'; // Read-only design study; default production appearance is unchanged.
   @Prop cardWidth:number=180;
   @Prop cardHeight:number=180;
   @Prop scaleFactor:number=1;
@@ -35,12 +36,28 @@ export struct AlbumCapability {
   @Builder private artwork(album:AlbumCover,incoming:boolean) {
     Stack() {
       if(album.background) {Image(album.background).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false).onComplete(()=>{if(incoming)this.ready(album.cover,true)}).onError(()=>{if(incoming)this.ready(album.cover,true)})}
-      if(album.cover) {
+      if(album.cover && this.presentation==='cover') {
         Image(album.cover).width(albumCoverSize(this.cardWidth,this.cardHeight)*this.scaleFactor).height(albumCoverSize(this.cardWidth,this.cardHeight)*this.scaleFactor)
           .objectFit(ImageFit.Contain).borderRadius(albumCoverRadius(this.cardWidth,this.cardHeight)*this.scaleFactor).draggable(false)
           .shadow({radius:12*this.scaleFactor,color:'#35000000',offsetY:5*this.scaleFactor})
           .accessibilityText((album.title||'专辑')+' · '+album.artist)
           .onComplete(()=>{if(incoming)this.ready(album.cover,false)}).onError(()=>{if(incoming)this.ready(album.cover,false)})
+      }
+      if(album.cover && this.presentation!=='cover') {
+        Column().width('100%').height('100%').backgroundColor('#38000000')
+        Image(album.cover)
+          .width(albumInfoGeometry(this.cardWidth,this.cardHeight,this.presentation).coverSize*this.scaleFactor)
+          .height(albumInfoGeometry(this.cardWidth,this.cardHeight,this.presentation).coverSize*this.scaleFactor)
+          .position({x:albumInfoGeometry(this.cardWidth,this.cardHeight,this.presentation).coverX*this.scaleFactor,y:albumInfoGeometry(this.cardWidth,this.cardHeight,this.presentation).coverY*this.scaleFactor})
+          .borderRadius(14*this.scaleFactor).objectFit(ImageFit.Contain).draggable(false)
+          .shadow({radius:10*this.scaleFactor,color:'#28000000',offsetY:4*this.scaleFactor})
+          .onComplete(()=>{if(incoming)this.ready(album.cover,false)}).onError(()=>{if(incoming)this.ready(album.cover,false)})
+        Column({space:4*this.scaleFactor}) {
+          Text(album.title||'未命名专辑').fontSize(albumInfoGeometry(this.cardWidth,this.cardHeight,this.presentation).titleSize*this.scaleFactor).fontWeight(FontWeight.Medium).fontColor('#FFFFFF').maxLines(this.presentation==='row'?2:1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
+          if(album.artist) {Text(album.artist).fontSize(albumInfoGeometry(this.cardWidth,this.cardHeight,this.presentation).artistSize*this.scaleFactor).fontColor('#DDFFFFFF').maxLines(this.presentation==='row'?2:1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')}
+        }.alignItems(HorizontalAlign.Start)
+          .width(albumInfoGeometry(this.cardWidth,this.cardHeight,this.presentation).textWidth*this.scaleFactor)
+          .position({x:albumInfoGeometry(this.cardWidth,this.cardHeight,this.presentation).textX*this.scaleFactor,y:albumInfoGeometry(this.cardWidth,this.cardHeight,this.presentation).textY*this.scaleFactor})
       }
     }.width('100%').height('100%')
   }

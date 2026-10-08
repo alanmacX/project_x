@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>冰箱贴 · Previewer</title><link rel="stylesheet" href="previewer.css"></head>
+<body>
+<header><div><strong>冰箱贴 · Previewer</strong><p>本地作品预览 · 与 App 共用设计计算</p></div><label class="button">打开 .fridge<input id="file" type="file" accept=".fridge,application/json" hidden></label></header>
+<main>
+<nav aria-label="预览模式"><button id="sceneTab" aria-pressed="true">作品画布</button><button id="albumTab" aria-pressed="false">专辑备选</button></nav>
+<section id="scenePane"><div class="workspace"><div id="artwork"></div></div><div class="toolbar"><label>画布宽度 <select id="size"><option>180</option><option selected>300</option><option>420</option></select></label><label>数据时间 <input id="tick" type="datetime-local" value="2026-10-08T14:00"></label><button id="export" disabled>导出验收图</button><button id="report" disabled>导出报告</button></div></section>
+<section id="albumPane" hidden><div class="toolbar"><label>文字样例 <select id="content"><option value="normal">正常内容</option><option value="long">长名称</option><option value="empty">未填写</option></select></label><label class="button">本地正方形封面<input id="cover" type="file" accept="image/png,image/jpeg,image/webp" hidden></label><label class="button">本地背景图<input id="background" type="file" accept="image/png,image/jpeg,image/webp" hidden></label></div><div id="albums" class="albums"></div><p class="note">候选由 App 的 AlbumLayout 计算，选定后才写入作品协议。没有播放按钮或音乐图标。</p></section>
+<aside><strong id="status">打开作品，或比较专辑备选</strong><ul id="issues"></ul><p id="contract" class="note"></p></aside>
+</main>
+<script src="shared-models.js"></script><script src="renderer.js"></script><script src="app.js"></script>
+</body></html>

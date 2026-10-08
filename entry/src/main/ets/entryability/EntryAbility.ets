@@ -20,6 +20,17 @@ export default class EntryAbility extends UIAbility {
     if (want.parameters?.['demo'] === 'cloud') this.launchPage = 'pages/CloudAcceptance';
     if (want.parameters?.['demo'] === 'edges') this.launchPage = 'pages/ReadingEdgeStudy';
     if (want.parameters?.['demo'] === 'mica') this.launchPage = 'pages/MicaStudy';
+    if (want.parameters?.['demo'] === 'album') {
+      this.launchPage = 'pages/AlbumStudy';
+      const content = Number(want.parameters?.['albumContent'] ?? 0);
+      AppStorage.setOrCreate('albumStudyContent', [0,1,2].includes(content) ? content : 0);
+    }
+    if (want.parameters?.['demo'] === 'preview') {
+      this.launchPage = 'pages/FridgePreviewer';
+      const source = want.parameters?.['previewFile'];
+      AppStorage.setOrCreate('previewFile', typeof source === 'string' ? source : '');
+      AppStorage.setOrCreate('previewCapture', want.parameters?.['previewCapture'] === 'yes');
+    }
   }
 
   private mainWindow: window.Window | null = null;

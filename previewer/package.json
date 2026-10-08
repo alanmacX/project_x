@@ -1,0 +1,7 @@
+{
+  "name": "fridge-previewer",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {"build": "node build.cjs", "check": "node build.cjs --check"},
+  "devDependencies": {"typescript": "5.9.3"}
+}
