@@ -49,6 +49,7 @@ export struct AlbumSettings {
     const album=activeAlbum(next);next.albumItems=albumLibrary(next).map((a:AlbumCover):AlbumCover=>a.id===album.id?{id:a.id,cover:a.cover,background:a.background,title:artist?a.title:value.slice(0,160),artist:artist?value.slice(0,160):a.artist}:a);
     if(artist)next.artist=value.slice(0,160);else next.title=value.slice(0,160);this.onUpdate(this.cardId,next);
   }
+  private setPresentation(index:number):void {const next=JSON.parse(JSON.stringify(this.cap)) as CapBlock;next.albumPresentation=['cover','classic','row'][index];this.onUpdate(this.cardId,next);}
   private currentAlbum():AlbumCover {return activeAlbum(this.cap,this.tick||Date.now());}
   private setRotation(index:number):void {
     const next=selectAlbum(this.cap,this.currentAlbum());next.albumRotationMinutes=[0,60,180,360,1440][index];this.onUpdate(this.cardId,next);
@@ -65,6 +66,7 @@ export struct AlbumSettings {
   }
   build() {
     Column({space:12}) {
+      SettingsSegmented({labels:['纯封面','经典信息','横向信息'],selectedIndex:Math.max(0,['cover','classic','row'].indexOf(this.cap.albumPresentation??'cover')),appDark:this.appDark,onSelect:(i:number)=>this.setPresentation(i)})
       if(this.cap.albumCover) {Image(this.cap.albumCover).width(64).height(64).borderRadius(6).objectFit(ImageFit.Contain).draggable(false)}
       SettingsAction({label:this.busy?'处理中':this.cap.albumCover?'添加到封面库':'选择本地封面',appDark:this.appDark,fillWidth:true,isEnabled:!this.busy&&albumLibrary(this.cap).length<12,onPress:()=>this.choose()})
       TextInput({text:this.currentAlbum().title,placeholder:'专辑名（可选）'}).height(44).maxLength(160).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(14).enabled(!this.busy).onChange((v:string)=>this.text(v,false))

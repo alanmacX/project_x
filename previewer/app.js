@@ -17,10 +17,10 @@ function render(){
 function study(){
  const value=$('content').value;
  const sample={...album,title:value==='empty'?'':value==='long'?'A Very Long Album Name · 很长的专辑名称测试':album.title,artist:value==='empty'?'':value==='long'?'多位歌手与合作音乐人 / Featured Artists':album.artist};
- const options=[['cover','A · 现有纯封面','保持已批准的 4.9% 留边'],['classic','B · 经典信息款','左上封面，名称与歌手在下方'],['portrait','C · 大封面信息款','封面优先，文字收在底部'],['row','D · 并排紧凑款','适合横向卡片']];
+ const options=[['cover','A · 现有纯封面','保持已批准的 4.9% 留边'],['classic','B · 经典信息款','左上封面，名称与歌手在下方'],['row','D · 并排紧凑款','适合横向卡片']];
  $('albums').replaceChildren(...options.map(([style,label,note],i)=>{
   const el=document.createElement('article');el.className='sample';const art=document.createElement('div');art.className='image';
-  art.innerHTML=FridgeWeb.albumSVG(sample,style==='row'?280:208,style==='row'?180:208,style,'study'+i);
+  art.innerHTML=FridgeWeb.albumSVG(sample,style==='row'?300:180,style==='row'?150:180,style,'study'+i);
   const title=document.createElement('strong');title.textContent=label;const p=document.createElement('p');p.textContent=note;el.append(art,title,p);return el;
  }));
 }

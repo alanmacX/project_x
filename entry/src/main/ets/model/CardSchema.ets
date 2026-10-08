@@ -29,6 +29,7 @@ export interface CapBlock {
   k: string;
   albumItems?: AlbumCover[];
   albumInset?: number;
+  albumPresentation?: string;
   albumRotationMinutes?: number;
   albumRotationStart?: number;
   albumId?: string;
@@ -331,6 +332,7 @@ export function normalizeCapability(raw: CapBlock): CapBlock {
     cap.albumId=typeof raw.albumId==='string'?raw.albumId.slice(0,96):'';cap.albumSource=['local','musicbrainz'].includes(raw.albumSource??'')?raw.albumSource:'';
     cap.artist=typeof raw.artist==='string'?raw.artist.slice(0,160):'';
     cap.albumInset=ALBUM_INSET;
+    cap.albumPresentation=['classic','row'].includes(raw.albumPresentation??'')?raw.albumPresentation:'cover';
     cap.albumRotationMinutes=[60,180,360,1440].includes(raw.albumRotationMinutes??0)?raw.albumRotationMinutes:0;
     cap.albumRotationStart=bounded(raw.albumRotationStart??0,0,8640000000000000,0);
     const ids:string[]=[];

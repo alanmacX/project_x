@@ -33,19 +33,18 @@
   const g=layout.albumInfoGeometry(w,h,style);
   out+=`<rect width="${w}" height="${h}" fill="black" opacity="${56/255}"/>`;
   out+=`<g filter="url(#${id}shadow)">`+image(album.cover,g.coverX,g.coverY,g.coverSize,g.coverSize,14,id+'cover')+'</g>';
-  let cursor=g.textY;
-  // Native row layout has two lines. Preserve that line capacity in the web adapter.
-  const lines=style==='row'?2:1;
-  function wrap(value,size){
-   if(lines===1)return [fitted(value,size,g.textWidth)];
-   const chars=Array.from(value),out=[];let line='';
+  function wrap(value,size,lines){
+   const chars=Array.from(value||''),result=[];let line='';
    if(measure)measure.font='500 '+size+'px system-ui';
-   while(chars.length&&out.length<lines){const c=chars.shift();if(line&&measure&&measure.measureText(line+c).width>g.textWidth){out.push(line);line=c;}else line+=c;}
-   if(out.length<lines)out.push(line);if(chars.length)out[lines-1]=fitted(out[lines-1]+chars.join(''),size,g.textWidth);return out;
+   while(chars.length){const c=chars[0];if(line&&measure&&measure.measureText(line+c).width>g.textWidth){if(result.length===lines-1){result.push(fitted(line+chars.join(''),size,g.textWidth));return result;}result.push(line);line='';}else{line+=chars.shift();}}
+   if(line)result.push(line);return result;
   }
-  for(const line of wrap(album.title||'未命名专辑',g.titleSize)){out+=textLine(line,g.textX,cursor+g.titleSize*.9,g.titleSize,g.textWidth);cursor+=g.titleSize*1.15;}
-  cursor+=4;
-  if(album.artist)for(const line of wrap(album.artist,g.artistSize)){out+=textLine(line,g.textX,cursor+g.artistSize*.9,g.artistSize,g.textWidth,221/255);cursor+=g.artistSize*1.15;}
+  const titles=wrap(album.title||'未命名专辑',g.titleSize,g.titleLines),artists=wrap(album.artist,g.artistSize,g.artistLines);
+  const textHeight=titles.length*g.titleSize*1.15+(artists.length?g.artistGap+artists.length*g.artistSize*1.15:0);
+  let cursor=g.textY-(g.centerText?textHeight/2:0);
+  for(const line of titles){out+=textLine(line,g.textX,cursor+g.titleSize*.9,g.titleSize,g.textWidth);cursor+=g.titleSize*1.15;}
+  cursor+=g.artistGap;
+  for(const line of artists){out+=textLine(line,g.textX,cursor+g.artistSize*.9,g.artistSize,g.textWidth,221/255);cursor+=g.artistSize*1.15;}
   return out;
  }
  function shadow(id,r=12,y=5,opacity=53/255){return `<filter id="${id}shadow" x="-40%" y="-40%" width="180%" height="190%"><feDropShadow dx="0" dy="${y}" stdDeviation="${r/2}" flood-opacity="${opacity}"/></filter>`;}
@@ -107,7 +106,7 @@
    if(c.shape==='subject'&&c.cutout){defs+=`<mask id="${id}alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="${c.w}" height="${c.h}" style="mask-type:alpha"><use href="${media(c.cutout)}" transform="translate(${offsetX} ${offsetY}) scale(${innerW} ${innerH})"/></mask>`;}
    const isFree=c.capFree||FridgeCore.load('ReadingComposition').isReadingComposition(c.capability?.readingBlend||''),readout=c.capability&&!content?FridgeReadouts.capability(c,tick,id+'cap'):'';
    body+=`<g ${c.shape==='subject'&&c.cutout?`mask="url(#${id}alpha)"`:`clip-path="url(#${id}clip)"`}>`;
-   if(content)body+=albumBody({...content,cover:media(content.cover),background:media(content.background)},c.w,c.h,'cover',id);
+   if(content)body+=albumBody({...content,cover:media(content.cover),background:media(content.background)},c.w,c.h,c.capability.albumPresentation||'cover',id);
    else{
     body+=`<rect width="${c.w}" height="${c.h}" fill="${color(paper)}"/>`;
     if(c.shape==='subject'&&c.subjectPhoto&&c.cutout)body+=image(media(c.cutout),offsetX,offsetY,innerW,innerH,0,id+'photo','none');

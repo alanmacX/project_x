@@ -1089,6 +1089,9 @@ struct Index {
   private updateExtraCapability(id:string,next:CapBlock):void {
     const card=this.store.findCard(id);if(!card||card.capability?.k!==next.k)return;
     const courseDataChanged=next.k==='timetable'&&!sameTimetable(card.capability,next);
+    if(next.k==='album'&&(next.albumPresentation??'cover')!==(card.capability.albumPresentation??'cover')) {
+      if(next.albumPresentation==='row')card.h=card.w/2;else card.h=card.w;
+    }
     card.capability=next;this.syncFields();this.change();
     if(courseDataChanged&&this.store.findCard(id)?.capability===next)this.store.rememberTimetable(next).catch(()=>{if(this.alive)this.getUIContext().getPromptAction().showToast({message:'课表未能保存，请重试修改；现有本地课表已保留'});});
   }

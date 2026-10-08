@@ -549,6 +549,7 @@ function normalizeCapability(raw) {
         cap.albumSource = ['local', 'musicbrainz'].includes(raw.albumSource ?? '') ? raw.albumSource : '';
         cap.artist = typeof raw.artist === 'string' ? raw.artist.slice(0, 160) : '';
         cap.albumInset = exports.ALBUM_INSET;
+        cap.albumPresentation = ['classic', 'row'].includes(raw.albumPresentation ?? '') ? raw.albumPresentation : 'cover';
         cap.albumRotationMinutes = [60, 180, 360, 1440].includes(raw.albumRotationMinutes ?? 0) ? raw.albumRotationMinutes : 0;
         cap.albumRotationStart = bounded(raw.albumRotationStart ?? 0, 0, 8640000000000000, 0);
         const ids = [];
@@ -984,13 +985,9 @@ exports.albumAnchors = albumAnchors;
 function isSquareAlbumCover(width, height) { return Number.isInteger(width) && width > 0 && width === height; }
 exports.isSquareAlbumCover = isSquareAlbumCover;
 function albumInfoGeometry(width, height, style) {
-    const w = Math.max(0, width), h = Math.max(0, height), pad = Math.min(16, w * .075, h * .075);
-    if (style === 'row') {
-        const cover = Math.max(0, Math.min(h - 2 * pad, w * .43));
-        return { coverX: pad, coverY: (h - cover) / 2, coverSize: cover, textX: pad + cover + 12, textY: h * .36, textWidth: Math.max(0, w - 2 * pad - cover - 12), titleSize: Math.min(17, w * .072), artistSize: Math.min(14, w * .06) };
-    }
-    const large = style === 'portrait', size = Math.max(0, Math.min(w - 2 * pad, h * (large ? .66 : .49)));
-    return { coverX: pad, coverY: pad, coverSize: size, textX: pad, textY: pad + size + (large ? 10 : 16), textWidth: Math.max(0, w - 2 * pad), titleSize: Math.min(18, w * .085), artistSize: Math.min(15, w * .068) };
+    const w = Math.max(0, width), h = Math.max(0, height), row = style === 'row', s = Math.min(w / (row ? 300 : 180), h / (row ? 150 : 180)), pad = 13.5 * s, gap = (row ? 15 : 8) * s;
+    const cover = row ? Math.max(0, Math.min(h - 2 * pad, w - 2 * pad - gap - 60 * s)) : 97.5 * s;
+    return { coverX: pad, coverY: pad, coverSize: cover, textX: row ? pad + cover + gap : pad, textY: row ? h / 2 : pad + cover + gap, textWidth: Math.max(0, row ? w - 2 * pad - cover - gap : w - 2 * pad), titleSize: (row ? 17 : 15.3) * s, artistSize: (row ? 14 : 12.24) * s, artistGap: (row ? 6 : 3) * s, titleLines: 2, artistLines: row ? 2 : 1, centerText: row };
 }
 exports.albumInfoGeometry = albumInfoGeometry;
 
@@ -3260,4 +3257,4 @@ function traceMask(mask, width, height) {
 }
 exports.traceMask = traceMask;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"22025e67a0e539a97fa42d4a1534d30e0f8b402fb51cb029f73635ab68c97029"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"221042a56f5ddff76da48e0f3b86062ceba153d25749848466829a7f798d5298"};})(globalThis);

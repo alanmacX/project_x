@@ -58,3 +58,14 @@ assert.equal(player.state.cards.length,6);assert.equal(player.assets.length,0);
 for(const width of [180,300,420]){const rendered=ctx.FridgeWeb.renderPackage(player,width,1791439200000);assert.equal(rendered.issues.length,0);assert.ok(rendered.svg.includes('08日'));assert.equal(rendered.layers.cards.length,6);}
 for(const card of player.state.cards)if(card.capability)assert.equal(ctx.FridgeReadouts.inspectCard(card).fits,true,card.id+' player readout fits');
 console.log('PASS independent skill fixture: six editable cards, native readout fit and three preview widths');
+// Real text measurement path: overflow appears on the last permitted line only.
+const textCtx=vm.createContext({document:{createElement:()=>({getContext:()=>({measureText:s=>({width:Array.from(s).length*8})})})}});
+for(const name of ['shared-models.js','renderer.js'])vm.runInContext(fs.readFileSync(path.join(root,'previewer',name),'utf8'),textCtx);
+const longTitle='很长的专辑名称'.repeat(20),longArtist='歌手名称'.repeat(20);
+for(const [style,w,h,expected] of [['classic',180,180,3],['row',300,150,4]]){
+ const image=textCtx.FridgeWeb.albumSVG({cover:'data:image/png;base64,iVBORw0KGgo=',title:longTitle,artist:longArtist},w,h,style);
+ assert.equal((image.match(/<text /g)||[]).length,expected);
+ assert.equal((image.match(/…/g)||[]).length,2,'both overflowing fields end with ellipsis');
+ assert(!image.includes(longTitle));
+}
+console.log('PASS title/artist truncate on their final permitted line.');

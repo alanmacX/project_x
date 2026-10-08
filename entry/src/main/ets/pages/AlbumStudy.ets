@@ -30,8 +30,8 @@ struct AlbumStudy {
  @Builder sample(style:string,label:string,note:string) {
   Column({space:12}) {
    Stack() {
-    AlbumCapability({cap:this.sampleCap(),cardWidth:style==='row'?280:208,cardHeight:style==='row'?180:208,scaleFactor:this.sampleSize()/(style==='row'?280:208),presentation:style})
-     .width(this.sampleSize()).height(style==='row'?this.sampleSize()*180/280:this.sampleSize()).borderRadius(20*this.sampleSize()/(style==='row'?280:208)).clip(true).shadow({radius:12,color:'#20000000',offsetY:5})
+    AlbumCapability({cap:this.sampleCap(),cardWidth:style==='row'?300:180,cardHeight:style==='row'?150:180,scaleFactor:this.sampleSize()/(style==='row'?300:180),presentation:style})
+     .width(this.sampleSize()).height(style==='row'?this.sampleSize()*150/300:this.sampleSize()).borderRadius(20*this.sampleSize()/(style==='row'?300:180)).clip(true).shadow({radius:12,color:'#20000000',offsetY:5})
    }.width(this.sampleSize()).height(this.sampleSize())
    Text(label).fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.dark)).width(this.sampleSize())
    Text(note).fontSize(12).fontColor(AppDesign.muted(this.dark)).width(this.sampleSize()).maxLines(3)
@@ -44,10 +44,9 @@ struct AlbumStudy {
    Scroll() {Flex({wrap:FlexWrap.Wrap,justifyContent:FlexAlign.Center}) {
     this.sample('cover','A · 现有纯封面','保持 4.9% 留边和当前圆角')
     this.sample('classic','B · 经典信息款','左上小封面，名称与歌手在下方')
-    this.sample('portrait','C · 大封面信息款','封面优先，文字收在底部')
-    this.sample('row','D · 并排紧凑款','封面与文字并列，适合横向卡')
+    this.sample('row','C · 横向信息款','封面与文字并列，适合横向卡')
    }}.layoutWeight(1).width('100%').scrollBar(BarState.Off)
-   Text('候选页不修改现有卡片；最终仅保留纯封面＋你选的信息款。').fontSize(12).fontColor(AppDesign.muted(this.dark))
+   Text('候选页不修改现有卡片；正式设置支持纯封面、经典信息和横向信息。').fontSize(12).fontColor(AppDesign.muted(this.dark))
   }.width('100%').height('100%').padding({left:16,right:16,top:this.safeTop+12,bottom:this.safeBottom+12}).backgroundColor(AppDesign.background(this.dark)).onAreaChange((_o:Area,a:Area)=>this.pageWidth=Number(a.width))
  }
 }
