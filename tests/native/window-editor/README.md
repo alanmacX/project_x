@@ -9,6 +9,7 @@ Device: MatePad Mini, 1600×2560, 120 Hz. Native HAP, existing eight-card canvas
 - Native sheet mounts before hero motion; its own native entrance runs independently of the editor chrome opacity.
 - Preview follows detent crossings with hysteresis; pan frames do not regenerate artwork. Exit starts at the actual expanded preview rectangle.
 - Inspector nodes and capability visibility use native TransitionEffect. Different native SegmentButton option counts use separate keyed instances inside a fixed-height host, avoiding a synchronous button-count layout flush.
+- Initial and resumed clock values use the same minute bucket, avoiding an unchanged-minute repaint.
 - Warm same-canvas Form routing reuses the loaded scene. Foreground capability results commit in one batch, and late results wait for gestures/hero transitions to settle.
 - Scene acknowledgement reads avoid full model normalization; unchanged saves avoid rebuilding the derived contour cache.
 
@@ -25,7 +26,7 @@ Native hitrace categories: ace, app, graphic. UI task duration is **not** a comp
 | Native button-count mutation | SegmentButton update 63.33 ms; outer click callback 76.25 ms |
 | Keyed native option groups | Sample UI-task maximum 14.89 ms; touch callback 3.83 ms; prior button-count update spike absent |
 
-Initial inspector creation had a 42.88 ms frame in one trace; exit samples reached 24.16 ms. A final warm widget round-trip also contained a 44.81 ms UI task during scene reconciliation, despite avoiding the redundant full reload. Cold-start total timing was not demonstrably improved. Therefore this is not evidence of sustained 120 FPS or complete elimination of all startup costs.
+Initial inspector creation had a 42.88 ms frame in one trace; exit samples reached 24.16 ms. A final warm widget round-trip also contained a 44.81 ms UI task during scene reconciliation, despite avoiding the redundant full reload. After aligning the initial clock bucket, another warm sample had a 28.52 ms maximum UI task and 11.80 ms p95, plus a 34.77 ms Preferences completion callback on exit. These separate samples do not establish a stable overall improvement. Cold-start total timing was not demonstrably improved. Therefore this is not evidence of sustained 120 FPS or complete elimination of all startup costs.
 
 ## Native acceptance
 

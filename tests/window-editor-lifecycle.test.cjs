@@ -2,6 +2,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
 const source=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
 function method(start,end){return source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start)));}
+assert.match(source, /@State tick: number = Math\.floor\(Date\.now\(\)\/60000\)\*60000;/, 'initial clock uses the same minute bucket as foreground reconciliation');
 const routes=[],reads=[],saves=[];
 const context={exports:{},AppStorage:{setOrCreate:(key,value)=>routes.push([key,value])},DismissReason:{PRESS_BACK:0,SLIDE_DOWN:3},needsDataRefresh:cap=>!!cap,capabilityRequestKey:cap=>cap.k,readCapability:async cap=>{reads.push(cap.k);return {...cap,percent:cap.percent+1};}};
 const fixture=`class Fixture {

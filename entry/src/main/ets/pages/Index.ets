@@ -277,7 +277,7 @@ struct Index {
   private appWentBackground(): void { if(this.appBackgrounded)this.finishCardDeletion(); if(!this.appBackgrounded && this.ready) {this.scheduleForegroundRefresh();this.incomingTemplateChanged();} if (this.appBackgrounded && this.ready) { if(this.scheduleTransition){this.scheduleVisualGeneration++;this.scheduleTransition=false;this.schedulePhase=0;this.timedScene=null;this.scheduledName='';this.scheduledFocusId='';this.renderBoard();} if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); } }
 
   @State repairingSubjects: boolean = false;
-  @State tick: number = Date.now();
+  @State tick: number = Math.floor(Date.now()/60000)*60000;
   private foregroundRefreshTimer: number = -1;
 
   aboutToAppear(): void {
