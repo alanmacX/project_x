@@ -32,7 +32,7 @@ const {exportTemplate,materializeTemplate}=load('TemplateIO');
 (async()=>{for(const item of items){files.set(item.cover.slice(7),Buffer.from('cover'));files.set(item.background.slice(7),Buffer.from('background'));}
 const shared=defaultState();const album=new FridgeCard();album.id='playlist';album.capability=cap;shared.cards=[album];
 const file=await exportTemplate(JSON.stringify(shared),'playlist','/saved','/cache');const raw=files.get(file).toString();assert.equal(JSON.parse(raw).assets.length,4);
-const imported=JSON.parse(await materializeTemplate(raw,'/received')).cards[0].capability;assert.equal(imported.albumItems.length,2);assert.equal(activeAlbum(imported,epoch+3600000).title,'B');assert.ok(imported.albumItems.every(a=>a.cover.startsWith('file:///received/')&&a.background.startsWith('file:///received/')));
+const imported=JSON.parse(await materializeTemplate(raw,'/received')).cards[0].capability;assert.equal(imported.albumItems.length,2);assert.equal(imported.albumRotationStart,0,'share excludes sender rotation clock');assert.equal(activeAlbum(imported,epoch+3600000).title,'A');assert.ok(imported.albumItems.every(a=>a.cover.startsWith('file:///received/')&&a.background.startsWith('file:///received/')));
 const htmlPack=JSON.parse(fs.readFileSync(path.resolve(__dirname,'../skills/fridge-create/examples/html-clock.fridge'),'utf8'));
 const htmlState=htmlPack.state;htmlState.cards[0].elements[0].src='file:///saved/html.png';files.set('/saved/html.png',Buffer.from(htmlPack.assets[0].data,'base64'));
 const htmlFile=await exportTemplate(JSON.stringify(htmlState),'html-card','/saved','/cache');

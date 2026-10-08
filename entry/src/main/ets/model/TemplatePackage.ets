@@ -1,3 +1,4 @@
+import { sharedCapability } from './SharedCapability';
 import { validateHtmlCard } from './HtmlCardTemplate';
 import { FridgeState, FridgeCard, normalizeState, defaultState, BOARD_W, BOARD_H } from './CardSchema';
 import { assertCanvasCapacity } from './CanvasCapacity';
@@ -8,7 +9,8 @@ export function packageScene(json: string, cardId: string): TemplatePackage {
   const state=normalizeState(JSON.parse(json) as FridgeState);
   if(cardId.length>0){state.cards=state.cards.filter((c:FridgeCard)=>c.id===cardId);if(state.cards.length!==1)throw new Error('卡片不存在');state.cards[0].groupId='';state.sceneLayouts=[];state.sceneRules=[];state.sceneBaseLayoutId='';state.background=defaultState().background;}
   state.canvasId='canvas_main';
-  for(const card of state.cards){const cap=card.capability;if(cap?.k==='battery'){cap.percent=-1;cap.charging=false;cap.chargeState='';cap.updatedAt=0;cap.attemptedAt=0;}if(cap?.k==='agenda'&&cap.agendaSource==='system'){cap.events=[];cap.updatedAt=0;cap.attemptedAt=0;}}
+  for(const rule of state.sceneRules){rule.createdAt=0;rule.dismissed='';rule.enabled=false;}
+  for(const card of state.cards)if(card.capability)card.capability=sharedCapability(card.capability);
   return {format:'fridgememo-template',version:state.cards.some((c:FridgeCard)=>c.html!==undefined)?2:1,kind:cardId.length>0?'card':'canvas',state:state,assets:[]};
 }
 export function readPackage(json: string): TemplatePackage {
@@ -44,7 +46,7 @@ export function readPackage(json: string): TemplatePackage {
 /** Remap every identifier; importing twice never aliases a card, element or group. */
 export function importedCards(state:FridgeState,newId:()=>string):FridgeCard[]{
   const cards=normalizeState(JSON.parse(JSON.stringify(state)) as FridgeState).cards,groups=new Map<string,string>();
-  for(const c of cards){c.id=newId();if(c.groupId.length>0){if(!groups.has(c.groupId))groups.set(c.groupId,newId());c.groupId=groups.get(c.groupId)??'';}c.elements.forEach(el=>{const old=el.id;el.id=newId();if(c.html?.previewElementId===old)c.html.previewElementId=el.id;});c.renderContourKey='';}
+  for(const c of cards){if(c.capability){c.capability=sharedCapability(c.capability);if(c.capability.k==='album'&&(c.capability.albumRotationMinutes??0)>0)c.capability.albumRotationStart=Date.now();}c.id=newId();if(c.groupId.length>0){if(!groups.has(c.groupId))groups.set(c.groupId,newId());c.groupId=groups.get(c.groupId)??'';}c.elements.forEach(el=>{const old=el.id;el.id=newId();if(c.html?.previewElementId===old)c.html.previewElementId=el.id;});c.renderContourKey='';}
   return cards;
 }
 

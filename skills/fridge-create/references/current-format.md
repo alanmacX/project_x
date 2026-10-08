@@ -62,3 +62,9 @@ Current reader limits package text to 90MiB, assets to 256, individual asset Bas
 ## Static HTML cards (container v2)
 
 Use container version 2 only when a card has `html`. Native-only v1 works keep importing. The card stores `{version:1,designVersion:1,width,height,source,previewElementId}`; its referenced image element embeds the appearance cache as a normal local asset. IDs must be remapped together. App editing changes normal layers/capability/layout; changing HTML source requires regenerating its cache with the authoring workflow. HTML is not a new provider and never runs in desktop Forms. See html-draft.md.
+
+## Design-only sharing and recipient data
+
+`.fridge` transfers artwork and native provider intent, not sender runtime data. Production `SharedCapability.sharedCapability` is the export/import allowlist. Never embed calendar events, courses, semester dates, school exceptions, battery snapshots, countdown/anniversary targets, credentials, cached provider responses or private future fields in a template capability. Agenda binds to the recipient system calendar (with their existing permission); timetable binds to their saved local timetable or remains unconfigured. Clock/date/progress/battery use the recipient device. Deadline capabilities require the recipient to set their own title/date. World-clock city/zone are intentional design choices. Album titles/artists/covers are artwork; rotation restarts on import. HTML native bindings follow the same policy.
+
+Decorative text, photos, album covers, HTML source and its appearance cache are intentionally shared artwork. Do not bake personal provider records into those assets; automatic provider sanitization cannot remove information already painted into an image or static HTML. Preview fixtures may use synthetic data for QA, but exported/imported templates must use recipient bindings. Timed scene designs arrive disabled and without sender acknowledgement history.

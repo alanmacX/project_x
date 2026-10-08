@@ -1686,7 +1686,7 @@ struct Index {
       if(!this.alive){if(this.context)removeStagedTemplate(uri,this.context.cacheDir);return;}
       this.templateReviewOpen=true;
       const finish=():void=>{if(this.context)removeStagedTemplate(uri,this.context.cacheDir);this.templateReviewOpen=false;this.incomingTemplateChanged();};
-      this.getUIContext().showAlertDialog({cancel:finish,title:summary.kind==='card'?'导入卡片':'导入画布',message:summary.count+' 张卡片，'+summary.images+' 个图片资源。'+(summary.kind==='canvas'?'保存为独立画布，保留现有作品。':'添加到当前画布。'),primaryButton:{value:'取消',action:finish},secondaryButton:{value:summary.kind==='canvas'?'保存新画布':'添加到画布',action:()=>{this.importTemplate(uri,summary.kind).finally(finish);}}});
+      this.getUIContext().showAlertDialog({cancel:finish,title:summary.kind==='card'?'导入卡片':'导入画布',message:summary.count+' 张卡片，'+summary.images+' 个图片资源。只导入设计，能力使用你的本机数据。'+(summary.kind==='canvas'?'保存为独立画布，保留现有作品。':'添加到当前画布。'),primaryButton:{value:'取消',action:finish},secondaryButton:{value:summary.kind==='canvas'?'保存新画布':'添加到画布',action:()=>{this.importTemplate(uri,summary.kind).finally(finish);}}});
     }catch(e){if(this.context)removeStagedTemplate(uri,this.context.cacheDir);this.templateReviewOpen=false;this.templateError('无法导入',e as Error);}
   }
   private async importTemplate(uri:string,kind:string):Promise<void>{
@@ -1694,12 +1694,16 @@ struct Index {
     try{this.busy=true;const available=kind==='canvas'?CANVAS_CARD_LIMIT:Math.max(0,CANVAS_CARD_LIMIT-this.store.state.cards.length);
       const state=normalizeState(JSON.parse(await taskpool.execute(new taskpool.Task(materializeTemplateUri,uri,this.context.filesDir,available)) as string) as FridgeState);
       const cards=importedCards(state,()=>this.store.newId());
+      if(cards.some((c:FridgeCard)=>c.capability?.k==='timetable')) {
+        const saved=await this.store.savedTimetable();
+        if(saved)for(const card of cards)if(card.capability?.k==='timetable')card.capability=useSavedTimetable(card.capability,saved);
+      }
       if(kind==='canvas') {
         await this.store.save(false); this.backgroundGeneration++; fitImportedCanvas(cards,state.canvasAspect,this.canvasAspect);remapSceneSchedules(state,cards,()=>this.store.newId(),this.canvasAspect); state.cards=cards; state.canvasAspect=this.canvasAspect;
         const id=this.store.createCanvas('导入的画布',state); this.busy=false; await this.chooseCanvas(id); return;
       }
       if(kind==='card'&&cards.length===1){cards[0].x=Math.max(0,(BOARD_W-cards[0].w)/2);cards[0].y=Math.max(0,(BOARD_H-cards[0].h)/2);}
-      cards.forEach((c:FridgeCard)=>this.clamp(c));this.store.addCards(cards.slice().sort((a:FridgeCard,b:FridgeCard)=>a.z-b.z));this.render();this.persist(true);this.scheduleBackground();
+      cards.forEach((c:FridgeCard)=>this.clamp(c));this.store.addCards(cards.slice().sort((a:FridgeCard,b:FridgeCard)=>a.z-b.z));this.render();this.persist(true);this.scheduleBackground();this.refreshCapabilities();
       if(cards.length>0)this.select(cards[0].id);
     }catch(e){this.templateError('导入未完成',e as Error);}finally{this.busy=false;}
   }

@@ -23,7 +23,7 @@ if(mode==='prepare'){
  if(w<32||h<32||w>2048||h>2048||Math.abs(w/h-config.width/config.height)>.01)throw Error('Screenshot dimensions do not match the HTML viewport');
  const state=schema.defaultState(),card=new schema.FridgeCard(),el=new schema.CanvasElement();
  card.id='html-card';card.w=config.width;card.h=config.height;card.html=template;card.material='white';card.frame=false;
- if(config.capability){if(!schema.CAPABILITIES.includes(config.capability.k)||config.capability.k==='album')throw Error('Use one supported native capability; album retains its own appearance');card.capability=schema.normalizeCapability(config.capability);for(const key of ['url','field','sourceConfigured','parcels','parcelPlace','temp','desc'])delete card.capability[key];if(config.capBox)card.capBox=schema.normalizeBox(config.capBox);card.capFree=true;}
+ if(config.capability){if(!schema.CAPABILITIES.includes(config.capability.k)||config.capability.k==='album')throw Error('Use one supported native capability; album retains its own appearance');card.capability=core.load('SharedCapability').sharedCapability(schema.normalizeCapability(config.capability));if(config.capBox)card.capBox=schema.normalizeBox(config.capBox);card.capFree=true;}
  Object.assign(el,{id:'html-appearance',kind:'image',src:'asset://0',x:0,y:0,w:1,h:1,rot:0,opacity:1,behindCapability:true});card.elements=[el];state.cards=[card];
  const pack={format:'fridgememo-template',version:2,kind:'card',state,assets:[{key:'asset://0',extension:'.png',data:bytes.toString('base64')}]};
  const json=JSON.stringify(pack);core.load('TemplatePackage').readPackage(json);fs.writeFileSync(outputPath,json);

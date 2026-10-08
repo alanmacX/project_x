@@ -3,6 +3,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.remapSceneSchedules = exports.fitImportedCanvas = exports.importedCards = exports.readPackage = exports.packageScene = void 0;
+const SharedCapability_1 = require("./SharedCapability");
 const HtmlCardTemplate_1 = require("./HtmlCardTemplate");
 const CardSchema_1 = require("./CardSchema");
 const CanvasCapacity_1 = require("./CanvasCapacity");
@@ -19,21 +20,14 @@ function packageScene(json, cardId) {
         state.background = (0, CardSchema_1.defaultState)().background;
     }
     state.canvasId = 'canvas_main';
-    for (const card of state.cards) {
-        const cap = card.capability;
-        if (cap?.k === 'battery') {
-            cap.percent = -1;
-            cap.charging = false;
-            cap.chargeState = '';
-            cap.updatedAt = 0;
-            cap.attemptedAt = 0;
-        }
-        if (cap?.k === 'agenda' && cap.agendaSource === 'system') {
-            cap.events = [];
-            cap.updatedAt = 0;
-            cap.attemptedAt = 0;
-        }
+    for (const rule of state.sceneRules) {
+        rule.createdAt = 0;
+        rule.dismissed = '';
+        rule.enabled = false;
     }
+    for (const card of state.cards)
+        if (card.capability)
+            card.capability = (0, SharedCapability_1.sharedCapability)(card.capability);
     return { format: 'fridgememo-template', version: state.cards.some((c) => c.html !== undefined) ? 2 : 1, kind: cardId.length > 0 ? 'card' : 'canvas', state: state, assets: [] };
 }
 exports.packageScene = packageScene;
@@ -118,6 +112,11 @@ exports.readPackage = readPackage;
 function importedCards(state, newId) {
     const cards = (0, CardSchema_1.normalizeState)(JSON.parse(JSON.stringify(state))).cards, groups = new Map();
     for (const c of cards) {
+        if (c.capability) {
+            c.capability = (0, SharedCapability_1.sharedCapability)(c.capability);
+            if (c.capability.k === 'album' && (c.capability.albumRotationMinutes ?? 0) > 0)
+                c.capability.albumRotationStart = Date.now();
+        }
         c.id = newId();
         if (c.groupId.length > 0) {
             if (!groups.has(c.groupId))
@@ -155,6 +154,55 @@ function remapSceneSchedules(state, cards, newId, targetAspect) {
     state.sceneRules.forEach(r => { r.id = newId(); r.targetId = (r.kind === 'layout' ? layoutIds : cardIds).get(r.targetId); r.enabled = false; r.dismissed = ''; r.createdAt = Date.now(); });
 }
 exports.remapSceneSchedules = remapSceneSchedules;
+
+},
+"SharedCapability":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.sharedCapability = void 0;
+/** Share appearance and provider intent, never sender records or runtime snapshots.
+ * Deliberate artwork (layer text, photos, HTML source/cache and album metadata) travels separately.
+ * Keep this allowlist explicit so future provider fields are private by default.
+ */
+function sharedCapability(cap) {
+    const next = { k: cap.k, readingBlend: cap.readingBlend, readingEdge: cap.readingEdge,
+        readingOutside: cap.readingOutside, readingHook: cap.readingHook, readingTint: cap.readingTint,
+        readingStyle: cap.readingStyle };
+    if (cap.k === 'worldclock') {
+        next.zone = cap.zone;
+        next.city = cap.city;
+    }
+    if (cap.k === 'calendar')
+        next.calendarOffset = cap.calendarOffset;
+    if (cap.k === 'battery') {
+        next.percent = -1;
+        next.charging = false;
+    }
+    if (cap.k === 'agenda') {
+        next.agendaSource = 'system';
+        next.events = [];
+    }
+    if (cap.k === 'timetable') {
+        next.timetableMode = cap.timetableMode;
+        next.skipHolidays = cap.skipHolidays;
+        next.courses = [];
+    }
+    if (cap.k === 'album') {
+        next.title = cap.title;
+        next.artist = cap.artist;
+        next.albumPresentation = cap.albumPresentation;
+        next.albumInset = cap.albumInset;
+        next.albumCover = cap.albumCover;
+        next.albumBackground = cap.albumBackground;
+        next.albumItems = cap.albumItems;
+        next.albumRotationMinutes = cap.albumRotationMinutes;
+        next.albumId = cap.albumId;
+        next.albumRotationStart = 0;
+        next.albumSource = 'local';
+    }
+    return JSON.parse(JSON.stringify(next));
+}
+exports.sharedCapability = sharedCapability;
 
 },
 "HtmlCardTemplate":function(require,module,exports){
@@ -3306,4 +3354,4 @@ function traceMask(mask, width, height) {
 }
 exports.traceMask = traceMask;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"15bb4091ed0c04c39b0ab89dbe06338fb8045e798abddfead749c8dc72d77b54"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"0f57941daa7e8a5cfc596ca75355e39cf5166014cf9d6ec0495b84bdd2960815"};})(globalThis);
