@@ -1,7 +1,7 @@
 import { hookReserve } from './MicaGeometry';
 import { isReadingComposition, compositionPadding } from './ReadingComposition';
 import { readingSurface } from './CapabilityPresentation';
-import { cardOutline } from './RenderContours';
+import { cardOutline } from './ContourRegistry';
 import { FridgeCard, ElementBox, ShapePoint, BOARD_W, BOARD_H, MIN_CARD_EDGE, MIN_SUBJECT_EDGE } from './CardSchema';
 import { capabilityMinimum, capabilityReadableMinimum, CapabilitySize } from './CapabilityMetrics';
 

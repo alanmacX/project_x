@@ -1,7 +1,8 @@
 /* Browser adapter only. Protocol, sizing and rotation selection come from production models. */
 (function(global){
  'use strict';
- const schema=FridgeCore.load('CardSchema'),layout=FridgeCore.load('AlbumLayout'),rotation=FridgeCore.load('AlbumRotation'),depth=FridgeCore.load('CardDepth');
+ const schema=FridgeCore.load('CardSchema'),layout=FridgeCore.load('AlbumLayout'),rotation=FridgeCore.load('AlbumRotation'),depth=FridgeCore.load('CardDepth'),canvas=FridgeCore.load('CanvasLayout');
+ let dimensions=new Map();
  const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const color=c=>/^#[\da-f]{6}$/i.test(c)?c:'#30322D';
  const measure=typeof document==='undefined'?null:document.createElement('canvas').getContext('2d');
@@ -14,6 +15,11 @@
  function textLine(text,x,y,size,width,opacity=1){return `<text x="${x}" y="${y}" font-size="${size}" font-weight="500" fill="white" opacity="${opacity}">${escape(fitted(text,size,width))}</text>`;}
  function image(src,x,y,w,h,r,id,fit='xMidYMid meet'){
   if(!src)return '';
+  if(src.startsWith('#')){
+   let dx=x,dy=y,dw=w,dh=h;const size=dimensions.get(src);
+   if(size&&fit!=='none'){const ratio=fit.endsWith('slice')?Math.max(w/size.width,h/size.height):Math.min(w/size.width,h/size.height);dw=size.width*ratio;dh=size.height*ratio;dx=x+(w-dw)/2;dy=y+(h-dh)/2;}
+   return `<defs><clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}"/></clipPath></defs><g clip-path="url(#${id})"><use href="${src}" transform="translate(${dx} ${dy}) scale(${dw} ${dh})"/></g>`;
+  }
   return `<defs><clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}"/></clipPath></defs><image href="${escape(src)}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="${fit}" clip-path="url(#${id})"/>`;
  }
  function albumBody(album,w,h,style,id){
@@ -49,36 +55,65 @@
  function issuesFor(pack){
   const issues=[];
   for(const c of pack.state.cards){
-   if(c.capability&&c.capability.k!=='album')issues.push(c.id+'：'+c.capability.k+' 尚未接入浏览器渲染，视觉验收阻断');
-   if(c.shape==='subject')issues.push(c.id+'：主体蒙版与厚度尚未接入，视觉验收阻断');
-   if((c.elements||[]).length)issues.push(c.id+'：自定义元素的字体适配/混合尚未接入，视觉验收阻断');
-   if(c.capability?.k==='album'&&(c.w!==c.h))issues.push(c.id+'：非正方形外框的原生裁切尚未对照，视觉验收阻断');
+   if(c.capability&&!schema.CAPABILITIES.includes(c.capability.k))issues.push(c.id+'：未知能力，视觉验收阻断');
+   if(c.shape==='subject'&&!c.cutout)issues.push(c.id+'：缺少主体蒙版，视觉验收阻断');
+   if(c.shape==='subject'&&!c.outline.length)issues.push(c.id+'：缺少厚度轮廓，视觉验收阻断');
+   for(const el of c.elements||[])if(!['text','image','shape'].includes(el.kind))issues.push(c.id+'：未知元素，视觉验收阻断');
   }
   return issues;
  }
+ function element(el,w,h,ox,oy,ink,media,id){
+  const x=ox+el.x*w,y=oy+el.y*h,ew=el.w*w,eh=el.h*h;let body='';
+  if(el.kind==='image')body=image(media(el.src),0,0,ew,eh,0,id+'img','xMidYMid slice');
+  else if(el.kind==='shape')body=`<rect width="${ew}" height="${el.primitive==='line'?3:eh}" rx="${el.primitive==='circle'?Math.min(ew,eh)/2:4}" fill="${color(el.color||ink)}"/>`;
+  else{
+   const value=String(el.text||''),weight=el.bold?500:400;let fs=el.fs,lines=[];
+   function wrap(){const out=[];let line='';if(measure)measure.font=weight+' '+fs+'px system-ui';for(const char of value){if(char==='\n'){out.push(line);line='';continue;}if(line&&measure&&measure.measureText(line+char).width>ew){out.push(line);line=char;}else line+=char;}out.push(line);return out;}
+   lines=wrap();while(fs>Math.min(8,el.fs)&&lines.length*fs*1.2>eh){fs=Math.max(Math.min(8,el.fs),fs-.5);lines=wrap();}
+   const capacity=Math.max(1,Math.floor(eh/(fs*1.2))),shown=lines.slice(0,capacity);if(lines.length>capacity)shown[capacity-1]=fitted(shown[capacity-1]+'…',fs,ew);
+   const anchor=el.align==='center'?'middle':el.align==='right'?'end':'start',tx=anchor==='middle'?ew/2:anchor==='end'?ew:0;
+   body=`<defs><clipPath id="${id}txt"><rect width="${ew}" height="${eh}"/></clipPath></defs><g clip-path="url(#${id}txt)">`+shown.map((line,i)=>`<text x="${tx}" y="${i*fs*1.2+fs*.91}" font-size="${fs}" font-weight="${weight}" text-anchor="${anchor}" fill="${color(el.color||ink)}">${escape(line)}</text>`).join('')+'</g>';
+  }
+  return `<g data-element="${escape(el.id)}" transform="translate(${x} ${y}) rotate(${el.rot} ${ew/2} ${eh/2})" opacity="${el.opacity}">${body}</g>`;
+ }
  function renderPackage(pack,width,tick){
-  const scene=pack.state,scale=width/schema.BOARD_W,height=width/scene.canvasAspect,assets=new Map();
+  const scene=pack.state,scale=width/schema.BOARD_W,height=width/scene.canvasAspect,assets=new Map();dimensions=new Map();
   const diagnostics=issuesFor(pack);
-  for(const a of pack.assets){
+  let assetDefs='';for(const [index,a] of pack.assets.entries()){
    if(!/^[A-Za-z0-9+/]*={0,2}$/.test(a.data)||a.data.length%4!==0)throw Error('图片 Base64 编码无效');
    const mime=a.extension==='.jpg'||a.extension==='.jpeg'?'jpeg':a.extension.slice(1);
-   assets.set(a.key,'data:image/'+mime+';base64,'+a.data);
+   const key='#media'+index;assets.set(a.key,key);dimensions.set(key,pack.assetDimensions?.[a.key]||{width:1,height:1});
+   assetDefs+=`<image id="media${index}" href="data:image/${mime};base64,${a.data}" width="1" height="1" preserveAspectRatio="none"/>`;
   }
   const media=ref=>assets.get(ref)||'';
-  let defs='',body=`<rect width="${width}" height="${height}" fill="${color(scene.background.color)}"/>`;
+  let defs=assetDefs,body=`<rect width="${width}" height="${height}" fill="${color(scene.background.color)}"/>`;
   if(scene.background.src&&scene.background.mode!=='solid'&&scene.background.mode!=='smart')body+=image(media(scene.background.src),0,0,width,height,0,'backdrop','xMidYMid slice');
   scene.cards.slice().sort((a,b)=>a.z-b.z).forEach((c,i)=>{
-   const id='c'+i,r=schema.cardCornerRadius(c),[paper]=schema.materialColors(c.material,c.paper,c.ink),edge=depth.cardEdgeColor(paper,false);
+   const id='c'+i,r=schema.cardCornerRadius(c),[paper,ink]=schema.materialColors(c.material,c.paper,c.ink),edge=depth.cardEdgeColor(paper,c.shape==='subject'&&c.subjectPhoto),f=canvas.subjectSurfaceFactor(c);
    const content=c.capability?.k==='album'?rotation.activeAlbum(c.capability,tick):null;
    defs+=shadow(id)+shadow(id+'cast',5.5,4,48/255)+shadow(id+'contact',1.4,1.2,72/255)+`<clipPath id="${id}clip"><rect width="${c.w}" height="${c.h}" rx="${r}"/></clipPath>`;
    const x=c.x*scale,y=c.y*height/schema.BOARD_H;
    body+=`<g transform="translate(${x} ${y}) scale(${scale})"><g transform="rotate(${c.rot} ${c.w/2} ${c.h/2})">`;
-   // Same face/sidewall/contact/cast layer order as CardFace.backing.
-   body+=`<rect y="2" width="${c.w}" height="${c.h}" rx="${r}" fill="${edge}" filter="url(#${id}castshadow)"/><rect y="2" width="${c.w}" height="${c.h}" rx="${r}" fill="${edge}" filter="url(#${id}contactshadow)"/><rect y="2" width="${c.w}" height="${c.h}" rx="${r}" fill="${edge}"/>`;
-   body+=`<g clip-path="url(#${id}clip)"><rect width="${c.w}" height="${c.h}" fill="${color(paper)}"/>`;
+   if(c.shape==='subject'&&c.outline.length){
+    const commands=FridgeCore.load('ContourPath').contourPath(c.outline,c.w,c.h,f),border=c.subjectBorder?6:0;
+    for(const [radius,y,alpha] of [[5.5,6,48/255],[1.4,3.2,72/255]])for(const [extra,opacity] of [[2*radius,.15],[radius,.25],[0,.6]])body+=`<path d="${commands}" transform="translate(0 ${y})" fill="black" stroke="black" stroke-width="${border+extra}" stroke-linejoin="round" opacity="${alpha*opacity}"/>`;
+    body+=`<path d="${commands}" transform="translate(0 2)" fill="${edge}" stroke="${edge}" stroke-width="${border}" stroke-linejoin="round"/><path d="${commands}" fill="${c.subjectPhoto?'white':paper}" stroke="${c.subjectPhoto?'white':paper}" stroke-width="${border}" stroke-linejoin="round"/>`;
+   }else body+=`<rect y="2" width="${c.w}" height="${c.h}" rx="${r}" fill="${edge}" filter="url(#${id}castshadow)"/><rect y="2" width="${c.w}" height="${c.h}" rx="${r}" fill="${edge}" filter="url(#${id}contactshadow)"/><rect y="2" width="${c.w}" height="${c.h}" rx="${r}" fill="${edge}"/>`;
+   const innerW=c.w*f,innerH=c.h*f,offsetX=(c.w-innerW)/2,offsetY=(c.h-innerH)/2;
+   if(c.shape==='subject'&&c.cutout){defs+=`<mask id="${id}alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="${c.w}" height="${c.h}" style="mask-type:alpha"><use href="${media(c.cutout)}" transform="translate(${offsetX} ${offsetY}) scale(${innerW} ${innerH})"/></mask>`;}
+   const isFree=c.capFree||FridgeCore.load('ReadingComposition').isReadingComposition(c.capability?.readingBlend||''),readout=c.capability&&!content?FridgeReadouts.capability(c,tick,id+'cap'):'';
+   body+=`<g ${c.shape==='subject'&&c.cutout?`mask="url(#${id}alpha)"`:`clip-path="url(#${id}clip)"`}>`;
    if(content)body+=albumBody({...content,cover:media(content.cover),background:media(content.background)},c.w,c.h,'cover',id);
-   else if(c.capability||c.shape==='subject'||c.elements.length)body+=`<rect x="8" y="8" width="${Math.max(0,c.w-16)}" height="${Math.max(0,c.h-16)}" rx="8" fill="#F4E6CC"/><text x="${c.w/2}" y="${c.h/2}" text-anchor="middle" font-size="12" fill="#6C5740">未支持的渲染</text>`;
-   body+='</g></g></g>';
+   else{
+    body+=`<rect width="${c.w}" height="${c.h}" fill="${color(paper)}"/>`;
+    if(c.shape==='subject'&&c.subjectPhoto&&c.cutout)body+=image(media(c.cutout),offsetX,offsetY,innerW,innerH,0,id+'photo','none');
+    const layers=behind=>(c.elements||[]).filter(el=>el.behindCapability===behind).map((el,j)=>element(el,innerW,innerH,offsetX,offsetY,ink,media,id+(behind?'back':'front')+j)).join('');
+    body+=layers(true);if(!isFree&&!canvas.capabilityObstructed(c))body+=readout;body+=layers(false);if(!isFree&&canvas.capabilityObstructed(c))body+=readout;
+   }
+   body+='</g>';if(isFree)body+=readout;
+   if(c.frame&&c.shape!=='subject')body+=`<rect x="1.5" y="1.5" width="${Math.max(0,c.w-3)}" height="${Math.max(0,c.h-3)}" rx="${Math.max(0,r-1.5)}" fill="none" stroke="white" stroke-width="3"/>`;
+   if(c.shape!=='subject'){defs+=`<linearGradient id="${id}lip" x2="0" y2="1"><stop stop-color="#FFFFFF88"/><stop offset="1" stop-color="#00000020"/></linearGradient>`;body+=`<rect width="${c.w}" height="${c.h}" rx="${r}" fill="none" stroke="url(#${id}lip)" stroke-width=".6"/>`;}
+   body+='</g></g>';
   });
   return {svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="system-ui,sans-serif"><defs>${defs}<clipPath id="board"><rect width="${width}" height="${height}" rx="20"/></clipPath></defs><g clip-path="url(#board)">${body}</g></svg>`,issues:diagnostics,width,height};
  }

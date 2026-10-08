@@ -1126,4 +1126,1812 @@ function cloudReadingPath(w, h, scale) {
 }
 exports.cloudReadingPath = cloudReadingPath;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"a1fd3d905196b2fa8fba0708ba9f47a3b2eca03517278baaac8f7c14d1297abf"};})(globalThis);
+},
+"CanvasLayout":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.restoreStartupLayouts = exports.warmStartupLayouts = exports.capabilityPreset = exports.cardCapabilityMinimum = exports.capabilityInset = exports.cardHandlePoint = exports.ensureCapabilitySize = exports.minimumCardSize = exports.clampCardGeometry = exports.capabilityPlacement = exports.resizeFactor = exports.capabilityBox = exports.capabilityObstructed = exports.freeCapabilityBox = exports.constrainCapabilityDrag = exports.fitCapabilityPosition = exports.capabilityAttachmentEdges = exports.fitContentBox = exports.safeContentBox = exports.subjectSurfaceFactor = exports.subjectInterior = void 0;
+const MicaGeometry_1 = require("./MicaGeometry");
+const ReadingComposition_1 = require("./ReadingComposition");
+const CapabilityPresentation_1 = require("./CapabilityPresentation");
+const ContourRegistry_1 = require("./ContourRegistry");
+const CardSchema_1 = require("./CardSchema");
+const CapabilityMetrics_1 = require("./CapabilityMetrics");
+function outlineIntervals(y, loops) {
+    const xs = [];
+    for (const loop of loops) {
+        for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
+            const a = loop[i], b = loop[j];
+            if ((a.y > y) !== (b.y > y))
+                xs.push((b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x);
+        }
+    }
+    return xs.sort((a, b) => a - b);
+}
+function spanInside(left, right, intervals) {
+    for (let i = 0; i + 1 < intervals.length; i += 2)
+        if (left >= intervals[i] && right <= intervals[i + 1])
+            return true;
+    return false;
+}
+/** Largest interior rectangle; never place a capability across a subject's transparent holes. */
+function subjectInterior(loops, preferredAspect = 0) {
+    const size = 48, heights = new Array(size).fill(0);
+    let area = 0, score = 0;
+    const box = new CardSchema_1.ElementBox();
+    box.x = 0;
+    box.y = 0;
+    box.w = 0;
+    box.h = 0;
+    for (let y = 0; y < size; y++) {
+        const top = outlineIntervals((y + .05) / size, loops), middle = outlineIntervals((y + .5) / size, loops), bottom = outlineIntervals((y + .95) / size, loops);
+        for (let x = 0; x < size; x++) {
+            const left = (x + .05) / size, right = (x + .95) / size;
+            const yes = spanInside(left, right, top) && spanInside(left, right, middle) && spanInside(left, right, bottom);
+            heights[x] = yes ? heights[x] + 1 : 0;
+        }
+        for (let right = 0; right < size; right++) {
+            let height = heights[right];
+            for (let left = right; left >= 0 && height > 0; left--) {
+                height = Math.min(height, heights[left]);
+                const value = height * (right - left + 1);
+                const candidate = preferredAspect > 0 ? Math.min((right - left + 1) / preferredAspect, height) : value;
+                if (candidate > score || (candidate === score && value > area)) {
+                    score = candidate;
+                    area = value;
+                    box.x = left / size;
+                    box.y = (y + 1 - height) / size;
+                    box.w = (right - left + 1) / size;
+                    box.h = height / size;
+                }
+            }
+        }
+    }
+    const padding = Math.min(0.012, box.w / 12, box.h / 12);
+    box.x += padding;
+    box.y += padding;
+    box.w -= 2 * padding;
+    box.h -= 2 * padding;
+    return box;
+}
+exports.subjectInterior = subjectInterior;
+// Extraction replaces the contour array; snapshots share it. A cache lookup must
+// never serialize thousands of points on the UI thread.
+const outlineIds = new WeakMap();
+let nextOutlineId = 1;
+function outlineIdentity(card) {
+    if (card.shape !== 'subject')
+        return card.shape;
+    // ArkUI @Prop may deep-copy arrays. Extracted assets have immutable, unique
+    // file names, so their cache identity also survives component propagation.
+    if (card.cutout.length > 0)
+        return card.cutout + ':' + card.subjectVersion;
+    const outline = (0, ContourRegistry_1.cardOutline)(card);
+    if (outline.length === 0)
+        return 'empty';
+    let id = outlineIds.get(outline);
+    if (id === undefined) {
+        id = nextOutlineId++;
+        outlineIds.set(outline, id);
+    }
+    return String(id);
+}
+const subjectCache = new Map();
+function subjectSurfaceFactor(card) {
+    return card.shape === 'subject' && card.subjectBorder ? Math.max(.5, Math.min(1 - 6 / card.w, 1 - 6 / card.h)) : 1;
+}
+exports.subjectSurfaceFactor = subjectSurfaceFactor;
+function safeContentBox(card) {
+    if (card.shape === 'subject' && (0, ContourRegistry_1.cardOutline)(card).length > 0) {
+        const min = cardCapabilityMinimum(card, true), aspect = min.w > 0 ? min.w * card.h / (min.h * card.w) : 0;
+        // Cache the normalized interior independently of the pixel-size white edge.
+        // Proportional resizing keeps this aspect stable; floating-point noise must not rescan the outline.
+        const key = Math.round(aspect * 1000000) + ':' + outlineIdentity(card);
+        let interior = subjectCache.get(key);
+        if (interior === undefined) {
+            interior = subjectInterior((0, ContourRegistry_1.cardOutline)(card), aspect);
+            if (subjectCache.size > 32)
+                subjectCache.clear();
+            subjectCache.set(key, interior);
+        }
+        const box = new CardSchema_1.ElementBox(), factor = subjectSurfaceFactor(card), inset = (1 - factor) / 2;
+        box.x = inset + interior.x * factor;
+        box.y = inset + interior.y * factor;
+        box.w = interior.w * factor;
+        box.h = interior.h * factor;
+        return box;
+    }
+    const box = new CardSchema_1.ElementBox();
+    const inset = card.shape === 'round' ? 0.15 : (card.shape === 'blob' ? 0.12 : (card.shape === 'pill' ? 0.15 : 0.06));
+    box.x = inset;
+    box.y = inset;
+    box.w = 1 - 2 * inset;
+    box.h = 1 - 2 * inset;
+    return box;
+}
+exports.safeContentBox = safeContentBox;
+function fitContentBox(requested, safe) {
+    const box = new CardSchema_1.ElementBox();
+    box.w = Math.min(requested.w, safe.w);
+    box.h = Math.min(requested.h, safe.h);
+    box.x = Math.max(safe.x, Math.min(safe.x + safe.w - box.w, requested.x));
+    box.y = Math.max(safe.y, Math.min(safe.y + safe.h - box.h, requested.y));
+    box.rot = 0;
+    box.opacity = requested.opacity;
+    return box;
+}
+exports.fitContentBox = fitContentBox;
+const layoutCache = new Map();
+const MASK_SIZE = 96;
+class InteriorMask {
+    constructor() {
+        this.integral = [];
+        this.left = [];
+        this.right = [];
+        this.top = [];
+        this.bottom = [];
+    }
+}
+const maskCache = new Map();
+function interiorMask(card) {
+    const key = outlineIdentity(card), cached = maskCache.get(key);
+    if (cached !== undefined)
+        return cached;
+    const mask = new InteriorMask(), stride = MASK_SIZE + 1;
+    mask.integral = new Array(stride * stride).fill(0);
+    const loops = (0, ContourRegistry_1.cardOutline)(card);
+    for (let y = 0; y < MASK_SIZE; y++) {
+        const samples = [outlineIntervals(y / MASK_SIZE, loops), outlineIntervals((y + .5) / MASK_SIZE, loops), outlineIntervals((y + 1) / MASK_SIZE, loops)];
+        let row = 0;
+        for (let x = 0; x < MASK_SIZE; x++) {
+            row += samples.every((span) => spanInside(x / MASK_SIZE, (x + 1) / MASK_SIZE, span)) ? 0 : 1;
+            mask.integral[(y + 1) * stride + x + 1] = mask.integral[y * stride + x + 1] + row;
+        }
+    }
+    if (maskCache.size >= 128)
+        maskCache.delete(Array.from(maskCache.keys())[0]);
+    maskCache.set(key, mask);
+    return mask;
+}
+class SideProfile {
+    constructor() {
+        this.left = [];
+        this.right = [];
+    }
+}
+const sideProfiles = new Map();
+/** Exact contour intersections are sampled once, then interpolated in O(1) per drag sample. */
+function capabilityAttachmentEdges(card, box) {
+    const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+    if (card.shape === 'round') {
+        const dx = Math.sqrt(Math.max(0, .25 - Math.pow(cy - .5, 2))), dy = Math.sqrt(Math.max(0, .25 - Math.pow(cx - .5, 2)));
+        return [.5 - dx, .5 + dx, .5 - dy, .5 + dy];
+    }
+    if (card.shape !== 'subject' || !(0, ContourRegistry_1.cardOutline)(card).length) {
+        const edge = (left) => {
+            const top = cy < .5, f = card.shape === 'blob' ? (top ? (left ? .28 : .12) : (left ? .18 : .26)) : 0;
+            const rx = f || Math.min(.5, (card.shape === 'pill' ? Math.min(card.w, card.h) / 2 : 16) / card.w), ry = f || Math.min(.5, (card.shape === 'pill' ? Math.min(card.w, card.h) / 2 : 16) / card.h), y = top ? cy : 1 - cy;
+            return y >= ry ? 0 : rx * (1 - Math.sqrt(Math.max(0, 1 - Math.pow((y - ry) / ry, 2))));
+        };
+        return [edge(true), 1 - edge(false), 0, 1];
+    }
+    const key = outlineIdentity(card);
+    let profile = sideProfiles.get(key);
+    if (!profile) {
+        profile = new SideProfile();
+        const loops = (0, ContourRegistry_1.cardOutline)(card);
+        for (let i = 0; i <= 256; i++) {
+            const xs = outlineIntervals(Math.max(.000001, Math.min(.999999, i / 256)), loops);
+            profile.left.push(xs.length ? xs[0] : NaN);
+            profile.right.push(xs.length ? xs[xs.length - 1] : NaN);
+        }
+        for (const values of [profile.left, profile.right]) {
+            let first = values.findIndex(Number.isFinite);
+            if (first < 0) {
+                values.fill(values === profile.left ? 0 : 1);
+                continue;
+            }
+            for (let i = 0; i < first; i++)
+                values[i] = values[first];
+            let last = first;
+            for (let i = first + 1; i < values.length; i++)
+                if (Number.isFinite(values[i])) {
+                    for (let j = last + 1; j < i; j++)
+                        values[j] = values[last] + (values[i] - values[last]) * (j - last) / (i - last);
+                    last = i;
+                }
+            for (let i = last + 1; i < values.length; i++)
+                values[i] = values[last];
+        }
+        if (sideProfiles.size >= 128)
+            sideProfiles.delete(Array.from(sideProfiles.keys())[0]);
+        sideProfiles.set(key, profile);
+    }
+    const at = Math.max(0, Math.min(256, cy * 256)), i = Math.floor(at), j = Math.min(256, i + 1);
+    return [profile.left[i] + (profile.left[j] - profile.left[i]) * (at - i), profile.right[i] + (profile.right[j] - profile.right[i]) * (at - i), 0, 1];
+}
+exports.capabilityAttachmentEdges = capabilityAttachmentEdges;
+/** Convex regular shapes need only four analytic corner checks, even while resizing. */
+function regularContains(card, box) {
+    if (box.x < 0 || box.y < 0 || box.x + box.w > 1.000001 || box.y + box.h > 1.000001)
+        return false;
+    for (const x of [box.x, box.x + box.w])
+        for (const y of [box.y, box.y + box.h]) {
+            if (card.shape === 'round') {
+                if (Math.pow((x - .5) * 2, 2) + Math.pow((y - .5) * 2, 2) > 1.000001)
+                    return false;
+            }
+            else {
+                const top = y < .5, left = x < .5, fraction = top ? (left ? .28 : .12) : (left ? .18 : .26), radius = card.shape === 'pill' ? Math.min(card.w, card.h) / 2 : 16;
+                const rx = card.shape === 'blob' ? fraction : Math.min(.5, radius / card.w), ry = card.shape === 'blob' ? fraction : Math.min(.5, radius / card.h), cx = left ? rx : 1 - rx, cy = top ? ry : 1 - ry;
+                if ((left ? x < cx : x > cx) && (top ? y < cy : y > cy) && Math.pow((x - cx) / rx, 2) + Math.pow((y - cy) / ry, 2) > 1.000001)
+                    return false;
+            }
+        }
+    return true;
+}
+function maskContains(mask, box) {
+    const l = Math.max(0, Math.floor(box.x * MASK_SIZE + 1e-7)), t = Math.max(0, Math.floor(box.y * MASK_SIZE + 1e-7));
+    const r = Math.min(MASK_SIZE, Math.ceil((box.x + box.w) * MASK_SIZE - 1e-7)), b = Math.min(MASK_SIZE, Math.ceil((box.y + box.h) * MASK_SIZE - 1e-7)), stride = MASK_SIZE + 1;
+    return box.x >= 0 && box.y >= 0 && box.x + box.w <= 1.000001 && box.y + box.h <= 1.000001 && mask.integral[b * stride + r] - mask.integral[t * stride + r] - mask.integral[b * stride + l] + mask.integral[t * stride + l] === 0;
+}
+/** Position across the entire silhouette, preserving size and intentional compositions. */
+function fitCapabilityPosition(card, requested) {
+    if (card.shape === 'subject' && (0, ContourRegistry_1.cardOutline)(card).length === 0)
+        return fitContentBox(requested, safeContentBox(card));
+    const f = subjectSurfaceFactor(card), inset = (1 - f) / 2, box = new CardSchema_1.ElementBox();
+    box.w = requested.w / f;
+    box.h = requested.h / f;
+    box.x = (requested.x - inset) / f;
+    box.y = (requested.y - inset) / f;
+    box.opacity = requested.opacity;
+    const mask = card.shape === 'subject' ? interiorMask(card) : undefined;
+    const contains = (candidate) => mask !== undefined ? maskContains(mask, candidate) : regularContains(card, candidate);
+    if (!contains(box)) {
+        let best = Number.MAX_VALUE, bx = 0, by = 0;
+        for (let y = 0; y + box.h * MASK_SIZE <= MASK_SIZE; y++)
+            for (let x = 0; x + box.w * MASK_SIZE <= MASK_SIZE; x++) {
+                const nx = x / MASK_SIZE, ny = y / MASK_SIZE, distance = Math.pow((nx - box.x) * card.w, 2) + Math.pow((ny - box.y) * card.h, 2);
+                if (distance >= best)
+                    continue;
+                const candidate = new CardSchema_1.ElementBox();
+                candidate.x = nx;
+                candidate.y = ny;
+                candidate.w = box.w;
+                candidate.h = box.h;
+                if (contains(candidate)) {
+                    best = distance;
+                    bx = nx;
+                    by = ny;
+                }
+            }
+        if (best === Number.MAX_VALUE)
+            return readableSlot(card, safeContentBox(card));
+        box.x = bx;
+        box.y = by;
+    }
+    box.x = inset + box.x * f;
+    box.y = inset + box.y * f;
+    box.w *= f;
+    box.h *= f;
+    return box;
+}
+exports.fitCapabilityPosition = fitCapabilityPosition;
+/** Gesture path uses constant-time mask queries, never a contour scan or nearest-position search. */
+function constrainCapabilityDrag(card, requested, previous) {
+    if (card.capFree)
+        return freeCapabilityBox(requested, (0, ReadingComposition_1.isReadingComposition)(card.capability?.readingBlend ?? ''), card.capability?.readingBlend === 'sticker');
+    if (card.shape === 'subject' && (0, ContourRegistry_1.cardOutline)(card).length === 0)
+        return fitContentBox(requested, safeContentBox(card));
+    const f = subjectSurfaceFactor(card), inset = (1 - f) / 2, mask = card.shape === 'subject' ? interiorMask(card) : undefined;
+    const valid = (x, y) => { const box = new CardSchema_1.ElementBox(); box.x = (x - inset) / f; box.y = (y - inset) / f; box.w = requested.w / f; box.h = requested.h / f; return mask !== undefined ? maskContains(mask, box) : regularContains(card, box); };
+    if (valid(requested.x, requested.y))
+        return requested;
+    const result = new CardSchema_1.ElementBox();
+    result.w = requested.w;
+    result.h = requested.h;
+    result.opacity = requested.opacity;
+    let low = 0, high = 1;
+    for (let i = 0; i < 10; i++) {
+        const middle = (low + high) / 2;
+        if (valid(previous.x + (requested.x - previous.x) * middle, previous.y + (requested.y - previous.y) * middle))
+            low = middle;
+        else
+            high = middle;
+    }
+    result.x = previous.x + (requested.x - previous.x) * low;
+    result.y = previous.y + (requested.y - previous.y) * low;
+    if (valid(requested.x, result.y))
+        result.x = requested.x;
+    if (valid(result.x, requested.y))
+        result.y = requested.y;
+    return result;
+}
+exports.constrainCapabilityDrag = constrainCapabilityDrag;
+/** Foreground movement stays continuous across concavities and transparent holes. */
+function freeCapabilityBox(requested, outside = false, wide = false) {
+    const box = new CardSchema_1.ElementBox();
+    box.w = Math.min(wide ? 3 : 1, Math.max(.01, requested.w));
+    box.h = Math.min(1, Math.max(.01, requested.h));
+    box.x = Math.max(outside ? -2 : 0, Math.min(outside ? 2 : 1 - box.w, requested.x));
+    box.y = Math.max(outside ? -2 : 0, Math.min(outside ? 2 : 1 - box.h, requested.y));
+    box.rot = outside ? requested.rot : 0;
+    box.opacity = requested.opacity;
+    return box;
+}
+exports.freeCapabilityBox = freeCapabilityBox;
+function capabilityObstructed(card) {
+    return card.elements.some((el) => !el.behindCapability && (el.kind === 'text' || el.kind === 'image') && card.capBox.x < el.x + el.w && card.capBox.x + card.capBox.w > el.x && card.capBox.y < el.y + el.h && card.capBox.y + card.capBox.h > el.y);
+}
+exports.capabilityObstructed = capabilityObstructed;
+function capabilityBox(card) {
+    if (card.capability?.k === 'album') {
+        const box = new CardSchema_1.ElementBox();
+        box.x = 0;
+        box.y = 0;
+        box.w = 1;
+        box.h = 1;
+        return box;
+    }
+    const minimum = cardCapabilityMinimum(card, true, card.w * card.capBox.w);
+    const key = (card.capability?.readingBlend ?? '') + ':' + minimum.w + ':' + minimum.h + ':' + card.shape + ':' + outlineIdentity(card) + ':' + card.subjectBorder + ':' + card.capFree + ':' + card.w + ':' + card.h + ':' + JSON.stringify(card.capBox);
+    const cached = layoutCache.get(key);
+    if (cached !== undefined)
+        return cached;
+    const requested = new CardSchema_1.ElementBox();
+    requested.x = card.capBox.x;
+    requested.y = card.capBox.y;
+    requested.opacity = card.capBox.opacity;
+    requested.rot = card.capBox.rot;
+    requested.w = Math.max(card.capBox.w, minimum.w / card.w);
+    requested.h = Math.max(card.capBox.h, minimum.h / card.h);
+    const result = card.capFree ? freeCapabilityBox(requested, (0, ReadingComposition_1.isReadingComposition)(card.capability?.readingBlend ?? ''), card.capability?.readingBlend === 'sticker') : fitCapabilityPosition(card, requested);
+    if (layoutCache.size > 128)
+        layoutCache.clear();
+    layoutCache.set(key, result);
+    return result;
+}
+exports.capabilityBox = capabilityBox;
+function resizeFactor(w, h, dx, dy, angle) {
+    const a = angle * Math.PI / 180;
+    const x = dx * Math.cos(a) + dy * Math.sin(a), y = -dx * Math.sin(a) + dy * Math.cos(a);
+    return 1 + (x * w - y * h) / (w * w + h * h);
+}
+exports.resizeFactor = resizeFactor;
+function capabilityPlacement(card) {
+    const box = capabilityBox(card);
+    if (box.w > 0 && box.h > 0)
+        return box;
+    const safe = safeContentBox(card), overlay = readableSlot(card, safe);
+    return overlay;
+}
+exports.capabilityPlacement = capabilityPlacement;
+/** Permit cropped compositions, while keeping a recoverable portion inside the canvas. */
+function clampCardGeometry(card, width = CardSchema_1.BOARD_W, height = CardSchema_1.BOARD_H, renderedHeight = height) {
+    const a = card.rot * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+    const xs = [0, card.h * s, card.w * c + card.h * s, card.w * c];
+    const ys = [0, -card.h * c, card.w * s - card.h * c, card.w * s];
+    const visibleX = Math.min(32, card.w * .2), visibleY = Math.min(32, card.h * .2);
+    card.x = Math.max(visibleX - Math.max(...xs), Math.min(width - visibleX - Math.min(...xs), card.x));
+    card.y = Math.max((visibleY - card.h - Math.max(...ys)) * height / renderedHeight, Math.min((renderedHeight - visibleY - card.h - Math.min(...ys)) * height / renderedHeight, card.y));
+}
+exports.clampCardGeometry = clampCardGeometry;
+function readableSlot(card, safe) {
+    const min = cardCapabilityMinimum(card, true, card.w * safe.w), requested = new CardSchema_1.ElementBox();
+    requested.x = card.capBox.x;
+    requested.y = card.capBox.y;
+    requested.opacity = card.capBox.opacity;
+    requested.w = Math.max(card.capBox.w, min.w / card.w);
+    requested.h = Math.max(card.capBox.h, min.h / card.h);
+    return fitContentBox(requested, safe);
+}
+function minimumCardSize(card) {
+    const size = new CapabilityMetrics_1.CapabilitySize();
+    size.w = card.shape === 'subject' ? CardSchema_1.MIN_SUBJECT_EDGE : CardSchema_1.MIN_CARD_EDGE;
+    size.h = card.shape === 'subject' ? CardSchema_1.MIN_SUBJECT_EDGE : CardSchema_1.MIN_CARD_EDGE;
+    if (card.capability === null || card.capability.k === 'album')
+        return size;
+    if (card.capFree) {
+        const min = cardCapabilityMinimum(card, true, card.w * card.capBox.w);
+        size.w = Math.max(size.w, min.w);
+        size.h = Math.max(size.h, min.h);
+        return size;
+    }
+    const safe = safeContentBox(card), min = cardCapabilityMinimum(card, true, card.w * safe.w);
+    if (card.shape === 'subject' && (0, ContourRegistry_1.cardOutline)(card).length > 0) {
+        const surface = subjectSurfaceFactor(card), interiorW = safe.w / surface, interiorH = safe.h / surface;
+        // Solve the fixed 6-unit white edge at the target size, not today's size.
+        // Both dimensions share a scale: a thin silhouette must retain its aspect.
+        const edge = card.subjectBorder ? 6 / Math.min(card.w, card.h) : 0;
+        size.w = Math.max(CardSchema_1.MIN_SUBJECT_EDGE, min.w / Math.max(.0001, interiorW) + card.w * edge);
+        size.h = Math.max(CardSchema_1.MIN_SUBJECT_EDGE, min.h / Math.max(.0001, interiorH) + card.h * edge);
+        return size;
+    }
+    size.w = Math.max(card.shape === 'subject' ? CardSchema_1.MIN_SUBJECT_EDGE : CardSchema_1.MIN_CARD_EDGE, min.w / Math.max(.0001, safe.w));
+    size.h = Math.max(card.shape === 'subject' ? CardSchema_1.MIN_SUBJECT_EDGE : CardSchema_1.MIN_CARD_EDGE, min.h / Math.max(.0001, safe.h));
+    return size;
+}
+exports.minimumCardSize = minimumCardSize;
+/** Expand proportionally and refuse a shape whose interior cannot support this capability on the board. */
+function ensureCapabilitySize(card) {
+    const min = minimumCardSize(card), factor = Math.max(1, min.w / card.w, min.h / card.h);
+    const w = card.w * factor, h = card.h * factor;
+    if (w > 320 + .01 || h > 420 + .01)
+        return false;
+    card.w = w;
+    card.h = h;
+    return true;
+}
+exports.ensureCapabilitySize = ensureCapabilitySize;
+/** Attach subject controls to the actual silhouette near each corner, including concave shapes. */
+function cardHandlePoint(card, right, bottom) {
+    const target = { x: right ? 1 : 0, y: bottom ? 1 : 0 };
+    if (card.shape !== 'subject' || (0, ContourRegistry_1.cardOutline)(card).length === 0)
+        return target;
+    let best = Number.MAX_VALUE, point = target;
+    for (const loop of (0, ContourRegistry_1.cardOutline)(card))
+        for (const p of loop) {
+            const distance = Math.pow((p.x - target.x) * card.w, 2) + Math.pow((p.y - target.y) * card.h, 2);
+            if (distance < best) {
+                best = distance;
+                const f = subjectSurfaceFactor(card), inset = (1 - f) / 2;
+                point = { x: inset + p.x * f, y: inset + p.y * f };
+            }
+        }
+    return point;
+}
+exports.cardHandlePoint = cardHandlePoint;
+/** Backing and inset belong to layout, so a photo subject never silently loses readable space. */
+function capabilityInset(card) {
+    // Feathered reading fields have no hard perimeter requiring a panel-sized gutter.
+    if ((0, ReadingComposition_1.isReadingComposition)(card.capability?.readingBlend ?? ''))
+        return (0, ReadingComposition_1.compositionPadding)(card.capability.readingBlend);
+    return (0, CapabilityPresentation_1.readingSurface)(card.capability, card.shape === 'subject' && card.subjectPhoto, capabilityObstructed(card)) ? 4 : 0;
+}
+exports.capabilityInset = capabilityInset;
+function cardCapabilityMinimum(card, compact = true, width = 0) {
+    const inset = capabilityInset(card), available = Math.max(0, width - inset * 2);
+    const size = compact ? (0, CapabilityMetrics_1.capabilityReadableMinimum)(card.capability, available) : (0, CapabilityMetrics_1.capabilityMinimum)(card.capability, false, available);
+    if (card.capability !== null) {
+        size.w += inset * 2;
+        size.h += inset * 2 + (0, MicaGeometry_1.hookReserve)(card.capability.readingBlend ?? '');
+    }
+    return size;
+}
+exports.cardCapabilityMinimum = cardCapabilityMinimum;
+/** Presets choose a readable island inside the actual silhouette; artwork geometry stays intact. */
+function capabilityPreset(card, anchor) {
+    const safe = safeContentBox(card), min = cardCapabilityMinimum(card, false, card.w * safe.w), box = new CardSchema_1.ElementBox();
+    box.w = Math.min(safe.w, Math.max(cardCapabilityMinimum(card, true).w, min.w) / card.w);
+    box.h = Math.min(safe.h, min.h / card.h);
+    box.x = safe.x + (safe.w - box.w) / 2;
+    box.y = safe.y + (safe.h - box.h) * (anchor === 'top' ? 0 : anchor === 'bottom' ? 1 : .5);
+    box.opacity = 1;
+    return box;
+}
+exports.capabilityPreset = capabilityPreset;
+class StartupLayoutCache {
+    constructor() {
+        this.interiors = {};
+        this.masks = {};
+        this.placements = {};
+    }
+}
+/** Only immutable photo assets can retain the same identity across worker boundaries. */
+function warmStartupLayouts(cards) {
+    for (const card of cards) {
+        minimumCardSize(card);
+        if (card.capability !== null)
+            capabilityPlacement(card);
+        if (card.capability && ['space', 'sticker'].includes(card.capability.readingBlend ?? ''))
+            capabilityAttachmentEdges(card, card.capBox);
+    }
+    const assets = cards.filter((card) => card.shape === 'subject' && card.cutout.length > 0).map(outlineIdentity);
+    const cache = new StartupLayoutCache();
+    for (const entry of subjectCache)
+        if (assets.some((asset) => entry[0].endsWith(':' + asset)))
+            cache.interiors[entry[0]] = entry[1];
+    for (const entry of maskCache)
+        if (assets.includes(entry[0]))
+            cache.masks[entry[0]] = entry[1];
+    for (const entry of layoutCache)
+        if (assets.some((asset) => entry[0].includes(':' + asset + ':')))
+            cache.placements[entry[0]] = entry[1];
+    return JSON.stringify(cache);
+}
+exports.warmStartupLayouts = warmStartupLayouts;
+/** The payload is produced by our validation worker, never accepted from a share package. */
+function restoreStartupLayouts(json) {
+    const cache = JSON.parse(json);
+    for (const key of Object.keys(cache.interiors))
+        subjectCache.set(key, cache.interiors[key]);
+    for (const key of Object.keys(cache.masks))
+        maskCache.set(key, cache.masks[key]);
+    for (const key of Object.keys(cache.placements))
+        layoutCache.set(key, cache.placements[key]);
+}
+exports.restoreStartupLayouts = restoreStartupLayouts;
+
+},
+"MicaGeometry":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.micaPath = exports.hookCenter = exports.hookReserve = void 0;
+const ReadingComposition_1 = require("./ReadingComposition");
+function hookReserve(blend) { return blend === 'tag' || blend === 'dock' ? 20 : 0; }
+exports.hookReserve = hookReserve;
+function hookCenter(position, w, scale) { const margin = Math.min(w / 2, 14 * scale); return margin + Math.max(0, Math.min(1, position)) * (w - 2 * margin); }
+exports.hookCenter = hookCenter;
+/** Every curve is outside the content rectangle. Edge amplitude is in vp, never a percentage of label height. */
+function micaPath(blend, w, h, scale, edge = '') {
+    if (w <= 0 || h <= 0)
+        return '';
+    const p = Math.min((0, ReadingComposition_1.compositionPadding)(blend) * scale, w / 4, h / 4), a = p * .42, r = Math.min(p * 2, w / 4, h / 4), l = a, t = a, b = h - a, x = w - a;
+    if (blend === 'bare')
+        return `M ${p} ${p * .3} C ${w * .25} 0 ${w * .66} ${p * .7} ${w - p} ${p * .2} L ${w - p * .35} ${p * .5} L ${w - p * .5} ${h * .18} L ${w - p * .12} ${h * .2} L ${w - p * .4} ${h * .35} L ${w - p * .05} ${h * .4} L ${w - p * .35} ${h * .55} L ${w - p * .1} ${h * .68} L ${w - p * .55} ${h - p * .35} L ${w - p} ${h - p * .2} C ${w * .66} ${h} ${w * .3} ${h - p * .65} ${p} ${h - p * .25} L ${p * .25} ${h - p * .6} L ${p * .48} ${h * .75} L ${p * .12} ${h * .7} L ${p * .4} ${h * .5} L ${p * .06} ${h * .4} L ${p * .45} ${h * .25} L ${p * .2} ${p * .6} Z`;
+    if (blend === 'badge')
+        return `M ${w / 2} 0 A ${w / 2} ${h / 2} 0 1 1 ${w / 2 - .001} 0 Z`;
+    if (blend === 'tag' || blend === 'dock')
+        return `M ${r} 0 L ${w - r} 0 Q ${w} 0 ${w} ${r} L ${w} ${h - r} Q ${w} ${h} ${w - r} ${h} L ${r} ${h} Q 0 ${h} 0 ${h - r} L 0 ${r} Q 0 0 ${r} 0 Z`;
+    // Tangents and controls stay in the outer padding band. The straight safe rectangle is contained even at very wide/tall aspect ratios.
+    const path = `M ${p} ${t} C ${w * .28} ${edge === 'top' ? 0 : 0} ${w * .34} ${t + a} ${w * .5} ${t} C ${w * .68} 0 ${w * .8} ${t + a} ${w - p} ${t} Q ${x} ${t} ${x} ${p} C ${edge === 'right' ? w : w - a * 2} ${h * .35} ${w} ${h * .65} ${x} ${h - p} Q ${x} ${b} ${w - p} ${b} C ${w * .72} ${h} ${w * .63} ${b - a} ${w * .5} ${b} C ${w * .3} ${h} ${w * .2} ${b - a} ${p} ${b} Q ${l} ${b} ${l} ${h - p} C 0 ${h * .65} ${edge === 'left' ? 0 : a * 2} ${h * .35} ${l} ${p} Q ${l} ${t} ${p} ${t} Z`;
+    if (!edge)
+        return path;
+    let index = 0;
+    return path.replace(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi, (raw) => { const value = Number(raw), isX = index++ % 2 === 0; if (isX && edge === 'left' && value <= p)
+        return '0'; if (isX && edge === 'right' && value >= w - p)
+        return String(w); if (!isX && edge === 'top' && value <= p)
+        return '0'; if (!isX && edge === 'bottom' && value >= h - p)
+        return String(h); return raw; });
+}
+exports.micaPath = micaPath;
+
+},
+"ReadingComposition":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.hookPosition = exports.hookPoint = exports.snapComposition = exports.CompositionSnap = exports.brushPath = exports.compositionOverflow = exports.CompositionOverflow = exports.compositionPadding = exports.compositionPlacement = exports.compositionPath = exports.compositionSuggestion = exports.isReadingComposition = exports.READING_COMPOSITION_NOTES = exports.READING_COMPOSITION_LABELS = exports.READING_COMPOSITIONS = exports.readingStyles = void 0;
+const CloudReadingGeometry_1 = require("./CloudReadingGeometry");
+const ReadingStylePolicy_1 = require("./ReadingStylePolicy");
+const EdgeAttachment_1 = require("./EdgeAttachment");
+const CardSchema_1 = require("./CardSchema");
+var ReadingStylePolicy_2 = require("./ReadingStylePolicy");
+Object.defineProperty(exports, "readingStyles", { enumerable: true, get: function () { return ReadingStylePolicy_2.readingStyles; } });
+exports.READING_COMPOSITIONS = ['cloud', 'bare', 'badge', 'sticker', 'tag'];
+exports.READING_COMPOSITION_LABELS = ['柔软云朵', '笔触', '徽章', '边缘自适应', '挂钩'];
+exports.READING_COMPOSITION_NOTES = ['圆润云瓣向内容外延展，保留原有字号和缩小下限', '半透明笔触，贴近内容区域', '电量专用圆形徽章', '沿卡片左右边缘滑动，选择内贴合或外贴合', '穿孔挂钩，上沿留出内容避让区'];
+function isReadingComposition(blend) { return exports.READING_COMPOSITIONS.includes(blend); }
+exports.isReadingComposition = isReadingComposition;
+function compositionSuggestion(kind) { return (0, ReadingStylePolicy_1.preferredReadingStyle)(kind); }
+exports.compositionSuggestion = compositionSuggestion;
+/** Smooth fixed-complexity silhouette; generated in native pixel coordinates, no outline scan. */
+function compositionPath(blend, w, h, edge = '') {
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0)
+        return '';
+    if (edge) {
+        const raw = 'M 0 18 C 25 8 31 12 52 9 C 76 1 93 10 96 30 C 100 55 91 79 93 85 C 66 96 45 89 26 95 C 15 94 4 94 0 82 L 0 18 Z';
+        let axis = 0, x = 0;
+        return raw.replace(/-?\d+(?:\.\d+)?/g, (v) => { if (axis++ % 2 === 0) {
+            x = Number(v);
+            return '@';
+        } const y = Number(v), a = edge === 'top' ? 100 - y : edge === 'right' ? 100 - x : edge === 'bottom' ? y : x, b = edge === 'top' ? x : edge === 'right' ? 100 - y : edge === 'bottom' ? 100 - x : y; return String(a * w / 100) + ' ' + String(b * h / 100); }).replace(/@ /g, '');
+    }
+    if (blend === 'space')
+        return `M ${w * .12} ${h * .3} C ${-w * .02} ${h * .03} ${w * .25} ${-h * .04} ${w * .38} ${h * .1} C ${w * .57} ${-h * .05} ${w * .7} ${h * .06} ${w * .74} ${h * .15} C ${w * 1.02} ${h * .05} ${w * 1.05} ${h * .36} ${w * .94} ${h * .49} C ${w * 1.08} ${h * .75} ${w * .83} ${h * 1.02} ${w * .64} ${h * .89} C ${w * .46} ${h * 1.08} ${w * .21} ${h * .99} ${w * .18} ${h * .86} C ${-w * .04} ${h * .94} ${-w * .06} ${h * .52} ${w * .12} ${h * .3} Z`;
+    return `M ${w * .08} ${h * .09} C ${w * .24} ${-h * .03} ${w * .43} ${h * .09} ${w * .6} ${h * .05} C ${w * .81} ${-h * .03} ${w * 1.02} ${h * .07} ${w * .96} ${h * .3} C ${w * .91} ${h * .51} ${w * 1.06} ${h * .72} ${w * .94} ${h * .9} C ${w * .78} ${h * 1.05} ${w * .58} ${h * .91} ${w * .39} ${h * .96} C ${w * .19} ${h * 1.04} ${-w * .01} ${h * .93} ${w * .04} ${h * .73} C ${w * .1} ${h * .5} ${-w * .04} ${h * .28} ${w * .08} ${h * .09} Z`;
+}
+exports.compositionPath = compositionPath;
+/** Layout is persisted once, then edited normally. Never reposition on refresh or tick. */
+function compositionPlacement(card, box, blend) {
+    const out = new CardSchema_1.ElementBox();
+    out.w = box.w;
+    out.h = box.h;
+    out.x = box.x;
+    out.y = box.y;
+    out.opacity = box.opacity;
+    out.rot = box.rot;
+    if (blend === 'space')
+        out.x = -out.w * .3;
+    if (blend === 'dock')
+        out.x = .55;
+    if (blend === 'tag')
+        out.y = Math.min(1 - out.h, .7 - out.h * .5);
+    return out;
+}
+exports.compositionPlacement = compositionPlacement;
+function compositionPadding(blend) { return blend === 'cloud' ? CloudReadingGeometry_1.CLOUD_READING_PADDING : blend === 'space' ? 10 : blend === 'bare' ? 8 : blend === 'sticker' ? 6 : 4; }
+exports.compositionPadding = compositionPadding;
+class CompositionOverflow {
+    constructor() {
+        this.left = 0;
+        this.top = 0;
+        this.right = 0;
+        this.bottom = 0;
+    }
+}
+exports.CompositionOverflow = CompositionOverflow;
+/** Cache fringe includes external attachments, including their rotated corners. */
+function compositionOverflow(card, scale) {
+    const out = new CompositionOverflow();
+    if ((!card.capFree && card.capability?.readingBlend !== 'cloud') || !isReadingComposition(card.capability?.readingBlend ?? ''))
+        return out;
+    const b = card.capability?.readingBlend === 'sticker' ? (0, EdgeAttachment_1.edgeAttachment)(card, card.capBox, card.capability.readingEdge || 'left', card.capability.readingOutside === true).box : card.capBox, w = b.w * card.w, h = b.h * card.h, a = b.rot * Math.PI / 180;
+    const rw = Math.abs(Math.cos(a)) * w + Math.abs(Math.sin(a)) * h, rh = Math.abs(Math.sin(a)) * w + Math.abs(Math.cos(a)) * h;
+    const cx = (b.x + b.w / 2) * card.w, cy = (b.y + b.h / 2) * card.h, fringe = card.capability?.readingBlend === 'cloud' ? CloudReadingGeometry_1.CLOUD_READING_FRINGE : ['tag', 'dock'].includes(card.capability?.readingBlend ?? '') ? 50 : Math.max(w, h) * .06;
+    out.left = Math.max(0, -(cx - rw / 2 - fringe)) * scale;
+    out.top = Math.max(0, -(cy - rh / 2 - fringe)) * scale;
+    out.right = Math.max(0, cx + rw / 2 + fringe - card.w) * scale;
+    out.bottom = Math.max(0, cy + rh / 2 + fringe - card.h) * scale;
+    return out;
+}
+exports.compositionOverflow = compositionOverflow;
+function brushPath() { return 'M 3 26 C 16 11 29 17 41 14 C 57 8 68 21 91 16 L 97 34 L 94 70 C 79 88 67 76 53 86 C 32 90 23 77 5 84 L 8 64 L 2 48 Z'; }
+exports.brushPath = brushPath;
+/** One edge only; no contour walk and no frame-sized arrays. Distances are physical vp. */
+class CompositionSnap {
+    constructor() {
+        this.box = new CardSchema_1.ElementBox();
+        this.edge = '';
+    }
+}
+exports.CompositionSnap = CompositionSnap;
+function snapComposition(box, cardW, cardH, scale, blend, previousEdge = '', boundary = [0, 1, 0, 1]) {
+    const out = new CompositionSnap();
+    out.box.x = box.x;
+    out.box.y = box.y;
+    out.box.w = box.w;
+    out.box.h = box.h;
+    out.box.rot = box.rot;
+    out.box.opacity = box.opacity;
+    if (!['space', 'sticker'].includes(blend) || Math.abs(box.rot) > 3)
+        return out;
+    let best = 6;
+    const candidates = [boundary[0], boundary[1] - box.w, boundary[0] - box.w, boundary[1], boundary[2], boundary[3] - box.h, boundary[2] - box.h, boundary[3]];
+    const edges = ['left', 'right', 'right', 'left', 'top', 'bottom', 'bottom', 'top'];
+    if (previousEdge) {
+        let held = -1, heldDistance = 10;
+        for (let i = 0; i < 8; i++) {
+            const d = Math.abs((i < 4 ? box.x : box.y) - candidates[i]) * (i < 4 ? cardW : cardH) * scale;
+            if (edges[i] === previousEdge && d < heldDistance) {
+                held = i;
+                heldDistance = d;
+            }
+        }
+        if (held >= 0) {
+            out.edge = previousEdge;
+            if (held < 4)
+                out.box.x = candidates[held];
+            else
+                out.box.y = candidates[held];
+            return out;
+        }
+    }
+    for (let i = 0; i < 8; i++) {
+        const distance = Math.abs((i < 4 ? box.x : box.y) - candidates[i]) * (i < 4 ? cardW : cardH) * scale;
+        if (distance < best) {
+            best = distance;
+            out.edge = edges[i];
+            if (i < 4) {
+                out.box.x = candidates[i];
+                out.box.y = box.y;
+            }
+            else {
+                out.box.x = box.x;
+                out.box.y = candidates[i];
+            }
+        }
+    }
+    return out;
+}
+exports.snapComposition = snapComposition;
+/** Hook can be placed anywhere on the upper semicircle, with tiny lift adjustment. */
+function hookPoint(position) { const a = Math.PI + Math.max(0, Math.min(1, position)) * Math.PI; const x = Math.cos(a), y = Math.sin(a); return [.5 + .5 * Math.sign(x) * Math.sqrt(Math.abs(x)), .5 - .5 * Math.sqrt(Math.abs(y))]; }
+exports.hookPoint = hookPoint;
+function hookPosition(x, y) { return Math.max(0, Math.min(1, (Math.atan2(-Math.pow(Math.max(.0001, .5 - y) * 2, 2), Math.sign(x - .5) * Math.pow(Math.abs(x - .5) * 2, 2)) + Math.PI) / Math.PI)); }
+exports.hookPosition = hookPosition;
+
+},
+"EdgeAttachment":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.attachedPath = exports.edgeAttachment = exports.EdgeAttachment = void 0;
+const CapabilityMetrics_1 = require("./CapabilityMetrics");
+const CardSchema_1 = require("./CardSchema");
+const CanvasLayout_1 = require("./CanvasLayout");
+class EdgeAttachment {
+    constructor() {
+        this.box = new CardSchema_1.ElementBox();
+        this.side = 'left';
+        this.outer = false;
+        this.profile = [];
+        this.gutter = 0;
+    }
+}
+exports.EdgeAttachment = EdgeAttachment;
+/** Fixed 25 samples; cached silhouette lookup + interpolation, never scans raw contours during a drag. */
+function edgeAttachment(card, requested, side, outer) {
+    const out = new EdgeAttachment();
+    out.box.x = requested.x;
+    out.box.y = Math.max(0, Math.min(1 - requested.h, requested.y));
+    out.box.w = requested.w;
+    out.box.h = requested.h;
+    out.box.opacity = requested.opacity;
+    out.box.rot = 0;
+    out.side = side === 'right' ? 'right' : 'left';
+    out.outer = outer;
+    const samples = [];
+    for (let i = 0; i <= 24; i++) {
+        const row = new CardSchema_1.ElementBox();
+        row.x = .4;
+        row.w = .2;
+        row.h = 0;
+        row.y = out.box.y + out.box.h * i / 24;
+        const e = (0, CanvasLayout_1.capabilityAttachmentEdges)(card, row);
+        samples.push(out.side === 'left' ? e[0] : e[1]);
+    }
+    const f = (0, CanvasLayout_1.subjectSurfaceFactor)(card);
+    for (let i = 0; i < samples.length; i++)
+        samples[i] = (1 - f) / 2 + samples[i] * f;
+    const low = Math.min(...samples), high = Math.max(...samples);
+    out.gutter = Math.max(0, (high - low) * card.w);
+    out.box.w = (Math.max(requested.w * card.w, (0, CapabilityMetrics_1.capabilityReadableMinimum)(card.capability).w + 12) + out.gutter) / card.w;
+    const attachedLeft = (out.side === 'left') !== outer;
+    out.box.x = attachedLeft ? low : high - out.box.w;
+    out.profile = samples.map(x => (x - out.box.x) / out.box.w);
+    out.gutter = Math.max(0, (high - low) * card.w);
+    return out;
+}
+exports.edgeAttachment = edgeAttachment;
+/** Contact side follows the complete silhouette; the reading rectangle is inset by its entire excursion. */
+function attachedPath(w, h, profile, left, p) {
+    if (profile.length < 2)
+        return '';
+    const xs = profile.map(x => Math.max(0, Math.min(w, x * w)));
+    let path = `M ${left ? w - p : p} 0 L ${xs[0]} 0`;
+    for (let i = 1; i < xs.length; i++)
+        path += ` L ${xs[i]} ${h * i / (xs.length - 1)}`;
+    path += ` L ${left ? w - p : p} ${h} Q ${left ? w : 0} ${h} ${left ? w : 0} ${h - p} L ${left ? w : 0} ${p} Q ${left ? w : 0} 0 ${left ? w - p : p} 0 Z`;
+    return path;
+}
+exports.attachedPath = attachedPath;
+
+},
+"CapabilityMetrics":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.boundedReadoutFont = exports.capabilityContentScale = exports.capabilityReadableMinimum = exports.MIN_CAPABILITY_SCALE = exports.capabilityFits = exports.compactCapability = exports.capabilityMinimum = exports.CapabilitySize = void 0;
+const TimetableLayout_1 = require("./TimetableLayout");
+class CapabilitySize {
+    constructor() {
+        this.w = 112;
+        this.h = 58;
+    }
+}
+exports.CapabilitySize = CapabilitySize;
+/** Full and compact layouts have separate readable minima; neither shrinks to microscopic text. */
+function capabilityMinimum(cap, compact = false, availableWidth = 0) {
+    const size = new CapabilitySize();
+    if (cap === null) {
+        size.w = 0;
+        size.h = 0;
+        return size;
+    }
+    if (cap.k === 'timetable') {
+        const count = cap.timetableMode === 'day' ? (0, TimetableLayout_1.timetableCapacity)(cap) : 1, columns = (0, TimetableLayout_1.briefColumns)(availableWidth);
+        size.w = cap.timetableMode === 'day' ? columns * TimetableLayout_1.LESSON_MIN_WIDTH : compact ? 80 : TimetableLayout_1.LESSON_MIN_WIDTH;
+        size.h = cap.timetableMode === 'day' ? (0, TimetableLayout_1.briefHeight)(count, columns) : (0, TimetableLayout_1.briefHeight)(1, 1);
+        return size;
+    }
+    if (compact) {
+        size.w = 80;
+        size.h = 36;
+        if (cap.k === 'clock') {
+            size.w = 68;
+            size.h = 32;
+        }
+        if (cap.k === 'worldclock') {
+            size.w = 104;
+            size.h = 76;
+        }
+        if (cap.k === 'lunar') {
+            size.w = 112;
+            size.h = 72;
+        }
+        if (cap.k === 'date') {
+            size.w = 64;
+            size.h = 48;
+        }
+        if (cap.k === 'calendar') {
+            size.w = 112;
+            size.h = 62;
+        }
+        if (cap.k === 'countdown' || cap.k === 'anniversary') {
+            const date = new Date((cap.date ?? '') + 'T00:00:00'), days = isNaN(date.getTime()) ? 0 : Math.abs(Math.round((date.getTime() - Date.now()) / 86400000));
+            size.w = Math.max(72, Math.ceil(String(days).length * 9.6 + 32));
+            size.h = 46;
+        }
+        if (cap.k === 'dayprogress' || cap.k === 'yearprogress') {
+            size.w = 72;
+            size.h = 52;
+        }
+        if (cap.k === 'battery') {
+            size.w = 64;
+            size.h = 56;
+        }
+        if (['agenda'].includes(cap.k)) {
+            size.w = 120;
+            size.h = 82;
+        }
+        return size;
+    }
+    if (cap.k === 'worldclock') {
+        size.w = 144;
+        size.h = 112;
+    }
+    if (cap.k === 'lunar') {
+        size.w = 160;
+        size.h = 112;
+    }
+    if (cap.k === 'date') {
+        size.w = 128;
+        size.h = 92;
+    }
+    if (cap.k === 'calendar') {
+        size.w = 168;
+        size.h = 202;
+    }
+    if (cap.k === 'countdown' || cap.k === 'anniversary') {
+        size.w = 144;
+        size.h = 110;
+    }
+    if (cap.k === 'dayprogress' || cap.k === 'yearprogress') {
+        size.w = 132;
+        size.h = 92;
+    }
+    if (cap.k === 'battery') {
+        size.w = 96;
+        size.h = 96;
+    }
+    if (['agenda'].includes(cap.k)) {
+        size.w = 164;
+        size.h = 136;
+    }
+    return size;
+}
+exports.capabilityMinimum = capabilityMinimum;
+function compactCapability(cap, width, height) {
+    const full = capabilityMinimum(cap);
+    return width < full.w - .01 || height < full.h - .01;
+}
+exports.compactCapability = compactCapability;
+function capabilityFits(cap, width, height) {
+    const min = capabilityReadableMinimum(cap, width);
+    return width + .1 >= min.w && height + .1 >= min.h;
+}
+exports.capabilityFits = capabilityFits;
+// Compact typography may adapt by 20%, but never shrink without a readable floor.
+// Keep the nominal metrics for rendering; layout constraints use the same floor.
+exports.MIN_CAPABILITY_SCALE = .8;
+function capabilityReadableMinimum(cap, width = 0) {
+    const min = capabilityMinimum(cap, true, width > 0 ? width / exports.MIN_CAPABILITY_SCALE : 0);
+    min.w *= exports.MIN_CAPABILITY_SCALE;
+    min.h *= exports.MIN_CAPABILITY_SCALE;
+    return min;
+}
+exports.capabilityReadableMinimum = capabilityReadableMinimum;
+function capabilityContentScale(cap, width, height) {
+    const compact = compactCapability(cap, width, height);
+    const min = capabilityMinimum(cap, compact, compact ? width / exports.MIN_CAPABILITY_SCALE : width);
+    return Math.min(2, width / min.w, height / min.h);
+}
+exports.capabilityContentScale = capabilityContentScale;
+/** Fit a fixed-format readout before native layout; TextClock has no single-line adaptive sizing. */
+function boundedReadoutFont(nominal, width, emWidth) {
+    return Math.max(0, Math.min(nominal, width / Math.max(1, emWidth)));
+}
+exports.boundedReadoutFont = boundedReadoutFont;
+
+},
+"TimetableLayout":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.minuteOf = exports.weekLessons = exports.weekStart = exports.WeekLesson = exports.briefHeight = exports.briefColumns = exports.timetableCapacity = exports.BRIEF_HEADER_HEIGHT = exports.LESSON_CELL_HEIGHT = exports.LESSON_MIN_WIDTH = void 0;
+const CapabilityData_1 = require("./CapabilityData");
+exports.LESSON_MIN_WIDTH = 104;
+exports.LESSON_CELL_HEIGHT = 32;
+exports.BRIEF_HEADER_HEIGHT = 18;
+const counts = new Map();
+class CapacityRecord {
+    constructor() {
+        this.semester = '';
+        this.courses = undefined;
+        this.days = undefined;
+        this.changes = undefined;
+        this.holidays = undefined;
+        this.skipHolidays = true;
+        this.count = 1;
+    }
+}
+const identities = new WeakMap();
+function remember(cap, count) {
+    const record = new CapacityRecord();
+    record.semester = cap.semester ?? '';
+    record.courses = cap.courses;
+    record.days = cap.teachingDays;
+    record.changes = cap.courseChanges;
+    record.holidays = cap.holidayDates;
+    record.skipHolidays = cap.skipHolidays !== false;
+    record.count = count;
+    identities.set(cap, record);
+    return count;
+}
+/** Reserve the busiest day across the semester and explicit transfers, not just today's count. */
+function timetableCapacity(cap) {
+    const identity = identities.get(cap);
+    if (identity && identity.semester === (cap.semester ?? '') && identity.courses === cap.courses && identity.days === cap.teachingDays && identity.changes === cap.courseChanges && identity.holidays === cap.holidayDates && identity.skipHolidays === (cap.skipHolidays !== false))
+        return identity.count;
+    const key = JSON.stringify([cap.semester, cap.courses, cap.teachingDays, cap.courseChanges, cap.holidayDates, cap.skipHolidays !== false]);
+    const cached = counts.get(key);
+    if (cached !== undefined)
+        return remember(cap, cached);
+    let maximum = 1;
+    for (let week = 1; week <= 60; week++) {
+        const days = [0, 0, 0, 0, 0, 0, 0];
+        for (const c of cap.courses ?? [])
+            if ((0, CapabilityData_1.courseInWeek)(c, week))
+                days[c.day - 1]++;
+        maximum = Math.max(maximum, ...days);
+    }
+    const dates = (cap.teachingDays ?? []).map((d) => d.date).concat((cap.courseChanges ?? []).map((d) => d.targetDate)).filter((d) => d.length > 0);
+    for (const date of Array.from(new Set(dates)))
+        maximum = Math.max(maximum, (0, CapabilityData_1.coursesOnDay)(cap, new Date(date + 'T12:00:00').getTime()).length);
+    if (counts.size >= 64)
+        counts.clear();
+    counts.set(key, maximum);
+    return remember(cap, maximum);
+}
+exports.timetableCapacity = timetableCapacity;
+function briefColumns(width) { return width >= 312 ? 3 : width >= 208 ? 2 : 1; }
+exports.briefColumns = briefColumns;
+function briefHeight(count, columns) { return exports.BRIEF_HEADER_HEIGHT + Math.ceil(Math.max(1, count) / columns) * exports.LESSON_CELL_HEIGHT; }
+exports.briefHeight = briefHeight;
+class WeekLesson {
+    constructor() {
+        this.event = { id: '', title: '', start: 0, end: 0, location: '', allDay: false };
+        this.day = 1;
+        this.lane = 0;
+        this.lanes = 1;
+    }
+}
+exports.WeekLesson = WeekLesson;
+function weekStart(semester, week) {
+    const start = new Date(semester + 'T12:00:00');
+    start.setDate(start.getDate() + (week - 1) * 7);
+    return start.getTime();
+}
+exports.weekStart = weekStart;
+/** Same effective calendar engine as the widget; overlapping courses get separate lanes. */
+function weekLessons(cap, week) {
+    const start = weekStart(cap.semester ?? '', week);
+    if (isNaN(start))
+        return [];
+    const out = [];
+    for (let day = 1; day <= 7; day++) {
+        const date = new Date(start);
+        date.setDate(date.getDate() + day - 1);
+        const events = (0, CapabilityData_1.coursesOnDay)(cap, date.getTime());
+        let cluster = [], ends = [], clusterEnd = 0;
+        for (const event of events) {
+            if (event.start >= clusterEnd) {
+                for (const item of cluster)
+                    item.lanes = ends.length;
+                cluster = [];
+                ends = [];
+            }
+            let lane = ends.findIndex((end) => end <= event.start);
+            if (lane < 0)
+                lane = ends.length;
+            ends[lane] = event.end;
+            clusterEnd = Math.max(clusterEnd, event.end);
+            const item = new WeekLesson();
+            item.event = event;
+            item.day = day;
+            item.lane = lane;
+            cluster.push(item);
+            out.push(item);
+        }
+        for (const item of cluster)
+            item.lanes = ends.length;
+    }
+    return out;
+}
+exports.weekLessons = weekLessons;
+function minuteOf(time) { const d = new Date(time); return d.getHours() * 60 + d.getMinutes(); }
+exports.minuteOf = minuteOf;
+
+},
+"CapabilityData":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.mergeCapabilityResult = exports.nextDataBoundary = exports.pendingParcels = exports.pickupCandidates = exports.teachingDayLabel = exports.timetableDisplay = exports.TIMETABLE_EVENING = exports.NEXT_LESSON_LEAD = exports.TimetableDisplay = exports.courseInstances = exports.courseInWeek = exports.coursesOnDay = exports.semesterWeek = exports.eventWhen = exports.timeText = exports.agendaItems = exports.needsDataRefresh = exports.capabilityRequestKey = void 0;
+const AlbumRotation_1 = require("./AlbumRotation");
+const TimeCapabilities_1 = require("./TimeCapabilities");
+const ParcelIntake_1 = require("./ParcelIntake");
+const HolidayCalendar_1 = require("./HolidayCalendar");
+function capabilityRequestKey(cap) { return [cap.k, cap.agendaSource ?? ''].join('|'); }
+exports.capabilityRequestKey = capabilityRequestKey;
+function needsDataRefresh(cap, now = Date.now()) {
+    if (cap === null)
+        return false;
+    if (cap.k === 'battery')
+        return true;
+    if (cap.k === 'agenda')
+        return cap.agendaSource === 'system' && now - (cap.attemptedAt ?? 0) >= 15 * 60000;
+    return false;
+}
+exports.needsDataRefresh = needsDataRefresh;
+function agendaItems(cap, now) { return (cap.events ?? []).filter((e) => e.end > now).sort((a, b) => a.start - b.start).slice(0, 3); }
+exports.agendaItems = agendaItems;
+function timeText(time) { const d = new Date(time); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+exports.timeText = timeText;
+function eventWhen(event, now) {
+    const d = new Date(event.start), today = new Date(now), day = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(), t = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    return (day === t ? '今天' : day === t + 86400000 ? '明天' : (d.getMonth() + 1) + '月' + d.getDate() + '日') + ' ' + (event.allDay ? '全天' : timeText(event.start));
+}
+exports.eventWhen = eventWhen;
+function semesterWeek(semester, now) {
+    const start = new Date(semester + 'T00:00:00'), d = new Date(now);
+    if (isNaN(start.getTime()))
+        return 0;
+    // UTC dates avoid DST turning a semester week into 6.96 days.
+    return Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())) / 604800000) + 1;
+}
+exports.semesterWeek = semesterWeek;
+/** All effective lessons for one civil day, including finished lessons (brief/week view). */
+function coursesOnDay(cap, time) {
+    const out = [], key = (0, HolidayCalendar_1.dateKey)(new Date(time));
+    const days = cap.teachingDays ?? [], changes = cap.courseChanges ?? [];
+    const override = days.slice().reverse().find((d) => d.date === key);
+    const movedAway = days.some((d) => d.sourceDate === key && d.date !== key);
+    const holiday = (0, HolidayCalendar_1.holidayName)(new Date(time)).length > 0 || (cap.holidayDates ?? []).some((d) => d.date === key);
+    const sourceKey = override ? override.sourceDate : (movedAway || cap.skipHolidays !== false && holiday ? '' : key);
+    if (sourceKey) {
+        const source = new Date(sourceKey + 'T12:00:00'), week = semesterWeek(cap.semester ?? '', source.getTime()), day = source.getDay() || 7;
+        for (const c of cap.courses ?? []) {
+            if (!courseInWeek(c, week) || c.day !== day || changes.some((change) => change.courseId === c.id && change.date === sourceKey))
+                continue;
+            appendCourse(out, c, key, c.start, c.end, c.room, 'regular');
+        }
+    }
+    if (override?.sourceDate !== '')
+        for (const change of changes) {
+            if (change.targetDate !== key)
+                continue;
+            const c = (cap.courses ?? []).find((item) => item.id === change.courseId);
+            if (!c)
+                continue;
+            const source = new Date(change.date + 'T12:00:00');
+            if ((source.getDay() || 7) !== c.day || !courseInWeek(c, semesterWeek(cap.semester ?? '', source.getTime())))
+                continue;
+            appendCourse(out, c, key, change.start, change.end, change.room, change.id);
+        }
+    return out.sort((a, b) => a.start - b.start || a.end - b.end || a.id.localeCompare(b.id));
+}
+exports.coursesOnDay = coursesOnDay;
+function courseInWeek(c, week) {
+    return week >= c.firstWeek && week <= c.lastWeek && !(c.parity === 1 && week % 2 === 0) && !(c.parity === 2 && week % 2 !== 0);
+}
+exports.courseInWeek = courseInWeek;
+function courseInstances(cap, now) {
+    const out = [], day = new Date(now);
+    day.setHours(12, 0, 0, 0);
+    for (let offset = 0; offset < 14; offset++) {
+        const date = new Date(day.getTime());
+        date.setDate(date.getDate() + offset);
+        out.push(...coursesOnDay(cap, date.getTime()).filter((e) => e.end > now));
+    }
+    return out.sort((a, b) => a.start - b.start).slice(0, 3);
+}
+exports.courseInstances = courseInstances;
+function appendCourse(out, course, date, startText, endText, room, suffix) {
+    const start = new Date(date + 'T' + startText + ':00'), end = new Date(date + 'T' + endText + ':00');
+    out.push({ id: course.id + '_' + date + '_' + suffix, courseId: course.id, title: course.name, start: start.getTime(), end: end.getTime(), location: room, allDay: false });
+}
+class TimetableDisplay {
+    constructor() {
+        this.date = 0;
+        this.heading = '';
+        this.empty = '';
+        this.lessons = [];
+    }
+}
+exports.TimetableDisplay = TimetableDisplay;
+exports.NEXT_LESSON_LEAD = 10 * 60000;
+exports.TIMETABLE_EVENING = 20;
+function timetableDisplay(cap, now) {
+    const out = new TimetableDisplay(), today = new Date(now), tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const lessons = coursesOnDay(cap, now);
+    let nextDay = false;
+    if (cap.timetableMode === 'day') {
+        nextDay = lessons.length > 0 ? lessons.every((e) => e.end <= now) : today.getHours() >= exports.TIMETABLE_EVENING;
+        out.lessons = nextDay ? coursesOnDay(cap, tomorrow.getTime()) : lessons;
+        out.heading = nextDay ? '明日课程' : '今日课程';
+    }
+    else {
+        // Advance at the end-of-class lead time; short lessons remain visible before they begin.
+        out.lessons = lessons.filter((e) => e.start > now || e.end - exports.NEXT_LESSON_LEAD > now).slice(0, 1);
+        if (!out.lessons.length && today.getHours() >= exports.TIMETABLE_EVENING) {
+            out.lessons = coursesOnDay(cap, tomorrow.getTime()).slice(0, 1);
+            nextDay = true;
+        }
+        out.heading = nextDay ? '明日第一课' : out.lessons.length && out.lessons[0].start <= now ? '正在上课' : '下一课';
+    }
+    if (!out.lessons.length && cap.timetableMode !== 'day')
+        out.heading = '课程表';
+    out.date = nextDay ? tomorrow.getTime() : now;
+    const reason = teachingDayLabel(cap, out.date);
+    out.empty = !(cap.courses ?? []).length ? '添加课程表' : reason || (nextDay ? '明日无课' : lessons.length ? lessons.some((e) => e.end > now) ? '本节即将结束' : '今日课程已结束' : '今日无课');
+    return out;
+}
+exports.timetableDisplay = timetableDisplay;
+function teachingDayLabel(cap, now) {
+    const date = new Date(now), key = (0, HolidayCalendar_1.dateKey)(date), rule = (cap.teachingDays ?? []).slice().reverse().find((d) => d.date === key);
+    if (rule)
+        return rule.sourceDate === '' ? '校历停课' : rule.sourceDate === key ? '按校历上课' : '补 ' + rule.sourceDate.slice(5) + ' 的课程';
+    if ((cap.courseChanges ?? []).some((c) => c.targetDate === key))
+        return '单次调课';
+    const name = (cap.holidayDates ?? []).find((d) => d.date === key)?.name || (0, HolidayCalendar_1.holidayName)(date);
+    return cap.skipHolidays !== false && name ? name + ' · 假期' : (cap.teachingDays ?? []).some((d) => d.sourceDate === key && d.date !== key) ? '今日课程已调走' : '';
+}
+exports.teachingDayLabel = teachingDayLabel;
+/** Contextual pickup labels only: do not mistake login verification or an order number for a pickup code. */
+function pickupCandidates(text) { return (0, ParcelIntake_1.parsePickupNotice)(text); }
+exports.pickupCandidates = pickupCandidates;
+function pendingParcels(cap) { return (cap.parcels ?? []).filter((p) => !p.picked); }
+exports.pendingParcels = pendingParcels;
+function nextDataBoundary(cap, now) {
+    if (cap.k === 'album')
+        return (0, AlbumRotation_1.nextAlbumBoundary)(cap, now);
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const events = cap.k === 'agenda' ? agendaItems(cap, now) : cap.k === 'timetable' ? coursesOnDay(cap, now).concat(coursesOnDay(cap, tomorrow.getTime())) : [];
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    const boundaries = events.reduce((all, e) => all.concat([e.start, e.end]), []).filter((t) => t > now);
+    if (cap.k === 'worldclock')
+        boundaries.push((0, TimeCapabilities_1.nextCityBoundary)(cap.zone ?? '', now));
+    if (cap.k === 'lunar')
+        boundaries.push(midnight.getTime());
+    if (cap.k === 'timetable' || cap.k === 'agenda')
+        boundaries.push(midnight.getTime());
+    if (cap.k === 'timetable') {
+        const evening = new Date(now);
+        evening.setHours(exports.TIMETABLE_EVENING, 0, 0, 0);
+        if (evening.getTime() > now)
+            boundaries.push(evening.getTime());
+        if (cap.timetableMode !== 'day')
+            for (const e of events)
+                if (e.end - exports.NEXT_LESSON_LEAD > now)
+                    boundaries.push(e.end - exports.NEXT_LESSON_LEAD);
+    }
+    return boundaries.length ? Math.min(...boundaries) : now + 30 * 60000;
+}
+exports.nextDataBoundary = nextDataBoundary;
+function mergeCapabilityResult(current, result) {
+    const next = JSON.parse(JSON.stringify(current));
+    next.attemptedAt = result.attemptedAt;
+    next.updatedAt = result.updatedAt;
+    next.refreshState = result.refreshState;
+    next.desc = result.desc;
+    if (current.k === 'battery') {
+        next.percent = result.percent;
+        next.charging = result.charging;
+        next.chargeState = result.chargeState;
+    }
+    if (current.k === 'agenda')
+        next.events = result.events;
+    return next;
+}
+exports.mergeCapabilityResult = mergeCapabilityResult;
+
+},
+"ParcelIntake":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.mergePickupParcels = exports.parsePickupNotice = void 0;
+/** Parse only an explicit pickup label. Never infer a code from an unlabelled phone/order/OTP. */
+function parsePickupNotice(text) {
+    const normalized = text.slice(0, 16384).replace(/[０-９]/g, (c) => String(c.charCodeAt(0) - 65296)).replace(/[－—–]/g, '-');
+    const out = [], pattern = /(?:取件码|提货码|取货码|领取码)[\s：:是为【\[(]*([A-Za-z0-9]{1,8}(?:[ -](?=[A-Za-z0-9]*\d)[A-Za-z0-9]{1,8}){0,3})(?![A-Za-z0-9-])/g;
+    let match;
+    while ((match = pattern.exec(normalized)) !== null && out.length < 12) {
+        const code = match[1].trim().replace(/ +/g, '-');
+        if (!/\d/.test(code) || code.length > 24 || /^1[3-9]\d{9}$/.test(code) || /^\d{14,}$/.test(code))
+            continue;
+        const start = Math.max(0, match.index - 80), end = Math.min(normalized.length, match.index + 100);
+        // Search close to the label first; punctuation prevents swallowing an entire notification.
+        const before = normalized.slice(start, match.index).split(/[。；;\n，,]/).reverse();
+        const after = normalized.slice(pattern.lastIndex, end).split(/[。；;\n，,]/);
+        let place = '';
+        for (const part of before.concat(after)) {
+            const location = part.match(/([\u4e00-\u9fffA-Za-z0-9·]{2,32}(?:驿站|快递柜|自提点|服务站))/);
+            if (location) {
+                place = location[1].replace(/^.*(?:请到|请至|前往|已到达|已到|存放于|放在|送至)/, '');
+                break;
+            }
+        }
+        if (!out.some((item) => item.code === code && item.place === place))
+            out.push({ id: 'p' + match.index, code: code, place: place, picked: false });
+    }
+    return out;
+}
+exports.parsePickupNotice = parsePickupNotice;
+function mergePickupParcels(existing, confirmed, fallbackPlace, now) {
+    const result = existing.slice();
+    let index = 0;
+    for (const item of confirmed) {
+        const code = item.code.trim().slice(0, 24), place = (item.place.trim() || fallbackPlace.trim()).slice(0, 80);
+        if (!code || result.some((p) => !p.picked && p.code === code && p.place === place))
+            continue;
+        result.unshift({ id: 'p' + now + '_' + index++, code: code, place: place, picked: false });
+    }
+    // Active records are never silently evicted to make room for new ones.
+    if (result.length > 64)
+        throw new Error('包裹记录已满，请先清理已取记录');
+    return result;
+}
+exports.mergePickupParcels = mergePickupParcels;
+
+},
+"CapabilityPresentation":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.paperReadingRadius = exports.paperReadingInk = exports.paperReadingBackground = exports.READING_PAPER_FILL = exports.READING_PAPER_COLOR = exports.readingHalo = exports.readingVeilColor = exports.readingWarning = exports.readingSurfaceColor = exports.textContrast = exports.readingSurface = exports.summaryPresentation = exports.summaryRowCapacity = exports.SummaryPresentation = void 0;
+const CardSchema_1 = require("./CardSchema");
+/** Stable type hierarchy in card coordinates. Larger cards gain content, not inflated typography. */
+class SummaryPresentation {
+    constructor() {
+        this.heading = '';
+        this.empty = '';
+        this.events = [];
+        this.remaining = 0;
+    }
+}
+exports.SummaryPresentation = SummaryPresentation;
+function summaryRowCapacity(height) {
+    return Math.max(1, Math.min(3, Math.floor((height - 26) / 48)));
+}
+exports.summaryRowCapacity = summaryRowCapacity;
+function summaryPresentation(cap, height, now) {
+    const out = new SummaryPresentation(), capacity = summaryRowCapacity(height);
+    {
+        const all = (cap.events ?? []).filter((event) => event.end > now).slice().sort((a, b) => a.start - b.start);
+        out.heading = '接下来';
+        out.events = all.slice(0, capacity);
+        out.remaining = all.length - out.events.length;
+        out.empty = cap.agendaSource ? '暂无日程' : '尚未添加日程';
+    }
+    return out;
+}
+exports.summaryPresentation = summaryPresentation;
+function readingSurface(cap, photograph, obstructed) {
+    if (cap?.readingBlend === 'bare')
+        return true;
+    if (cap && ['cloud', 'badge', 'sticker', 'space', 'tag', 'dock'].includes(cap.readingBlend ?? ''))
+        return true;
+    return cap !== null && (obstructed || cap.readingStyle === 'surface' || cap.readingStyle !== 'plain' && photograph);
+}
+exports.readingSurface = readingSurface;
+function luminance(color) {
+    const values = [1, 3, 5].map((start) => { const v = parseInt(color.slice(start, start + 2), 16) / 255; return v <= .04045 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); });
+    return values[0] * .2126 + values[1] * .7152 + values[2] * .0722;
+}
+function textContrast(ink, background) {
+    if (!/^#[0-9a-fA-F]{6}$/.test(ink) || !/^#[0-9a-fA-F]{6}$/.test(background))
+        return 1;
+    const a = luminance(ink), b = luminance(background);
+    return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
+}
+exports.textContrast = textContrast;
+function readingSurfaceColor(ink) {
+    const warm = '#F9F6EF', dark = '#252824';
+    const preferred = textContrast(ink, warm) >= textContrast(ink, dark) ? warm : dark;
+    if (textContrast(ink, preferred) >= 4.5)
+        return preferred;
+    return textContrast(ink, '#FFFFFF') >= textContrast(ink, '#000000') ? '#FFFFFF' : '#000000';
+}
+exports.readingSurfaceColor = readingSurfaceColor;
+function readingWarning(card) {
+    if (card.capability === null || readingSurface(card.capability, card.shape === 'subject' && card.subjectPhoto, false))
+        return '';
+    if (card.shape === 'subject' && card.subjectPhoto)
+        return '照片上文字可能不易辨认，可开启阅读衬底';
+    const colors = (0, CardSchema_1.materialColors)(card.material, card.paper, card.ink);
+    return textContrast(colors[1], colors[0]) < 4.5 ? '文字对比度偏低，可启用阅读衬底或调整内容颜色' : '';
+}
+exports.readingWarning = readingWarning;
+/** A transparent field, not a panel. Glyph halos supply local contrast without
+ * replacing the photograph with a nearly opaque rectangular surface. */
+function readingVeilColor(ink, strength, blend = 'feather') {
+    const alpha = Math.round(Math.max(0, Math.min(blend === 'scrim' ? .72 : .42, strength)) * 255);
+    return '#' + alpha.toString(16).padStart(2, '0') + readingSurfaceColor(ink).slice(1);
+}
+exports.readingVeilColor = readingVeilColor;
+function readingHalo(ink, scale, enabled, blend = 'feather') {
+    if (!enabled)
+        return [];
+    const color = '#D9' + readingSurfaceColor(ink).slice(1);
+    return [{ radius: (blend === 'halo' ? 1.1 : .65) * scale, color: color, offsetX: 0, offsetY: 0 },
+        { radius: (blend === 'halo' ? 2.2 : 1.8) * scale, color: color, offsetX: 0, offsetY: 0 }];
+}
+exports.readingHalo = readingHalo;
+/** Translucent tracing paper: one tint layer, static grain, no opaque backing or photo blur. */
+exports.READING_PAPER_COLOR = '#FBF7EE';
+exports.READING_PAPER_FILL = '#80FBF7EE';
+function paperReadingBackground(background) {
+    const alpha = 128 / 255;
+    return '#' + [1, 3, 5].map((i) => Math.round(parseInt(exports.READING_PAPER_COLOR.slice(i, i + 2), 16) * alpha + parseInt(background.slice(i, i + 2), 16) * (1 - alpha)).toString(16).padStart(2, '0')).join('');
+}
+exports.paperReadingBackground = paperReadingBackground;
+function paperReadingInk(ink) { return Math.min(textContrast(ink, paperReadingBackground('#000000')), textContrast(ink, paperReadingBackground('#FFFFFF'))) >= 4.5 ? ink : '#10100C'; }
+exports.paperReadingInk = paperReadingInk;
+function paperReadingRadius(width, height) { return Math.max(0, Math.min(10, Math.min(width, height) * .16)); }
+exports.paperReadingRadius = paperReadingRadius;
+
+},
+"ContourRegistry":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.storePreparedContour = exports.hasPreparedContour = exports.serializeContourCache = exports.restoreContourCache = exports.releaseRenderContours = exports.cardOutline = exports.registerRenderContour = void 0;
+const ContourGeometry_1 = require("./ContourGeometry");
+// Contours belong to immutable image assets, not to the reactive component tree.
+// Keeping one entry per card avoids @Prop cloning thousands of points at every transition.
+const contours = new Map();
+const compacted = new WeakMap();
+function registerRenderContour(card, prepared = false) {
+    if (card.outline.length === 0)
+        return card.renderContourKey;
+    const key = card.id + ':' + card.cutout + ':' + card.subjectVersion;
+    let outline = compacted.get(card.outline);
+    if (outline === undefined) {
+        outline = prepared ? card.outline : (0, ContourGeometry_1.compactContours)(card.outline);
+        compacted.set(card.outline, outline);
+    }
+    contours.set(key, outline);
+    return key;
+}
+exports.registerRenderContour = registerRenderContour;
+function cardOutline(card) {
+    return card.outline.length > 0 ? card.outline : (contours.get(card.renderContourKey) ?? []);
+}
+exports.cardOutline = cardOutline;
+function releaseRenderContours() { contours.clear(); serializedEntries = []; serializedJson = ''; }
+exports.releaseRenderContours = releaseRenderContours;
+class CachedContour {
+    constructor() {
+        this.source = '';
+        this.outline = [];
+    }
+}
+class ContourCache {
+    constructor() {
+        this.version = 1;
+        this.entries = {};
+    }
+}
+class SerializedEntry {
+    constructor() {
+        this.key = '';
+        this.source = [];
+        this.prepared = [];
+    }
+}
+let serializedEntries = [];
+let serializedJson = '';
+const encodedSources = new WeakMap();
+function contourSource(outline) {
+    let source = encodedSources.get(outline);
+    if (source === undefined) {
+        source = JSON.stringify(outline);
+        encodedSources.set(outline, source);
+    }
+    return source;
+}
+function assetKey(card) { return card.cutout ? card.cutout + ':' + card.subjectVersion : card.id; }
+/** Derived geometry is disposable. Exact source matching prevents stale shapes after edits/imports. */
+function restoreContourCache(cards, json) {
+    if (!json || json.length > 8 * 1024 * 1024)
+        return 0;
+    let cache;
+    try {
+        cache = JSON.parse(json);
+    }
+    catch (_) {
+        return 0;
+    }
+    if (cache?.version !== 1 || !cache.entries)
+        return 0;
+    let restored = 0;
+    for (const card of cards) {
+        if (!card.outline.length)
+            continue;
+        const entry = cache.entries[assetKey(card)];
+        if (!entry || entry.source !== contourSource(card.outline) || !Array.isArray(entry.outline) || entry.outline.length !== card.outline.length)
+            continue;
+        let count = 0;
+        const valid = entry.outline.every((loop) => Array.isArray(loop) && loop.length >= 3 && loop.every((p) => {
+            count++;
+            return count <= 65536 && p !== null && p !== undefined && Number.isFinite(p.x) && Number.isFinite(p.y) && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1;
+        }));
+        if (valid) {
+            compacted.set(card.outline, entry.outline);
+            restored++;
+        }
+    }
+    return restored;
+}
+exports.restoreContourCache = restoreContourCache;
+function serializeContourCache(cards) {
+    // Moving/resizing changes placement, never the immutable image contour. Avoid
+    // encoding the same potentially megabyte-sized cache after every gesture.
+    const entries = [];
+    for (const card of cards) {
+        const outline = compacted.get(card.outline);
+        if (outline === undefined || !card.outline.length)
+            continue;
+        const entry = new SerializedEntry();
+        entry.key = assetKey(card);
+        entry.source = card.outline;
+        entry.prepared = outline;
+        entries.push(entry);
+    }
+    if (entries.length === serializedEntries.length && entries.every((entry, index) => {
+        const previous = serializedEntries[index];
+        return entry.key === previous.key && entry.source === previous.source && entry.prepared === previous.prepared;
+    }))
+        return serializedJson;
+    const cache = new ContourCache();
+    for (const item of entries) {
+        const entry = new CachedContour();
+        entry.source = contourSource(item.source);
+        entry.outline = item.prepared;
+        cache.entries[item.key] = entry;
+    }
+    const json = entries.length === 0 ? '' : JSON.stringify(cache);
+    serializedEntries = entries;
+    serializedJson = json.length <= 8 * 1024 * 1024 ? json : '';
+    return serializedJson;
+}
+exports.serializeContourCache = serializeContourCache;
+/** Worker adapter primes this pure registry without platform dependencies. */
+function hasPreparedContour(outline) { return compacted.has(outline); }
+exports.hasPreparedContour = hasPreparedContour;
+function storePreparedContour(outline, prepared) { compacted.set(outline, prepared); }
+exports.storePreparedContour = storePreparedContour;
+
+},
+"ContourGeometry":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.compactContours = exports.compactLoop = void 0;
+function distanceSquared(p, a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y, n = dx * dx + dy * dy;
+    const t = n === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / n));
+    return (p.x - a.x - t * dx) ** 2 + (p.y - a.y - t * dy) ** 2;
+}
+function area(points) {
+    let sum = 0;
+    for (let i = 0; i < points.length; i++) {
+        const a = points[i], b = points[(i + 1) % points.length];
+        sum += a.x * b.y - b.x * a.y;
+    }
+    return sum / 2;
+}
+function orient(a, b, c) { return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x); }
+function crosses(a, b, c, d) {
+    if (Math.max(a.x, b.x) < Math.min(c.x, d.x) || Math.max(c.x, d.x) < Math.min(a.x, b.x) ||
+        Math.max(a.y, b.y) < Math.min(c.y, d.y) || Math.max(c.y, d.y) < Math.min(a.y, b.y))
+        return false;
+    return orient(a, b, c) * orient(a, b, d) < -1e-18 && orient(c, d, a) * orient(c, d, b) < -1e-18;
+}
+function simple(points) {
+    for (let i = 0; i < points.length; i++)
+        for (let j = i + 2; j < points.length; j++) {
+            if (i === 0 && j === points.length - 1)
+                continue;
+            if (crosses(points[i], points[(i + 1) % points.length], points[j], points[(j + 1) % points.length]))
+                return false;
+        }
+    return true;
+}
+/** Closed Douglas-Peucker with a hard maximum deviation, original vertices and preserved winding. */
+function compactLoop(loop, tolerance = .00035) {
+    if (loop.length < 5)
+        return loop;
+    let opposite = 1, far = 0;
+    for (let i = 1; i < loop.length; i++) {
+        const d = (loop[i].x - loop[0].x) ** 2 + (loop[i].y - loop[0].y) ** 2;
+        if (d > far) {
+            far = d;
+            opposite = i;
+        }
+    }
+    const points = loop.concat([loop[0]]), keep = new Uint8Array(points.length);
+    keep[0] = 1;
+    keep[opposite] = 1;
+    keep[loop.length] = 1;
+    // Pin deliberate corners and the paired endpoints of narrow U-turns.
+    for (let i = 0; i < loop.length; i++) {
+        const a = loop[(i + loop.length - 1) % loop.length], p = loop[i], b = loop[(i + 1) % loop.length], c = loop[(i + 2) % loop.length];
+        const ux = p.x - a.x, uy = p.y - a.y, vx = b.x - p.x, vy = b.y - p.y, wx = c.x - b.x, wy = c.y - b.y;
+        const u = Math.hypot(ux, uy), v = Math.hypot(vx, vy), w = Math.hypot(wx, wy);
+        if (u > tolerance * 4 && v > tolerance * 4 && Math.abs(ux * vy - uy * vx) > u * v * .2)
+            keep[i] = 1;
+        if (v < tolerance * 2 && u > tolerance * 4 && w > tolerance * 4 && ux * wx + uy * wy < -.8 * u * w) {
+            keep[i] = 1;
+            keep[(i + 1) % loop.length] = 1;
+        }
+    }
+    const stack = [];
+    let previous = 0;
+    for (let i = 1; i < keep.length; i++)
+        if (keep[i]) {
+            stack.push(previous, i);
+            previous = i;
+        }
+    const limit = tolerance * tolerance;
+    while (stack.length > 0) {
+        const end = stack.pop(), start = stack.pop();
+        let index = -1, maximum = limit;
+        for (let i = start + 1; i < end; i++) {
+            const d = distanceSquared(points[i], points[start], points[end]);
+            if (d > maximum) {
+                maximum = d;
+                index = i;
+            }
+        }
+        if (index >= 0) {
+            keep[index] = 1;
+            stack.push(start, index, index, end);
+        }
+    }
+    const result = loop.filter((_, i) => keep[i] === 1), before = area(loop), after = area(result);
+    if (result.length < 3 || before * after <= 0 || Math.abs(after - before) > Math.abs(before) * .005 || !simple(result)) {
+        return tolerance > .00005 ? compactLoop(loop, tolerance / 2) : loop;
+    }
+    return result;
+}
+exports.compactLoop = compactLoop;
+function contains(loop, p) {
+    let inside = false;
+    for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
+        const a = loop[i], b = loop[j];
+        if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x)
+            inside = !inside;
+    }
+    return inside;
+}
+function compactContours(loops, tolerance = .00035) {
+    const result = loops.map((loop) => compactLoop(loop, tolerance));
+    // Never merge/cross separate parts or hole boundaries.
+    for (let i = 0; i < result.length; i++)
+        for (let j = i + 1; j < result.length; j++) {
+            if (contains(loops[i], loops[j][0]) !== contains(result[i], result[j][0]) || contains(loops[j], loops[i][0]) !== contains(result[j], result[i][0]))
+                return loops;
+            for (let a = 0; a < result[i].length; a++)
+                for (let b = 0; b < result[j].length; b++) {
+                    if (crosses(result[i][a], result[i][(a + 1) % result[i].length], result[j][b], result[j][(b + 1) % result[j].length]))
+                        return loops;
+                }
+        }
+    return result.every((loop, i) => loop === loops[i]) ? loops : result;
+}
+exports.compactContours = compactContours;
+
+},
+"BatteryPresentation":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.batteryPaperArcMask = exports.batteryPaperMask = exports.batteryArcLabel = exports.BatteryArcGlyph = exports.batteryRingPath = exports.batteryTint = exports.batteryStatus = exports.batteryLevel = void 0;
+function batteryLevel(cap) {
+    const n = cap.percent;
+    return typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 100 ? Math.round(n) : -1;
+}
+exports.batteryLevel = batteryLevel;
+function batteryStatus(cap) {
+    if (batteryLevel(cap) < 0)
+        return '等待电量';
+    if (cap.refreshState === 'failed')
+        return '上次读数';
+    if (cap.chargeState === 'full')
+        return '已充满';
+    if (cap.charging)
+        return '充电中';
+    return batteryLevel(cap) <= 20 ? '电量偏低' : '本机电量';
+}
+exports.batteryStatus = batteryStatus;
+function batteryTint(cap, ink) {
+    if (cap.refreshState === 'failed' || batteryLevel(cap) < 0)
+        return ink;
+    if (cap.charging || cap.chargeState === 'full')
+        return '#3B8868';
+    return batteryLevel(cap) <= 20 ? '#C8443D' : ink;
+}
+exports.batteryTint = batteryTint;
+/** A 288° arc leaves the bottom fifth open. Native Path commands use physical pixels; callers convert their vp diameter. */
+function batteryRingPath(diameter, percent = 100) {
+    if (!Number.isFinite(diameter) || diameter <= 0 || !Number.isFinite(percent) || percent <= 0)
+        return '';
+    const center = diameter / 2, radius = diameter * .44, start = 126 * Math.PI / 180;
+    const sweep = 288 * Math.min(100, percent) / 100, end = start + sweep * Math.PI / 180;
+    const x = center + radius * Math.cos(start), y = center + radius * Math.sin(start);
+    return 'M ' + x.toFixed(3) + ' ' + y.toFixed(3) + ' A ' + radius.toFixed(3) + ' ' + radius.toFixed(3) + ' 0 ' + (sweep > 180 ? '1' : '0') + ' 1 ' + (center + radius * Math.cos(end)).toFixed(3) + ' ' + (center + radius * Math.sin(end)).toFixed(3);
+}
+exports.batteryRingPath = batteryRingPath;
+class BatteryArcGlyph {
+    constructor() {
+        this.character = '';
+        this.x = 0;
+        this.y = 0;
+        this.angle = 0;
+    }
+}
+exports.BatteryArcGlyph = BatteryArcGlyph;
+/** Read left to right through the bottom gap, with each glyph tangent to the same circle. */
+function batteryArcLabel(diameter, label, font) {
+    const radius = diameter * .44, advance = font * .62, step = advance / radius;
+    return Array.from(label).map((character, index) => {
+        const point = new BatteryArcGlyph(), offset = (index - (label.length - 1) / 2) * step;
+        point.character = character;
+        point.x = diameter * .5 + radius * Math.sin(offset);
+        point.y = diameter * .5 + radius * Math.cos(offset);
+        point.angle = -offset * 180 / Math.PI;
+        return point;
+    });
+}
+exports.batteryArcLabel = batteryArcLabel;
+/** Opposite winding clips a true annulus; its centre reveals the photograph. */
+function batteryPaperMask(diameter, innerRadius) {
+    if (!Number.isFinite(diameter) || diameter <= 0 || !Number.isFinite(innerRadius))
+        return '';
+    const r = diameter / 2, c = r, inner = Math.max(0, Math.min(r, innerRadius));
+    return 'M ' + (c + r) + ' ' + c + ' A ' + r + ' ' + r + ' 0 1 1 ' + (c - r) + ' ' + c + ' A ' + r + ' ' + r + ' 0 1 1 ' + (c + r) + ' ' + c + ' Z M ' + (c + inner) + ' ' + c + ' A ' + inner + ' ' + inner + ' 0 1 0 ' + (c - inner) + ' ' + c + ' A ' + inner + ' ' + inner + ' 0 1 0 ' + (c + inner) + ' ' + c + ' Z';
+}
+exports.batteryPaperMask = batteryPaperMask;
+/** A rounded annular segment: thin behind the dial, wider only under the numeric gap. */
+function batteryPaperArcMask(diameter, innerRadius, startDegrees, sweepDegrees) {
+    if (!Number.isFinite(diameter) || diameter <= 0 || !Number.isFinite(innerRadius) || !Number.isFinite(startDegrees) || !Number.isFinite(sweepDegrees) || sweepDegrees <= 0)
+        return '';
+    if (sweepDegrees >= 360)
+        return batteryPaperMask(diameter, innerRadius);
+    const r = diameter / 2, c = r, inner = Math.max(0, Math.min(r, innerRadius)), cap = (r - inner) / 2, start = startDegrees * Math.PI / 180, end = (startDegrees + sweepDegrees) * Math.PI / 180;
+    const x0 = c + r * Math.cos(start), y0 = c + r * Math.sin(start), x1 = c + r * Math.cos(end), y1 = c + r * Math.sin(end), xi1 = c + inner * Math.cos(end), yi1 = c + inner * Math.sin(end), xi0 = c + inner * Math.cos(start), yi0 = c + inner * Math.sin(start), large = sweepDegrees > 180 ? 1 : 0;
+    return 'M ' + x0 + ' ' + y0 + ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + x1 + ' ' + y1 + ' A ' + cap + ' ' + cap + ' 0 0 1 ' + xi1 + ' ' + yi1 + ' A ' + inner + ' ' + inner + ' 0 ' + large + ' 0 ' + xi0 + ' ' + yi0 + ' A ' + cap + ' ' + cap + ' 0 0 1 ' + x0 + ' ' + y0 + ' Z';
+}
+exports.batteryPaperArcMask = batteryPaperArcMask;
+
+},
+"MicaMaterialStudy":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.micaStudyPigment = exports.micaStudyTint = exports.micaStudyFill = exports.MICA_STUDY_NOTES = exports.MICA_STUDY_LABELS = void 0;
+/** Read-only study presets. No runtime blur, image decoding, or time-dependent noise. */
+exports.MICA_STUDY_LABELS = ['现有材质', 'A · 轻透云母', 'B · 云白采色', 'C · 奶油采色'];
+exports.MICA_STUDY_NOTES = ['当前正式效果', '轻透基底 · 柔和色晕', '云白透光 · 局部融色', '较低透明度 · 更浓采色'];
+function micaStudyFill(tint, variant) {
+    const source = /^#[0-9a-fA-F]{6}$/.test(tint) ? tint : '#E8D6B0';
+    const index = Math.max(0, Math.min(2, Math.floor(variant) - 1)), ratio = [.16, .42, .72][index], alpha = [.76, .88, .95][index];
+    const white = '#FAF8EF';
+    const cloud = [250, 248, 239], rgb = [1, 3, 5].map((i) => parseInt(source.slice(i, i + 2), 16) * ratio + parseInt(white.slice(i, i + 2), 16) * (1 - ratio));
+    // Dark photographs must not turn the sampled mica into a dark unreadable label.
+    // Test the worst-case black underlay and lift toward cloud white, preserving hue.
+    for (let pass = 0; pass < 12; pass++) {
+        const linear = rgb.map((v) => { const c = v * alpha / 255; return c <= .04045 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4); });
+        const luminance = linear[0] * .2126 + linear[1] * .7152 + linear[2] * .0722;
+        if ((luminance + .05) / .055 >= 4.5)
+            break;
+        for (let i = 0; i < 3; i++)
+            rgb[i] = rgb[i] * .85 + cloud[i] * .15;
+    }
+    return '#' + Math.round(alpha * 255).toString(16).padStart(2, '0') + rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+}
+exports.micaStudyFill = micaStudyFill;
+/** Neutral shadows do not drown out a photograph's coloured subject. */
+function micaStudyTint(swatches) {
+    let best = '', score = -1;
+    for (const swatch of swatches) {
+        const rgb = [1, 3, 5].map((i) => parseInt(swatch.color.slice(i, i + 2), 16) / 255), chroma = Math.max(...rgb) - Math.min(...rgb);
+        if (chroma < .16 || Math.max(...rgb) < .35)
+            continue;
+        const value = swatch.weight * Math.sqrt(chroma);
+        if (value > score) {
+            best = swatch.color;
+            score = value;
+        }
+    }
+    return best || swatches[0]?.color || '#E8D6B0';
+}
+exports.micaStudyTint = micaStudyTint;
+/** Concentrated pigment is restricted to a soft corner pool, away from the white light. */
+function micaStudyPigment(tint, variant, strength = 1) {
+    const source = /^#[0-9a-fA-F]{6}$/.test(tint) ? tint : '#E8D6B0';
+    const alpha = [.16, .28, .42][Math.max(0, Math.min(2, Math.floor(variant) - 1))] * strength;
+    const rgb = [1, 3, 5].map((i) => parseInt(source.slice(i, i + 2), 16));
+    for (let pass = 0; pass < 12; pass++) {
+        const linear = rgb.map((v) => { const c = v / 255; return c <= .04045 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4); });
+        if (linear[0] * .2126 + linear[1] * .7152 + linear[2] * .0722 >= .36)
+            break;
+        for (let i = 0; i < 3; i++)
+            rgb[i] = rgb[i] * .85 + [250, 248, 239][i] * .15;
+    }
+    return '#' + Math.round(alpha * 255).toString(16).padStart(2, '0') + rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+}
+exports.micaStudyPigment = micaStudyPigment;
+
+},
+"PaperTextWidth":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.paperTextWidth = void 0;
+const widths = new Map();
+/** Shared conservative system-font advances in vp. FormKit has no UIContext;
+ * measuring through getUIContext() aborts card construction in its renderer.
+ * Both hosts use this same metric, including digits reserved for changing data. */
+function paperTextWidth(text, font, weight = 400) {
+    const key = font + ':' + weight + ':' + text, cached = widths.get(key);
+    if (cached !== undefined)
+        return cached;
+    let em = 0;
+    for (const char of text) {
+        const cp = char.codePointAt(0) ?? 0;
+        if (cp >= 0x2E80)
+            em += 1;
+        else if (/[0-9]/.test(char))
+            em += .63;
+        else if (/[ilI.,:;'!|]/.test(char))
+            em += .3;
+        else if (/[MW@%]/.test(char))
+            em += .92;
+        else if (/\s/.test(char))
+            em += .32;
+        else
+            em += .62;
+    }
+    const width = Math.ceil(em * font * (weight >= 500 ? 1.025 : 1));
+    if (widths.size >= 256)
+        widths.clear();
+    widths.set(key, width);
+    return width;
+}
+exports.paperTextWidth = paperTextWidth;
+
+},
+"CapabilityCalendar":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.progressOf = exports.calendarCells = exports.daysLeftOf = void 0;
+/** Shared local-only readout data. Native and independent preview use the same calculations. */
+function daysLeftOf(date, tick = Date.now()) {
+    const target = new Date(date + 'T00:00:00'), now = new Date(tick);
+    return isNaN(target.getTime()) ? 0 : Math.round((target.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000);
+}
+exports.daysLeftOf = daysLeftOf;
+function calendarCells(now) {
+    const first = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
+    const count = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < Math.ceil((first + count) / 7) * 7; i++)
+        cells.push(i >= first && i < first + count ? i - first + 1 : 0);
+    return cells;
+}
+exports.calendarCells = calendarCells;
+function progressOf(k, now) {
+    if (k === 'dayprogress')
+        return (now.getHours() * 60 + now.getMinutes()) / 1440;
+    const start = new Date(now.getFullYear(), 0, 1), end = new Date(now.getFullYear() + 1, 0, 1);
+    return (now.getTime() - start.getTime()) / (end.getTime() - start.getTime());
+}
+exports.progressOf = progressOf;
+
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"75f9cf118598c3a57ddd22767477c25d20dbfe5980ec3ef3e8e29e9a631dbefd"};})(globalThis);
