@@ -38,12 +38,12 @@ const nativeViews=['CardFace','CardCanvas','CapBlockView','ReadingBacking','Read
 const schemaSource=modules.get('CardSchema').source;
 function fields(declaration){const body=schemaSource.split(declaration)[1]?.split('\n}')[0];if(!body)throw Error('Authoring declaration changed: '+declaration);return [...body.matchAll(/^\s*([a-zA-Z][\w]*)\??\s*:/gm)].map(match=>match[1]);}
 const contract={
- contractVersion:1,skillContractVersion:2,app:JSON.parse(fs.readFileSync(path.join(repository,'AppScope/app.json5'),'utf8')).app,
- package:{format:'fridgememo-template',version:1,schemaVersion:2,kinds:['card','canvas'],htmlSupported:false},
+ contractVersion:1,skillContractVersion:3,app:JSON.parse(fs.readFileSync(path.join(repository,'AppScope/app.json5'),'utf8')).app,
+ package:{format:'fridgememo-template',version:2,readVersions:[1,2],schemaVersion:2,kinds:['card','canvas'],htmlSupported:true,htmlMode:'static-source-and-cache/native-capability',htmlTemplateVersion:1},
  identity:{models:fingerprint,materials:crypto.createHash('sha256').update(materialBundle).digest('hex'),browserAdapter:hashFiles(['previewer/renderer.js','previewer/capabilities.js']),nativeViews:hashFiles(nativeViews.map(name=>'entry/src/main/ets/views/'+name+'.ets'))},
  coordinates:{boardWidth:schema.BOARD_W,legacyPositionHeight:schema.BOARD_H,cardSizeUnits:'board_width',elementUnits:'card_fraction',rotationUnits:'degrees'},
  limits:{canvasCards:context.FridgeCore.load('CanvasCapacity').CANVAS_CARD_LIMIT},
- design:{binding:'current-host',persistedProfileField:false,rectRadius:schema.RECT_CORNER_RADIUS,album:{inset:schema.ALBUM_INSET,coverRadius:schema.ALBUM_CORNER_RADIUS,cardRadius:schema.ALBUM_CARD_CORNER_RADIUS,squareCover:true}},
+ design:{binding:'current-host',persistedProfileField:false,rectRadius:schema.RECT_CORNER_RADIUS,album:{presentations:['cover','classic','row'],inset:schema.ALBUM_INSET,coverRadius:schema.ALBUM_CORNER_RADIUS,cardRadius:schema.ALBUM_CARD_CORNER_RADIUS,squareCover:true}},
  capabilities:Array.from(schema.CAPABILITIES,kind=>({kind,readingStyles:Array.from(policy.readingStyles(kind)),legacyDefault:policy.defaultReadingStyle(kind),preferredStyle:policy.preferredReadingStyle(kind)})),
  fields:{state:fields('export class FridgeState {'),card:fields('export class FridgeCard {'),capability:fields('export interface CapBlock {'),element:[...fields('export class ElementBox {'),...fields('export class CanvasElement extends ElementBox {')]},
  retiredCapabilityFields:['url','field','sourceConfigured','parcels','parcelPlace','temp','desc'],

@@ -32,6 +32,7 @@ function validate(json) {
   if (!Array.isArray(raw.state.cards)) throw Error('cards must be an array');
   for (const c of raw.state.cards) {
     known(c, fields(source, 'export class FridgeCard {'), 'card');
+    if(c.html)known(c.html,new Set(['version','designVersion','width','height','source','previewElementId']),'html');
     if (c.caps !== undefined) throw Error('Legacy caps are not authored in schema 2');
     addID(c.id);
     if (c.groupId) groups.set(c.groupId, (groups.get(c.groupId) || 0) + 1);
@@ -73,7 +74,7 @@ if (require.main === module) {
   try {
     if (process.argv.length !== 3) throw Error('Usage: node scripts/fridge-package-check.cjs /absolute/path/work.fridge');
     const result = validate(fs.readFileSync(process.argv[2], 'utf8'));
-    console.log('PASS current v1 reader + authoring checks: ' + JSON.stringify(result));
+    console.log('PASS current v1/v2 reader + authoring checks: ' + JSON.stringify(result));
     console.log('Visual rendering, media decoding, permissions and Form behavior still require app verification.');
   } catch (error) { console.error(error.message); process.exitCode=1; }
 }

@@ -30,6 +30,7 @@ export default class EntryAbility extends UIAbility {
       const source = want.parameters?.['previewFile'];
       AppStorage.setOrCreate('previewFile', typeof source === 'string' ? source : '');
       AppStorage.setOrCreate('previewCapture', want.parameters?.['previewCapture'] === 'yes');
+      AppStorage.setOrCreate('previewTransparent', want.parameters?.['previewTransparent'] === 'yes');
     }
   }
 

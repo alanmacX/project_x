@@ -1,6 +1,6 @@
 ---
 name: fridge-create
-description: Generate or refine editable offline 冰箱贴 .fridge card or canvas packages, following the app’s capability and design contracts. Use for requests to create 冰箱贴 works or HTML card drafts; not for generic websites or app source changes.
+description: Generate or refine editable offline 冰箱贴 .fridge card or canvas packages, following the app’s capability and design contracts. Use for requests to create 冰箱贴 works or static HTML cards; not for generic websites or app source changes.
 ---
 
 # Fridge Create
@@ -13,7 +13,7 @@ Read [current-format.md](references/current-format.md) before writing any packag
 
 Read the generated [design-contract.json](references/design-contract.json) first. It records the app version, supported capabilities/fields, current design tokens and identities for production models, materials and both renderers. In the app repository run `node previewer/build.cjs --check`; stale generated artifacts must be rebuilt and reviewed before authoring. App marketing version alone is insufficient during pre-release polishing: compare the implementation identities as well. Contract version 1 has no persisted design profile in a .fridge; do not invent one. See [upgrades.md](references/upgrades.md) when a release or design changes.
 
-The shipped reader supports only `fridgememo-template`, version 1, `card`/`canvas`, state schema 2. HTML templates are not implemented. Never place invented `html`, `slots`, providers or script assets in a v1 `.fridge` and claim it works. For an HTML request, deliver clearly labelled `.draft.json` and a local HTML prototype, explain that integration is pending, and follow [html-draft.md](references/html-draft.md). Do not downgrade HTML silently into an image or native approximation.
+The shipped reader supports `fridgememo-template` versions 1 and 2, `card`/`canvas`, state schema 2. Native-only packages remain v1. Static HTML cards use v2: preserve HTML source, a local image-layer cache, and at most one native capability. Read [html-draft.md](references/html-draft.md) for the supported workflow and limits. Arbitrary scripts, dynamic DOM and network providers are unsupported. Never claim the cache is live HTML, or discard the source to flatten a work.
 
 ## Creative direction and assets
 

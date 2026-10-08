@@ -1,3 +1,4 @@
+import { HtmlCardTemplate, normalizeHtmlCard } from './HtmlCardTemplate';
 import { COMPOSITION_KEYS, validReadingStyle, defaultReadingStyle } from './ReadingStylePolicy';
 import { SceneRule, SavedSceneLayout, normalizeSceneLayouts, normalizeSceneRules } from './SceneScheduleSchema';
 import { clockZone } from './TimeCapabilities';
@@ -111,6 +112,7 @@ export class CanvasElement extends ElementBox {
 }
 export interface ShapePoint { x: number; y: number; }
 export class FridgeCard {
+  html?: HtmlCardTemplate;
   groupId: string = '';
   id: string = '';
   x: number = 24;
@@ -244,7 +246,7 @@ export function normalizeState(raw: FridgeState): FridgeState {
   state.maxZ = bounded(raw.maxZ, 0, Number.MAX_SAFE_INTEGER, 10);
   for (const source of (Array.isArray(raw.cards) ? raw.cards : [])) {
     if (source === null || typeof source.id !== 'string') continue;
-    const card = new FridgeCard(); card.id = source.id; card.groupId = typeof source.groupId === 'string' ? source.groupId.slice(0, 96) : '';
+    const card = new FridgeCard(); if(source.html!==undefined)card.html=normalizeHtmlCard(source.html); card.id = source.id; card.groupId = typeof source.groupId === 'string' ? source.groupId.slice(0, 96) : '';
     card.w = bounded(source.w, source.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE, 320, 180); card.h = bounded(source.h, source.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE, 420, 180);
     // Validate finite coordinates here. Rotated/host-aware recovery belongs to
     // the whole canvas, where grouping and the actual aspect are available.

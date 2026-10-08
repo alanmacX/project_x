@@ -1,6 +1,7 @@
+import { validateHtmlCard } from './HtmlCardTemplate';
 import { FridgeState, FridgeCard, normalizeState, defaultState, BOARD_W, BOARD_H } from './CardSchema';
 import { assertCanvasCapacity } from './CanvasCapacity';
-export interface TemplateSummary { kind: string; count: number; images: number; }
+export interface TemplateSummary { version:number; kind: string; count: number; images: number; }
 export interface TemplateAsset { key: string; extension: string; data: string; }
 export interface TemplatePackage { format: string; version: number; kind: string; state: FridgeState; assets: TemplateAsset[]; }
 export function packageScene(json: string, cardId: string): TemplatePackage {
@@ -8,13 +9,21 @@ export function packageScene(json: string, cardId: string): TemplatePackage {
   if(cardId.length>0){state.cards=state.cards.filter((c:FridgeCard)=>c.id===cardId);if(state.cards.length!==1)throw new Error('卡片不存在');state.cards[0].groupId='';state.sceneLayouts=[];state.sceneRules=[];state.sceneBaseLayoutId='';state.background=defaultState().background;}
   state.canvasId='canvas_main';
   for(const card of state.cards){const cap=card.capability;if(cap?.k==='battery'){cap.percent=-1;cap.charging=false;cap.chargeState='';cap.updatedAt=0;cap.attemptedAt=0;}if(cap?.k==='agenda'&&cap.agendaSource==='system'){cap.events=[];cap.updatedAt=0;cap.attemptedAt=0;}}
-  return {format:'fridgememo-template',version:1,kind:cardId.length>0?'card':'canvas',state:state,assets:[]};
+  return {format:'fridgememo-template',version:state.cards.some((c:FridgeCard)=>c.html!==undefined)?2:1,kind:cardId.length>0?'card':'canvas',state:state,assets:[]};
 }
 export function readPackage(json: string): TemplatePackage {
   if(json.length>90*1024*1024)throw new Error('作品包超过大小限制');
   const raw=JSON.parse(json) as TemplatePackage;
-  if(raw.format!=='fridgememo-template'||raw.version!==1||!['card','canvas'].includes(raw.kind)||raw.state?.schemaVersion!==2||!Array.isArray(raw.state?.cards)||raw.state.cards.length>128||!Array.isArray(raw.assets)||raw.assets.length>256)throw new Error('不是支持的作品包');
+  if(raw.format!=='fridgememo-template'||![1,2].includes(raw.version)||!['card','canvas'].includes(raw.kind)||raw.state?.schemaVersion!==2||!Array.isArray(raw.state?.cards)||raw.state.cards.length>128||!Array.isArray(raw.assets)||raw.assets.length>256)throw new Error('不是支持的作品包');
   assertCanvasCapacity(0, raw.state.cards.length);
+  for(const card of raw.state.cards) {
+    if(card.html!==undefined) {
+      if(raw.version!==2)throw new Error('HTML 卡片需要 v2 作品包');
+      validateHtmlCard(card.html);
+      const layer=(card.elements??[]).find(el=>el.id===card.html!.previewElementId);
+      if(!layer||layer.kind!=='image'||layer.animated===true||!layer.src||card.capability?.k==='album')throw new Error('HTML 卡片渲染缓存或原生能力绑定无效');
+    }
+  }
   if(raw.kind==='card'&&raw.state.cards.length!==1)throw new Error('卡片包内容不完整');
   const keys:string[]=[];for(const a of raw.assets){if(typeof a.key!=='string'||keys.includes(a.key)||!/^asset:\/\/\d+$/.test(a.key)||!/^\.(png|jpg|jpeg|gif|webp)$/.test(a.extension)||typeof a.data!=='string'||a.data.length>32*1024*1024)throw new Error('作品图片无效');keys.push(a.key);}
   const refs:string[]=[raw.state.background?.src??'',raw.state.background?.photo??''];
@@ -35,7 +44,7 @@ export function readPackage(json: string): TemplatePackage {
 /** Remap every identifier; importing twice never aliases a card, element or group. */
 export function importedCards(state:FridgeState,newId:()=>string):FridgeCard[]{
   const cards=normalizeState(JSON.parse(JSON.stringify(state)) as FridgeState).cards,groups=new Map<string,string>();
-  for(const c of cards){c.id=newId();if(c.groupId.length>0){if(!groups.has(c.groupId))groups.set(c.groupId,newId());c.groupId=groups.get(c.groupId)??'';}c.elements.forEach(el=>{el.id=newId();});c.renderContourKey='';}
+  for(const c of cards){c.id=newId();if(c.groupId.length>0){if(!groups.has(c.groupId))groups.set(c.groupId,newId());c.groupId=groups.get(c.groupId)??'';}c.elements.forEach(el=>{const old=el.id;el.id=newId();if(c.html?.previewElementId===old)c.html.previewElementId=el.id;});c.renderContourKey='';}
   return cards;
 }
 

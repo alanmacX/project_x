@@ -58,3 +58,7 @@ Reading blends cloud/bare/tag/sticker work for ordinary capabilities. Battery ad
 Each asset is {key:`asset://0`, extension:`.png`, data:Base64}. Keys are unique numeric IDs. Only png/jpg/jpeg/gif/webp extensions. Use actual image bytes; fake signatures or SVG pretending to be PNG are invalid artwork even if JSON parsing succeeds. Every nonempty cutout, element src, background src/photo and album image ref must resolve to an embedded asset. Never embed file://, HTTP URLs or credentials in a package.
 
 Current reader limits package text to 90MiB, assets to 256, individual asset Base64 to 32MiB, and canvas cards to 16. These are hard limits, not generation targets; keep works small. HTML/CSS/SVG/font resources are NOT supported package assets yet.
+
+## Static HTML cards (container v2)
+
+Use container version 2 only when a card has `html`. Native-only v1 works keep importing. The card stores `{version:1,designVersion:1,width,height,source,previewElementId}`; its referenced image element embeds the appearance cache as a normal local asset. IDs must be remapped together. App editing changes normal layers/capability/layout; changing HTML source requires regenerating its cache with the authoring workflow. HTML is not a new provider and never runs in desktop Forms. See html-draft.md.

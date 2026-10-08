@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "skillContractVersion": 2,
+  "skillContractVersion": 3,
   "app": {
     "bundleName": "com.fridgewidget.app",
     "vendor": "fridgememo",
@@ -11,16 +11,22 @@
   },
   "package": {
     "format": "fridgememo-template",
-    "version": 1,
+    "version": 2,
+    "readVersions": [
+      1,
+      2
+    ],
     "schemaVersion": 2,
     "kinds": [
       "card",
       "canvas"
     ],
-    "htmlSupported": false
+    "htmlSupported": true,
+    "htmlMode": "static-source-and-cache/native-capability",
+    "htmlTemplateVersion": 1
   },
   "identity": {
-    "models": "221042a56f5ddff76da48e0f3b86062ceba153d25749848466829a7f798d5298",
+    "models": "15bb4091ed0c04c39b0ab89dbe06338fb8045e798abddfead749c8dc72d77b54",
     "materials": "bdf4f906c73c835bcd5ac3a0b61f4c15b3c3ae4ca76a76794b74a96c72b56374",
     "browserAdapter": "69855240dcf6eb70391e34638614662b3f2b6b606e274d1ee5e1eb2df4292f3d",
     "nativeViews": "af5931b008b523c7aa0fe7572865ac2cc1a51ff820f8c5748e8c2d0dd6ab5e6a"
@@ -40,6 +46,11 @@
     "persistedProfileField": false,
     "rectRadius": 16,
     "album": {
+      "presentations": [
+        "cover",
+        "classic",
+        "row"
+      ],
       "inset": 4.9,
       "coverRadius": 14,
       "cardRadius": 20,
@@ -203,6 +214,7 @@
       "cards"
     ],
     "card": [
+      "html",
       "groupId",
       "id",
       "x",

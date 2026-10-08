@@ -3,7 +3,7 @@ import { picker, fileIo } from '@kit.CoreFileKit';
 import { taskpool } from '@kit.ArkTS';
 import { image } from '@kit.ImageKit';
 import { FridgeCard, FridgeState, defaultState, BOARD_W, BOARD_H } from '../model/CardSchema';
-import { loadPreviewPackage, clearPreviewPackage } from '../model/FridgePreviewWorker';
+import { loadPreviewPackage, clearPreviewPackage, PreviewPackageResult } from '../model/FridgePreviewWorker';
 import { primeRenderContours } from '../model/RenderContours';
 import { prepareSubjectDepth } from '../model/SubjectDepthCache';
 import { CardFace } from '../views/CardFace';
@@ -23,8 +23,10 @@ struct FridgePreviewer {
  @State pageWidth:number=390;
  @State sizeIndex:number=1;
  @State loaded:boolean=false;
+ @State transparentDemo:boolean=false;
  @State busy:boolean=false;
  @State status:string='选择 .fridge 文件，在相同原生渲染器中预览';
+ private packageVersion:number=1;
  private tick:number=1791429300000;
  private generation:number=0;
  private autoCapture:boolean=false;
@@ -35,6 +37,7 @@ struct FridgePreviewer {
  aboutToAppear():void {
   const path=AppStorage.get<string>('previewFile')??'';AppStorage.delete('previewFile');
   this.autoCapture=AppStorage.get<boolean>('previewCapture')===true;AppStorage.delete('previewCapture');
+  this.transparentDemo=AppStorage.get<boolean>('previewTransparent')===true;AppStorage.delete('previewTransparent');
   if(/^qa_[A-Za-z0-9_-]+\.fridge$/.test(path)){this.load('file://'+this.ctx().cacheDir+'/'+path);return;}
   if(path.startsWith(this.ctx().cacheDir+'/')){const name=path.slice(this.ctx().cacheDir.length+1);if(/^qa_[A-Za-z0-9_-]+\.fridge$/.test(name))this.load('file://'+this.ctx().cacheDir+'/'+name);}
  }
@@ -53,7 +56,7 @@ struct FridgePreviewer {
    const json=await taskpool.execute(new taskpool.Task(loadPreviewPackage,uri,this.ctx().cacheDir,revision)) as string;
    if(!this.alive||token!==this.generation){taskpool.execute(new taskpool.Task(clearPreviewPackage,this.ctx().cacheDir,revision));return;}
    this.completed.push(revision);
-   const scene=JSON.parse(json) as FridgeState;scene.cards.sort((a,b)=>a.z-b.z);
+   const result=JSON.parse(json) as PreviewPackageResult;this.packageVersion=result.version;const scene=JSON.parse(result.json) as FridgeState;scene.cards.sort((a,b)=>a.z-b.z);
    await primeRenderContours(scene.cards,json);
    await prepareSubjectDepth(scene.cards,this.boardScale(),this.ctx().cacheDir,this.getUIContext().vp2px(1));
    if(!this.alive||token!==this.generation)return;
@@ -71,7 +74,7 @@ struct FridgePreviewer {
    file=fileIo.openSync(base+'.png',fileIo.OpenMode.CREATE|fileIo.OpenMode.READ_WRITE|fileIo.OpenMode.TRUNC);
    await packer.packToFile(pixel,file.fd,{format:'image/png',quality:100});
    const app=await bundleManager.getBundleInfoForSelf(bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT);
-   const report=JSON.stringify({previewVersion:1,sourceFingerprint:PREVIEW_DESIGN_FINGERPRINT,appVersion:app.versionName,appVersionCode:app.versionCode,renderer:'CardFace/CanvasBackdrop',packageVersion:1,schemaVersion:this.scene.schemaVersion,canvasAspect:this.scene.canvasAspect,widthVp:this.boardWidth(),heightVp:this.boardHeight(),tick:this.tick,cards:this.scene.cards.length,host:'app',clockMode:'system-live',actualFormVerified:false},null,2);
+   const report=JSON.stringify({previewVersion:1,sourceFingerprint:PREVIEW_DESIGN_FINGERPRINT,appVersion:app.versionName,appVersionCode:app.versionCode,renderer:this.transparentDemo?'CardFace (transparent application demo)':'CardFace/CanvasBackdrop',transparentDemo:this.transparentDemo,packageVersion:this.packageVersion,schemaVersion:this.scene.schemaVersion,canvasAspect:this.scene.canvasAspect,widthVp:this.boardWidth(),heightVp:this.boardHeight(),tick:this.tick,cards:this.scene.cards.length,host:'app',clockMode:'system-live',actualFormVerified:false},null,2);
    const out=fileIo.openSync(base+'.json',fileIo.OpenMode.CREATE|fileIo.OpenMode.READ_WRITE|fileIo.OpenMode.TRUNC);
    try{fileIo.writeSync(out.fd,report);}finally{fileIo.closeSync(out.fd);}
    this.status='已导出 PNG 和验收元数据到缓存目录';
@@ -80,7 +83,7 @@ struct FridgePreviewer {
  }
  @Builder artwork() {
   Stack({alignContent:Alignment.TopStart}) {
-   CanvasBackdrop({sceneBackground:this.scene.background})
+   if(!this.transparentDemo){CanvasBackdrop({sceneBackground:this.scene.background})}
    ForEach(this.scene.cards,(c:FridgeCard)=>{
     CardFace({card:c,scaleFactor:this.boardScale(),tick:this.tick})
      .width(c.w*this.boardScale()).height(c.h*this.boardScale())

@@ -31,6 +31,8 @@ export async function prepareWidgetPayload(json: string, contourCache: string = 
   try {const parsed=JSON.parse(contourCache) as Record<string,Object>;if(parsed.version===1 && parsed.entries)cache=parsed.entries as Record<string,Object>;}catch(_){}
   try {
     for (const card of state.cards) {
+      // Form only needs the appearance image and native data, never the HTML authoring source.
+      card.html=undefined;
       const key=card.cutout?card.cutout+':'+card.subjectVersion:card.id;
       const entry=cache[key] as Record<string,Object>;
       const cached=entry?.outline as ShapePoint[][];

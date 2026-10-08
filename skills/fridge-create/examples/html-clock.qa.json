@@ -1,0 +1,54 @@
+{
+  "packageChecksum": "2541cbca339120fbb5488e1a71c098bfabe4f9d266d25e489e218a814c0ae6d2",
+  "designContract": {
+    "contractVersion": 1,
+    "skillContractVersion": 3,
+    "identity": {
+      "models": "15bb4091ed0c04c39b0ab89dbe06338fb8045e798abddfead749c8dc72d77b54",
+      "materials": "bdf4f906c73c835bcd5ac3a0b61f4c15b3c3ae4ca76a76794b74a96c72b56374",
+      "browserAdapter": "69855240dcf6eb70391e34638614662b3f2b6b606e274d1ee5e1eb2df4292f3d",
+      "nativeViews": "af5931b008b523c7aa0fe7572865ac2cc1a51ff820f8c5748e8c2d0dd6ab5e6a"
+    }
+  },
+  "packageVersion": 2,
+  "htmlTemplateVersion": 1,
+  "sourcePreserved": true,
+  "localCachedAppearance": true,
+  "nativeCapability": "clock",
+  "validation": [
+    "production package reader",
+    "v1 compatibility",
+    "HTML save/export/materialize round trip",
+    "duplicate/import reference remap",
+    "desktop payload omits source",
+    "unsafe/future input rejection",
+    "album classic/row geometry and multiline truncation"
+  ],
+  "nativePreview": {
+    "previewVersion": 1,
+    "sourceFingerprint": "15bb4091ed0c04c39b0ab89dbe06338fb8045e798abddfead749c8dc72d77b54",
+    "appVersion": "1.0.0",
+    "appVersionCode": 1000000,
+    "renderer": "CardFace/CanvasBackdrop",
+    "transparentDemo": false,
+    "packageVersion": 2,
+    "schemaVersion": 2,
+    "canvasAspect": 1,
+    "widthVp": 300,
+    "heightVp": 300,
+    "tick": 1791429300000,
+    "cards": 1,
+    "host": "app",
+    "clockMode": "system-live",
+    "actualFormVerified": false
+  },
+  "screenshot": "html-clock/native-preview.png",
+  "visualReview": "passed for the supplied sample",
+  "actualFormVerified": false,
+  "pixelParityVerified": false,
+  "limitations": [
+    "Static HTML appearance; no live user JavaScript or network",
+    "Source editing and rerendering use offline authoring tool; App edits normal layers/capability/layout",
+    "Clock in native QA is system-live; browser time is a fixed preview value"
+  ]
+}

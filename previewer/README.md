@@ -67,3 +67,5 @@ const layers = FridgeWeb.renderLayers(pack, 900, fixedTick, {namespace: 'profile
 [subject-tool.html](subject-tool.html) 是独立离线作者工具，导入已透明的 PNG，读取原始 alpha，用生产 SubjectGeometry.traceMask 输出轮廓；保留 PNG 字节、孔洞与完整坐标空间。支持原创异形底板以及真实照片/插画主体。导出包含素材 asset、cardFields、源文件校验和、透明边界/碎片诊断的辅助 JSON，供作者组装 `.fridge`；不是成品文件，也不做 AI 分割或修改图片。
 
 大留白先裁紧源图并重新提取，不能单改轮廓；不要对照片编造 polygon。异常碎片在建立轮廓图之前限流，1024px 长边/24MB 及当前轮廓限制用于避免准备工具卡死。真实输入和整张作品仍要目视检查。主题创作的素材搜寻、原创生成和异形组合方法见 skill 的 art-direction.md；下载来源、使用范围与加工过程放在作品旁的 `.sources.json`，不塞进 v1 包。
+
+HTML card：v2 作品包携带静态 HTML 源码和 image 图层缓存，预览器与 ArkUI/Form 使用同一个缓存，源码不执行。支持一个原生能力；网页脚本、网络和动态 DOM 不支持。源文件的重新渲染由离线创作工具完成，App 内可编辑图层、能力及整卡布局。

@@ -13,7 +13,7 @@ export async function exportTemplate(json:string,cardId:string,filesDir:string,c
   pack.state.background.signature='';pack.state.cards.forEach((c:FridgeCard)=>{c.renderContourKey='';});
   const path=cacheDir+'/'+(cardId.length>0?'卡片':'画布')+'_'+Date.now()+'.fridge';writeBytes(path,new util.TextEncoder().encodeInto(JSON.stringify(pack)));return path;
 }
-export async function inspectTemplate(uri:string):Promise<string>{const p=readPackage(new util.TextDecoder().decodeWithStream(readBytes(uri,90*1024*1024)));const summary:TemplateSummary={kind:p.kind,count:p.state.cards.length,images:p.assets.length};return JSON.stringify(summary);}
+export async function inspectTemplate(uri:string):Promise<string>{const p=readPackage(new util.TextDecoder().decodeWithStream(readBytes(uri,90*1024*1024)));const summary:TemplateSummary={version:p.version,kind:p.kind,count:p.state.cards.length,images:p.assets.length};return JSON.stringify(summary);}
 export async function materializeTemplate(json:string,filesDir:string,availableCards:number=CANVAS_CARD_LIMIT):Promise<string>{
   const pack=readPackage(json),codec=new util.Base64Helper(),created:string[]=[];let total=0;
   assertCanvasCapacity(CANVAS_CARD_LIMIT-availableCards,pack.state.cards.length);

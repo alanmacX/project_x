@@ -898,7 +898,7 @@ struct Index {
         }catch(e){this.getUIContext().getPromptAction().showToast({message:(e as Error).message});return;}
       }
       if (k === 'worldclock') cap.zone = 'Asia/Shanghai';
-      if(k==='album') {card.shape='rect';card.frame=false;this.editorTabs=[1];this.settingsTab=1;}
+      if(k==='album') {card.html=undefined;card.shape='rect';card.frame=false;this.editorTabs=[1];this.settingsTab=1;}
       card.capability = cap; card.capBox = capabilityPreset(card,'center'); this.layerId = 'capability';
     }
     this.syncFields(); this.change(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.refreshCapabilities();
@@ -921,14 +921,14 @@ struct Index {
   private removeElement(): void {
     const card = this.current(); if (card === null) return;
     if (this.layerId === 'capability') card.capability = null;
-    else card.elements = card.elements.filter((e: CanvasElement) => e.id !== this.layerId);
+    else {if(card.html?.previewElementId===this.layerId)card.html=undefined;card.elements = card.elements.filter((e: CanvasElement) => e.id !== this.layerId);}
     this.layerId = ''; this.syncFields(); this.change();
   }
   private duplicate(): void {
     if (this.busy || this.canvasChanging || !this.canAddCards(1)) return;
     const card = this.current(); if (card === null) return;
     const copy = JSON.parse(JSON.stringify(card)) as FridgeCard; copy.id = this.store.newId(); copy.groupId = ''; copy.x += 16; copy.y += 16;
-    copy.elements.forEach((e: CanvasElement) => { e.id = this.store.newId(); });
+    copy.elements.forEach((e: CanvasElement) => {const old=e.id;e.id = this.store.newId();if(copy.html?.previewElementId===old)copy.html.previewElementId=e.id;});
     this.clamp(copy); this.store.addCard(copy); this.select(copy.id); this.change();
   }
   private deleteCard(id: string): void {

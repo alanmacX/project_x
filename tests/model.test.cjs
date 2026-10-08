@@ -304,10 +304,12 @@ function load(name) {
   assert.equal(disk.get('fridge_state_json'),'{broken');
   const photo = new FridgeCard(); photo.id='photo'; photo.paper='#234567'; photo.shape='subject'; photo.cutout='file:///private/subject.png';
   const img = new CanvasElement(); img.id='image'; img.kind='image'; img.src='file:///private/photo.gif'; img.animated=true; photo.elements.push(img);
+  photo.html={version:1,designVersion:1,width:180,height:180,source:'<div>Local appearance</div>',previewElementId:'image'};
   const snapshot=JSON.stringify({schemaVersion:2,cards:[photo]});
   await updateWidget('123',snapshot,'4*4'); assert.ok(jobs.includes('deliverWidget'),'large widget scene preparation runs through TaskPool'); const payload=updates.at(-1).data;
   assert.equal(payload.formImages[widgetImageKey('photo_image',img.src)],11); assert.equal(payload.formImages[widgetImageKey('photo_subject',photo.cutout)],11);
   const transfer=JSON.parse(JSON.parse(payload.scenePacket).cards)[0];
+  assert.equal(transfer.html,undefined,'HTML authoring source is never sent to desktop Forms');assert.ok(photo.html.source.includes('Local appearance'),'widget preparation preserves the local editable source');
   assert.equal(transfer.elements[0].animated,true,'GIF playback metadata survives form transfer'); assert.equal(transfer.elements[0].src,'memory://'+widgetImageKey('photo_image',img.src)); assert.equal(transfer.cutout,'memory://'+widgetImageKey('photo_subject',photo.cutout));
   assert.equal(payload.cards,undefined); assert.equal(payload.faceCards,undefined); assert.equal(payload.background,undefined,'artwork is transferred only once in the atomic packet');
   assert.notEqual(widgetImageKey('photo_image',img.src),widgetImageKey('photo_image','file:///private/replacement.gif'),'replacing a photo refreshes its image resource');

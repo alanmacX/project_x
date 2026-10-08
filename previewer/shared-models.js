@@ -3,6 +3,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.remapSceneSchedules = exports.fitImportedCanvas = exports.importedCards = exports.readPackage = exports.packageScene = void 0;
+const HtmlCardTemplate_1 = require("./HtmlCardTemplate");
 const CardSchema_1 = require("./CardSchema");
 const CanvasCapacity_1 = require("./CanvasCapacity");
 function packageScene(json, cardId) {
@@ -33,16 +34,26 @@ function packageScene(json, cardId) {
             cap.attemptedAt = 0;
         }
     }
-    return { format: 'fridgememo-template', version: 1, kind: cardId.length > 0 ? 'card' : 'canvas', state: state, assets: [] };
+    return { format: 'fridgememo-template', version: state.cards.some((c) => c.html !== undefined) ? 2 : 1, kind: cardId.length > 0 ? 'card' : 'canvas', state: state, assets: [] };
 }
 exports.packageScene = packageScene;
 function readPackage(json) {
     if (json.length > 90 * 1024 * 1024)
         throw new Error('作品包超过大小限制');
     const raw = JSON.parse(json);
-    if (raw.format !== 'fridgememo-template' || raw.version !== 1 || !['card', 'canvas'].includes(raw.kind) || raw.state?.schemaVersion !== 2 || !Array.isArray(raw.state?.cards) || raw.state.cards.length > 128 || !Array.isArray(raw.assets) || raw.assets.length > 256)
+    if (raw.format !== 'fridgememo-template' || ![1, 2].includes(raw.version) || !['card', 'canvas'].includes(raw.kind) || raw.state?.schemaVersion !== 2 || !Array.isArray(raw.state?.cards) || raw.state.cards.length > 128 || !Array.isArray(raw.assets) || raw.assets.length > 256)
         throw new Error('不是支持的作品包');
     (0, CanvasCapacity_1.assertCanvasCapacity)(0, raw.state.cards.length);
+    for (const card of raw.state.cards) {
+        if (card.html !== undefined) {
+            if (raw.version !== 2)
+                throw new Error('HTML 卡片需要 v2 作品包');
+            (0, HtmlCardTemplate_1.validateHtmlCard)(card.html);
+            const layer = (card.elements ?? []).find(el => el.id === card.html.previewElementId);
+            if (!layer || layer.kind !== 'image' || layer.animated === true || !layer.src || card.capability?.k === 'album')
+                throw new Error('HTML 卡片渲染缓存或原生能力绑定无效');
+        }
+    }
     if (raw.kind === 'card' && raw.state.cards.length !== 1)
         throw new Error('卡片包内容不完整');
     const keys = [];
@@ -113,7 +124,8 @@ function importedCards(state, newId) {
                 groups.set(c.groupId, newId());
             c.groupId = groups.get(c.groupId) ?? '';
         }
-        c.elements.forEach(el => { el.id = newId(); });
+        c.elements.forEach(el => { const old = el.id; el.id = newId(); if (c.html?.previewElementId === old)
+            c.html.previewElementId = el.id; });
         c.renderContourKey = '';
     }
     return cards;
@@ -145,10 +157,45 @@ function remapSceneSchedules(state, cards, newId, targetAspect) {
 exports.remapSceneSchedules = remapSceneSchedules;
 
 },
+"HtmlCardTemplate":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.normalizeHtmlCard = exports.validateHtmlCard = void 0;
+function validateHtmlCard(template) {
+    if (!template || template.version !== 1 || template.designVersion !== 1 || !Number.isInteger(template.width) || !Number.isInteger(template.height) || template.width < 32 || template.height < 32 || template.width > 1024 || template.height > 1024 || typeof template.previewElementId !== 'string' || !template.previewElementId.length || template.previewElementId.length > 96 || typeof template.source !== 'string' || !template.source.length || template.source.length > 512 * 1024)
+        throw new Error('HTML 卡片版本或尺寸不受支持，请更新应用');
+    for (const key of Object.keys(template))
+        if (!['version', 'designVersion', 'width', 'height', 'source', 'previewElementId'].includes(key))
+            throw new Error('HTML 卡片包含尚未支持的字段，请更新应用');
+    const source = template.source;
+    // These sources are data in the app. The same policy gates any authoring preview.
+    if (/<\s*\/?\s*(script|iframe|object|embed|link|base|form|input|button|audio|video|foreignobject|animate|animatetransform|animatemotion|set|marquee)\b/i.test(source) || /\bon[a-z]+\s*=/i.test(source) || /(javascript\s*:|https?\s*:|file\s*:|@import|@font-face|expression\s*\(|animation(?:-[a-z]+)?\s*:|transition(?:-[a-z]+)?\s*:)/i.test(source))
+        throw new Error('HTML 卡片只支持静态本地外观，不支持脚本、联网或交互控件');
+    const refs = source.match(/(?:src|href)\s*=\s*[^>\s]+/gi) ?? [];
+    for (const ref of refs)
+        if (!/^(?:src|href)\s*=\s*["'](?:data:image\/(?:png|jpeg|webp);base64,|#)/i.test(ref))
+            throw new Error('HTML 素材必须内嵌为本地图片');
+    for (const ref of source.match(/url\s*\([^)]*\)/gi) ?? [])
+        if (!/^url\s*\(\s*(["']?)#[a-z0-9_-]+\1\s*\)$/i.test(ref))
+            throw new Error('HTML 不使用外部 CSS 资源；SVG 可以引用本地渐变 ID');
+    if (/\bsrcset\s*=/i.test(source))
+        throw new Error('HTML 不使用外部响应式图片资源');
+}
+exports.validateHtmlCard = validateHtmlCard;
+function normalizeHtmlCard(template) {
+    if (template === undefined || template === null)
+        return undefined;
+    validateHtmlCard(template);
+    return { version: 1, designVersion: 1, width: template.width, height: template.height, source: template.source, previewElementId: template.previewElementId };
+}
+exports.normalizeHtmlCard = normalizeHtmlCard;
+
+},
 "CardSchema":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.normalizeCapability = exports.contrastingInk = exports.serializeDoorCards = exports.serializeFaceCards = exports.normalizeState = exports.normalizeElement = exports.localImageSource = exports.normalizeBox = exports.bounded = exports.defaultState = exports.cardCornerRadius = exports.shapeRadius = exports.materialColors = exports.typeLabel = exports.FridgeState = exports.normalizeBackground = exports.CanvasBackground = exports.BackgroundAnchor = exports.DoorState = exports.FridgeCard = exports.CanvasElement = exports.ElementBox = exports.CAPABILITIES = exports.CapType = exports.MIN_SUBJECT_EDGE = exports.ALBUM_CARD_CORNER_RADIUS = exports.ALBUM_CORNER_RADIUS = exports.ALBUM_INSET = exports.RECT_CORNER_RADIUS = exports.MIN_CARD_EDGE = exports.BOARD_H = exports.BOARD_W = void 0;
+const HtmlCardTemplate_1 = require("./HtmlCardTemplate");
 const ReadingStylePolicy_1 = require("./ReadingStylePolicy");
 const SceneScheduleSchema_1 = require("./SceneScheduleSchema");
 const TimeCapabilities_1 = require("./TimeCapabilities");
@@ -411,6 +458,8 @@ function normalizeState(raw) {
         if (source === null || typeof source.id !== 'string')
             continue;
         const card = new FridgeCard();
+        if (source.html !== undefined)
+            card.html = (0, HtmlCardTemplate_1.normalizeHtmlCard)(source.html);
         card.id = source.id;
         card.groupId = typeof source.groupId === 'string' ? source.groupId.slice(0, 96) : '';
         card.w = bounded(source.w, source.shape === 'subject' ? exports.MIN_SUBJECT_EDGE : exports.MIN_CARD_EDGE, 320, 180);
@@ -3257,4 +3306,4 @@ function traceMask(mask, width, height) {
 }
 exports.traceMask = traceMask;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"221042a56f5ddff76da48e0f3b86062ceba153d25749848466829a7f798d5298"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"15bb4091ed0c04c39b0ab89dbe06338fb8045e798abddfead749c8dc72d77b54"};})(globalThis);
