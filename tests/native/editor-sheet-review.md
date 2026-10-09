@@ -24,3 +24,13 @@ Limits: no physical-device frame-rate measurement or API 26 material rendering v
 - Phone emulator 1320×2848: content swipe at 900 px/s expanded sheet Scroll bounds from [0,1839][1320,2847] to [0,920][1320,2848]; corresponding layer strip bottom changed from 1785 to 867. Downward content swipe restored original bounds. Additional fast up / slow down swipes and Back executed.
 - assembleHap passed; all 53 remaining host regression suites passed (obsolete custom gesture suite removed). Frame-cache regression covers 126 continuous pane-height samples without repeated outline tracing.
 - This verifies native gesture handoff and settled geometry, not physical-device tactile quality or frame-rate performance.
+
+## Editor and home control surfaces — 2026-10-10
+
+- Frame node is retained at the canvas coordinates throughout editor entry/exit; opacity follows the existing board transition instead of mounting at exit completion.
+- Calendar and other automatic capabilities have no Data tab. Countdown, anniversary, world clock, agenda and timetable retain editable data; album retains cover/details. Capability replacement clamps the selected inspector section.
+- Home controls use an independent root surface above cards and frame. Only its four 44vp target rectangles participate in hit testing; the rest remains available to the card surface. Artwork consumes the same atomic resize/rotation pose. Geometry commits preserve stored z order.
+- Phone emulator 1320×2848: checked native sheet at both detents; layer strip continues beneath the rounded top corners without a straight viewport cutoff. Selected-card Edit opens the editor from the root controls. Resize release retains all four controls and updates their bounds (e.g. resize target [1118,663][1267,812] to [1101,664][1250,813]).
+- Found an additional interaction issue: reapplying the same scheduled scene cleared selection. Same-scene refresh now retains selection; entering a board gesture invalidates older asynchronous scene calculations.
+- assembleHap and 54 host regression suites passed. Regression added for control pose ownership, editable tabs, same-scene selection and preserved card stacking.
+- No physical-device frame-rate claim; frame node retention is verified in code, not a device frame-by-frame video in this pass.

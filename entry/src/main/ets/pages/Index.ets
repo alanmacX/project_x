@@ -427,7 +427,7 @@ struct Index {
   private applyScheduledScene(next:ScheduledScene):void {
     const previous=this.timedScene?.key??'base',differentCanvas=(this.timedScene?.state.canvasId??this.store.state.canvasId)!==next.state.canvasId;
     if(previous!==next.key){this.backgroundGeneration++;if(this.backgroundTimer>=0)clearTimeout(this.backgroundTimer);this.backgroundTimer=-1;this.backgroundBusy=false;}
-    const apply=():void=>{if(next.normalState.canvasId!==this.store.state.canvasId){this.store.adoptCanvas(next.normalState);this.refreshCanvasList();this.persist(false);}this.timedScene=next.ruleId?next:null;this.scheduledFocusId=next.focusId;this.scheduledName=next.ruleId?next.name||'定时场景':'';this.selectedId='';this.groupSelecting=false;this.groupSelection=[];this.canvasBackground=next.state.background;this.renderBoard();if(!next.ruleId&&previous!=='base')this.scheduleBackground();};
+    const apply=():void=>{if(next.normalState.canvasId!==this.store.state.canvasId){this.store.adoptCanvas(next.normalState);this.refreshCanvasList();this.persist(false);}this.timedScene=next.ruleId?next:null;this.scheduledFocusId=next.focusId;this.scheduledName=next.ruleId?next.name||'定时场景':'';if(previous!==next.key||differentCanvas){this.selectedId='';this.groupSelecting=false;this.groupSelection=[];}this.canvasBackground=next.state.background;this.renderBoard();if(!next.ruleId&&previous!=='base')this.scheduleBackground();};
     if(previous===next.key&&!differentCanvas){apply();return;}
     const transitionGeneration=++this.scheduleVisualGeneration;this.scheduleTransition=true;
     if(differentCanvas||next.focusId.length>0||(this.timedScene?.focusId??'').length>0) {
@@ -1083,7 +1083,7 @@ struct Index {
       if(k==='album') {card.html=undefined;card.shape='rect';card.frame=false;this.settingsTab=1;}
       this.settingsTab=1;card.capability = cap; card.capBox = capabilityPreset(card,'center'); this.layerId = 'capability';
     }
-    this.capabilityPickerOpen=false;this.editorSection=3;this.editorSheetTab=0;this.syncFields(); this.change(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.refreshCapabilities();
+    this.capabilityPickerOpen=false;this.editorSheetTab=0;this.syncFields();this.editorSection=Math.min(3,this.editorTools().length-1); this.change(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.refreshCapabilities();
   }
   private addElement(kind: string): void {
     const card = this.current(); if (card === null || card.capability?.k==='album') return;
@@ -1173,7 +1173,7 @@ struct Index {
     if(bitmap)setTimeout(()=>bitmap.release(),80);
   }
   private boardInteraction(id: string, active: boolean): void {
-    if (active) { this.selectedId=id; const card = this.store.findCard(id); this.movingGroupIds = card === null ? [] : groupMembers(this.store.state.cards, card).filter((c: FridgeCard) => c.id !== id).map((c: FridgeCard) => c.id); this.boardMotion.ids = this.movingGroupIds.length > 0 ? [id, ...this.movingGroupIds] : []; }
+    if (active) { this.scheduleGeneration++;this.selectedId=id; const card = this.store.findCard(id); this.movingGroupIds = card === null ? [] : groupMembers(this.store.state.cards, card).filter((c: FridgeCard) => c.id !== id).map((c: FridgeCard) => c.id); this.boardMotion.ids = this.movingGroupIds.length > 0 ? [id, ...this.movingGroupIds] : []; }
     else {this.boardMotion.guideVertical=false;this.boardMotion.guideHorizontal=false; this.boardMotion.offset = { x: 0, y: 0 }; this.boardMotion.ids = []; this.movingGroupIds = []; }
     this.activeBoardId = active ? id : '';
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer); this.saveTimer = -1;
@@ -1192,7 +1192,6 @@ struct Index {
     this.boardMotion.offset = { x: 0, y: 0 };
     card.x = updated.x; card.y = updated.y; card.w = updated.w; card.h = updated.h; card.rot = updated.rot;
     if(!translating)this.clamp(card);
-    groupMembers(this.store.state.cards, card).sort((a: FridgeCard, b: FridgeCard) => a.z - b.z).forEach((member: FridgeCard) => this.store.bringToFront(member));
     // Geometry handoff only updates the visible board; hydrate inspector on entry.
     if (this.editing || this.viewing) this.render(); else this.renderBoard();
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer);
@@ -1347,7 +1346,7 @@ struct Index {
           }.width('100%').height('100%').opacity(this.editorOpacity).hitTestBehavior(HitTestMode.None)
         }
         this.editingScene()
-        if(!this.editing&&!this.viewing&&this.canvasBackground.frameStyle!=='none'){CanvasFrame({material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle}).width(BOARD_W*this.boardScale).height(this.boardHeight).position({x:this.boardLeft,y:this.boardTop}).opacity(this.boardOpacity).zIndex(100003).hitTestBehavior(HitTestMode.None)}
+        if(!this.viewing&&this.canvasBackground.frameStyle!=='none'){CanvasFrame({material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle}).width(BOARD_W*this.boardScale).height(this.boardHeight).position({x:this.boardLeft,y:this.boardTop}).opacity(this.boardOpacity).zIndex(100003).hitTestBehavior(HitTestMode.None)}
         if(this.scheduledFocusId && !this.editing) {
           ForEach(this.cards.filter((card:FridgeCard)=>card.id===this.scheduledFocusId),(card:FridgeCard)=>{
             Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {}
@@ -1379,6 +1378,14 @@ struct Index {
               onDetentsDidChange:(height:number)=>{const expanded=this.getUIContext().px2vp(height)>this.editorWorkspace().body*.60;this.editorExpanded=expanded;},
               onWillDismiss:(action:DismissSheetAction)=>this.dismissEditorSheet(action),onWillSpringBackWhenDismiss:(action:SpringBackAction)=>action.springBack()
             })
+        if(!this.editing&&!this.viewing&&!this.arriving&&!this.groupSelecting&&this.selectedGroup().length<2&&!this.scheduledName&&!this.scheduleTransition) {
+          ForEach(this.cardIds.filter((id:string)=>id===this.selectedId),(id:string)=>{
+            BoardCard({controlsOnly:true,card:this.cardMap[id],motion:this.boardMotion,selected:true,scaleFactor:this.boardScale,yScaleFactor:this.boardHeight/BOARD_H,
+              boardLeft:this.boardLeft,boardTop:this.boardTop,controlViewportWidth:BOARD_W*this.boardScale,controlViewportHeight:this.boardHeight,
+              onDelete:(id:string)=>this.deleteCard(id),onEdit:(id:string)=>this.openEditor(id),
+              onInteraction:(active:boolean)=>this.boardInteraction(id,active),onCommit:(next:FridgeCard)=>this.commitGeometry(next)})
+          },(id:string)=>id)
+        }
         if (this.editorMounted) { this.editor() }
         if (this.chromeSnapshot !== undefined) {
           Image(this.chromeSnapshot).width(this.screenWidth).height(this.screenHeight - this.safeTop - EDITOR_SAFE_GAP)
@@ -1418,7 +1425,7 @@ struct Index {
         ForEach(this.startupCardCount>=0?this.cardIds.slice(0,this.startupCardCount):this.cardIds, (id: string) => {
           Stack({ alignContent: Alignment.TopStart }) {
             Stack({ alignContent: Alignment.TopStart }) {
-            BoardCard({ layerMotion:this.layerMotion, controlViewportWidth: BOARD_W * this.boardScale, controlViewportHeight: this.boardHeight, motion: this.boardMotion, card: this.sceneCard(id), localCoordinates: true, scatterAngle: 0, editingSurface: this.editing,
+            BoardCard({ showControls:false,layerMotion:this.layerMotion, controlViewportWidth: BOARD_W * this.boardScale, controlViewportHeight: this.boardHeight, motion: this.boardMotion, card: this.sceneCard(id), localCoordinates: true, scatterAngle: 0, editingSurface: this.editing,
               displayAngle: id === this.selectedId ? this.surfaceAngle() : this.cardMap[id].rot + this.scatter * (this.cardMap[id].z % 2 === 0 ? 9 : -9),
               selected: this.selectedId === id && !this.editing && !this.groupSelecting && this.selectedGroup().length < 2, scaleFactor: this.boardScale, yScaleFactor: this.boardHeight / BOARD_H,
               animateContent:this.editing&&!this.heroActive&&id===this.selectedId,
@@ -2073,18 +2080,21 @@ struct Index {
   }
   @Builder
   editorStage() {
+    // The native sheet covers the lower stage. Do not pre-clip the layer strip
+    // at its straight top edge: its rounded corners reveal the content behind it.
     Row({space:12}) {
       this.canvasEditor()
       this.editorLayers()
-    }.width(this.editorWorkspace().stageW).height(this.previewPaneHeight()).clip(true)
+    }.width(this.editorWorkspace().stageW).height(this.editorWorkspace().body).alignItems(VerticalAlign.Top).clip(this.editorLandscape())
   }
   @Builder
   editorLayers() {
     Scroll() {Column({space:8}) {this.layerEntries()}.width('100%').padding({top:8,bottom:8,right:4})}
-      .id('editorLayerStrip').width(this.editorWorkspace().layersW).height(this.previewPaneHeight()).scrollable(ScrollDirection.Vertical).align(Alignment.Top).scrollBar(BarState.Off)
+      .id('editorLayerStrip').width(this.editorWorkspace().layersW).height(this.previewPaneHeight()+(this.editorLandscape()?0:64)).scrollable(ScrollDirection.Vertical).align(Alignment.Top).scrollBar(BarState.Off)
   }
+  private capabilityHasEditableData():boolean {return ['countdown','anniversary','worldclock','agenda','timetable','album'].includes(this.preview.capability?.k??'');}
   private editorTools():string[] {
-    return this.preview.capability?.k==='album'?['样式','封面与资料']:this.layerId==='capability'?['样式','位置','颜色','数据']:this.layerId.length?(this.elementPreview.kind==='image'?['图片','位置']:['外观','位置','颜色']):['形状','底色'];
+    return this.preview.capability?.k==='album'?['样式','封面与资料']:this.layerId==='capability'?(this.capabilityHasEditableData()?['样式','位置','颜色','数据']:['样式','位置','颜色']):this.layerId.length?(this.elementPreview.kind==='image'?['图片','位置']:['外观','位置','颜色']):['形状','底色'];
   }
   private openEditorSection(index:number):void {
     if(this.heroActive||this.editorSection===index)return;this.editorSection=index;this.editorSheetTab=0;this.scroller.scrollTo({xOffset:0,yOffset:0});

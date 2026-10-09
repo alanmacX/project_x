@@ -27,6 +27,7 @@ export struct BoardCard {
   private dragX: number = 0;
   private dragY: number = 0;
   private rotationShift(): ShapePoint {
+    if(!this.controlsOnly&&this.motion.controlId===this.card.id)return {x:this.motion.controlPose.xShift,y:this.motion.controlPose.yShift};
     if (!this.rotating) return { x: 0, y: 0 };
     const a=this.initialAngle*Math.PI/180,b=this.liveAngle*Math.PI/180;
     return { x: this.w()*(Math.cos(a)-Math.cos(b))/2+this.h()*(Math.sin(a)-Math.sin(b))/2,
@@ -38,7 +39,7 @@ export struct BoardCard {
     const x=24+this.visibleOverflow().left+this.w()/2-(p.x+22),y=24+this.visibleOverflow().top+this.h()/2-(p.y+22);
     this.rotateCentre={ x:this.fingerStartX+x*Math.cos(a)-y*Math.sin(a),y:this.fingerStartY+x*Math.sin(a)+y*Math.cos(a) };
     this.previousFingerAngle=Math.atan2(this.fingerStartY-this.rotateCentre.y,this.fingerStartX-this.rotateCentre.x)*180/Math.PI;
-    this.accumulatedAngle=0; this.rotating=true; this.onInteraction(true); this.updateRotation(e);
+    this.accumulatedAngle=0; this.rotating=true; this.publishControlPose(); this.onInteraction(true); this.updateRotation(e);
   }
   private updateRotation(e: GestureEvent): void {
     const p=this.screenOffset(e),x=this.fingerStartX+p.x-this.rotateCentre.x,y=this.fingerStartY+p.y-this.rotateCentre.y;
@@ -46,14 +47,16 @@ export struct BoardCard {
     const angle=Math.atan2(y,x)*180/Math.PI,delta=((angle-this.previousFingerAngle+540)%360)-180;
     this.accumulatedAngle+=delta;this.previousFingerAngle=angle;
     const value=this.initialAngle+this.accumulatedAngle,snap=Math.round(value/90)*90;
-    this.liveAngle=Math.abs(value-snap)<2?snap:value;
+    this.liveAngle=Math.abs(value-snap)<2?snap:value;this.publishControlPose();
   }
   private finishRotation(): void {
     const next=this.copyCard(),shift=this.rotationShift();next.x+=shift.x/this.scaleFactor;next.y+=shift.y/this.yScaleFactor;
-    next.rot=((this.liveAngle+180)%360+360)%360-180;this.onCommit(next);this.rotating=false;this.onInteraction(false);
+    next.rot=((this.liveAngle+180)%360+360)%360-180;this.onCommit(next);this.rotating=false;this.clearControlPose();this.onInteraction(false);
   }
   @Prop @Watch('invalidateGeometry') card: FridgeCard = new FridgeCard();
   @Prop @Watch('syncHandles') selected: boolean = false;
+  @Prop controlsOnly:boolean=false;
+  @Prop showControls:boolean=true;
   @Prop heroHidden: boolean = false;
   @Prop localCoordinates: boolean = false;
   private frameRate: ExpectedFrameRateRange = motionFrameRate();
@@ -95,8 +98,9 @@ export struct BoardCard {
   private handlesTimer: number = -1;
   private alive: boolean = false;
   aboutToAppear(): void { this.alive = true; this.syncHandles(); }
-  aboutToDisappear(): void { this.alive = false; if (this.handlesTimer >= 0) clearTimeout(this.handlesTimer); }
+  aboutToDisappear(): void { this.alive = false; this.clearControlPose(); if (this.handlesTimer >= 0) clearTimeout(this.handlesTimer); }
   private syncHandles(): void {
+    if(!this.showControls)return;
     if (this.handlesTimer >= 0) clearTimeout(this.handlesTimer);
     // Let the current render settle before beginning the small controls transaction.
     this.handlesTimer = setTimeout(() => {
@@ -186,8 +190,8 @@ export struct BoardCard {
     }
     return this.handles[bottom ? (right ? 2 : 3) : (right ? 1 : 0)];
   }
-  private w(): number { return (this.resizing ? this.liveW : this.card.w) * this.scaleFactor; }
-  private h(): number { return (this.resizing ? this.liveH : this.card.h) * this.scaleFactor; }
+  private w(): number { return this.card.w*this.resizeScale()*this.scaleFactor; }
+  private h(): number { return this.card.h*this.resizeScale()*this.scaleFactor; }
   private shown(): boolean { return this.selected && !this.moving && !this.editingSurface; }
   private animateLift(active: boolean): void {
     this.getUIContext().animateTo({ duration: 160, curve: Curve.Friction, expectedFrameRateRange: this.frameRate }, () => {
@@ -237,21 +241,21 @@ export struct BoardCard {
     this.minimumFactor = Math.max(min.w / this.originW, min.h / this.originH);
     this.maximumFactor = Math.max(this.minimumFactor, Math.min(320 / this.originW, 420 / this.originH));
     this.resizeVectorW = this.originW * handle.x; this.resizeVectorH = this.originH * (1 - handle.y);
-    this.liveW = this.card.w; this.liveH = this.card.h; this.liveY = this.card.y; this.resizing = true; this.atMinimum = false; this.onInteraction(true);
+    this.liveW = this.card.w; this.liveH = this.card.h; this.liveY = this.card.y; this.resizing = true; this.atMinimum = false; this.publishControlPose(); this.onInteraction(true);
   }
   private resize(e: GestureEvent): void {
     const offset = this.screenOffset(e);
     const requested = resizeFactor(this.resizeVectorW, this.resizeVectorH, offset.x / this.scaleFactor, offset.y / this.scaleFactor, this.card.rot);
     this.atMinimum = requested < this.minimumFactor;
     const factor = Math.max(this.minimumFactor, Math.min(this.maximumFactor, requested));
-    this.liveW = this.originW * factor; this.liveH = this.originH * factor; this.liveY = this.originY + (this.originH - this.liveH) * this.scaleFactor / this.yScaleFactor;
+    this.liveW = this.originW * factor; this.liveH = this.originH * factor; this.liveY = this.originY + (this.originH - this.liveH) * this.scaleFactor / this.yScaleFactor;this.publishControlPose();
   }
-  private cancelResize(): void { this.resizing = false; this.atMinimum = false; this.onInteraction(false); }
+  private cancelResize(): void { this.resizing = false; this.atMinimum = false;this.clearControlPose(); this.onInteraction(false); }
   private finishResize(): void {
     if (!this.resizing) return;
     const next = this.copyCard();
     next.w = this.liveW; next.h = this.liveH; next.y = this.liveY;
-    clampCardGeometry(next,BOARD_W,BOARD_H,this.controlViewportHeight/this.scaleFactor); this.onCommit(next);this.resizing=false;this.onInteraction(false);
+    clampCardGeometry(next,BOARD_W,BOARD_H,this.controlViewportHeight/this.scaleFactor); this.onCommit(next);this.resizing=false;this.clearControlPose();this.onInteraction(false);
     if (this.atMinimum) this.getUIContext().getPromptAction().showToast({ message: this.card.capability === null ? '已到最小尺寸' : '已到最小可读尺寸；移除能力后可继续缩小' });
     this.atMinimum = false;
   }
@@ -263,7 +267,18 @@ export struct BoardCard {
     if(key!==this.overflowKey){this.overflowValue=compositionOverflow(this.faceCard(),this.scaleFactor);this.overflowKey=key;}
     return this.overflowValue;
   }
-  private resizeScale():number{return this.resizing?this.liveW/this.card.w:1;}
+  private controlRegions():Rectangle[] {
+    if(!this.controlsOnly)return [{x:0,y:0,width:'100%',height:'100%'}];
+    return [this.controlPosition(false,false),this.controlPosition(true,false),this.controlPosition(false,true),this.controlPosition(true,true)]
+      .map((p:ShapePoint):Rectangle=>({x:p.x,y:p.y,width:44,height:44}));
+  }
+  private publishControlPose():void {
+    if(!this.controlsOnly)return;
+    const shift=this.rotationShift();this.motion.controlPose={scale:this.resizing?this.liveW/this.card.w:1,y:this.resizing?(this.liveY-this.card.y)*this.yScaleFactor:0,angle:this.rotating?this.liveAngle:this.card.rot,xShift:shift.x,yShift:shift.y};
+    this.motion.controlId=this.card.id;
+  }
+  private clearControlPose():void {if(this.controlsOnly&&this.motion.controlId===this.card.id)this.motion.controlId='';}
+  private resizeScale():number{return this.resizing?this.liveW/this.card.w:!this.controlsOnly&&this.motion.controlId===this.card.id?this.motion.controlPose.scale:1;}
   private shadowFringe():number{return 24*this.resizeScale();}
   private faceCard(): FridgeCard {return this.card;}
   private visibleOverflow():CompositionOverflow {
@@ -272,6 +287,7 @@ export struct BoardCard {
   }
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
+      if(!this.controlsOnly) {
       Stack() {
         // Shadow fringe stays in the texture; rotation and translation stay outside it.
         Stack({ alignContent: Alignment.TopStart }) {
@@ -294,18 +310,19 @@ export struct BoardCard {
           PanGesture({ distance: 4 }).onActionStart((e: GestureEvent) => { this.beginFinger(e); this.startMove(); this.move(e); }).onActionUpdate((e: GestureEvent) => this.move(e))
             .onActionEnd((e: GestureEvent) => { this.move(e); this.finishMove(); }).onActionCancel(() => this.cancelMove()),
           TapGesture().onAction(() => { if (!this.moving) this.onSelect(this.card.id); })))
+      }
       // Mount material controls and contour-aware handles only on selection.
       // Keep them alive through their dismissal animation.
-      if(this.shown() || this.controlsMounted) {
+      if(this.showControls&&(this.shown() || this.controlsMounted)) {
       Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.ERROR }) {SymbolGlyph($r('sys.symbol.xmark')).fontSize(20).fontColor(['#D3423C']).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(24).fontColor('#D3423C').backgroundColor(Color.White)
         .attributeModifier(immersiveChrome())
         .opacity(this.controlsOpacity).scale({ x: this.controlsScale, y: this.controlsScale })
-        .position(this.controlPosition(false, false)).hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
+        .position(this.controlPosition(false, false)).hitTestBehavior(this.shown() ? HitTestMode.Block : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('删除卡片').onClick(() => this.onDelete(this.card.id))
       Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right')).fontSize(22).fontColor(['#303030']).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(22).fontColor('#303030').backgroundColor(Color.White)
         .attributeModifier(immersiveChrome())
         .opacity(this.controlsOpacity).scale({ x: this.resizeControlScale, y: this.resizeControlScale })
-        .position(this.controlPosition(true, false)).hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
+        .position(this.controlPosition(true, false)).hitTestBehavior(this.shown() ? HitTestMode.Block : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('调整卡片大小').onClick(() => this.getUIContext().getPromptAction().showToast({ message: '向外拖动放大，向内拖动缩小' }))
         .gesture(PanGesture({ distance: 2 }).onActionStart((e: GestureEvent) => { this.beginFinger(e); this.startResize(); this.resize(e); }).onActionUpdate((e: GestureEvent) => this.resize(e))
           .onActionEnd((e: GestureEvent) => { this.resize(e); this.finishResize(); }).onActionCancel(() => this.cancelResize()))
@@ -316,24 +333,25 @@ export struct BoardCard {
       Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(22).fontColor(['#303030']).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(22).fontColor('#303030').backgroundColor(Color.White)
         .attributeModifier(immersiveChrome()).opacity(this.controlsOpacity).scale({ x: this.controlsScale, y: this.controlsScale })
         .position(this.controlPosition(false, true))
-        .hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
+        .hitTestBehavior(this.shown() ? HitTestMode.Block : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('旋转整张卡片')
         .onClick(() => this.getUIContext().getPromptAction().showToast({ message: '沿卡片中心绕动旋转，靠近水平或竖直时自动吸附' }))
         .gesture(PanGesture({ distance: 2 }).onActionStart((e: GestureEvent) => this.startRotation(e))
           .onActionUpdate((e: GestureEvent) => this.updateRotation(e))
           .onActionEnd((e: GestureEvent) => { this.updateRotation(e); this.finishRotation(); })
-          .onActionCancel(() => { this.rotating = false; this.onInteraction(false); }))
+          .onActionCancel(() => { this.rotating = false;this.clearControlPose(); this.onInteraction(false); }))
       Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(20).fontColor(['#303030']).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(11).fontColor('#303030').backgroundColor(Color.White)
         .attributeModifier(immersiveChrome())
         .opacity(this.controlsOpacity).scale({ x: this.controlsScale, y: this.controlsScale })
-        .position(this.controlPosition(true, true)).hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
+        .position(this.controlPosition(true, true)).hitTestBehavior(this.shown() ? HitTestMode.Block : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('编辑卡片内容').onClick(() => this.onEdit(this.card.id))
       }
-    }.width(this.w()+48+this.visibleOverflow().left+this.visibleOverflow().right).height(this.h()+48+this.visibleOverflow().top+this.visibleOverflow().bottom).opacity(this.heroHidden ? 0 : 1).hitTestBehavior(this.heroHidden ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Transparent)
-      .rotate({ angle: this.editingSurface ? this.displayAngle : (this.rotating ? this.liveAngle : this.card.rot) + this.scatterAngle, centerX:24+this.visibleOverflow().left,centerY:this.h()+24+this.visibleOverflow().top })
-      .translate({ x: this.scatterX + (this.motion.ids.includes(this.card.id) ? this.motion.offset.x : this.dx) + this.rotationShift().x, y: this.scatterY + (this.motion.ids.includes(this.card.id) ? this.motion.offset.y : this.dy) + this.rotationShift().y })
+    }.width(this.w()+48+this.visibleOverflow().left+this.visibleOverflow().right).height(this.h()+48+this.visibleOverflow().top+this.visibleOverflow().bottom).opacity(this.heroHidden ? 0 : 1).hitTestBehavior(this.heroHidden ? HitTestMode.BLOCK_DESCENDANTS : this.controlsOnly?HitTestMode.Default:HitTestMode.Transparent)
+      .responseRegion(this.controlRegions())
+      .rotate({ angle: this.editingSurface ? this.displayAngle : (this.rotating ? this.liveAngle : !this.controlsOnly&&this.motion.controlId===this.card.id?this.motion.controlPose.angle:this.card.rot) + this.scatterAngle, centerX:24+this.visibleOverflow().left,centerY:this.h()+24+this.visibleOverflow().top })
+      .translate({ x: this.scatterX + (this.motion.ids.includes(this.card.id) ? this.motion.offset.x : this.dx) + this.rotationShift().x, y: this.scatterY + (!this.controlsOnly&&this.motion.controlId===this.card.id?this.motion.controlPose.y:0) + (this.motion.ids.includes(this.card.id) ? this.motion.offset.y : this.dy) + this.rotationShift().y })
       .position({ x: (this.localCoordinates ? 0 : this.boardLeft + this.card.x * this.scaleFactor - 24)-this.visibleOverflow().left,
         y: (this.localCoordinates ? (this.resizing ? this.liveY - this.card.y : 0) * this.yScaleFactor : this.boardTop + (this.resizing ? this.liveY : this.card.y) * this.yScaleFactor - 24)-this.visibleOverflow().top })
-      .zIndex(this.moving ? 100002 : (this.resizing ? 100001 : this.card.z))
+      .zIndex(this.controlsOnly?190000:this.moving ? 100002 : (this.resizing ? 100001 : this.card.z))
   }
 }
