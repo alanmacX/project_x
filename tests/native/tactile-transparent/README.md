@@ -12,7 +12,11 @@
 
 ## Verification and limitations
 
-Signed debug build compiles with the existing old profile. This does not prove the approved Form entitlement is present. No device connected this round; desktop transparency, performance and light/dark wallpaper legibility remain unverified.
+Signed debug build and in-place installation passed on MatePad Mini with the manually supplied transparent debug Profile on 2026-10-09. The Profile matches the existing development leaf certificate, includes the connected device and `com.huawei.service.desktop.transparentForm`. Signing files remain local and excluded from Git.
+
+Real desktop acceptance: switched the existing canvas from smart blend to transparent; its empty regions reveal wallpaper without the former gradient rectangle. Cards, paper surfaces and hooks remain visible. Tapping an empty region inside the Form opens the app, and returning home retains transparency. Existing user cards were preserved. Screenshots are local artifacts under `output/tactile-material/native/`.
+
+This verifies one existing launcher Form and one populated canvas. It does not certify every user scene's >=10% coverage, light/dark wallpapers, frame rate, cold Form addition or all device models.
 
 Huawei's official guide (updated 2026-08-29) requires manual signing for both debugging and distribution, approved capability enabled/saved in AGC and a Profile containing it. DevEco Studio previewer does not show the real transparent effect.
 
