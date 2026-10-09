@@ -12,10 +12,11 @@ const fixture=`class Fixture {
 } exports.Fixture=Fixture;`;
 vm.runInNewContext(ts.transpileModule(fixture,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,env);
 const f=new env.exports.Fixture(),v=f.previewViewport();for(let i=0;i<20;i++)assert.equal(f.previewViewport(),v);assert.equal(scans,1);assert.equal(layouts,1);
-f.pane=200;assert.notEqual(f.previewViewport(),v);assert.equal(scans,2,'native sheet height change invalidates placement');
+f.pane=200;assert.notEqual(f.previewViewport(),v);assert.equal(scans,1,'native sheet height changes reuse cached outline bounds');
+for(let pane=200;pane<=450;pane+=2){f.pane=pane;f.previewViewport();}assert.equal(scans,1,'continuous dragging never retraces the card outline');
 f.settingsTab=0;assert.equal(f.previewViewport().left,0,'hidden capability does not affect subject fit');
-f.safeTop=32;f.previewViewport();assert.equal(scans,4,'safe-area transition invalidates placement');
-f.preview={...f.preview};f.previewViewport();assert.equal(scans,5,'immutable card updates invalidate fit');
+f.safeTop=32;f.previewViewport();assert.equal(scans,2,'safe-area transition repositions without retracing unchanged artwork');
+f.preview={...f.preview};f.previewViewport();assert.equal(scans,3,'immutable card updates invalidate fit');
 const base=f.layerBaseCard();for(let i=0;i<20;i++)assert.equal(f.layerBaseCard(),base);assert.equal(shells,1);
 assert.equal(base.capability,null);assert.equal(base.elements.length,0);assert.equal(f.preview.capability.courses.length,2,'base thumbnail never mutates live course data');assert.equal(f.preview.elements.length,1);
 f.preview={...f.preview};assert.notEqual(f.layerBaseCard(),base);assert.equal(shells,2);

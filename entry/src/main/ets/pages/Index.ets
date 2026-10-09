@@ -1,4 +1,3 @@
-import { EditorScrollDetent } from '../model/EditorScrollDetent';
 import { prepareReadingTints, ReadingTintRequest, ReadingTintResult } from '../model/ReadingMaterialWorker';
 import { cardSource, hash } from '../model/BackgroundInputs';
 import { capabilityRenderTick } from '../model/CapabilityClock';
@@ -148,7 +147,6 @@ struct Index {
   @State @Watch('homeToolsChanged') scheduleOpen:boolean=false;
   @State timingHeaderActive:boolean=false;
   @State backgroundHeaderActive:boolean=false;
-  private editorScrollDetent:EditorScrollDetent=new EditorScrollDetent();
   @State sceneEditing:boolean=false;
   @State scenePanelTab:number=0;
   @State sceneEntries:CanvasEntry[]=[];
@@ -214,8 +212,7 @@ struct Index {
   @State editorSection:number=0;
   @State editorSheetTab:number=0;
   @State editorExpanded:boolean=false;
-  @State editorPull:number=0;
-  @State editorPreviewExpanded:boolean=false;
+  @State editorSheetHeightVp:number=0;
   @State editorSheetOpen:boolean=false;
   @State @Watch('homeToolsChanged') homeToolsOpen:boolean=false;
   @State homeToolsMoving:boolean=false;
@@ -725,21 +722,27 @@ struct Index {
   private editorViewportWidth(): number { return this.editorWorkspace().previewW; }
   private previewPaneHeight(): number {
     const workspace=this.editorWorkspace();
-    return workspace.wide?workspace.body:workspace.body*(this.editorPreviewExpanded?.22:.60);
+    return workspace.wide?workspace.body:Math.max(workspace.body*.22,Math.min(workspace.body*.60,workspace.body-(this.editorSheetHeightVp||workspace.body*.40)));
   }
   private editorControlHeight():number {return this.editorWorkspace().body*(this.editorExpanded?.78:.40);}
   private editingAngle(): number { return this.preview.rot; }
   private previewViewportCard:FridgeCard|null=null;
   private previewViewportKey:string='';
   private previewViewportValue:EditorViewport=new EditorViewport();
+  private previewFringeCard:FridgeCard|null=null;
+  private previewFringeTab:number=-1;
+  private previewFringe:number[]=[0,0,0,0];
   private previewViewport(): EditorViewport {
     const width=this.editorViewportWidth(),landscape=this.editorLandscape(),pane=this.previewPaneHeight();
     const key=[this.screenHeight,this.safeTop,this.safeBottom,width,landscape,pane,this.settingsTab].join(':');
     if(this.previewViewportCard===this.preview&&this.previewViewportKey===key)return this.previewViewportValue;
-    const overflow=compositionOverflow(this.preview,1);
-    if(this.settingsTab===0){overflow.left=0;overflow.top=0;overflow.right=0;overflow.bottom=0;}
+    if(this.previewFringeCard!==this.preview||this.previewFringeTab!==this.settingsTab){
+      const overflow=compositionOverflow(this.preview,1);
+      this.previewFringe=this.settingsTab===0?[0,0,0,0]:[overflow.left,overflow.top,overflow.right,overflow.bottom];
+      this.previewFringeCard=this.preview;this.previewFringeTab=this.settingsTab;
+    }
     this.previewViewportValue=editorViewport(this.preview.w, this.preview.h, this.editingAngle(),width,
-      this.screenHeight, this.safeTop, this.safeBottom,landscape,pane,[overflow.left,overflow.top,overflow.right,overflow.bottom]);
+      this.screenHeight, this.safeTop, this.safeBottom,landscape,pane,this.previewFringe);
     this.previewViewportCard=this.preview;this.previewViewportKey=key;return this.previewViewportValue;
   }
   private editorScale(): number { return this.previewViewport().scale; }
@@ -755,7 +758,7 @@ struct Index {
   private openEditor(id: string, created: boolean = false): void {
     if(this.scheduledName||this.scheduleTransition){this.getUIContext().getPromptAction().showToast({message:'请先恢复原始画布再编辑'});return;}
     if (this.heroActive || this.arriving) return;
-    this.editorExpanded=false;this.editorPull=0;this.editorScrollDetent.end();this.editorPreviewExpanded=false;this.editorBackPending=false;
+    this.editorExpanded=false;this.editorSheetHeightVp=0;this.editorBackPending=false;
     this.heroHideContent = false; this.select(id, true); this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false;this.editorSection=0;this.editorSheetTab=0;this.settingsTab=this.preview.capability!==null?1:0;
     this.heroRect = this.boardRect();
     if (created) {
@@ -828,7 +831,7 @@ struct Index {
   private closeEditor(): void {
     if (this.heroActive || !this.editing) return;
     if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview();
-    const origin=this.editorRect();this.editorSheetOpen=false;this.editorExpanded=false;this.editorPreviewExpanded=false;
+    const origin=this.editorRect();this.editorSheetOpen=false;this.editorExpanded=false;this.editorSheetHeightVp=0;
     this.creatingTransition = false; this.heroHideContent = this.settingsTab === 0;
     this.heroBase = origin; this.setHeroPose(this.heroBase); this.setTransitionClip(false); this.heroActive = true;
     // Publish the edited card to the board once, before it fades back in.
@@ -1373,7 +1376,7 @@ struct Index {
               showClose:false,dragBar:true,enableOutsideInteractive:true,maskColor:Color.Transparent,
               backgroundColor:Color.Transparent,blurStyle:BlurStyle.NONE,scrollSizeMode:ScrollSizeMode.CONTINUOUS,
               onHeightDidChange:(height:number)=>this.editorSheetHeightChanged(height),
-              onDetentsDidChange:(height:number)=>{const expanded=this.getUIContext().px2vp(height)>this.editorWorkspace().body*.60;if(expanded!==this.editorExpanded||expanded!==this.editorPreviewExpanded)this.expandEditor(expanded);},
+              onDetentsDidChange:(height:number)=>{const expanded=this.getUIContext().px2vp(height)>this.editorWorkspace().body*.60;this.editorExpanded=expanded;},
               onWillDismiss:(action:DismissSheetAction)=>this.dismissEditorSheet(action),onWillSpringBackWhenDismiss:(action:SpringBackAction)=>action.springBack()
             })
         if (this.editorMounted) { this.editor() }
@@ -2091,24 +2094,12 @@ struct Index {
   }
   private editorSheetHeightChanged(height:number):void {
     if(!this.editing||this.heroActive||this.editorLandscape())return;
-    const fraction=this.getUIContext().px2vp(height)/this.editorWorkspace().body;
-    const expanded=this.editorPreviewExpanded?fraction>.54:fraction>.62;
-    // Hysteresis: update the compositor pose once per detent crossing, not artwork on every pan frame.
-    if(expanded!==this.editorPreviewExpanded)this.getUIContext().animateTo(settingsDialogOpen(),()=>this.editorPreviewExpanded=expanded);
+    // The native sheet owns gesture, velocity and settling. Follow its actual height,
+    // including spring-back, rather than starting another animation on every frame.
+    const next=Math.max(0,this.getUIContext().px2vp(height)-this.safeBottom);
+    if(Math.abs(next-this.editorSheetHeightVp)>.25)this.editorSheetHeightVp=next;
   }
-  private editorContentTouch(event:TouchEvent):void {
-    if(this.editorLandscape()||this.heroActive)return;
-    if(event.type===TouchType.Cancel||event.touches.length>1){this.editorScrollDetent.end();this.settleEditorPull();return;}
-    if(event.type===TouchType.Up){const target=this.editorScrollDetent.finish(this.editorExpanded);this.settleEditorPull(target);return;}
-    if(event.touches.length!==1)return;
-    const touch=event.touches[0];
-    if(event.type===TouchType.Down){this.editorScrollDetent.begin(touch.windowX,touch.windowY);}
-    else if(event.type===TouchType.Move){this.editorPull=this.editorScrollDetent.move(touch.windowX,touch.windowY,this.editorExpanded,this.scroller.currentOffset().yOffset);}
-  }
-  private settleEditorPull(target?:boolean):void {
-    this.getUIContext().animateTo(settingsDialogOpen(),()=>{this.editorPull=0;if(target!==undefined){this.editorExpanded=target;this.editorPreviewExpanded=target;}});
-  }
-  private expandEditor(value:boolean):void {if(this.heroActive)return;this.getUIContext().animateTo(settingsDialogOpen(),()=>{this.editorExpanded=value;this.editorPreviewExpanded=value;});}
+  private expandEditor(value:boolean):void {if(this.heroActive)return;this.editorExpanded=value;}
   @Builder
   editorInspector() {
     // Native SegmentButton is inexpensive to select, but changing its button count forces a synchronous layout flush.
@@ -2145,13 +2136,11 @@ struct Index {
           }
         }.width('100%').padding({bottom:24}).transition(settingsContentSwap())},(sectionKey:string)=>sectionKey)}.width('100%')
       }.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Off)
-        .onTouch((event:TouchEvent)=>this.editorContentTouch(event))
-        // The content gesture settles on release. The native drag bar keeps its own continuous sheet pan.
-        .nestedScroll({scrollForward:NestedScrollMode.SELF_ONLY,scrollBackward:NestedScrollMode.SELF_ONLY})
+        // Share the native sheet gesture: expand first upwards; scroll to the top first downwards.
+        .nestedScroll({scrollForward:this.editorLandscape()?NestedScrollMode.SELF_ONLY:NestedScrollMode.PARENT_FIRST,scrollBackward:this.editorLandscape()?NestedScrollMode.SELF_ONLY:NestedScrollMode.SELF_FIRST})
     }.width(this.editorLandscape()?this.editorWorkspace().panelW:this.screenWidth)
       .height(this.editorLandscape()?this.editorWorkspace().body:'100%')
       .padding({left:12,right:12,top:8,bottom:4}).backgroundColor(this.appSurface()).borderRadius({topLeft:24,topRight:24}).clip(true)
-      .translate({y:this.editorLandscape()?0:this.editorPull})
   }
   @Builder
   albumStyleChoices() {
