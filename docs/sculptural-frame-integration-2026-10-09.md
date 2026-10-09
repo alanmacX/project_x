@@ -11,3 +11,7 @@ Offline reproduction: with Playwright and Sharp available, run `node tools/bake-
 Native QA on MatePad Mini: build, replace-install, App display and actual desktop display verified. Native Stack alignment did not place individual rails; explicit numeric coordinates fixed it. Form's initial fallback dimensions did not match the host slot; the frame now measures its own actual area using onAreaChange. There are no live texture calculations, full-canvas blur or shadow layers in CanvasFrame. This is an implementation cost reduction, not a measured refresh-rate guarantee.
 
 Local screenshots: `output/frame-integration-2026-10-09/app.jpeg` and `desktop.jpeg`. Screenshot data is kept out of Git.
+
+## Boundary correction
+
+Removed the study's four-unit presentation margin. Both background and persistent card scene clips now use the frame's 31/600-width outer radius, and the extra thin canvas outline is disabled while a frame is enabled. Form receives actual dimensions from its frame's area measurement so clipping matches the frame too. Offline bake checks require opaque material at all four edge midpoints and zero alpha at the center. The outer frame now defines the canvas boundary, rather than sitting inside a second outline.

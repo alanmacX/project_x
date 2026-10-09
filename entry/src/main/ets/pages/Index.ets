@@ -1392,7 +1392,7 @@ struct Index {
     }.width(this.creatingTransition ? this.screenWidth : this.editing ? (this.heroActive ? this.transitionClipW : this.screenWidth) : BOARD_W * this.boardScale)
       .height(this.creatingTransition ? this.screenHeight : this.editing ? (this.heroActive ? this.transitionClipH : this.screenHeight) : this.boardHeight)
       .position({ x: 0, y: 0 }).translate({ x: this.sceneClipX(), y: this.sceneClipY() })
-      .borderRadius(this.creatingTransition ? 0 : this.editing ? (this.heroActive ? this.transitionClipRadius : 0) : 24).clip(true)
+      .borderRadius(this.creatingTransition ? 0 : this.editing ? (this.heroActive ? this.transitionClipRadius : 0) : (this.canvasBackground.frameStyle==='none'?24:BOARD_W*this.boardScale*31/600)).clip(true)
       .hitTestBehavior(this.editing || this.arriving || this.homeToolsMoving || this.scheduledName.length>0 || this.scheduleTransition ? HitTestMode.None : HitTestMode.Transparent)
   }
   @Builder
@@ -1404,8 +1404,8 @@ struct Index {
         if (this.cards.length === 0) {
           Text('放一张自己的卡片').fontSize(16).fontColor('#989898').width('100%').height('100%').textAlign(TextAlign.Center).hitTestBehavior(HitTestMode.None)
         }
-      }.width(BOARD_W * this.boardScale).height(this.boardHeight).borderRadius(24).clip(true).backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:Color.White)
-        .border({ width: .5, color: '#E9E9E9' }).id('homeCanvasSurface')
+      }.width(BOARD_W * this.boardScale).height(this.boardHeight).borderRadius(this.canvasBackground.frameStyle==='none'?24:BOARD_W*this.boardScale*31/600).clip(true).backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:Color.White)
+        .border({ width: this.canvasBackground.frameStyle==='none'?.5:0, color: '#E9E9E9' }).id('homeCanvasSurface')
         .position({ x: this.boardLeft, y: this.boardTop })
       if(this.floatingHome()){this.homeDock()}else{this.homeLayers();this.homeBackground()}
     }.width('100%').height('100%').opacity(this.arriving ? 1 : this.boardOpacity).accessibilityLevel(this.editing || this.viewing ? 'no-hide-descendants' : 'auto').hitTestBehavior(this.editing || this.viewing || this.canvasChanging ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Default)
@@ -1659,7 +1659,7 @@ struct Index {
     Row({ space: 8 }) {
       Button({ type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {
         Row({ space: 12 }) {
-          CanvasBackdrop({ sceneBackground: this.canvasBackground }).width(40).height(40).borderRadius(10).clip(true).border({ width: .5, color: AppDesign.border(this.appDark) })
+          CanvasBackdrop({ sceneBackground: this.canvasBackground }).width(40).height(40).borderRadius(this.canvasBackground.frameStyle==='none'?10:40*31/600).clip(true).border({ width: this.canvasBackground.frameStyle==='none'?.5:0, color: AppDesign.border(this.appDark) })
           Column({ space: 3 }) { Text('画布背景').fontSize(14).fontColor(this.appText()); Text(this.backgroundBusy ? '正在取色' : this.backgroundLabel()).fontSize(11).fontColor(this.appMuted()) }.alignItems(HorizontalAlign.Start)
           Blank()
           SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([this.appMuted()]).hitTestBehavior(HitTestMode.None)
@@ -1712,7 +1712,7 @@ struct Index {
           }, (card: FridgeCard) => card.id)
           }.width('100%').height('100%').opacity(this.backgroundPreviewReady?1:0)
           CanvasFrame({style:this.canvasBackground.frameStyle,widthVp:240,heightVp:240/this.canvasAspect}).width('100%').height('100%').zIndex(100000)
-        }.width(240).height(240 / this.canvasAspect).borderRadius(20).clip(true)
+        }.width(240).height(240 / this.canvasAspect).borderRadius(this.canvasBackground.frameStyle==='none'?20:240*31/600).clip(true)
         Column({ space: 16 }) {
           if(this.backgroundSettingsStage>=1){
           SettingsSegmented({labels:['纯色','取色','多色','照片','透明'],selectedIndex:this.canvasBackground.mode==='preset'?2:Math.max(0,['solid','smart','blend','photo','transparent'].indexOf(this.canvasBackground.mode)),appDark:this.appDark,

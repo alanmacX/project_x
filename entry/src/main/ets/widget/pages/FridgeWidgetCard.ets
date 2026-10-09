@@ -159,8 +159,8 @@ struct FridgeWidgetCard {
           .rotate({angle:this.cardMap[id].rot,centerX:0,centerY:'100%'})
           .zIndex(this.cardMap[id].z).hitTestBehavior(HitTestMode.None)
       }, (id: string) => id)
-      if(this.canvasBackground.frameStyle!=='none'){CanvasFrame({style:this.canvasBackground.frameStyle}).width('100%').height('100%').zIndex(100000).hitTestBehavior(HitTestMode.None)}
-    }.width('100%').height('100%').backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:Color.White).borderRadius(24).clip(true)
+      if(this.canvasBackground.frameStyle!=='none'){CanvasFrame({style:this.canvasBackground.frameStyle,onFrameSize:(width:number,height:number)=>{if(width>0&&height>0){this.measuredWidth=width;this.measuredHeight=height;}}}).width('100%').height('100%').zIndex(100000).hitTestBehavior(HitTestMode.None)}
+    }.width('100%').height('100%').backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:Color.White).borderRadius(this.canvasBackground.frameStyle==='none'?24:this.widthValue()*31/600).clip(true)
       // Cache the complete clipped form, including shadow fringes, while its
       // host scales it during launch/return. Crossfades render live until settled.
       .renderGroup(this.incoming===null)

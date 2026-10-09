@@ -27,3 +27,8 @@ assert.equal(schema.normalizeBackground({mode:'solid'}).frameStyle,'none');
 assert.equal(schema.normalizeBackground({mode:'transparent',transparentFrame:'dark'}).frameStyle,'dark');
 assert.equal(schema.normalizeBackground({mode:'transparent',frameStyle:'none',transparentFrame:'dark'}).frameStyle,'none');
 assert(fs.readFileSync('entry/src/main/ets/model/BackgroundWorker.ets','utf8').includes('bg.frameStyle=state.background.frameStyle'));
+
+const study=fs.readFileSync('previewer/frame-study.js','utf8');
+assert(study.includes('margin=0'),'production frame must not retain demo inset');
+assert(index.includes("width: this.canvasBackground.frameStyle==='none'?.5:0"),'frame owns the only visible outer boundary');
+assert(index.includes("(this.canvasBackground.frameStyle==='none'?24:BOARD_W*this.boardScale*31/600)).clip(true)"),'card scene clip must match the sculptural frame contour');

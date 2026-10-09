@@ -27,8 +27,8 @@
   },
   "identity": {
     "models": "852b723104669e39ecc614f56f1002926e896d9bad19130faa3c6f1684099831",
-    "materials": "a9f1a510af0e5084c5350b1605bbcbd067a96ba260589a5c584536cdd8fdf89f",
-    "browserAdapter": "434bfa213863962ea4dc0718815f488c0a8300a7454153df02398ed8488a3e9a",
+    "materials": "16fb924cdc383c4ccd0b8a2a23cc9cec1159676ff254d497b4d5917b62f822bb",
+    "browserAdapter": "a38f89a6617e9cded18564ddf70de13d1d01592119e8b6bacb4140ac6a7a1263",
     "nativeViews": "17d7bb650ae7dfad0e26355379d13c26c372ed9b4e9cc0c22f21562860e854ec"
   },
   "coordinates": {

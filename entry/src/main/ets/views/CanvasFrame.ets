@@ -5,6 +5,7 @@ export struct CanvasFrame {
   @Prop style:string='auto';
   @Prop widthVp:number=0;
   @Prop heightVp:number=0;
+  onFrameSize:(width:number,height:number)=>void=()=>{};
   @State measuredWidth:number=0;
   @State measuredHeight:number=0;
   private frameWidth():number{return this.widthVp>0?this.widthVp:this.measuredWidth;}
@@ -36,6 +37,11 @@ export struct CanvasFrame {
         this.tile(7,this.edge(),this.edge(),this.frameWidth()-this.edge(),this.frameHeight()-this.edge())
       }
     }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
-      .onAreaChange((_old:Area,size:Area)=>{const width=Number(size.width);if(width>0&&Math.abs(width-this.measuredWidth)>.1)this.measuredWidth=width;const height=Number(size.height);if(height>0&&Math.abs(height-this.measuredHeight)>.1)this.measuredHeight=height;})
+      .onAreaChange((_old:Area,size:Area)=>{
+        const width=Number(size.width),height=Number(size.height);
+        if(width>0&&height>0&&(Math.abs(width-this.measuredWidth)>.1||Math.abs(height-this.measuredHeight)>.1)){
+          this.measuredWidth=width;this.measuredHeight=height;this.onFrameSize(width,height);
+        }
+      })
   }
 }

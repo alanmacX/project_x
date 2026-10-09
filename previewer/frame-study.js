@@ -39,7 +39,7 @@ function render(){
  // Shade at two pixels per study unit, capped to avoid unbounded bitmap allocation.
  const dpr=Math.min(devicePixelRatio,2),W=Math.round(cssWidth*dpr),H=Math.round(cssHeight*dpr);
  canvas.width=W;canvas.height=H;
- const scale=cssWidth/600,B=state.width*scale,margin=4*scale,w=cssWidth-margin*2,h=cssHeight-margin*2;
+ const scale=cssWidth/600,B=state.width*scale,margin=0,w=cssWidth-margin*2,h=cssHeight-margin*2;
  const R=state.square?0:Math.max(B+7*scale,31*scale),D=state.depth*scale;
  const image=ctx.createImageData(W,H),rgba=image.data,base=palette[state.material];
  const lx=-.38,ly=-.48,lz=.79;
