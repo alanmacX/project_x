@@ -118,9 +118,9 @@ export class FridgeStore {
     doc.state = source === undefined ? defaultState() : cloneCanvas(source, id); doc.state.canvasId = id;
     this.documents.push(doc); this.catalog.canvases.push({id:id,name:doc.name}); this.switchCanvas(id); return id;
   }
-  renameCanvas(name: string): void {
+  renameCanvas(name: string, id: string = this.catalog.activeId): void {
     const value = name.trim().slice(0,40); if (!value) return;
-    const entry = this.catalog.canvases.find((c) => c.id === this.catalog.activeId), doc = this.documents.find((c) => c.id === this.catalog.activeId);
+    const entry = this.catalog.canvases.find((c) => c.id === id), doc = this.documents.find((c) => c.id === id);
     if (entry) entry.name = value; if (doc) doc.name = value;
   }
   async deleteCanvas(id: string): Promise<void> {

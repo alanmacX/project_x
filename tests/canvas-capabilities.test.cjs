@@ -80,6 +80,7 @@ function load(name) {
  const reloaded=new FridgeStore();await reloaded.init({});assert.equal(reloaded.state.canvasId,second);assert.equal(reloaded.documents.length,1,'cold start loads only active artwork');
  await reloaded.openCanvas('canvas_main');assert.equal(reloaded.state.cards[0].id,'original');
  reloaded.renameCanvas('旧画布');await reloaded.save(false);assert.equal(readCatalog(disk.get('fridge_canvases_json')).canvases[0].name,'旧画布');
+ reloaded.renameCanvas('非当前画布改名',second);await reloaded.save(false);assert.equal(reloaded.catalog.activeId,'canvas_main');assert.equal(readCatalog(disk.get('fridge_canvases_json')).canvases.find(c=>c.id===second).name,'非当前画布改名');
  const external=JSON.parse(disk.get(canvasKey('canvas_main')));external.cards[0].capability.title='Widget-side change';disk.set(canvasKey('canvas_main'),JSON.stringify(external));await reloaded.openCanvas('canvas_main');assert.equal(reloaded.state.cards[0].capability.title,'Widget-side change','switching reloads cached artwork after a FormExtension update');
  const duplicate=reloaded.createCanvas('副本',reloaded.state);reloaded.state.cards[0].x=145;await reloaded.save();await reloaded.openCanvas('canvas_main');assert.notEqual(reloaded.state.cards[0].x,145,'duplicate is independently editable');
  // The fallback canvas has already been delivered: unchanged scene bytes must
