@@ -1,11 +1,10 @@
-import { subjectDepthImage } from '../model/SubjectDepthCache';
 import { EditorLayerMotion } from '../model/EditorLayerMotion';
 import { contourPath } from '../model/ContourPath';
 import { cardOutline } from '../model/RenderContours';
 import { FridgeCard, materialColors, cardCornerRadius } from '../model/CardSchema';
 import { CardCanvas } from './CardCanvas';
 import { subjectSurfaceFactor } from '../model/CanvasLayout';
-import { cardDepthScale, cardEdgeColor } from '../model/CardDepth';
+import { cardDepthScale, cardEdgeColor, CARD_SIDE, CARD_CAST_RADIUS, CARD_CAST_Y, CARD_CAST_COLOR, CARD_CONTACT_RADIUS, CARD_CONTACT_Y, CARD_CONTACT_COLOR, contourReliefBands, ReliefBand } from '../model/CardDepth';
 /** The same surface, optional frame and depth are used in app, editor, hero and widget. */
 @Component
 export struct CardFace {
@@ -20,6 +19,8 @@ export struct CardFace {
   @Prop movingLayerId: string = '';
   @Prop moveX: number = 0;
   @Prop moveY: number = 0;
+  private reliefCache:Map<string,ReliefBand[]>=new Map<string,ReliefBand[]>();
+  private bands(radius:number,color:string):ReliefBand[]{const key=radius+color;if(!this.reliefCache.has(key))this.reliefCache.set(key,contourReliefBands(radius,parseInt(color.slice(1,3),16)/255));return this.reliefCache.get(key)!;}
   private pathKey: string = '';
   private outlineRef: Object | null = null;
   private pathCommands: string = '';
@@ -38,22 +39,14 @@ export struct CardFace {
   @Builder
   backing(color: string, offset: number, radius: number, shadowColor: string, shadowY: number) {
     if(this.card.shape==='subject' && this.commands().length>0) {
-      // Explicit alpha contour bands avoid host-dependent blur compositing in
-      // FormKit. Both hosts draw the same cached paths, without a blur filter.
-      if (radius > 0) {
-        Path().commands(this.commands()).fill(shadowColor).stroke(shadowColor)
-          .strokeWidth((this.card.subjectBorder?6*this.scaleFactor:0)+radius*2)
-          .strokeLineJoin(LineJoinStyle.Round).antiAlias(true).opacity(.15)
-          .width('100%').height('100%').translate({y:offset+shadowY}).hitTestBehavior(HitTestMode.None)
-        Path().commands(this.commands()).fill(shadowColor).stroke(shadowColor)
-          .strokeWidth((this.card.subjectBorder?6*this.scaleFactor:0)+radius)
-          .strokeLineJoin(LineJoinStyle.Round).antiAlias(true).opacity(.25)
-          .width('100%').height('100%').translate({y:offset+shadowY}).hitTestBehavior(HitTestMode.None)
-        Path().commands(this.commands()).fill(shadowColor).stroke(shadowColor)
-          .strokeWidth(this.card.subjectBorder?6*this.scaleFactor:0)
-          .strokeLineJoin(LineJoinStyle.Round).antiAlias(true).opacity(.6)
-          .width('100%').height('100%').translate({y:offset+shadowY}).hitTestBehavior(HitTestMode.None)
-      } else {
+      if(radius>0){
+        ForEach(this.bands(radius,shadowColor),(band:ReliefBand)=>{
+          Path().commands(this.commands()).fill(shadowColor).stroke(shadowColor)
+            .strokeWidth((this.card.subjectBorder?6*this.scaleFactor:0)+band.extra)
+            .strokeLineJoin(LineJoinStyle.Round).antiAlias(true).opacity(band.opacity)
+            .width('100%').height('100%').translate({y:offset+shadowY}).hitTestBehavior(HitTestMode.None)
+        },(band:ReliefBand)=>band.extra.toString())
+      }else{
         Path().commands(this.commands()).fill(color).stroke(color)
           .strokeWidth(this.card.subjectBorder?6*this.scaleFactor:0).strokeLineJoin(LineJoinStyle.Round).antiAlias(true)
           .width('100%').height('100%').translate({y:offset}).hitTestBehavior(HitTestMode.None)
@@ -67,17 +60,12 @@ export struct CardFace {
     Stack() {
       // Soft cast shadow + tight contact shadow + a solid, slightly warm sidewall.
       // The cached face owns these layers; pan/rotation only transform its texture.
-      if(!this.widget && !this.lifted && subjectDepthImage(this.card,this.scaleFactor).length>0) {
-        Image(subjectDepthImage(this.card,this.scaleFactor)).width(this.card.w*this.scaleFactor+48).height(this.card.h*this.scaleFactor+48)
-          .position({x:-24,y:-24}).objectFit(ImageFit.Fill).draggable(false).hitTestBehavior(HitTestMode.None)
-      } else {
       Stack() {
-      this.backing(this.edge(),2*this.depthScale(),(this.lifted?9:5.5)*this.depthScale(),this.lifted?'#38000000':'#30000000',(this.lifted?7:4)*this.depthScale())
-      this.backing(this.edge(),2*this.depthScale(),1.4*this.depthScale(),'#48000000',1.2*this.depthScale())
-      this.backing(this.edge(),2*this.depthScale(),0,'#00000000',0)
-      this.backing(this.card.shape==='subject'&&this.card.subjectPhoto?'#FFFFFF':this.paper(),0,0,'#00000000',0)
+        this.backing(this.edge(),CARD_SIDE*this.depthScale(),(this.lifted?13:CARD_CAST_RADIUS)*this.depthScale(),CARD_CAST_COLOR,(this.lifted?8:CARD_CAST_Y)*this.depthScale())
+        this.backing(this.edge(),CARD_SIDE*this.depthScale(),CARD_CONTACT_RADIUS*this.depthScale(),CARD_CONTACT_COLOR,CARD_CONTACT_Y*this.depthScale())
+        this.backing(this.edge(),CARD_SIDE*this.depthScale(),0,'#00000000',0)
+        this.backing(this.card.shape==='subject'&&this.card.subjectPhoto?'#FFFFFF':this.paper(),0,0,'#00000000',0)
       }.width('100%').height('100%')
-      }
       CardCanvas({ layerMotion:this.layerMotion, card: this.card, scaleFactor: this.scaleFactor, tick: this.tick, widget: this.widget, hideContent: this.hideContent, animateContent:this.animateContent,
         movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
         .width((subjectSurfaceFactor(this.card) * 100) + '%').height((subjectSurfaceFactor(this.card) * 100) + '%')

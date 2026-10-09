@@ -2,6 +2,7 @@ import { capabilityRenderTick } from '../../model/CapabilityClock';
 import { cardRenderSnapshot } from '../../model/CardViewSnapshot';
 import { FridgeCard, CanvasBackground, normalizeBackground, BOARD_W } from '../../model/CardSchema';
 import { scenePercent } from '../../model/SceneLayout';
+import { CanvasFrame } from '../../views/CanvasFrame';
 import { CardFace } from '../../views/CardFace';
 
 function initialFormBackground():CanvasBackground {const bg=new CanvasBackground();bg.mode='transparent';return bg;}
@@ -158,6 +159,7 @@ struct FridgeWidgetCard {
           .rotate({angle:this.cardMap[id].rot,centerX:0,centerY:'100%'})
           .zIndex(this.cardMap[id].z).hitTestBehavior(HitTestMode.None)
       }, (id: string) => id)
+      if(this.canvasBackground.mode==='transparent'){CanvasFrame({style:this.canvasBackground.transparentFrame}).width('100%').height('100%').zIndex(100000).hitTestBehavior(HitTestMode.None)}
     }.width('100%').height('100%').backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:Color.White).borderRadius(24).clip(true)
       // Cache the complete clipped form, including shadow fringes, while its
       // host scales it during launch/return. Crossfades render live until settled.

@@ -9,3 +9,7 @@ A background with `mode: transparent` has no canvas-level fill/image. Every card
 For export/QA distinguish editable transparent .fridge / native Form / social share image. A branded social share image deliberately uses a light matte and signature footer for readability; it is not proof that the Form has an opaque background.
 
 Huawei transparent Form requires API 22+, `transparencyEnabled: true`, the approved AGC capability switch saved, and a manual signing Profile containing the entitlement for debug as well as release. DevEco previewer does not demonstrate real transparency. Retain real desktop acceptance as pending until the signed native form is tested.
+
+## Hollow frame and soft-light relief
+
+Transparent backgrounds carry `transparentFrame`: `auto` (default, native system light/dark), `light`, `dark` or `none`. The frame is a hollow bevel; never fill its center. It stays within the widget slot and is shared with recipient settings. The host owns card sidewall and shadows (1.35 logical units of relief, warm soft cast and tighter contact shadow). Do not bake extra drop shadows into cutout images. Native silhouette shadows follow the contour; never use a bounding rectangle shadow on an irregular subject.

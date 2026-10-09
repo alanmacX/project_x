@@ -350,6 +350,7 @@ class CanvasBackground {
         this.color = '#FFFFFF';
         this.src = '';
         this.photo = '';
+        this.transparentFrame = 'auto';
         this.palette = [];
         this.anchors = [];
         this.signature = '';
@@ -361,6 +362,7 @@ function normalizeBackground(raw) {
     if (raw === undefined || raw === null)
         return bg;
     bg.mode = ['solid', 'smart', 'blend', 'photo', 'preset', 'transparent'].includes(raw.mode) ? raw.mode : 'solid';
+    bg.transparentFrame = ['auto', 'light', 'dark', 'none'].includes(raw.transparentFrame) ? raw.transparentFrame : 'auto';
     bg.color = /^#[0-9a-fA-F]{6}$/.test(raw.color ?? '') ? raw.color : '#FFFFFF';
     bg.src = (raw.src ?? '').startsWith('file://') || (raw.src ?? '').startsWith('memory://') ? raw.src : '';
     bg.photo = (raw.photo ?? '').startsWith('file://') ? raw.photo : '';
@@ -1136,7 +1138,7 @@ exports.selectAlbum = selectAlbum;
 "CardDepth":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.cardEdgeColor = exports.cardDepthScale = void 0;
+exports.contourReliefBands = exports.ReliefBand = exports.CARD_CONTACT_COLOR = exports.CARD_CONTACT_Y = exports.CARD_CONTACT_RADIUS = exports.CARD_CAST_COLOR = exports.CARD_CAST_Y = exports.CARD_CAST_RADIUS = exports.CARD_SIDE = exports.cardEdgeColor = exports.cardDepthScale = void 0;
 /** All physical relief scales with artwork, including smaller desktop hosts. */
 function cardDepthScale(scale) { return Number.isFinite(scale) ? Math.max(0, scale) : 1; }
 exports.cardDepthScale = cardDepthScale;
@@ -1149,6 +1151,38 @@ function cardEdgeColor(color, photoSubject) {
     return '#' + channels.map((n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0')).join('');
 }
 exports.cardEdgeColor = cardEdgeColor;
+/** One soft-light relief recipe for all hosts. Values are logical artwork units. */
+exports.CARD_SIDE = 1.35;
+exports.CARD_CAST_RADIUS = 9;
+exports.CARD_CAST_Y = 4.5;
+exports.CARD_CAST_COLOR = '#290E0904';
+exports.CARD_CONTACT_RADIUS = 1.6;
+exports.CARD_CONTACT_Y = .6;
+exports.CARD_CONTACT_COLOR = '#320E0904';
+class ReliefBand {
+    constructor() {
+        this.extra = 0;
+        this.opacity = 0;
+    }
+}
+exports.ReliefBand = ReliefBand;
+/** Gaussian falloff, sampled once as geometry; no rectangular node shadow on a silhouette. */
+function contourReliefBands(radius, amplitude = .16) {
+    if (!Number.isFinite(radius) || radius <= 0)
+        return [];
+    const result = [], steps = radius > 3 ? 16 : 6, sigma = radius / 2;
+    let previous = 0;
+    for (let i = steps; i >= 0; i--) {
+        const distance = radius * 1.5 * i / steps, alpha = Math.exp(-distance * distance / (2 * sigma * sigma));
+        const band = new ReliefBand();
+        band.extra = 2 * distance;
+        band.opacity = (alpha - previous) / (1 - amplitude * previous);
+        previous = alpha;
+        result.push(band);
+    }
+    return result;
+}
+exports.contourReliefBands = contourReliefBands;
 
 },
 "ContourPath":function(require,module,exports){
@@ -3589,4 +3623,4 @@ function cardRenderSnapshot(source, prepared = false) {
 }
 exports.cardRenderSnapshot = cardRenderSnapshot;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"f42a66e8847abd2912855a0812aa29f67de00998d22855be61d322fccc2a19b7"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"e2d7a55412e4afb54bf45a58f21fafa8f21944761e33ad00fa28a1fd514fe3a4"};})(globalThis);

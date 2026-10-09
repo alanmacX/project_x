@@ -1,5 +1,12 @@
 {
   "color": [
-    { "name": "start_window_background", "value": "#101113" }
+    {
+      "name": "start_window_background",
+      "value": "#101113"
+    },
+    {
+      "name": "transparent_frame_surface",
+      "value": "#292B2D"
+    }
   ]
 }

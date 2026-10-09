@@ -26,10 +26,10 @@
     "htmlTemplateVersion": 1
   },
   "identity": {
-    "models": "f42a66e8847abd2912855a0812aa29f67de00998d22855be61d322fccc2a19b7",
+    "models": "e2d7a55412e4afb54bf45a58f21fafa8f21944761e33ad00fa28a1fd514fe3a4",
     "materials": "868838622c193570cd7922a284d3cc26ddd73789614693be4ebd6dffd5ada39d",
-    "browserAdapter": "f76a5f961cf282af90764d28e106472719f3eecc1f80e22d70a4a7b9a722bff3",
-    "nativeViews": "5e256e814d5324b6046b00dd14ad92e8eaf68d7412dc8af97d143a347f696fed"
+    "browserAdapter": "65e494dd8cf55e393322c46a73e92395b602b839f0a1937781572129f29af4e3",
+    "nativeViews": "5c53dfbeff1d2ee14307bf4bd05d742721d9d58b545e927c9a0da8a83a3addae"
   },
   "coordinates": {
     "boardWidth": 344,
@@ -60,6 +60,23 @@
       "preset",
       "transparent"
     ],
+    "transparentFrame": {
+      "default": "auto",
+      "options": [
+        "auto",
+        "light",
+        "dark",
+        "none"
+      ],
+      "hollow": true
+    },
+    "relief": {
+      "side": 1.35,
+      "castRadius": 9,
+      "castY": 4.5,
+      "contactRadius": 1.6,
+      "contactY": 0.6
+    },
     "transparentForm": {
       "minimumApi": 22,
       "requiresManualEntitlement": true,

@@ -15,7 +15,6 @@ import lazy { ReadingComparison } from '../views/ReadingComparison';
 import { CardDeletionFlight } from '../views/CardDeletionFlight';
 import lazy { enhanceImageJob, supportsSuperResolution } from '../model/SuperResolution';
 import { EnhancementPreview } from '../views/EnhancementPreview';
-import { prepareSubjectDepth } from '../model/SubjectDepthCache';
 import { revealStartup } from '../model/StartupPresentation';
 import { removeStagedTemplate } from '../model/IncomingTemplate';
 import { workspaceLayout } from '../model/WorkspaceLayout';
@@ -52,6 +51,7 @@ import { GroupBox, groupBox, groupMinimumScale, transformGroup } from '../model/
 import { BoardMotion, GroupPose } from '../model/BoardMotion';
 import { clampCanvasGroups, layerSections, LayerSection, combineCards, ungroupCards, groupMembers, groupDragBounds, cleanGroups } from '../model/CardGroups';
 import lazy { PhotoCrop } from '../views/PhotoCrop';
+import { CanvasFrame } from '../views/CanvasFrame';
 import { CanvasBackdrop } from '../views/CanvasBackdrop';
 import { CanvasBackground, FridgeState, normalizeState, normalizeBackground } from '../model/CardSchema';
 import { backgroundSignature, createSmartBackground, importBackgroundPhoto, cropBackgroundPhoto } from '../model/BackgroundWorker';
@@ -337,7 +337,6 @@ struct Index {
       const routedLaunch = widgetLaunch || this.routedId.length > 0 || this.viewRouteId.length > 0;
       this.canvasBackground = this.store.state.background; this.layoutBoard();
       startupMark('geometry-ready');
-      await prepareSubjectDepth(this.store.state.cards,this.boardScale,this.context!.cacheDir,this.getUIContext().vp2px(1));
       if(!this.alive)return;
       this.ready = true; this.render(); this.queueReadingTints(); startupMark('scene-ready');
       this.getUIContext().postFrameCallback(new PreparedTransition(()=>startupMark('scene-idle'),true));
@@ -1251,6 +1250,7 @@ struct Index {
           }.width('100%').height('100%').opacity(this.editorOpacity).hitTestBehavior(HitTestMode.None)
         }
         this.editingScene()
+        if(!this.editing&&!this.viewing&&this.canvasBackground.mode==='transparent'){CanvasFrame({style:this.canvasBackground.transparentFrame}).width(BOARD_W*this.boardScale).height(this.boardHeight).position({x:this.boardLeft,y:this.boardTop}).opacity(this.boardOpacity).zIndex(100003).hitTestBehavior(HitTestMode.None)}
         if(this.scheduledFocusId && !this.editing) {
           ForEach(this.cards.filter((card:FridgeCard)=>card.id===this.scheduledFocusId),(card:FridgeCard)=>{
             Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {}
@@ -1361,7 +1361,7 @@ struct Index {
   board() {
     Stack({ alignContent: Alignment.TopStart }) {
       Stack({ alignContent: Alignment.TopStart }) {
-        CanvasBackdrop({ sceneBackground: this.canvasBackground }).width('100%').height('100%')
+        CanvasBackdrop({ sceneBackground: this.canvasBackground,showFrame:false }).width('100%').height('100%')
         Column().width('100%').height('100%').onClick(() => { this.selectedId = ''; })
         if (this.cards.length === 0) {
           Text('放一张自己的卡片').fontSize(16).fontColor('#989898').width('100%').height('100%').textAlign(TextAlign.Center).hitTestBehavior(HitTestMode.None)
@@ -1637,14 +1637,13 @@ struct Index {
     const generation=++this.backgroundPreviewGeneration;
     this.backgroundPreviewReady=false;this.backgroundPreviewCount=0;this.backgroundSettingsStage=0;this.homeToolsOpen=false;this.canvasPickerOpen=false;this.backgroundOpen=true;
     // Sheet entrance must not rebuild every full-resolution silhouette shadow.
-    // Bake thumbnail relief off-thread; mount the miniature only after native sheet entrance.
+    // Mount the miniature after native sheet entrance; no alternate silhouette bake.
     this.getUIContext().postFrameCallback(new PreparedTransition(()=>this.mountBackgroundSettings(generation)));
     if(this.backgroundPreviewTimer>=0)clearTimeout(this.backgroundPreviewTimer);
     this.backgroundPreviewTimer=setTimeout(()=>{
       this.backgroundPreviewTimer=-1;
       if(!this.alive||!this.backgroundOpen||generation!==this.backgroundPreviewGeneration||!this.context)return;
-      prepareSubjectDepth(this.cards,240/BOARD_W,this.context.cacheDir,this.getUIContext().vp2px(1)).then(()=>{this.mountBackgroundPreview(generation);})
-        .catch(()=>{this.mountBackgroundPreview(generation);});
+      this.mountBackgroundPreview(generation);
     },420);
   }
   private mountBackgroundSettings(generation:number):void {
@@ -1683,7 +1682,9 @@ struct Index {
           if(this.backgroundSettingsStage>=2){
           ForEach([this.canvasBackground.mode],(_mode:string)=>{
           Column({space:16}) {
-          if(this.canvasBackground.mode==='transparent'){Text('只显示卡片，桌面壁纸透过空白处；卡片仍限制在小组件范围内。空画布会显示可见的添加提示。').fontSize(13).fontColor(this.appMuted()).width('100%')}
+          if(this.canvasBackground.mode==='transparent'){
+            SettingsSegmented({labels:['跟随系统','白框','深色框','无框'],selectedIndex:Math.max(0,['auto','light','dark','none'].indexOf(this.canvasBackground.transparentFrame)),appDark:this.appDark,onSelect:(index:number)=>{const bg=normalizeBackground(this.canvasBackground);bg.transparentFrame=['auto','light','dark','none'][index];this.applyBackground(bg);}})
+            Text('只显示卡片，桌面壁纸透过空白处；卡片仍限制在小组件范围内。空画布会显示可见的添加提示。').fontSize(13).fontColor(this.appMuted()).width('100%')}
           if (this.canvasBackground.mode === 'solid') {
             ColorSetting({label:'背景颜色',color:this.canvasBackground.color,canReset:false,sourceKey:this.backgroundColorKey(),appDark:this.appDark,
               onPick:(color:string,key:string)=>this.setBackgroundColor(color,key),onFallback:()=>this.chooseBackgroundColor()})

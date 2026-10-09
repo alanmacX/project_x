@@ -1,6 +1,16 @@
 {
   "color": [
-    { "name": "start_window_background", "value": "#FFFFFF" },
-    { "name": "card_bg", "value": "#BFC5CE" }
+    {
+      "name": "start_window_background",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "card_bg",
+      "value": "#BFC5CE"
+    },
+    {
+      "name": "transparent_frame_surface",
+      "value": "#F4F0E8"
+    }
   ]
 }

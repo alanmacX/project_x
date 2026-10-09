@@ -47,7 +47,7 @@
   for(const line of artists){out+=textLine(line,g.textX,cursor+g.artistSize*.9,g.artistSize,g.textWidth,221/255);cursor+=g.artistSize*1.15;}
   return out;
  }
- function shadow(id,r=12,y=5,opacity=53/255){return `<filter id="${id}shadow" x="-40%" y="-40%" width="180%" height="190%"><feDropShadow dx="0" dy="${y}" stdDeviation="${r/2}" flood-opacity="${opacity}"/></filter>`;}
+ function shadow(id,r=12,y=5,opacity=53/255){return `<filter id="${id}shadow" x="-40%" y="-40%" width="180%" height="190%"><feDropShadow dx="0" dy="${y}" stdDeviation="${r/2}" flood-color="#0E0904" flood-opacity="${opacity}"/></filter>`;}
  function albumSVG(album,w,h,style='cover',id='album'){
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" font-family="system-ui,sans-serif"><defs>${shadow(id,style==='cover'?12:10,style==='cover'?5:4,style==='cover'?53/255:40/255)}<clipPath id="${id}card"><rect width="${w}" height="${h}" rx="${schema.ALBUM_CARD_CORNER_RADIUS}"/></clipPath></defs><g clip-path="url(#${id}card)">${albumBody(album,w,h,style,id)}</g></svg>`;
  }
@@ -88,20 +88,20 @@
    assetDefs+=`<image id="${key.slice(1)}" href="data:image/${mime};base64,${a.data}" width="1" height="1" preserveAspectRatio="none"/>`;
   }
   const media=ref=>assets.get(ref)||'';
-  let defs=assetDefs,body=`<rect width="${width}" height="${height}" fill="${color(scene.background.color)}"/>`;
+  let defs=assetDefs,body=scene.background.mode==='transparent'?'':`<rect width="${width}" height="${height}" fill="${color(scene.background.color)}"/>`;
   if(scene.background.mode!=='transparent'&&scene.background.src&&scene.background.mode!=='solid'&&scene.background.mode!=='smart')body+=image(media(scene.background.src),0,0,width,height,0,namespace+'backdrop','xMidYMid slice');
   const background=body,cards=[];
   scene.cards.slice().sort((a,b)=>a.z-b.z).forEach((c,i)=>{
    const start=body.length,id=namespace+'c'+i,r=schema.cardCornerRadius(c),[paper,ink]=schema.materialColors(c.material,c.paper,c.ink),edge=depth.cardEdgeColor(paper,c.shape==='subject'&&c.subjectPhoto),f=canvas.subjectSurfaceFactor(c);
    const content=c.capability?.k==='album'?rotation.activeAlbum(c.capability,tick):null;
-   defs+=shadow(id)+shadow(id+'cast',5.5,4,48/255)+shadow(id+'contact',1.4,1.2,72/255)+`<clipPath id="${id}clip"><rect width="${c.w}" height="${c.h}" rx="${r}"/></clipPath>`;
+   defs+=shadow(id)+shadow(id+'cast',depth.CARD_CAST_RADIUS,depth.CARD_CAST_Y,41/255)+shadow(id+'contact',depth.CARD_CONTACT_RADIUS,depth.CARD_CONTACT_Y,50/255)+`<clipPath id="${id}clip"><rect width="${c.w}" height="${c.h}" rx="${r}"/></clipPath>`;
    const x=c.x*scale,y=c.y*height/schema.BOARD_H;
    body+=`<g data-fridge-card="${escape(c.id)}"><g transform="translate(${x} ${y}) scale(${scale})"><g transform="rotate(${c.rot} ${c.w/2} ${c.h/2})">`;
    if(c.shape==='subject'&&c.outline.length){
     const commands=FridgeCore.load('ContourPath').contourPath(c.outline,c.w,c.h,f),border=c.subjectBorder?6:0;
-    for(const [radius,y,alpha] of [[5.5,6,48/255],[1.4,3.2,72/255]])for(const [extra,opacity] of [[2*radius,.15],[radius,.25],[0,.6]])body+=`<path d="${commands}" transform="translate(0 ${y})" fill="black" stroke="black" stroke-width="${border+extra}" stroke-linejoin="round" opacity="${alpha*opacity}"/>`;
-    body+=`<path d="${commands}" transform="translate(0 2)" fill="${edge}" stroke="${edge}" stroke-width="${border}" stroke-linejoin="round"/><path d="${commands}" fill="${c.subjectPhoto?'white':paper}" stroke="${c.subjectPhoto?'white':paper}" stroke-width="${border}" stroke-linejoin="round"/>`;
-   }else body+=`<rect y="2" width="${c.w}" height="${c.h}" rx="${r}" fill="${edge}" filter="url(#${id}castshadow)"/><rect y="2" width="${c.w}" height="${c.h}" rx="${r}" fill="${edge}" filter="url(#${id}contactshadow)"/><rect y="2" width="${c.w}" height="${c.h}" rx="${r}" fill="${edge}"/>`;
+    for(const kind of ['cast','contact'])body+=`<path d="${commands}" transform="translate(0 ${depth.CARD_SIDE})" fill="${edge}" stroke="${edge}" stroke-width="${border}" stroke-linejoin="round" filter="url(#${id+kind}shadow)"/>`;
+    body+=`<path d="${commands}" transform="translate(0 ${depth.CARD_SIDE})" fill="${edge}" stroke="${edge}" stroke-width="${border}" stroke-linejoin="round"/><path d="${commands}" fill="${c.subjectPhoto?'white':paper}" stroke="${c.subjectPhoto?'white':paper}" stroke-width="${border}" stroke-linejoin="round"/>`;
+   }else body+=`<rect y="${depth.CARD_SIDE}" width="${c.w}" height="${c.h}" rx="${r}" fill="${edge}" filter="url(#${id}castshadow)"/><rect y="${depth.CARD_SIDE}" width="${c.w}" height="${c.h}" rx="${r}" fill="${edge}" filter="url(#${id}contactshadow)"/><rect y="${depth.CARD_SIDE}" width="${c.w}" height="${c.h}" rx="${r}" fill="${edge}"/>`;
    const innerW=c.w*f,innerH=c.h*f,offsetX=(c.w-innerW)/2,offsetY=(c.h-innerH)/2;
    if(c.shape==='subject'&&c.cutout){defs+=`<mask id="${id}alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="${c.w}" height="${c.h}" style="mask-type:alpha"><use href="${media(c.cutout)}" transform="translate(${offsetX} ${offsetY}) scale(${innerW} ${innerH})"/></mask>`;}
    const isFree=c.capFree||FridgeCore.load('ReadingComposition').isReadingComposition(c.capability?.readingBlend||''),readout=c.capability&&!content?FridgeReadouts.capability(c,tick,id+'cap'):'';
@@ -119,7 +119,12 @@
    body+='</g></g></g>';
    cards.push({id:c.id,groupId:c.groupId,z:c.z,x,y,width:c.w*scale,height:c.h*scale,rotation:c.rot,pivot:{x:x+c.w*scale/2,y:y+c.h*scale/2},markup:body.slice(start)});
   });
-  return {svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="system-ui,sans-serif"><defs>${defs}<clipPath id="${namespace}board"><rect width="${width}" height="${height}" rx="20"/></clipPath></defs><g clip-path="url(#${namespace}board)">${body}</g></svg>`,issues:diagnostics,width,height,layers:{version:1,namespace,defs,background,cards}};
+  let frame='';if(scene.background.mode==='transparent'&&scene.background.transparentFrame!=='none'){
+   const theme=scene.background.transparentFrame==='dark'||scene.background.transparentFrame==='auto'&&options.dark;
+   const rim=theme?'#292B2D':'#F4F0E8';
+   frame=`<g data-canvas-frame="${scene.background.transparentFrame}"><rect x="2.25" y="2.25" width="${Math.max(0,width-4.5)}" height="${Math.max(0,height-4.5)}" rx="22" fill="none" stroke="${rim}" stroke-width="4.5"/><rect x=".4" y=".4" width="${Math.max(0,width-.8)}" height="${Math.max(0,height-.8)}" rx="24" fill="none" stroke="#FFFFFF66" stroke-width=".65"/><rect x="4" y="4" width="${Math.max(0,width-8)}" height="${Math.max(0,height-8)}" rx="20" fill="none" stroke="#00000022" stroke-width=".6"/></g>`;
+  }
+  return {svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="system-ui,sans-serif"><defs>${defs}<clipPath id="${namespace}board"><rect width="${width}" height="${height}" rx="20"/></clipPath></defs><g clip-path="url(#${namespace}board)">${body}${frame}</g></svg>`,issues:diagnostics,width,height,layers:{version:1,namespace,defs,background,cards,frame}};
  }
  // Same render pass, no second appearance implementation and no timeline in the app.
  function renderLayers(pack,width,tick,options={}){const result=renderPackage(pack,width,tick,options);return {width:result.width,height:result.height,issues:result.issues,...result.layers};}
