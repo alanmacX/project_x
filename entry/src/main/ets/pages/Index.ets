@@ -143,7 +143,7 @@ struct Index {
   @State boardMotion: BoardMotion = new BoardMotion();
   private movingGroupIds: string[] = [];
   private store: FridgeStore = new FridgeStore();
-  @State scheduleOpen:boolean=false;
+  @State @Watch('homeToolsChanged') scheduleOpen:boolean=false;
   @State sceneEditing:boolean=false;
   @State scenePanelTab:number=0;
   @State sceneEntries:CanvasEntry[]=[];
@@ -681,6 +681,7 @@ struct Index {
   onBackPress(): boolean {
     if(this.navMenuOpen){this.finishNavMenu(-1);return true;}
     if(this.deletionId)return true;
+    if(this.scheduleOpen){this.scheduleOpen=false;this.updateScheduledScene(true);return true;}
     if(this.homeToolsOpen){this.homeToolsOpen=false;return true;}
     if(this.editing&&this.editorExpanded){this.expandEditor(false);return true;}
     if(this.showBackgroundOptions){this.showBackgroundOptions=false;return true;}
@@ -700,15 +701,15 @@ struct Index {
   private homeToolsChanged():void {
     if(!this.ready||this.editing||this.heroActive){this.homeToolsMotionGeneration++;this.homeToolsMoving=false;return;}
     const layout=workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect);
-    const target=layout.floating&&this.homeToolsOpen?layout.expandedBoardY:layout.boardY;
+    const target=layout.floating&&(this.homeToolsOpen||this.scheduleOpen)?layout.expandedBoardY:layout.boardY;
     const generation=++this.homeToolsMotionGeneration;this.homeToolsMoving=true;
-    const motion=canvasToolsMotion(this.homeToolsOpen);
+    const motion=canvasToolsMotion(this.homeToolsOpen||this.scheduleOpen);
     motion.onFinish=()=>{if(this.alive&&generation===this.homeToolsMotionGeneration)this.homeToolsMoving=false;};
     this.getUIContext().animateTo(motion,()=>{this.boardTop=target;});
   }
   private layoutBoard(): void {
     const layout=workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect);
-    this.boardScale=layout.boardW/BOARD_W;this.boardHeight=layout.boardH;this.boardLeft=layout.boardX;this.boardTop=layout.floating&&this.homeToolsOpen?layout.expandedBoardY:layout.boardY;
+    this.boardScale=layout.boardW/BOARD_W;this.boardHeight=layout.boardH;this.boardLeft=layout.boardX;this.boardTop=layout.floating&&(this.homeToolsOpen||this.scheduleOpen)?layout.expandedBoardY:layout.boardY;
     this.panelLeft=layout.panelX;this.panelTop=layout.panelY;this.panelWidth=layout.panelW;this.panelHeight=layout.panelH;
   }
   private scatterOffset(id: string, horizontal: boolean): number {
@@ -1393,7 +1394,7 @@ struct Index {
         }
       }
     }.width('100%').height('100%').backgroundColor(this.appBackground())
-      .bindSheet(this.backgroundOpen||this.scheduleOpen||this.canvasPickerOpen,this.homeTaskSheet,{height:this.taskSheetHeight(),detents:this.backgroundOpen?[this.taskSheetHeight(),this.taskSheetHeight(true)]:[this.taskSheetHeight()],preferType:SheetType.BOTTOM,width:this.screenWidth,dragBar:true,showClose:this.backgroundOpen,backgroundColor:this.appBackground(),onDisappear:()=>{this.backgroundOpen=false;this.backgroundPreviewReady=false;this.backgroundPreviewGeneration++;this.scheduleOpen=false;this.canvasPickerOpen=false;this.canvasCreating=false;this.updateScheduledScene(true);}})
+      .bindSheet(this.backgroundOpen||this.canvasPickerOpen,this.homeTaskSheet,{height:this.taskSheetHeight(),detents:this.backgroundOpen?[this.taskSheetHeight(),this.taskSheetHeight(true)]:[this.taskSheetHeight()],preferType:SheetType.BOTTOM,width:this.screenWidth,dragBar:true,showClose:this.backgroundOpen,backgroundColor:this.appBackground(),onDisappear:()=>{this.backgroundOpen=false;this.backgroundPreviewReady=false;this.backgroundPreviewGeneration++;this.canvasPickerOpen=false;this.canvasCreating=false;this.updateScheduledScene(true);}})
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_: Area, area: Area) => {
         const width = Number(area.width), height = Number(area.height);
@@ -1466,17 +1467,21 @@ struct Index {
       }.width(BOARD_W * this.boardScale).height(this.boardHeight).borderRadius(this.canvasBackground.frameStyle==='none'?24:BOARD_W*this.boardScale*31/600).clip(true).backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:Color.White)
         .border({ width: this.canvasBackground.frameStyle==='none'?.5:0, color: '#E9E9E9' }).id('homeCanvasSurface')
         .position({ x: this.boardLeft, y: this.boardTop })
-      if(this.floatingHome()){this.homeDock()}else{this.homeLayers();this.homeBackground()}
+      if(this.floatingHome()){this.homeDock()}else if(this.scheduleOpen){Column(){this.scheduleEditor()}.width(this.panelWidth).height(this.panelHeight).position({x:this.panelLeft,y:this.panelTop}).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)}else{this.homeLayers();this.homeBackground()}
     }.width('100%').height('100%').opacity(this.arriving ? 1 : this.boardOpacity).accessibilityLevel(this.editing || this.viewing ? 'no-hide-descendants' : 'auto').hitTestBehavior(this.editing || this.viewing || this.canvasChanging ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Default)
   }
   @Builder
-  homeTaskSheet() {if(this.backgroundOpen){this.backgroundEditor()}else if(this.canvasPickerOpen){this.canvasPicker()}else{this.scheduleEditor()}}
+  homeTaskSheet() {if(this.backgroundOpen){this.backgroundEditor()}else{this.canvasPicker()}}
   private floatingHome():boolean {return workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).floating;}
   private homeToolsHeight():number {const limit=Math.min(560,Math.max(200,(this.screenHeight-this.safeTop-this.safeBottom)*(this.screenHeight<600?.78:.56)));return Math.min(limit,Math.max(232,216+Math.min(4,this.cards.length)*72));}
   @Builder
   phoneTools() {
     Stack({alignContent:Alignment.TopStart}) {this.homeLayers(true);this.homeBackground(true)}
       .width(this.screenWidth-32).height(this.homeToolsHeight()).hitTestBehavior(this.homeToolsMoving?HitTestMode.BLOCK_DESCENDANTS:HitTestMode.Default)
+  }
+  @Builder
+  phoneTimingTools() {
+    Column(){this.scheduleEditor()}.width(this.screenWidth-32).height(this.homeToolsHeight())
   }
   @Builder
   timingButton(size:number) {
@@ -1486,7 +1491,8 @@ struct Index {
         Text('定时').fontSize(13).fontColor(this.appText()).hitTestBehavior(HitTestMode.None)
       }
     }.height(size).padding({left:12,right:12}).backgroundColor(this.appControl()).attributeModifier(immersiveChrome(this.appDark))
-      .accessibilityText(this.sceneEditing?'完成定时场景编辑':'定时：场景与画布轮换').onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}this.openScenePanel();})
+      .accessibilityText(this.sceneEditing?'完成定时场景编辑':'定时：场景与画布轮换').onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}if(this.scheduleOpen){this.scheduleOpen=false;this.updateScheduledScene(true);}else this.openScenePanel();})
+      .bindPopup(this.floatingHome()&&this.scheduleOpen,{builder:this.phoneTimingTools,placement:Placement.Top,width:this.screenWidth-32,radius:24,transition:canvasToolsTransition(),systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:false,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible){this.scheduleOpen=false;this.updateScheduledScene(true);}}})
   }
   @Builder
   homeDock() {
@@ -1498,7 +1504,7 @@ struct Index {
           SymbolGlyph($r('sys.symbol.chevron_up')).fontSize(12).fontColor([this.appMuted()]).rotate({angle:this.homeToolsOpen?180:0})
         }.width('100%').hitTestBehavior(HitTestMode.None)
       }.height(52).layoutWeight(1).padding({left:16,right:16}).attributeModifier(immersiveChrome(this.appDark))
-        .accessibilityText('展开画布工具 '+this.canvasName).onClick(()=>{this.refreshCanvasList();this.homeToolsOpen=!this.homeToolsOpen;})
+        .accessibilityText('展开画布工具 '+this.canvasName).onClick(()=>{this.refreshCanvasList();this.scheduleOpen=false;this.homeToolsOpen=!this.homeToolsOpen;})
         .bindPopup(this.homeToolsOpen,{builder:this.phoneTools,placement:Placement.Top,width:this.screenWidth-32,radius:24,transition:canvasToolsTransition(),systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:false,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible)this.homeToolsOpen=false;}})
       this.timingButton(52)
       Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
