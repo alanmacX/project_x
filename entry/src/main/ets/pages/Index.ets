@@ -214,6 +214,7 @@ struct Index {
   @State editorSection:number=0;
   @State editorSheetTab:number=0;
   @State editorExpanded:boolean=false;
+  @State editorPull:number=0;
   @State editorPreviewExpanded:boolean=false;
   @State editorSheetOpen:boolean=false;
   @State @Watch('homeToolsChanged') homeToolsOpen:boolean=false;
@@ -754,7 +755,7 @@ struct Index {
   private openEditor(id: string, created: boolean = false): void {
     if(this.scheduledName||this.scheduleTransition){this.getUIContext().getPromptAction().showToast({message:'请先恢复原始画布再编辑'});return;}
     if (this.heroActive || this.arriving) return;
-    this.editorExpanded=false;this.editorPreviewExpanded=false;this.editorBackPending=false;
+    this.editorExpanded=false;this.editorPull=0;this.editorScrollDetent.end();this.editorPreviewExpanded=false;this.editorBackPending=false;
     this.heroHideContent = false; this.select(id, true); this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false;this.editorSection=0;this.editorSheetTab=0;this.settingsTab=this.preview.capability!==null?1:0;
     this.heroRect = this.boardRect();
     if (created) {
@@ -1496,7 +1497,7 @@ struct Index {
         SymbolGlyph($r('sys.symbol.timer')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
         if(!this.compactTimingLabel()){Text('定时').fontSize(13).fontColor(this.appText()).hitTestBehavior(HitTestMode.None)}
       }
-    }.height(size).layoutWeight(!this.floatingHome()&&this.timingHeaderActive?1:0).padding({left:12,right:12}).backgroundColor(this.appControl()).attributeModifier(immersiveChrome(this.appDark))
+    }.height(size).constraintSize({minWidth:44}).layoutWeight(!this.floatingHome()&&this.timingHeaderActive?1:0).padding({left:this.floatingHome()?12:8,right:this.floatingHome()?12:8}).backgroundColor(this.appControl()).attributeModifier(immersiveChrome(this.appDark))
       .accessibilityText(this.sceneEditing?'完成定时场景编辑':'定时：场景与画布轮换').onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}if(this.scheduleOpen){this.scheduleOpen=false;this.updateScheduledScene(true);}else this.openScenePanel();})
       .bindPopup(this.floatingHome()&&this.scheduleOpen,{builder:this.phoneTimingTools,placement:Placement.Top,width:this.screenWidth-32,radius:24,transition:canvasToolsTransition(),systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:false,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible){this.scheduleOpen=false;this.updateScheduledScene(true);}}})
   }
@@ -1507,7 +1508,7 @@ struct Index {
           SymbolGlyph($r('sys.symbol.paintpalette')).fontSize(22).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
           if(this.backgroundHeaderActive&&!this.floatingHome()){Text('背景').fontSize(13).fontColor(this.appText()).hitTestBehavior(HitTestMode.None)}
         }.hitTestBehavior(HitTestMode.None)
-      }.constraintSize({minWidth:size}).layoutWeight(this.backgroundHeaderActive&&!this.floatingHome()?1:0).height(size).padding({left:this.floatingHome()?0:12,right:this.floatingHome()?0:12}).attributeModifier(immersiveChrome(this.appDark)).accessibilityText('画布背景')
+      }.constraintSize({minWidth:size}).layoutWeight(this.backgroundHeaderActive&&!this.floatingHome()?1:0).height(size).padding({left:this.floatingHome()?0:8,right:this.floatingHome()?0:8}).attributeModifier(immersiveChrome(this.appDark)).accessibilityText('画布背景')
         .enabled(!this.scheduledName&&!this.scheduleTransition).onClick(()=>{if(this.backgroundOpen)this.closeBackgroundEditor();else this.openBackgroundEditor();})
         .bindPopup(this.backgroundOpen&&this.backgroundPopupHome(),{builder:this.phoneBackgroundTools,placement:Placement.Top,width:this.floatingHome()?this.screenWidth-32:this.panelWidth,radius:24,transition:canvasToolsTransition(),systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:false,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible&&this.backgroundOpen&&this.floatingHome())this.closeBackgroundEditor();}})
   }
@@ -1607,23 +1608,21 @@ struct Index {
   @Builder
   homeLayers(floating:boolean=false) {
       Column({ space: 12 }) {
-        Row({space:8}) {
+        Row({space:floating?8:6}) {
 
           Button({type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
             Row({space:6}) {
-              Text(this.sceneEditing?'定时场景 · '+this.canvasName:'画布').fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(!floating&&(this.timingHeaderActive||this.backgroundHeaderActive)?0:1)
+              Text(this.sceneEditing?'定时场景 · '+this.canvasName:'画布').fontSize(floating?17:15).fontWeight(FontWeight.Medium).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(!floating&&(this.timingHeaderActive||this.backgroundHeaderActive)?0:1)
               if(floating||!(this.timingHeaderActive||this.backgroundHeaderActive)){SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}
             }.width(!floating&&(this.timingHeaderActive||this.backgroundHeaderActive)?'auto':'100%')
-          }.id('shareCanvas').padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).layoutWeight(!floating&&(this.timingHeaderActive||this.backgroundHeaderActive)?0:1).constraintSize({maxWidth:!floating&&(this.timingHeaderActive||this.backgroundHeaderActive)?this.panelWidth*.45:this.panelWidth}).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}if(this.canvasChanging)return;if(this.scheduleOpen||this.backgroundOpen){this.scheduleOpen=false;this.backgroundOpen=false;return;}this.refreshCanvasList();this.canvasCreating=false;this.canvasRenameId='';if(!floating)this.homeToolsOpen=false;this.scheduleOpen=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
+          }.id('shareCanvas').padding({left:floating?12:8,right:floating?12:8}).accessibilityText('切换画布 '+this.canvasName).height(44).layoutWeight(!floating&&(this.timingHeaderActive||this.backgroundHeaderActive)?0:1).constraintSize({maxWidth:!floating&&(this.timingHeaderActive||this.backgroundHeaderActive)?this.panelWidth*.45:this.panelWidth}).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}if(this.canvasChanging)return;if(this.scheduleOpen||this.backgroundOpen){this.scheduleOpen=false;this.backgroundOpen=false;return;}this.refreshCanvasList();this.canvasCreating=false;this.canvasRenameId='';if(!floating)this.homeToolsOpen=false;this.scheduleOpen=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
             .bindPopup(this.canvasPickerOpen,{builder:this.canvasPicker,placement:Placement.Top,width:this.canvasPopupWidth(),radius:20,transition:canvasToolsTransition(),systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:true,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible){this.canvasPickerOpen=false;this.canvasCreating=false;}}})
           if(!floating){this.timingButton(44);this.homeBackgroundButton(44)}
-          if(floating||!(this.scheduleOpen||this.backgroundOpen)){
-          Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.scheduledName&&!this.scheduleOpen&&!this.backgroundOpen).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
+          Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).width(48).padding({left:8,right:8}).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.scheduledName).onClick(() => { this.scheduleOpen=false;this.backgroundOpen=false;this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
           if(!floating) {
           Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([Color.White]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(24).backgroundColor('#262626').fontColor(Color.White).accessibilityText('添加卡片').enabled(!this.scheduledName&&!this.scheduleTransition).onClick(() => this.addCard())
           } else {
             Button('导入',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).id('importTemplate').height(44).fontSize(13).padding({left:12,right:12}).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.sharing&&!this.backgroundBusy).onClick(()=>this.pickTemplate())
-          }
           }
         }.width('100%')
         if (!this.scheduleOpen&&!this.backgroundOpen&&this.cards.length >= CANVAS_CARD_TARGET) {
@@ -2099,10 +2098,15 @@ struct Index {
   }
   private editorContentTouch(event:TouchEvent):void {
     if(this.editorLandscape()||this.heroActive)return;
-    if(event.type===TouchType.Up||event.type===TouchType.Cancel||event.touches.length!==1){this.editorScrollDetent.end();return;}
+    if(event.type===TouchType.Cancel||event.touches.length>1){this.editorScrollDetent.end();this.settleEditorPull();return;}
+    if(event.type===TouchType.Up){const target=this.editorScrollDetent.finish(this.editorExpanded);this.settleEditorPull(target);return;}
+    if(event.touches.length!==1)return;
     const touch=event.touches[0];
-    if(event.type===TouchType.Down)this.editorScrollDetent.begin(touch.windowX,touch.windowY);
-    else if(event.type===TouchType.Move){const target=this.editorScrollDetent.move(touch.windowX,touch.windowY,this.editorExpanded,this.scroller.currentOffset().yOffset);if(target!==undefined)this.expandEditor(target);}
+    if(event.type===TouchType.Down){this.editorScrollDetent.begin(touch.windowX,touch.windowY);}
+    else if(event.type===TouchType.Move){this.editorPull=this.editorScrollDetent.move(touch.windowX,touch.windowY,this.editorExpanded,this.scroller.currentOffset().yOffset);}
+  }
+  private settleEditorPull(target?:boolean):void {
+    this.getUIContext().animateTo(settingsDialogOpen(),()=>{this.editorPull=0;if(target!==undefined){this.editorExpanded=target;this.editorPreviewExpanded=target;}});
   }
   private expandEditor(value:boolean):void {if(this.heroActive)return;this.getUIContext().animateTo(settingsDialogOpen(),()=>{this.editorExpanded=value;this.editorPreviewExpanded=value;});}
   @Builder
@@ -2142,13 +2146,12 @@ struct Index {
         }.width('100%').padding({bottom:24}).transition(settingsContentSwap())},(sectionKey:string)=>sectionKey)}.width('100%')
       }.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Off)
         .onTouch((event:TouchEvent)=>this.editorContentTouch(event))
-        // Let the embedded sheet consume upward motion until its large detent;
-        // downward motion scrolls content to the top before returning to the small detent.
-        .nestedScroll({scrollForward:this.editorLandscape()?NestedScrollMode.SELF_ONLY:NestedScrollMode.PARENT_FIRST,
-          scrollBackward:this.editorLandscape()?NestedScrollMode.SELF_ONLY:NestedScrollMode.SELF_FIRST})
+        // The content gesture settles on release. The native drag bar keeps its own continuous sheet pan.
+        .nestedScroll({scrollForward:NestedScrollMode.SELF_ONLY,scrollBackward:NestedScrollMode.SELF_ONLY})
     }.width(this.editorLandscape()?this.editorWorkspace().panelW:this.screenWidth)
       .height(this.editorLandscape()?this.editorWorkspace().body:'100%')
       .padding({left:12,right:12,top:8,bottom:4}).backgroundColor(this.appSurface()).borderRadius({topLeft:24,topRight:24}).clip(true)
+      .translate({y:this.editorLandscape()?0:this.editorPull})
   }
   @Builder
   albumStyleChoices() {

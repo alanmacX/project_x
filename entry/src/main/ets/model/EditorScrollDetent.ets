@@ -1,20 +1,23 @@
-/** Observe a direct touch without consuming Scroll's native gesture or inertia. */
+/** Direct-touch resistance; settling is decided on release, never during inertia. */
 export class EditorScrollDetent {
   private x:number=0;
   private y:number=0;
   private active:boolean=false;
-  private snapped:boolean=false;
-  begin(x:number,y:number):void {this.x=x;this.y=y;this.active=true;this.snapped=false;}
-  end():void {this.active=false;}
-  move(x:number,y:number,expanded:boolean,offset:number):boolean|undefined {
-    if(!this.active||this.snapped)return undefined;
+  private travel:number=0;
+  begin(x:number,y:number):void {this.x=x;this.y=y;this.active=true;this.travel=0;}
+  end():void {this.active=false;this.travel=0;}
+  move(x:number,y:number,expanded:boolean,offset:number):number {
+    if(!this.active)return 0;
     const dx=x-this.x,dy=y-this.y;
-    if(Math.abs(dx)>Math.abs(dy))return undefined;
-    // Scrolled content must reach its start before a downward pull collapses it.
-    if(expanded&&offset>1){this.x=x;this.y=y;return undefined;}
-    if((!expanded&&dy<=-48)||(expanded&&dy>=56)) {
-      this.snapped=true;return !expanded;
-    }
-    return undefined;
+    if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>12){this.end();return 0;}
+    // Downward pulls only become sheet gestures after content reaches its start.
+    if(expanded&&offset>1){this.x=x;this.y=y;this.travel=0;return 0;}
+    this.travel=expanded?Math.max(0,dy):Math.min(0,dy);
+    // Progressive resistance: pulling farther gives diminishing visual travel.
+    return this.travel*.32/(1+Math.abs(this.travel)/72);
+  }
+  finish(expanded:boolean):boolean|undefined {
+    const target=this.active&&((!expanded&&this.travel<=-80)||(expanded&&this.travel>=96))?!expanded:undefined;
+    this.end();return target;
   }
 }

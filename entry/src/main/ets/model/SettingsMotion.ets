@@ -20,3 +20,11 @@ export function canvasToolsTransition():TransitionEffect {
 
 /** Shared physical motion keeps the floating tools and artwork in phase. */
 export function canvasToolsMotion(open:boolean):AnimateParam {return {curve:curves.springMotion(open ? .42 : .36,open ? .74 : .86),expectedFrameRateRange:settingsRate};}
+
+/** Swap inspector bodies in one anchored viewport; never translate navigation controls. */
+export function settingsContentSwap():TransitionEffect {
+  return TransitionEffect.asymmetric(
+    TransitionEffect.OPACITY.animation({duration:160,curve:Curve.EaseOut,expectedFrameRateRange:settingsRate}),
+    TransitionEffect.OPACITY.animation({duration:80,curve:Curve.EaseIn,expectedFrameRateRange:settingsRate})
+  );
+}
