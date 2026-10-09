@@ -1,3 +1,4 @@
+import { EditorScrollDetent } from '../model/EditorScrollDetent';
 import { prepareReadingTints, ReadingTintRequest, ReadingTintResult } from '../model/ReadingMaterialWorker';
 import { cardSource, hash } from '../model/BackgroundInputs';
 import { capabilityRenderTick } from '../model/CapabilityClock';
@@ -33,7 +34,7 @@ import lazy { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
 import lazy { SettingsSelect } from '../views/SettingsSelect';
 import lazy { SettingsSegmented } from '../views/SettingsSegmented';
 import lazy { SettingsCounter } from '../views/SettingsCounter';
-import { canvasToolsMotion, canvasToolsTransition, settingsReveal, settingsDialogOpen, settingsDialogClose } from '../model/SettingsMotion';
+import { canvasToolsMotion, canvasToolsTransition, settingsContentSwap, settingsReveal, settingsDialogOpen, settingsDialogClose } from '../model/SettingsMotion';
 import lazy { CapabilityDetails } from '../views/CapabilityDetails';
 import lazy { WeekTimetable } from '../views/WeekTimetable';
 import lazy { CapabilityPicker } from '../views/CapabilityPicker';
@@ -146,6 +147,8 @@ struct Index {
   private store: FridgeStore = new FridgeStore();
   @State @Watch('homeToolsChanged') scheduleOpen:boolean=false;
   @State timingHeaderActive:boolean=false;
+  @State backgroundHeaderActive:boolean=false;
+  private editorScrollDetent:EditorScrollDetent=new EditorScrollDetent();
   @State sceneEditing:boolean=false;
   @State scenePanelTab:number=0;
   @State sceneEntries:CanvasEntry[]=[];
@@ -592,6 +595,7 @@ struct Index {
         Row({space:8}) {
           Button('新画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).backgroundColor(AppDesign.popupChoice(this.appDark,false)).fontColor(this.appText()).onClick(()=>this.prepareCanvas(false))
           Button('复制画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).backgroundColor(AppDesign.popupChoice(this.appDark,false)).fontColor(this.appText()).onClick(()=>this.prepareCanvas(true))
+          if(!this.floatingHome()){Button('导入',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).fontSize(13).fontColor(this.appText()).backgroundColor(AppDesign.popupChoice(this.appDark,false)).enabled(!this.sharing).onClick(()=>this.pickTemplate())}
         }.width('100%')
 
       }
@@ -696,7 +700,7 @@ struct Index {
     const generation=++this.homeToolsMotionGeneration;this.homeToolsMoving=true;
     const motion=canvasToolsMotion(this.homeToolsOpen||this.scheduleOpen||this.backgroundOpen);
     motion.onFinish=()=>{if(this.alive&&generation===this.homeToolsMotionGeneration)this.homeToolsMoving=false;};
-    this.getUIContext().animateTo(motion,()=>{this.boardTop=target;this.timingHeaderActive=this.scheduleOpen;});
+    this.getUIContext().animateTo(motion,()=>{this.boardTop=target;this.timingHeaderActive=this.scheduleOpen;this.backgroundHeaderActive=this.backgroundOpen&&!this.floatingHome();});
   }
   private layoutBoard(): void {
     const layout=workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect);
@@ -1385,7 +1389,7 @@ struct Index {
         }
       }
     }.width('100%').height('100%').backgroundColor(this.appBackground())
-      .bindSheet(this.backgroundOpen&&!this.backgroundPopupHome(),this.homeTaskSheet,{height:this.backgroundToolsHeight(),detents:this.backgroundOpen?[this.backgroundToolsHeight(),this.taskSheetHeight(true)]:[this.taskSheetHeight()],preferType:SheetType.BOTTOM,width:this.screenWidth,dragBar:true,showClose:this.backgroundOpen,backgroundColor:this.appBackground(),onDisappear:()=>{this.backgroundOpen=false;this.canvasPickerOpen=false;this.canvasCreating=false;this.updateScheduledScene(true);}})
+
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_: Area, area: Area) => {
         const width = Number(area.width), height = Number(area.height);
@@ -1458,14 +1462,13 @@ struct Index {
       }.width(BOARD_W * this.boardScale).height(this.boardHeight).borderRadius(this.canvasBackground.frameStyle==='none'?24:BOARD_W*this.boardScale*31/600).clip(true).backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:Color.White)
         .border({ width: this.canvasBackground.frameStyle==='none'?.5:0, color: '#E9E9E9' }).id('homeCanvasSurface')
         .position({ x: this.boardLeft, y: this.boardTop })
-      if(this.floatingHome()){this.homeDock()}else{this.homeLayers();if(!this.backgroundPopupHome()){this.homeBackground()}}
+      if(this.floatingHome()){this.homeDock()}else{this.homeLayers()}
     }.width('100%').height('100%').opacity(this.arriving ? 1 : this.boardOpacity).accessibilityLevel(this.editing || this.viewing ? 'no-hide-descendants' : 'auto').hitTestBehavior(this.editing || this.viewing || this.canvasChanging ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Default)
   }
-  @Builder
-  homeTaskSheet() {this.backgroundEditor()}
   private floatingHome():boolean {return workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).floating;}
   private homeToolsHeight():number {const limit=Math.min(560,Math.max(200,(this.screenHeight-this.safeTop-this.safeBottom)*(this.screenHeight<600?.78:.56)));return Math.min(limit,Math.max(232,216+Math.min(4,this.cards.length)*72));}
-  private backgroundPopupHome():boolean {return !workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).wide||this.floatingHome();}
+  private backgroundPopupHome():boolean {return this.floatingHome();}
+  private compactTimingLabel():boolean {return !this.floatingHome()&&(this.panelWidth<440||this.backgroundHeaderActive&&this.panelWidth<520);}
   @Builder
   phoneTools() {
     Stack({alignContent:Alignment.TopStart}) {this.homeLayers(true)}
@@ -1491,7 +1494,7 @@ struct Index {
     Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
       Row({space:4}) {
         SymbolGlyph($r('sys.symbol.timer')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
-        Text('定时').fontSize(13).fontColor(this.appText()).hitTestBehavior(HitTestMode.None)
+        if(!this.compactTimingLabel()){Text('定时').fontSize(13).fontColor(this.appText()).hitTestBehavior(HitTestMode.None)}
       }
     }.height(size).layoutWeight(!this.floatingHome()&&this.timingHeaderActive?1:0).padding({left:12,right:12}).backgroundColor(this.appControl()).attributeModifier(immersiveChrome(this.appDark))
       .accessibilityText(this.sceneEditing?'完成定时场景编辑':'定时：场景与画布轮换').onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}if(this.scheduleOpen){this.scheduleOpen=false;this.updateScheduledScene(true);}else this.openScenePanel();})
@@ -1499,11 +1502,14 @@ struct Index {
   }
   @Builder
   homeBackgroundButton(size:number) {
-      Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
-        SymbolGlyph($r('sys.symbol.paintpalette')).fontSize(22).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
-      }.width(size).height(size).attributeModifier(immersiveChrome(this.appDark)).accessibilityText('画布背景')
+      Button({type:this.floatingHome()?ButtonType.Circle:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
+        Row({space:6}) {
+          SymbolGlyph($r('sys.symbol.paintpalette')).fontSize(22).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
+          if(this.backgroundHeaderActive&&!this.floatingHome()){Text('背景').fontSize(13).fontColor(this.appText()).hitTestBehavior(HitTestMode.None)}
+        }.hitTestBehavior(HitTestMode.None)
+      }.constraintSize({minWidth:size}).layoutWeight(this.backgroundHeaderActive&&!this.floatingHome()?1:0).height(size).padding({left:this.floatingHome()?0:12,right:this.floatingHome()?0:12}).attributeModifier(immersiveChrome(this.appDark)).accessibilityText('画布背景')
         .enabled(!this.scheduledName&&!this.scheduleTransition).onClick(()=>{if(this.backgroundOpen)this.closeBackgroundEditor();else this.openBackgroundEditor();})
-        .bindPopup(this.backgroundOpen&&this.backgroundPopupHome(),{builder:this.phoneBackgroundTools,placement:Placement.Top,width:this.floatingHome()?this.screenWidth-32:this.panelWidth,radius:24,transition:canvasToolsTransition(),systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:false,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible&&this.backgroundOpen)this.closeBackgroundEditor();}})
+        .bindPopup(this.backgroundOpen&&this.backgroundPopupHome(),{builder:this.phoneBackgroundTools,placement:Placement.Top,width:this.floatingHome()?this.screenWidth-32:this.panelWidth,radius:24,transition:canvasToolsTransition(),systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:false,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible&&this.backgroundOpen&&this.floatingHome())this.closeBackgroundEditor();}})
   }
   @Builder
   homeDock() {
@@ -1605,21 +1611,22 @@ struct Index {
 
           Button({type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
             Row({space:6}) {
-              Text(this.sceneEditing?'定时场景 · '+this.canvasName:'画布').fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(!floating&&this.timingHeaderActive?0:1)
-              if(floating||!this.timingHeaderActive){SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}
-            }.width(!floating&&this.timingHeaderActive?'auto':'100%')
-          }.id('shareCanvas').padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).layoutWeight(!floating&&this.timingHeaderActive?0:1).constraintSize({maxWidth:!floating&&this.timingHeaderActive?this.panelWidth*.45:this.panelWidth}).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}if(this.canvasChanging)return;if(this.scheduleOpen){this.scheduleOpen=false;return;}this.refreshCanvasList();this.canvasCreating=false;this.canvasRenameId='';if(!floating)this.homeToolsOpen=false;this.scheduleOpen=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
+              Text(this.sceneEditing?'定时场景 · '+this.canvasName:'画布').fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(!floating&&(this.timingHeaderActive||this.backgroundHeaderActive)?0:1)
+              if(floating||!(this.timingHeaderActive||this.backgroundHeaderActive)){SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}
+            }.width(!floating&&(this.timingHeaderActive||this.backgroundHeaderActive)?'auto':'100%')
+          }.id('shareCanvas').padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).layoutWeight(!floating&&(this.timingHeaderActive||this.backgroundHeaderActive)?0:1).constraintSize({maxWidth:!floating&&(this.timingHeaderActive||this.backgroundHeaderActive)?this.panelWidth*.45:this.panelWidth}).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}if(this.canvasChanging)return;if(this.scheduleOpen||this.backgroundOpen){this.scheduleOpen=false;this.backgroundOpen=false;return;}this.refreshCanvasList();this.canvasCreating=false;this.canvasRenameId='';if(!floating)this.homeToolsOpen=false;this.scheduleOpen=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
             .bindPopup(this.canvasPickerOpen,{builder:this.canvasPicker,placement:Placement.Top,width:this.canvasPopupWidth(),radius:20,transition:canvasToolsTransition(),systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:true,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible){this.canvasPickerOpen=false;this.canvasCreating=false;}}})
-          if(!floating){this.timingButton(44);if(this.backgroundPopupHome()){this.homeBackgroundButton(44)}}
-          Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.scheduledName&&!this.scheduleOpen).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
+          if(!floating){this.timingButton(44);this.homeBackgroundButton(44)}
+          if(floating||!(this.scheduleOpen||this.backgroundOpen)){
+          Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.scheduledName&&!this.scheduleOpen&&!this.backgroundOpen).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
           if(!floating) {
           Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([Color.White]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(24).backgroundColor('#262626').fontColor(Color.White).accessibilityText('添加卡片').enabled(!this.scheduledName&&!this.scheduleTransition).onClick(() => this.addCard())
-            if(this.backgroundPopupHome()){Button('导入',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.sharing&&!this.backgroundBusy).onClick(()=>this.pickTemplate())}
           } else {
             Button('导入',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).id('importTemplate').height(44).fontSize(13).padding({left:12,right:12}).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.sharing&&!this.backgroundBusy).onClick(()=>this.pickTemplate())
           }
+          }
         }.width('100%')
-        if (this.cards.length >= CANVAS_CARD_TARGET) {
+        if (!this.scheduleOpen&&!this.backgroundOpen&&this.cards.length >= CANVAS_CARD_TARGET) {
           Row({space:8}) {
             Text(this.cards.length + ' / ' + CANVAS_CARD_LIMIT).fontSize(12).fontColor(this.appMuted())
               .accessibilityText('当前画布 '+this.cards.length+' 张卡片，最多 '+CANVAS_CARD_LIMIT+' 张')
@@ -1629,6 +1636,8 @@ struct Index {
         Stack({ alignContent: Alignment.Bottom }) {
         if(!floating&&this.scheduleOpen) {
           Column(){this.scheduleEditor()}.width('100%').height('100%').transition(this.homePanelTransition(true))
+        } else if(!floating&&this.backgroundOpen) {
+          Column(){this.backgroundEditor()}.width('100%').height('100%').transition(this.homePanelTransition(true))
         } else {
         Stack({alignContent:Alignment.Bottom}){
         List({space:8}) {
@@ -1668,7 +1677,7 @@ struct Index {
         }.width('100%').height('100%').transition(this.homePanelTransition(false))
         }
         }.width('100%').layoutWeight(1)
-      }.width(floating?this.screenWidth-32:this.panelWidth).height(floating?this.homeToolsHeight():this.backgroundPopupHome()?this.panelHeight:this.panelHeight-76).padding(12).backgroundColor(floating?Color.Transparent:this.appSurface()).borderRadius(AppDesign.sectionRadius)
+      }.width(floating?this.screenWidth-32:this.panelWidth).height(floating?this.homeToolsHeight():this.panelHeight).padding(12).backgroundColor(floating?Color.Transparent:this.appSurface()).borderRadius(AppDesign.sectionRadius)
         .position({x:floating?0:this.panelLeft,y:floating?0:this.panelTop})
   }
   private homeActionHeight():number {return this.groupSelecting?60:this.selectedId.length===0?0:60;}
@@ -1756,22 +1765,6 @@ struct Index {
       const next = normalizeBackground(JSON.parse(json as string) as CanvasBackground); next.mode = 'preset'; next.photo = this.canvasBackground.photo; this.applyBackground(next);
     }).catch(() => this.getUIContext().getPromptAction().showToast({ message: '预设生成失败' })).finally(() => { if (generation === this.backgroundGeneration) this.backgroundBusy = false; });
   }
-  @Builder
-  homeBackground(floating:boolean=false) {
-    Row({ space: 8 }) {
-      Button({ type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {
-        Row({ space: 12 }) {
-          CanvasBackdrop({ sceneBackground: this.canvasBackground }).width(40).height(40).borderRadius(this.canvasBackground.frameStyle==='none'?10:40*31/600).clip(true).border({ width: this.canvasBackground.frameStyle==='none'?.5:0, color: AppDesign.border(this.appDark) })
-          Column({ space: 3 }) { Text('画布背景').fontSize(14).fontColor(this.appText()); Text(this.backgroundBusy ? '正在取色' : this.backgroundLabel()).fontSize(11).fontColor(this.appMuted()) }.alignItems(HorizontalAlign.Start)
-          Blank()
-          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([this.appMuted()]).hitTestBehavior(HitTestMode.None)
-        }.width('100%')
-      }.height(56).layoutWeight(1).backgroundColor(Color.Transparent).padding(8).accessibilityText('调整画布背景，'+this.backgroundLabel()).enabled(!this.scheduledName&&!this.scheduleTransition).onClick(() => { this.openBackgroundEditor(); })
-      Button(this.sharing ? '生成中' : '导入', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).id('importTemplate').height(44).fontSize(13).padding({ left: 12, right: 12 })
-        .backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.sharing && !this.backgroundBusy).onClick(() => this.pickTemplate())
-    }.width(floating?this.screenWidth-32:this.panelWidth).height(64).padding(4).borderRadius(AppDesign.sectionRadius).border({width:floating?0:1,color:AppDesign.border(this.appDark)}).backgroundColor(floating?Color.Transparent:this.appSurface())
-      .position({x:floating?0:this.panelLeft,y:floating?this.homeToolsHeight()-64:this.panelTop+this.panelHeight-64})
-  }
   private openBackgroundEditor():void {
     if(!this.context)return;
     this.homeToolsOpen=false;this.scheduleOpen=false;this.canvasPickerOpen=false;this.backgroundOpen=true;
@@ -1784,7 +1777,7 @@ struct Index {
         Column({ space: 12 }) {
           SettingsSegmented({labels:['纯色','取色','多色','照片','透明'],selectedIndex:this.canvasBackground.mode==='preset'?2:Math.max(0,['solid','smart','blend','photo','transparent'].indexOf(this.canvasBackground.mode)),appDark:this.appDark,
             onSelect:(index:number)=>{if(!this.backgroundBusy)this.chooseBackgroundMode(['solid','smart','blend','photo','transparent'][index]);}}).enabled(!this.backgroundBusy)
-          ForEach([this.canvasBackground.mode],(_mode:string)=>{
+          Stack({alignContent:Alignment.TopStart}) {ForEach([this.canvasBackground.mode],(_mode:string)=>{
           Column({space:12}) {
           Text('画框').fontSize(13).fontColor(this.appMuted()).width('100%')
           SettingsSegmented({labels:['无框','浅色','深色','跟随系统'],selectedIndex:Math.max(0,['none','light','dark','auto'].indexOf(this.canvasBackground.frameStyle)),appDark:this.appDark,onSelect:(index:number)=>{const bg=normalizeBackground(this.canvasBackground);bg.frameStyle=['none','light','dark','auto'][index];this.applyBackground(bg);}})
@@ -1812,8 +1805,8 @@ struct Index {
             Button('选择本地照片', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).width('100%').fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.backgroundBusy).onClick(() => this.pickBackgroundPhoto())
             Text('按桌面画布比例拖动、双指缩放后确认；原照片不修改。').fontSize(12).fontColor(this.appMuted()).width('100%')
           }
-          }.width('100%').transition(settingsReveal())
-          },(mode:string)=>mode)
+          }.width('100%').transition(settingsContentSwap())
+          },(mode:string)=>mode)}.width('100%')
         }.width('100%').padding(12).borderRadius(20).backgroundColor(this.appSurface()).border({ width: 1, color: AppDesign.border(this.appDark) })
         Column({ space: 12 }) {
           Text('柔色预设').fontSize(16).fontColor(this.appText()).width('100%')
@@ -2104,6 +2097,13 @@ struct Index {
     // Hysteresis: update the compositor pose once per detent crossing, not artwork on every pan frame.
     if(expanded!==this.editorPreviewExpanded)this.getUIContext().animateTo(settingsDialogOpen(),()=>this.editorPreviewExpanded=expanded);
   }
+  private editorContentTouch(event:TouchEvent):void {
+    if(this.editorLandscape()||this.heroActive)return;
+    if(event.type===TouchType.Up||event.type===TouchType.Cancel||event.touches.length!==1){this.editorScrollDetent.end();return;}
+    const touch=event.touches[0];
+    if(event.type===TouchType.Down)this.editorScrollDetent.begin(touch.windowX,touch.windowY);
+    else if(event.type===TouchType.Move){const target=this.editorScrollDetent.move(touch.windowX,touch.windowY,this.editorExpanded,this.scroller.currentOffset().yOffset);if(target!==undefined)this.expandEditor(target);}
+  }
   private expandEditor(value:boolean):void {if(this.heroActive)return;this.getUIContext().animateTo(settingsDialogOpen(),()=>{this.editorExpanded=value;this.editorPreviewExpanded=value;});}
   @Builder
   editorInspector() {
@@ -2121,7 +2121,7 @@ struct Index {
       this.editorInspector()
       if(this.sectionTabs().length>0 && (this.preview.capability?.k==='album'&&this.editorSection===1 || this.layerId==='capability'&&this.editorSection===3)) {SettingsSegmented({labels:this.sectionTabs(),selectedIndex:this.editorSheetTab,appDark:this.appDark,onSelect:(i:number)=>{this.editorSheetTab=i;this.scroller.scrollTo({xOffset:0,yOffset:0});}})}
       Scroll(this.scroller) {
-        Column() {ForEach([this.layerId+':'+this.editorSection+':'+this.editorSheetTab],(sectionKey:string)=>{Column({space:16}) {
+        Stack({alignContent:Alignment.TopStart}) {ForEach([this.layerId+':'+this.editorSection+':'+this.editorSheetTab],(sectionKey:string)=>{Column({space:16}) {
           if(this.preview.capability?.k==='album') {
             if(this.editorSection===0) {this.albumStyleChoices()}
             else {Column() {this.capabilityDataPanel()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(20)}
@@ -2139,8 +2139,13 @@ struct Index {
             if(this.editorSection===0) {this.appearancePanel()}
             else {this.baseColorPanel()}
           }
-        }.width('100%').padding({bottom:24}).transition(settingsReveal())},(sectionKey:string)=>sectionKey)}.width('100%')
+        }.width('100%').padding({bottom:24}).transition(settingsContentSwap())},(sectionKey:string)=>sectionKey)}.width('100%')
       }.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Off)
+        .onTouch((event:TouchEvent)=>this.editorContentTouch(event))
+        // Let the embedded sheet consume upward motion until its large detent;
+        // downward motion scrolls content to the top before returning to the small detent.
+        .nestedScroll({scrollForward:this.editorLandscape()?NestedScrollMode.SELF_ONLY:NestedScrollMode.PARENT_FIRST,
+          scrollBackward:this.editorLandscape()?NestedScrollMode.SELF_ONLY:NestedScrollMode.SELF_FIRST})
     }.width(this.editorLandscape()?this.editorWorkspace().panelW:this.screenWidth)
       .height(this.editorLandscape()?this.editorWorkspace().body:'100%')
       .padding({left:12,right:12,top:8,bottom:4}).backgroundColor(this.appSurface()).borderRadius({topLeft:24,topRight:24}).clip(true)

@@ -19,12 +19,13 @@ export struct SceneSchedulePanel {
   onToggle:(id:string,value:boolean)=>void=()=>{};
   onPreview:(rule:SceneRule)=>void=()=>{};
   onRotation:(rotation:CanvasRotation)=>void=()=>{};
+  private contentScroller:Scroller=new Scroller();
   @State tab:number=0;
   @State draft:SceneRule=new SceneRule();
   @State editingRule:boolean=false;
   @State rotationDraft:CanvasRotation=new CanvasRotation();
   aboutToAppear():void {this.tab=this.initialTab;this.rotationDraft=normalizeCanvasRotation(this.rotation,this.canvases.map(c=>c.id));}
-  private edit(rule:SceneRule):void {this.draft=JSON.parse(JSON.stringify(rule)) as SceneRule;this.editingRule=true;}
+  private edit(rule:SceneRule):void {this.draft=JSON.parse(JSON.stringify(rule)) as SceneRule;this.contentScroller.scrollTo({xOffset:0,yOffset:0});this.editingRule=true;}
   private pickTime():void {const d=new Date();d.setHours(Math.floor(this.draft.start/60),this.draft.start%60,0,0);TimePickerDialog.show({selected:d,useMilitaryTime:true,onAccept:(v:TimePickerResult)=>this.draft.start=(v.hour??0)*60+(v.minute??0)});}
   private pickDate():void {const p=this.draft.date.split('-').map(Number);DatePickerDialog.show({selected:p.length===3?new Date(p[0],p[1]-1,p[2]):new Date(),onAccept:(v:DatePickerResult)=>this.draft.date=sceneDay(new Date(v.year??new Date().getFullYear(),v.month??0,v.day??1))});}
   private saveRotation():void {this.rotationDraft=normalizeCanvasRotation(this.rotationDraft,this.canvases.map(c=>c.id));this.onRotation(this.rotationDraft);}
@@ -34,7 +35,7 @@ export struct SceneSchedulePanel {
   @Builder
   timing() {
     Column({space:10}) {
-      Row(){Text('出现时间').fontSize(17).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark));Blank();this.action('返回',()=>this.editingRule=false)}.width('100%')
+      Row(){Text('出现时间').fontSize(17).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark));Blank();this.action('返回',()=>{this.contentScroller.scrollTo({xOffset:0,yOffset:0});this.editingRule=false;})}.width('100%')
       TextInput({text:this.draft.name,placeholder:'场景名称'}).height(44).maxLength(30).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onChange(v=>this.draft.name=v)
       SettingsSegmented({labels:['每周重复','仅一次'],selectedIndex:this.draft.repeat==='once'?1:0,appDark:this.appDark,onSelect:i=>{this.draft.repeat=i===1?'once':'daily';if(!this.draft.date)this.draft.date=sceneDay(new Date());}})
       if(this.draft.repeat==='once'){this.action(this.draft.date,()=>this.pickDate())}
@@ -64,16 +65,12 @@ export struct SceneSchedulePanel {
         },(slot:CanvasTimeSlot)=>String(slot.start))
         this.action('添加时间分界',()=>{if(this.rotationDraft.slots.length>=12)return;let start=720;while(this.rotationDraft.slots.some(s=>s.start===start)&&start<1439)start++;if(start>=1440)return;this.rotationDraft.slots.push({start,canvasId:this.canvases[0]?.id??''});this.saveRotation();})
         Text('从 00:00 到 24:00 连续覆盖；修改分界会同时调整相邻区间。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
-      } else {Text('在“我的画布”里自由切换。').fontSize(14).fontColor(AppDesign.muted(this.appDark)).width('100%')}
+      } else {Text('在“画布”里自由切换。').fontSize(14).fontColor(AppDesign.muted(this.appDark)).width('100%')}
     }.width('100%').padding(12).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
   }
-  build() {
-    Scroll() {
-      Column({space:10}) {
-        SettingsSegmented({labels:['定时场景','画布轮换'],selectedIndex:this.tab,appDark:this.appDark,onSelect:i=>{this.tab=i;this.editingRule=false;}})
-        if(this.tab===1){this.rotationEditor()}
-        else if(this.editingRule){this.timing()}
-        else {
+  @Builder
+  sceneList() {
+    Column({space:10}) {
           ForEach(this.rules,(rule:SceneRule)=>{
             Column({space:6}) {
               Row(){Text(rule.name).fontSize(15).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:rule.enabled}).onChange(v=>this.onToggle(rule.id,v))}.width('100%')
@@ -83,8 +80,23 @@ export struct SceneSchedulePanel {
           },(rule:SceneRule)=>rule.id)
           Button('新建场景',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.EMPHASIZED}).height(40).width('100%').fontColor(AppDesign.onSelected(this.appDark)).backgroundColor(AppDesign.selected(this.appDark)).enabled(this.scenes.length<12).onClick(this.onCreate)
           Text('到点展示中央卡片，点击或超时恢复。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+
+    }.width('100%').padding({bottom:12})
+  }
+  build() {
+    Column({space:10}) {
+      SettingsSegmented({labels:['定时场景','画布轮换'],selectedIndex:this.tab,appDark:this.appDark,onSelect:i=>{this.tab=i;this.editingRule=false;}}).height(48)
+      // Tabs owns the transition viewport; outgoing pages cannot resize or displace the navigation row.
+      Tabs({index:this.tab}) {
+        TabContent() {
+          Scroll(this.contentScroller) {
+            Column() {if(this.editingRule){this.timing()}else{this.sceneList()}}.width('100%').alignItems(HorizontalAlign.Start)
+          }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
         }
-      }.width('100%').padding({top:8,left:8,right:8,bottom:12})
-    }.width('100%').height('100%').scrollBar(BarState.Off)
+        TabContent() {
+          Scroll() {this.rotationEditor()}.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
+        }
+      }.width('100%').layoutWeight(1).barHeight(0).scrollable(false).animationDuration(180).onChange((index:number)=>this.tab=index)
+    }.width('100%').height('100%').padding({top:8,left:8,right:8,bottom:0})
   }
 }
