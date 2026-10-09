@@ -4,7 +4,7 @@ import { attachedPath } from '../model/EdgeAttachment';
 import { readingSurfaceColor } from '../model/CapabilityPresentation';
 import { isReadingComposition, compositionPadding } from '../model/ReadingComposition';
 import { hookCenter, hookReserve, micaPath } from '../model/MicaGeometry';
-import { micaStudyFill, micaStudyPigment } from '../model/MicaMaterialStudy';
+import { micaStudyFill, micaStudyPigment, tactileFill, tactilePigment, tactileTextureOpacity, tactileEdgeColor, tactileThickness } from '../model/MicaMaterialStudy';
 import { PaperBacking } from './PaperBacking';
 /** Shared native material paths; translating a card never clears a bitmap surface. */
 @Component
@@ -38,7 +38,7 @@ export struct ReadingBacking {
   const w=vp2px(Math.max(0,this.w()-2*inset)),h=vp2px(Math.max(0,this.h()-2*inset)),s=vp2px(this.scaleFactor);
   if(w<=0||h<=0)return '';
   let path=this.profile.length?attachedPath(w,h,this.profile,this.contactLeft,6*s):micaPath(this.blend,w,h,s,this.edge);
-  if(this.study>0&&(this.blend==='tag'||this.blend==='dock')) {
+  if(this.study>0&&this.study<4&&(this.blend==='tag'||this.blend==='dock')) {
    const r=Math.min(18*s,w/4,h/4);
    path=`M ${r} 0 L ${w-r} 0 Q ${w} 0 ${w} ${r} L ${w} ${h-r} Q ${w} ${h} ${w-r} ${h} L ${r} ${h} Q 0 ${h} 0 ${h-r} L 0 ${r} Q 0 0 ${r} 0 Z`;
   }
@@ -60,10 +60,29 @@ export struct ReadingBacking {
   if(color==='#000000')return scrim?$r('app.media.reading_scrim_black'):$r('app.media.reading_feather_black');
   return scrim?$r('app.media.reading_scrim_warm'):$r('app.media.reading_feather_warm');
  }
+ private tactileWidth():number {return this.w()+(this.blend==='cloud'?2*CLOUD_READING_OUTSET*this.scaleFactor:0);}
+ private tactileHeight():number {return this.h()+(this.blend==='cloud'?2*CLOUD_READING_OUTSET*this.scaleFactor:0);}
+ private tactilePath():string {return this.blend==='cloud'?this.cloudPath():this.path();}
+ @Builder private tactileSurface() {
+  Stack() {
+   Path().commands(this.tactilePath()).fill(tactileEdgeColor(this.study)).stroke(Color.Transparent).antiAlias(true)
+    .width('100%').height('100%').translate({y:tactileThickness(this.study)*this.scaleFactor})
+   Stack() {
+    Column().width('100%').height('100%').backgroundColor(tactileFill(this.tint,this.study))
+    Column().width('100%').height('100%').radialGradient({center:['84%','90%'],radius:'96%',colors:[[tactilePigment(this.tint,this.study),0],['#00000000',1]]})
+    Image($r('app.media.reading_paper_fibres')).width('100%').height('100%').objectFit(ImageFit.Fill).opacity(tactileTextureOpacity(this.study)).draggable(false)
+    Column().width('100%').height('100%').linearGradient({angle:180,colors:[['#58FFFFFC',0],['#00FFFFFC',.48],['#0DAD9168',1]]})
+   }.width('100%').height('100%').clipShape(new PathShape().commands(this.tactilePath()))
+   Path().commands(this.tactilePath()).fill(Color.Transparent).stroke('#A8FFFDF7').strokeWidth(.7*this.scaleFactor).antiAlias(true).width('100%').height('100%')
+  }.width(this.tactileWidth()).height(this.tactileHeight())
+   .position({x:this.blend==='cloud'?-CLOUD_READING_OUTSET*this.scaleFactor:0,y:this.blend==='cloud'?-CLOUD_READING_OUTSET*this.scaleFactor:0})
+ }
  build() {
   Stack() {
    if(isReadingComposition(this.blend)) {
-    if(this.blend==='cloud') {
+    if(this.study>=4) {
+     this.tactileSurface()
+    } else if(this.blend==='cloud') {
      // Two native shapes, no blur/bitmap clear. Expanded bounds preserve the text core.
      Path().commands(this.cloudPath()).fill('#249C8B6C').stroke(Color.Transparent).antiAlias(true)
       .width(this.w()+2*CLOUD_READING_OUTSET*this.scaleFactor).height(this.h()+2*CLOUD_READING_OUTSET*this.scaleFactor)

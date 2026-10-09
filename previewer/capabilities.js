@@ -20,6 +20,10 @@
   let p=contact.profile.length?edge.attachedPath(w,h,contact.profile,contact.left,6*s):mica.micaPath(blend,w,h,s,cap.readingEdge||'');
   const reserve=mica.hookReserve(blend),hx=mica.hookCenter(cap.readingHook??.2,w,s);
   if(reserve){const r=3.3*s,y=10*s;p+=` M ${hx+r} ${y} A ${r} ${r} 0 1 0 ${hx-r} ${y} A ${r} ${r} 0 1 0 ${hx+r} ${y} Z`;}
+  if(composition.isReadingComposition(blend)&&(cap.readingMaterialStudy??0)>=4){
+   const v=cap.readingMaterialStudy,cloud=blend==='cloud',off=cloud?16*s:0,W=w+2*off,H=h+2*off,d=cloud?load('CloudReadingGeometry').cloudReadingPath(w,h,s):p;
+   return `<defs><clipPath id="${id}matte"><path d="${d}"/></clipPath><radialGradient id="${id}wash" cx="84%" cy="90%" r="96%"><stop stop-color="${col(material.tactilePigment(tint,v))}"/><stop offset="1" stop-color="transparent"/></radialGradient><linearGradient id="${id}glow" x2="0" y2="1"><stop stop-color="#FFFFFC58"/><stop offset=".48" stop-color="#FFFFFC00"/><stop offset="1" stop-color="#AD91680D"/></linearGradient></defs><g transform="translate(${-off} ${-off})"><path d="${d}" transform="translate(0 ${material.tactileThickness(v)*s})" fill="${col(material.tactileEdgeColor(v))}"/><g clip-path="url(#${id}matte)"><rect width="${W}" height="${H}" fill="${col(material.tactileFill(tint,v))}"/><rect width="${W}" height="${H}" fill="url(#${id}wash)"/><image href="${FridgeMaterials.reading_paper_fibres}" width="${W}" height="${H}" preserveAspectRatio="none" opacity="${material.tactileTextureOpacity(v)}"/><rect width="${W}" height="${H}" fill="url(#${id}glow)"/></g><path d="${d}" fill="none" stroke="#FFFDF7A8" stroke-width="${.7*s}"/></g>`;
+  }
   if(blend==='cloud'){
    const d=load('CloudReadingGeometry').cloudReadingPath(w,h,s),off=16*s;
    return `<g transform="translate(${-off} ${-off})"><path d="${d}" transform="translate(0 ${2*s})" fill="#9C8B6C24"/><path d="${d}" fill="#FAF4E3E6" stroke="#FFFDF6" stroke-width="${1.1*s}"/></g>`;

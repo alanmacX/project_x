@@ -2929,10 +2929,10 @@ exports.batteryPaperArcMask = batteryPaperArcMask;
 "MicaMaterialStudy":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.micaStudyPigment = exports.micaStudyTint = exports.micaStudyFill = exports.MICA_STUDY_NOTES = exports.MICA_STUDY_LABELS = void 0;
+exports.tactileThickness = exports.tactileEdgeColor = exports.tactileTextureOpacity = exports.tactilePigment = exports.tactileFill = exports.micaStudyPigment = exports.micaStudyTint = exports.micaStudyFill = exports.MICA_STUDY_NOTES = exports.MICA_STUDY_LABELS = void 0;
 /** Read-only study presets. No runtime blur, image decoding, or time-dependent noise. */
-exports.MICA_STUDY_LABELS = ['现有材质', 'A · 轻透云母', 'B · 云白采色', 'C · 奶油采色'];
-exports.MICA_STUDY_NOTES = ['当前正式效果', '轻透基底 · 柔和色晕', '云白透光 · 局部融色', '较低透明度 · 更浓采色'];
+exports.MICA_STUDY_LABELS = ['现有材质', 'A · 轻透云母', 'B · 云白采色', 'C · 奶油采色', 'D · 轻透磨砂', 'E · 暖白细纸'];
+exports.MICA_STUDY_NOTES = ['当前正式效果', '轻透基底 · 柔和色晕', '云白透光 · 局部融色', '较低透明度 · 更浓采色', '温润透光 · 薄边与细颗粒', '柔软暖白 · 纸面与接触厚度'];
 function micaStudyFill(tint, variant) {
     const source = /^#[0-9a-fA-F]{6}$/.test(tint) ? tint : '#E8D6B0';
     const index = Math.max(0, Math.min(2, Math.floor(variant) - 1)), ratio = [.16, .42, .72][index], alpha = [.76, .88, .95][index];
@@ -2982,6 +2982,22 @@ function micaStudyPigment(tint, variant, strength = 1) {
     return '#' + Math.round(alpha * 255).toString(16).padStart(2, '0') + rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
 }
 exports.micaStudyPigment = micaStudyPigment;
+/** Preview-only tactile profiles: stable offline texture, no animated noise or backdrop blur. */
+function tactileFill(tint, variant) {
+    const source = /^#[0-9a-f]{6}$/i.test(tint) ? tint : '#E8D6B0';
+    const white = [250, 248, 239], ratio = variant === 4 ? .12 : .065;
+    const rgb = [1, 3, 5].map((i, index) => Math.round(parseInt(source.slice(i, i + 2), 16) * ratio + white[index] * (1 - ratio)).toString(16).padStart(2, '0')).join('');
+    return (variant === 4 ? '#ED' : '#FA') + rgb;
+}
+exports.tactileFill = tactileFill;
+function tactilePigment(tint, variant) { return micaStudyPigment(tint, 2, variant === 4 ? .56 : .32); }
+exports.tactilePigment = tactilePigment;
+function tactileTextureOpacity(variant) { return variant === 4 ? .14 : .32; }
+exports.tactileTextureOpacity = tactileTextureOpacity;
+function tactileEdgeColor(variant) { return variant === 4 ? '#689B8967' : '#809D8D70'; }
+exports.tactileEdgeColor = tactileEdgeColor;
+function tactileThickness(variant) { return variant === 4 ? 1.1 : 1.8; }
+exports.tactileThickness = tactileThickness;
 
 },
 "PaperTextWidth":function(require,module,exports){
@@ -3403,4 +3419,4 @@ function traceMask(mask, width, height) {
 }
 exports.traceMask = traceMask;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"5f86ed4129866ff45e7e031ab76f2ed2cbff9a2fcec11fd1b5ae843198e7db07"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"a842cf4b1faa4ea39ae5e3649de2ab4f1f8dfb6ea2dcde80ba03424f2f5b5f6d"};})(globalThis);

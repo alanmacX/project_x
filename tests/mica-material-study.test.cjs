@@ -32,3 +32,14 @@ for(const tint of ['#000000','#0000FF','#FF0000','#EDC03E','#252525']) for(const
  const lin=rgb.map(c=>c<=.04045?c/12.92:((c+.055)/1.055)**2.4);
  assert((lin[0]*.2126+lin[1]*.7152+lin[2]*.0722+.05)/.055>=4.45,'darkest pigment pool keeps legible black text over a black photo');
 }
+
+for(const tint of ['#000000','#0000FF','#FF0000','#EDC03E','#71AD73','invalid']) for(const v of [4,5]) {
+ const base=env.exports.tactileFill(tint,v),pigment=env.exports.tactilePigment(tint,v);
+ const a=parseInt(base.slice(1,3),16)/255,p=parseInt(pigment.slice(1,3),16)/255;
+ const rgb=[3,5,7].map(i=>(parseInt(base.slice(i,i+2),16)*a*(1-p)+parseInt(pigment.slice(i,i+2),16)*p)/255);
+ const lin=rgb.map(c=>c<=.04045?c/12.92:((c+.055)/1.055)**2.4);
+ assert((lin[0]*.2126+lin[1]*.7152+lin[2]*.0722+.05)/.055>=4.5,'tactile tint keeps dark text readable on a dark subject');
+ assert.equal(base,env.exports.tactileFill(tint,v),'surface stays stable across redraws');
+}
+assert.notEqual(env.exports.tactileFill('#EDC03E',4),env.exports.tactileFill('#EDC03E',5));
+console.log('PASS tactile prototypes: deterministic sampled surface and readable darkest colour pool.');

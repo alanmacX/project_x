@@ -1,5 +1,5 @@
 import { READING_COMPOSITIONS, READING_COMPOSITION_LABELS, READING_COMPOSITION_NOTES, compositionPlacement, compositionOverflow, readingStyles } from '../model/ReadingComposition';
-import { MICA_STUDY_LABELS, MICA_STUDY_NOTES } from '../model/MicaMaterialStudy';
+import { MICA_STUDY_NOTES } from '../model/MicaMaterialStudy';
 import { sampleMicaStudyTint } from '../model/MicaStudyWorker';
 import { cardSource } from '../model/BackgroundInputs';
 import { taskpool } from '@kit.ArkTS';
@@ -16,7 +16,7 @@ export struct ReadingComparison {
   @Prop appDark:boolean=false;
   @State sample:FridgeCard=new FridgeCard();
   @State selected:number=0;
-  @State materialStudy:number=2;
+  @State materialStudy:number=4;
   private sampledTint:string='';
   @State panelWidth:number=320;
   @State panelHeight:number=420;
@@ -67,7 +67,7 @@ export struct ReadingComparison {
     Column({space:12}) {
       Text('融合方案对比').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%').padding({right:40})
       SettingsSelect({labels:this.labels(),selectedIndex:this.selected,appDark:this.appDark,onSelect:(index:number)=>this.choose(index)})
-      SettingsSelect({labels:MICA_STUDY_LABELS,selectedIndex:this.materialStudy,appDark:this.appDark,onSelect:(index:number)=>{this.materialStudy=index;this.updateMaterial();}})
+      SettingsSelect({labels:['现有','轻透磨砂','暖白细纸'],selectedIndex:this.materialStudy===0?0:this.materialStudy-3,appDark:this.appDark,onSelect:(index:number)=>{this.materialStudy=index===0?0:index+3;this.updateMaterial();}})
       Text(MICA_STUDY_NOTES[this.materialStudy]).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       Stack() {CardFace({card:this.sample,scaleFactor:this.sampleScale(),tick:this.tick}).width(this.sample.w*this.sampleScale()).height(this.sample.h*this.sampleScale()).translate({x:(compositionOverflow(this.sample,1).left-compositionOverflow(this.sample,1).right)*this.sampleScale()/2,y:(compositionOverflow(this.sample,1).top-compositionOverflow(this.sample,1).bottom)*this.sampleScale()/2})}
         .width('100%').height(this.previewHeight()).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
