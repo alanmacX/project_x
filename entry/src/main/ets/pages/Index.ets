@@ -596,11 +596,10 @@ struct Index {
           }.width(44).height(44).backgroundColor(Color.Transparent).enabled(this.canvasEntries.length>1).accessibilityText('删除当前画布')
             .onClick(()=>{this.canvasPickerOpen=false;this.deleteCanvas();})
         }.width('100%')
-        Button('画布轮换',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).width('100%').backgroundColor(AppDesign.popupChoice(this.appDark,true)).fontColor(this.appText()).onClick(()=>this.openScenePanel(1))
         Text('桌面组件保持各自绑定的画布').fontSize(12).fontColor(this.appMuted()).width('100%')
       }
     }.width('100%').padding(16).enabled(!this.canvasChanging)
-    }.width(this.canvasPopupWidth()).constraintSize({maxHeight:Math.max(160,this.screenHeight-this.safeTop-this.safeBottom-32)})
+    }.width('100%').height('100%')
       .scrollBar(BarState.Off).clip(true)
   }
   private arrivalOffsets: Record<string, ShapePoint> = {};
@@ -1386,7 +1385,7 @@ struct Index {
         }
       }
     }.width('100%').height('100%').backgroundColor(this.appBackground())
-      .bindSheet(this.backgroundOpen||this.scheduleOpen,this.homeTaskSheet,{height:this.taskSheetHeight(),detents:[this.taskSheetHeight(),this.taskSheetHeight(true)],preferType:this.screenWidth>=600?SheetType.CENTER:SheetType.BOTTOM,width:Math.min(620,this.screenWidth-24),showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>{this.backgroundOpen=false;this.backgroundPreviewReady=false;this.backgroundPreviewGeneration++;this.scheduleOpen=false;this.updateScheduledScene(true);}})
+      .bindSheet(this.backgroundOpen||this.scheduleOpen||this.canvasPickerOpen,this.homeTaskSheet,{height:this.taskSheetHeight(),detents:[this.taskSheetHeight(),this.taskSheetHeight(true)],preferType:this.screenWidth>=600?SheetType.CENTER:SheetType.BOTTOM,width:Math.min(620,this.screenWidth-24),showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>{this.backgroundOpen=false;this.backgroundPreviewReady=false;this.backgroundPreviewGeneration++;this.scheduleOpen=false;this.canvasPickerOpen=false;this.canvasCreating=false;this.updateScheduledScene(true);}})
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_: Area, area: Area) => {
         const width = Number(area.width), height = Number(area.height);
@@ -1463,13 +1462,23 @@ struct Index {
     }.width('100%').height('100%').opacity(this.arriving ? 1 : this.boardOpacity).accessibilityLevel(this.editing || this.viewing ? 'no-hide-descendants' : 'auto').hitTestBehavior(this.editing || this.viewing || this.canvasChanging ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Default)
   }
   @Builder
-  homeTaskSheet() {if(this.backgroundOpen){this.backgroundEditor()}else{this.scheduleEditor()}}
+  homeTaskSheet() {if(this.backgroundOpen){this.backgroundEditor()}else if(this.canvasPickerOpen){this.canvasPicker()}else{this.scheduleEditor()}}
   private floatingHome():boolean {return workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).floating;}
   private homeToolsHeight():number {const limit=Math.min(560,Math.max(200,(this.screenHeight-this.safeTop-this.safeBottom)*(this.screenHeight<600?.78:.56)));return Math.min(limit,Math.max(232,216+Math.min(4,this.cards.length)*72));}
   @Builder
   phoneTools() {
     Stack({alignContent:Alignment.TopStart}) {this.homeLayers(true);this.homeBackground(true)}
       .width(this.screenWidth-32).height(this.homeToolsHeight()).hitTestBehavior(this.homeToolsMoving?HitTestMode.BLOCK_DESCENDANTS:HitTestMode.Default)
+  }
+  @Builder
+  timingButton(size:number) {
+    Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
+      Row({space:4}) {
+        SymbolGlyph($r('sys.symbol.timer')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
+        Text('定时').fontSize(13).fontColor(this.appText()).hitTestBehavior(HitTestMode.None)
+      }
+    }.height(size).padding({left:12,right:12}).backgroundColor(this.appControl()).attributeModifier(immersiveChrome(this.appDark))
+      .accessibilityText(this.sceneEditing?'完成定时场景编辑':'定时：场景与画布轮换').onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}this.openScenePanel();})
   }
   @Builder
   homeDock() {
@@ -1483,6 +1492,7 @@ struct Index {
       }.height(52).layoutWeight(1).padding({left:16,right:16}).attributeModifier(immersiveChrome(this.appDark))
         .accessibilityText('展开画布工具 '+this.canvasName).onClick(()=>{this.refreshCanvasList();this.homeToolsOpen=!this.homeToolsOpen;})
         .bindPopup(this.homeToolsOpen,{builder:this.phoneTools,placement:Placement.Top,width:this.screenWidth-32,radius:24,transition:canvasToolsTransition(),systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:false,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible)this.homeToolsOpen=false;}})
+      this.timingButton(52)
       Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
         SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
       }.width(52).height(52).attributeModifier(immersiveChrome(this.appDark)).accessibilityText('添加卡片').enabled(!this.scheduledName&&!this.scheduleTransition).onClick(()=>this.addCard())
@@ -1568,13 +1578,8 @@ struct Index {
               Text(this.sceneEditing?'定时场景 · '+this.canvasName:this.canvasName).fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
               SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
             }.width('100%')
-          }.id('shareCanvas').padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).layoutWeight(1).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).margin({right:8}).onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}if(this.canvasChanging)return;this.refreshCanvasList();this.canvasCreating=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
-            .bindPopup(this.canvasPickerOpen,{builder:this.canvasPicker,placement:Placement.Top,width:this.canvasPopupWidth(),radius:20,systemMaterial:popupMaterial(this.appDark),
-              popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:true,autoCancel:true,focusable:true,keyboardAvoidMode:KeyboardAvoidMode.DEFAULT,
-              mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible){this.canvasPickerOpen=false;this.canvasCreating=false;}}})
-          Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
-            Row({space:4}){SymbolGlyph($r('sys.symbol.timer')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None);Text('定时').fontSize(13).fontColor(this.appText())}
-          }.height(44).padding({left:10,right:10}).backgroundColor(this.appControl()).attributeModifier(immersiveChrome(this.appDark)).margin({right:8}).accessibilityText(this.sceneEditing?'完成定时场景编辑':'定时场景').onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}this.openScenePanel();})
+          }.id('shareCanvas').padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).layoutWeight(1).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).margin({right:8}).onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}if(this.canvasChanging)return;this.refreshCanvasList();this.canvasCreating=false;this.homeToolsOpen=false;this.scheduleOpen=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
+          if(!floating){this.timingButton(44)}
           Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).margin({ right: 8 }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.scheduledName).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
           Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([Color.White]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(24).backgroundColor('#262626').fontColor(Color.White).accessibilityText('添加卡片').enabled(!this.scheduledName&&!this.scheduleTransition).onClick(() => this.addCard())
         }.width('100%')
