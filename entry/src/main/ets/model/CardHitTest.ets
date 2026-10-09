@@ -1,3 +1,5 @@
+import { isReadingComposition } from './ReadingComposition';
+import { edgeAttachment } from './EdgeAttachment';
 import { cardOutline } from './RenderContours';
 import { FridgeCard } from './CardSchema';
 import { subjectSurfaceFactor, capabilityPlacement } from './CanvasLayout';
@@ -5,11 +7,17 @@ import { subjectSurfaceFactor, capabilityPlacement } from './CanvasLayout';
 /** Local face coordinates, after ArkUI has inverted the card's display transform. */
 export function cardContainsPoint(card: FridgeCard, x: number, y: number, scale: number): boolean {
   const w = card.w * scale, h = card.h * scale;
-  if (w <= 0 || h <= 0 || x < 0 || y < 0 || x > w || y > h) return false;
-  if(card.capFree && card.capability!==null) {
-    const box=capabilityPlacement(card);
-    if(x>=box.x*w && x<=(box.x+box.w)*w && y>=box.y*h && y<=(box.y+box.h)*h)return true;
+  if(w<=0||h<=0||!Number.isFinite(x)||!Number.isFinite(y))return false;
+  // Foreground is part of its card, including attachments outside the silhouette.
+  if(card.capability!==null&&card.capability.k!=='album') {
+    const original=capabilityPlacement(card),blend=card.capability.readingBlend??'';
+    const box=blend==='sticker'?edgeAttachment(card,original,card.capability.readingEdge||'left',card.capability.readingOutside===true).box:original;
+    const a=(blend==='sticker'?0:box.rot)*Math.PI/180,cx=(box.x+box.w/2)*w,cy=(box.y+box.h/2)*h;
+    const dx=x-cx,dy=y-cy,px=dx*Math.cos(a)+dy*Math.sin(a),py=-dx*Math.sin(a)+dy*Math.cos(a);
+    const padding=isReadingComposition(blend)?4*scale:0;
+    if(box.opacity>0&&Math.abs(px)<=box.w*w/2+padding&&Math.abs(py)<=box.h*h/2+padding)return true;
   }
+  if(x<0||y<0||x>w||y>h)return false;
   if (card.shape === 'subject' && cardOutline(card).length > 0) {
     const f = subjectSurfaceFactor(card), ox = (1 - f) * w / 2, oy = (1 - f) * h / 2;
     let inside = false;

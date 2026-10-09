@@ -113,6 +113,7 @@ export class CanvasElement extends ElementBox {
 }
 export interface ShapePoint { x: number; y: number; }
 export class FridgeCard {
+  reliefSrc:string=''; // Host-derived only; ignored by import and omitted from editable storage.
   html?: HtmlCardTemplate;
   groupId: string = '';
   id: string = '';

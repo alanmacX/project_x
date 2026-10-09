@@ -41,12 +41,14 @@ const kits = {
 };
 const jobs = [];
 kits['@kit.ArkTS'] = { taskpool: { Task: class { constructor(fn,...args){this.fn=fn;this.args=args;} setTransferList(list){this.transfer=list;} }, execute: async task => { jobs.push(task.fn.name); await new Promise(resolve=>setImmediate(resolve)); return task.fn(...task.args); } } };
+kits['@kit.ArkGraphics2D']={drawing:{}};
+kits['@kit.ImageKit']={image:{}};
 const cache = new Map();
 function load(name) {
   const file = path.resolve(root, name + '.ets');
   if (cache.has(file)) return cache.get(file).exports;
   const module = {exports: {}}; cache.set(file, module);
-  const code = ts.transpileModule(fs.readFileSync(file, 'utf8').replace(/^@Concurrent\s*$/gm, ''), {
+  const code = ts.transpileModule(fs.readFileSync(file, 'utf8').replace(/^@Concurrent\s*$/gm, '').replace(/import lazy /g,'import '), {
     compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020},
   }).outputText;
   const requireMock = spec => kits[spec] || load(path.relative(root, path.resolve(path.dirname(file), spec)));
@@ -161,7 +163,9 @@ function load(name) {
   assert.equal(originalStorage.cards[0].x,24);assert.equal(movedStorage.cards[0].x,123);assert.deepEqual(movedStorage.cards[0].outline,[[{x:.2,y:.3}]]);
   measured.outline=[[{x:.9,y:.8}]];assert.deepEqual(JSON.parse(storageSnapshot(snapState)).cards[0].outline,measured.outline,'replacing the subject invalidates only its contour serialization');
 
-  const snapshots=load('CardViewSnapshot');const detached=snapshots.cardViewSnapshot(measured);
+  measured.reliefSrc='file:///private/derived-shadow.png';
+  const snapshots=load('CardViewSnapshot');assert.equal(snapshots.cardStorageShell(measured).reliefSrc,'','derived host files never enter portable storage');assert.equal(snapshots.cardViewSnapshot(measured).reliefSrc,measured.reliefSrc);
+  const detached=snapshots.cardViewSnapshot(measured);
   const beforeSource=JSON.stringify(measured);const serialized=JSON.parse(storageSnapshot(snapState));
   assert.equal(JSON.stringify(measured),beforeSource,'storage shell never mutates live card');
   measured.elements[0].text='changed';assert.notEqual(detached.elements[0].text,measured.elements[0].text,'undo/render snapshots remain deeply detached');

@@ -9,13 +9,16 @@ export interface WidgetPayload {
 }
 /** Parse/normalize/serialize large masks and prepare file descriptors away from the UI thread. */
 @Concurrent
-export async function prepareWidgetPayload(json: string, contourCache: string = '', previousManifest: string = ''): Promise<WidgetPayload> {
+export async function prepareWidgetPayload(json: string, contourCache: string = '', previousManifest: string = '',reliefJson:string='{}'): Promise<WidgetPayload> {
   const frameTime=Date.now();
   const state: FridgeState = normalizeState(JSON.parse(json) as FridgeState), payload: WidgetPayload = { background: '{}', cards: '[]', images: {}, descriptors: [], manifest: '' };
+  const relief=JSON.parse(reliefJson) as Record<string,string>;
+  for(const card of state.cards)card.reliefSrc=relief[card.id]??'';
   // Prepare the complete identity set before opening anything. A partial formImages map
   // replaces the system image cache; reuse is therefore all-or-nothing.
   const keys:string[]=[];
   for(const card of state.cards) {
+    if(card.reliefSrc.startsWith('file://'))keys.push(widgetImageKey(card.id+'_relief',card.reliefSrc));
     if(card.cutout.startsWith('file://'))keys.push(widgetImageKey(card.id+'_subject',card.cutout));
     for(const element of card.elements)if(element.kind==='image'&&element.src.startsWith('file://'))keys.push(widgetImageKey(card.id+'_'+element.id,element.src));
     if(card.capability?.k==='album') {
@@ -49,6 +52,10 @@ export async function prepareWidgetPayload(json: string, contourCache: string = 
           try {if(!reuse){const file=await fileIo.open(src.slice(7),fileIo.OpenMode.READ_ONLY);payload.descriptors.push(file.fd);payload.images[key]=file.fd;}mapped='memory://'+key;}catch(_){payload.manifest='';}
           if(field==='albumCover')cap.albumCover=mapped;else cap.albumBackground=mapped;
         }
+      }
+      if(card.reliefSrc.startsWith('file://')){
+        const key=widgetImageKey(card.id+'_relief',card.reliefSrc);
+        try{if(!reuse){const file=await fileIo.open(card.reliefSrc.slice(7),fileIo.OpenMode.READ_ONLY);payload.descriptors.push(file.fd);payload.images[key]=file.fd;}card.reliefSrc='memory://'+key;}catch(_){payload.manifest='';card.reliefSrc='';}
       }
       if (card.cutout.startsWith('file://')) {
         const key = widgetImageKey(card.id + '_subject', card.cutout);

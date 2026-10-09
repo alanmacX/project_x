@@ -1,18 +1,21 @@
-/** A hollow beveled frame: no fill and no backdrop blur. */
+/** Hollow sculpted mineral bevel. Borders only: no full-canvas blur/shadow render target. */
 @Component
 export struct CanvasFrame {
-  @Prop style: string = 'auto';
-  private surface():ResourceColor {return this.style==='light'?'#F4F0E8':this.style==='dark'?'#292B2D':$r('app.color.transparent_frame_surface');}
-  build() {
-    Stack() {
-      if(this.style!=='none') {
-        Column().width('100%').height('100%').borderRadius(24)
-          .border({width:4.5,color:this.surface()})
-          .shadow({radius:8,color:'#260A0805',offsetY:2})
-        Column().width('100%').height('100%').borderRadius(24)
-          .border({width:.65,color:{top:'#99FFFFFF',left:'#66FFFFFF',right:'#35000000',bottom:'#50000000'}})
-        Column().width('100%').height('100%').borderRadius(20).scale({x:.988,y:.988})
-          .border({width:.6,color:{top:'#33000000',left:'#22000000',right:'#55FFFFFF',bottom:'#88FFFFFF'}})
+  @Prop square:boolean=false;
+  @Prop style:string='auto';
+  private body():ResourceColor{return this.style==='light'?'#FFFAFAF8':this.style==='dark'?'#FF42464B':$r('app.color.transparent_frame_surface');}
+  build(){
+    Stack(){
+      if(this.style!=='none'){
+        // Outer cut face, broad translucent body, recessed inner cut face.
+        Column().width('100%').height('100%').borderRadius(this.square?0:24)
+          .border({width:12,color:this.body()})
+        Column().width('100%').height('100%').borderRadius(this.square?0:24)
+          .border({width:1.8,color:{top:'#FFFFFFFF',left:'#FFFDFDFC',right:'#FFC3C5C7',bottom:'#FFB8BBBE'}})
+        Column().width('calc(100% - 8vp)').height('calc(100% - 8vp)').borderRadius(this.square?0:20)
+          .border({width:3,color:{top:'#FFFFFFFF',left:'#FFF5F5F2',right:'#FFE0E1E0',bottom:'#FFD5D7D8'}})
+        Column().width('calc(100% - 24vp)').height('calc(100% - 24vp)').borderRadius(this.square?0:12)
+          .border({width:1.6,color:{top:'#FFA8ADB1',left:'#FFBDC1C4',right:'#FFFFFFFF',bottom:'#FFFFFFFF'}})
       }
     }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
   }

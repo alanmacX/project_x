@@ -51,6 +51,7 @@ import { GroupBox, groupBox, groupMinimumScale, transformGroup } from '../model/
 import { BoardMotion, GroupPose } from '../model/BoardMotion';
 import { clampCanvasGroups, layerSections, LayerSection, combineCards, ungroupCards, groupMembers, groupDragBounds, cleanGroups } from '../model/CardGroups';
 import lazy { PhotoCrop } from '../views/PhotoCrop';
+import lazy { prepareSceneRelief } from '../model/SceneRelief';
 import { CanvasFrame } from '../views/CanvasFrame';
 import { CanvasBackdrop } from '../views/CanvasBackdrop';
 import { CanvasBackground, FridgeState, normalizeState, normalizeBackground } from '../model/CardSchema';
@@ -338,7 +339,7 @@ struct Index {
       this.canvasBackground = this.store.state.background; this.layoutBoard();
       startupMark('geometry-ready');
       if(!this.alive)return;
-      this.ready = true; this.render(); this.queueReadingTints(); startupMark('scene-ready');
+      this.ready = true; this.render(); this.queueReadingTints();this.queueRelief(); startupMark('scene-ready');
       this.getUIContext().postFrameCallback(new PreparedTransition(()=>startupMark('scene-idle'),true));
       this.scheduleBackground(); this.routeChanged(); this.viewRouteChanged(); this.incomingTemplateChanged();
       if(!this.viewRouteId && this.routeCanvasId===this.store.state.canvasId)AppStorage.setOrCreate('routeCanvasId','');
@@ -633,7 +634,7 @@ struct Index {
       }
     } finally { this.repairingSubjects = false; }
   }
-  aboutToDisappear(): void { this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; this.backgroundPreviewGeneration++;if(this.backgroundPreviewTimer>=0)clearTimeout(this.backgroundPreviewTimer); if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer); if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
+  aboutToDisappear(): void { this.reliefGeneration++;if(this.reliefTimer>=0)clearTimeout(this.reliefTimer); this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; this.backgroundPreviewGeneration++;if(this.backgroundPreviewTimer>=0)clearTimeout(this.backgroundPreviewTimer); if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer); if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
     if(this.navMenuOpen){this.finishNavMenu(-1);return true;}
     if(this.deletionId)return true;
@@ -846,6 +847,12 @@ struct Index {
   private renderBoard(): void {
     const next = (this.timedScene?.state??this.store.state).cards.map((card: FridgeCard) => cardRenderSnapshot(card));
     if (next.length === this.cards.length && next.every((card: FridgeCard, index: number) => card === this.cards[index])) return;
+    // Geometry edits keep the board and layer collections alive. Replacing both
+    // containers forces every card/layer builder through the release frame.
+    if(next.length===this.cards.length&&next.every((c:FridgeCard,i:number)=>c.id===this.cards[i].id)){
+      for(let i=0;i<next.length;i++)if(next[i]!==this.cards[i]){this.cardMap[next[i].id]=next[i];this.cards[i]=next[i];}
+      return;
+    }
     this.cards = next;
     const map: Record<string, FridgeCard> = {};
     this.cards.forEach((item: FridgeCard) => { map[item.id] = item; });
@@ -936,8 +943,39 @@ struct Index {
     refreshNormalSceneLayout(this.store.state);
     this.normalLayoutId=this.store.state.sceneBaseLayoutId;
     this.store.state.canvasAspect = this.canvasAspect; this.store.state.canvasDimension = this.canvasDimension;
-    this.queueReadingTints();
+    this.queueReadingTints();this.queueRelief();
     this.store.save(syncWidgets).catch((e: Error) => { this.error = e.message === '桌面组件同步未完成' ? '桌面同步暂未完成，点此重试' : '保存失败，点此重试'; });
+  }
+  private reliefTimer:number=-1;
+  private reliefBusy:boolean=false;
+  private reliefGeneration:number=0;
+  private reliefKeys:Map<string,string>=new Map();
+  private reliefKey(c:FridgeCard):string{return [c.w,c.h,c.cutout,c.subjectVersion,c.paper,c.material,c.subjectPhoto,c.ink].join(':');}
+  private queueRelief():void{
+    if(!this.alive||!this.ready||this.reliefBusy)return;
+    if(this.reliefTimer>=0)clearTimeout(this.reliefTimer);
+    this.reliefTimer=setTimeout(()=>{this.reliefTimer=-1;this.prepareRelief();},180);
+  }
+  private async prepareRelief():Promise<void>{
+    if(!this.alive)return;
+    if(this.activeBoardId||this.gestureGroup||this.heroActive||this.layerDrag)return;
+    const id=this.store.state.canvasId,generation=++this.reliefGeneration;
+    const sources=this.store.state.cards.filter((c:FridgeCard)=>c.shape==='subject'&&c.cutout.startsWith('file://')&&(!c.reliefSrc||this.reliefKeys.get(c.id)!==this.reliefKey(c)));
+    if(!sources.length)return;
+    const keys=sources.map((c:FridgeCard)=>this.reliefKey(c));
+    this.reliefBusy=true;
+    try{
+      const result=JSON.parse(await taskpool.execute(new taskpool.Task(prepareSceneRelief,JSON.stringify(sources))) as string) as Record<string,string>;
+      if(!this.alive||id!==this.store.state.canvasId||generation!==this.reliefGeneration)return;
+      let changed=false;
+      for(let i=0;i<sources.length;i++){
+        const c=this.store.state.cards.find((v:FridgeCard)=>v.id===sources[i].id);
+        if(c&&keys[i]===this.reliefKey(c)&&result[c.id]){this.reliefKeys.set(c.id,keys[i]);if(c.reliefSrc!==result[c.id]){c.reliefSrc=result[c.id];changed=true;}}
+      }
+      if(changed)this.render();
+    }catch(_) { /* Keep the vector surface if derived artwork is unavailable. */ }finally{this.reliefBusy=false;
+      if(this.alive&&(id!==this.store.state.canvasId||this.store.state.cards.some((c:FridgeCard)=>c.shape==='subject'&&c.cutout.startsWith('file://')&&(!sources.some((s:FridgeCard)=>s.id===c.id)||sources.some((s:FridgeCard,i:number)=>s.id===c.id&&keys[i]!==this.reliefKey(c))))))this.queueRelief();
+    }
   }
   private readingTintKey(card:FridgeCard):string {return hash(cardSource(card)+'|'+card.subjectVersion);}
   private queueReadingTints():void {
@@ -1737,13 +1775,14 @@ struct Index {
   shareScene() {
     Column() {
       Stack({ alignContent: Alignment.TopStart }) {
-        if (!this.shareSingle) { CanvasBackdrop({ sceneBackground: this.shareBackground }).width('100%').height('100%') }
+        if (!this.shareSingle) { CanvasBackdrop({ sceneBackground: this.shareBackground,showFrame:false }).width('100%').height('100%') }
         ForEach(this.shareCards, (card: FridgeCard) => {
           CardFace({ card: card, scaleFactor: 1, tick: this.shareTick, widget: true })
             .width(card.w).height(card.h)
             .position({ x: this.shareSingle ? this.shareX : card.x, y: this.shareSingle ? this.shareY : card.y * this.shareCanvasHeight / BOARD_H })
             .rotate({ angle: card.rot, centerX: 0, centerY: '100%' }).zIndex(card.z)
         }, (card: FridgeCard) => card.id)
+        if(!this.shareSingle&&this.shareBackground.mode==='transparent'){CanvasFrame({style:this.shareBackground.transparentFrame,square:true}).width('100%').height('100%').zIndex(100000)}
       }.width(this.shareWidth).height(this.shareCanvasHeight).backgroundColor(this.shareOpaque ? Color.White : Color.Transparent).clip(true)
       if (!this.shareSingle) {
         Row({space:2}) {
@@ -1840,7 +1879,11 @@ struct Index {
       if(formatIndex<0)return;
       this.sharing = true; this.shareSingle = single; this.shareOpaque = !single || formatIndex === 1; this.shareTick = Date.now(); this.shareBackground = normalizeBackground(JSON.parse(JSON.stringify(source.background)) as CanvasBackground);
       const card = source.cards.find((item:FridgeCard)=>item.id===cardId)??null; if (single && card === null) return;
-      this.shareCards = (single ? [card!] : source.cards).map((item: FridgeCard) => cardRenderSnapshot(item)).sort((a: FridgeCard,b: FridgeCard) => a.z-b.z);
+      const artwork=single?[card!]:source.cards;
+      // Export may load a detached persisted canvas, which intentionally has no
+      // host-derived paths. Prepare the same relief off-thread before snapshot.
+      const relief=JSON.parse(await taskpool.execute(new taskpool.Task(prepareSceneRelief,JSON.stringify(artwork))) as string) as Record<string,string>;
+      this.shareCards=artwork.map((item:FridgeCard)=>{const copy=cardViewSnapshot(item);copy.reliefSrc=relief[item.id]??item.reliefSrc;return cardRenderSnapshot(copy);}).sort((a:FridgeCard,b:FridgeCard)=>a.z-b.z);
       if (single) {
         const a = card!.rot * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), w = card!.w, h = card!.h;
         const xs = [0,h*s,w*c+h*s,w*c], ys = [h,h-h*c,h+w*s-h*c,h+w*s];

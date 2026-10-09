@@ -35,7 +35,7 @@ export struct BoardCard {
   private startRotation(e: GestureEvent): void {
     this.beginFinger(e); this.initialAngle=this.card.rot; this.liveAngle=this.card.rot;
     const p=this.controlPosition(false,true),a=this.initialAngle*Math.PI/180;
-    const x=24+this.w()/2-(p.x+22),y=24+this.h()/2-(p.y+22);
+    const x=24+this.visibleOverflow().left+this.w()/2-(p.x+22),y=24+this.visibleOverflow().top+this.h()/2-(p.y+22);
     this.rotateCentre={ x:this.fingerStartX+x*Math.cos(a)-y*Math.sin(a),y:this.fingerStartY+x*Math.sin(a)+y*Math.cos(a) };
     this.previousFingerAngle=Math.atan2(this.fingerStartY-this.rotateCentre.y,this.fingerStartX-this.rotateCentre.x)*180/Math.PI;
     this.accumulatedAngle=0; this.rotating=true; this.onInteraction(true); this.updateRotation(e);
@@ -108,7 +108,7 @@ export struct BoardCard {
         onFinish:()=>{if(this.alive&&!this.shown()&&this.controlsOpacity===0)this.controlsMounted=false;} }, () => {
         this.controlsOpacity = opacity; this.controlsScale = scale; this.resizeControlScale = resizeScale;
       });
-    }, 0);
+    }, !this.resizing&&this.resizeControlScale>1?32:0);
   }
   @State liveW: number = 180;
   @State liveH: number = 180;
@@ -204,7 +204,7 @@ export struct BoardCard {
     const localY=p.y*h+(bottom?1:-1)*Math.max(0,60-columnSpan)/2;
     const px=originX+localX*Math.cos(a)-(localY-h)*Math.sin(a),py=originY+h+localX*Math.sin(a)+(localY-h)*Math.cos(a);
     const x=Math.max(22,Math.min(this.controlViewportWidth-22,px))-originX,y=Math.max(22,Math.min(this.controlViewportHeight-22,py))-originY-h;
-    return {x:2+x*Math.cos(a)+y*Math.sin(a),y:2+h-x*Math.sin(a)+y*Math.cos(a)};
+    return {x:2+x*Math.cos(a)+y*Math.sin(a)+this.visibleOverflow().left,y:2+h-x*Math.sin(a)+y*Math.cos(a)+this.visibleOverflow().top};
   }
   private startMove(): void {
     this.animateLift(true); this.originX = this.card.x; this.originY = this.card.y; this.dx = 0; this.dy = 0; this.dragX = 0; this.dragY = 0; this.lastDX = 0; this.moveBounds = this.getMoveBounds(this.card);this.alignmentAnchor=this.getAlignmentAnchor(this.card); this.moving = true; this.onInteraction(true);
@@ -251,28 +251,24 @@ export struct BoardCard {
     if (!this.resizing) return;
     const next = this.copyCard();
     next.w = this.liveW; next.h = this.liveH; next.y = this.liveY;
-    clampCardGeometry(next,BOARD_W,BOARD_H,this.controlViewportHeight/this.scaleFactor); this.onCommit(next); this.resizing = false; this.onInteraction(false);
+    clampCardGeometry(next,BOARD_W,BOARD_H,this.controlViewportHeight/this.scaleFactor); this.onCommit(next);this.resizing=false;this.onInteraction(false);
     if (this.atMinimum) this.getUIContext().getPromptAction().showToast({ message: this.card.capability === null ? '已到最小尺寸' : '已到最小可读尺寸；移除能力后可继续缩小' });
     this.atMinimum = false;
   }
   private overflowValue: CompositionOverflow = new CompositionOverflow();
   private overflowKey: string = '';
-  private resizeFace: FridgeCard | null = null;
-  private resizeFaceW: number = -1;
-  private resizeFaceH: number = -1;
-  private invalidateGeometry(): void { this.overflowKey='';this.resizeFace=null; }
+  private invalidateGeometry(): void { this.overflowKey=''; }
   private attachmentOverflow():CompositionOverflow {
-    const key=[this.w(),this.h(),this.scaleFactor,this.resizing].join(':');
+    const key=[this.card.w,this.card.h,this.scaleFactor].join(':');
     if(key!==this.overflowKey){this.overflowValue=compositionOverflow(this.faceCard(),this.scaleFactor);this.overflowKey=key;}
     return this.overflowValue;
   }
-  private faceCard(): FridgeCard {
-    if (!this.resizing) return this.card;
-    if(this.resizeFace===null || this.resizeFaceW!==this.liveW || this.resizeFaceH!==this.liveH) {
-      this.resizeFace=this.copyCard();this.resizeFace.w=this.liveW;this.resizeFace.h=this.liveH;
-      this.resizeFaceW=this.liveW;this.resizeFaceH=this.liveH;
-    }
-    return this.resizeFace;
+  private resizeScale():number{return this.resizing?this.liveW/this.card.w:1;}
+  private shadowFringe():number{return 24*this.resizeScale();}
+  private faceCard(): FridgeCard {return this.card;}
+  private visibleOverflow():CompositionOverflow {
+    const b=this.attachmentOverflow(),f=this.resizeScale(),out=new CompositionOverflow();
+    out.left=b.left*f;out.top=b.top*f;out.right=b.right*f;out.bottom=b.bottom*f;return out;
   }
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
@@ -280,17 +276,17 @@ export struct BoardCard {
         // Shadow fringe stays in the texture; rotation and translation stay outside it.
         Stack({ alignContent: Alignment.TopStart }) {
           CardFace({ layerMotion:this.layerMotion, card: this.faceCard(), scaleFactor: this.scaleFactor, tick: this.tick, lifted: this.moving || this.motion.ids.includes(this.card.id), hideContent: this.hideContent, animateContent:this.animateContent, movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
-            .width(this.w()).height(this.h()).position({ x: 24+this.attachmentOverflow().left, y: 24+this.attachmentOverflow().top }).hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS)
-        }.width(this.w()+48+this.attachmentOverflow().left+this.attachmentOverflow().right).height(this.h()+48+this.attachmentOverflow().top+this.attachmentOverflow().bottom).position({ x: -24-this.attachmentOverflow().left, y: -24-this.attachmentOverflow().top })
+            .width(this.card.w*this.scaleFactor).height(this.card.h*this.scaleFactor).position({ x: 24+this.attachmentOverflow().left, y: 24+this.attachmentOverflow().top }).hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS)
+        }.width(this.card.w*this.scaleFactor+48+this.attachmentOverflow().left+this.attachmentOverflow().right).height(this.card.h*this.scaleFactor+48+this.attachmentOverflow().top+this.attachmentOverflow().bottom).scale({x:this.resizeScale(),y:this.resizeScale(),centerX:0,centerY:0}).position({ x: -this.shadowFringe(), y: -this.shadowFringe() })
           .id('deleteFace_'+this.card.id).renderGroup(this.moving || this.motion.ids.includes(this.card.id) || (this.movingLayerId.length === 0 && this.card.elements.every(el => !el.animated))).hitTestBehavior(HitTestMode.None)
       }.scale({ x: this.motion.ids.includes(this.card.id) ? 1 : this.liftScale, y: this.motion.ids.includes(this.card.id) ? 1 : this.liftScale })
         .rotate({ angle: this.motion.ids.includes(this.card.id) ? 0 : this.tilt })
-        .width(this.w()).height(this.h()).position({ x: 24, y: 24 })
+        .width(this.w()+this.visibleOverflow().left+this.visibleOverflow().right).height(this.h()+this.visibleOverflow().top+this.visibleOverflow().bottom).position({ x: 24, y: 24 })
         .onTouchIntercept((e: TouchEvent): HitTestMode => {
           // Ownership is decided on DOWN; do not scan every contour on every MOVE.
           if (e.type === TouchType.Down) {
             const point = e.touches[0] ?? e.changedTouches[0];
-            this.touchHit = point !== undefined && cardContainsPoint(this.faceCard(), point.x, point.y, this.scaleFactor) ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS;
+            this.touchHit = point !== undefined && cardContainsPoint(this.faceCard(), point.x-this.visibleOverflow().left, point.y-this.visibleOverflow().top, this.scaleFactor) ? HitTestMode.Default : HitTestMode.None;
           }
           return this.touchHit;
         })
@@ -333,11 +329,11 @@ export struct BoardCard {
         .position(this.controlPosition(true, true)).hitTestBehavior(this.shown() ? HitTestMode.Default : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('编辑卡片内容').onClick(() => this.onEdit(this.card.id))
       }
-    }.width(this.w() + 48).height(this.h() + 48).opacity(this.heroHidden ? 0 : 1).hitTestBehavior(this.heroHidden ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Transparent)
-      .rotate({ angle: this.editingSurface ? this.displayAngle : (this.rotating ? this.liveAngle : this.card.rot) + this.scatterAngle, centerX: 24, centerY: this.h() + 24 })
+    }.width(this.w()+48+this.visibleOverflow().left+this.visibleOverflow().right).height(this.h()+48+this.visibleOverflow().top+this.visibleOverflow().bottom).opacity(this.heroHidden ? 0 : 1).hitTestBehavior(this.heroHidden ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Transparent)
+      .rotate({ angle: this.editingSurface ? this.displayAngle : (this.rotating ? this.liveAngle : this.card.rot) + this.scatterAngle, centerX:24+this.visibleOverflow().left,centerY:this.h()+24+this.visibleOverflow().top })
       .translate({ x: this.scatterX + (this.motion.ids.includes(this.card.id) ? this.motion.offset.x : this.dx) + this.rotationShift().x, y: this.scatterY + (this.motion.ids.includes(this.card.id) ? this.motion.offset.y : this.dy) + this.rotationShift().y })
-      .position({ x: (this.localCoordinates ? 0 : this.boardLeft + this.card.x * this.scaleFactor - 24),
-        y: (this.localCoordinates ? (this.resizing ? this.liveY - this.card.y : 0) * this.yScaleFactor : this.boardTop + (this.resizing ? this.liveY : this.card.y) * this.yScaleFactor - 24) })
+      .position({ x: (this.localCoordinates ? 0 : this.boardLeft + this.card.x * this.scaleFactor - 24)-this.visibleOverflow().left,
+        y: (this.localCoordinates ? (this.resizing ? this.liveY - this.card.y : 0) * this.yScaleFactor : this.boardTop + (this.resizing ? this.liveY : this.card.y) * this.yScaleFactor - 24)-this.visibleOverflow().top })
       .zIndex(this.moving ? 100002 : (this.resizing ? 100001 : this.card.z))
   }
 }

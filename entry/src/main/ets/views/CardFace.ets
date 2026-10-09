@@ -4,7 +4,7 @@ import { cardOutline } from '../model/RenderContours';
 import { FridgeCard, materialColors, cardCornerRadius } from '../model/CardSchema';
 import { CardCanvas } from './CardCanvas';
 import { subjectSurfaceFactor } from '../model/CanvasLayout';
-import { cardDepthScale, cardEdgeColor, CARD_SIDE, CARD_CAST_RADIUS, CARD_CAST_Y, CARD_CAST_COLOR, CARD_CONTACT_RADIUS, CARD_CONTACT_Y, CARD_CONTACT_COLOR, contourReliefBands, ReliefBand } from '../model/CardDepth';
+import { cardDepthScale, cardEdgeColor, CARD_SIDE, CARD_CAST_RADIUS, CARD_CAST_Y, CARD_CAST_COLOR, CARD_CONTACT_RADIUS, CARD_CONTACT_Y, CARD_CONTACT_COLOR } from '../model/CardDepth';
 /** The same surface, optional frame and depth are used in app, editor, hero and widget. */
 @Component
 export struct CardFace {
@@ -19,8 +19,6 @@ export struct CardFace {
   @Prop movingLayerId: string = '';
   @Prop moveX: number = 0;
   @Prop moveY: number = 0;
-  private reliefCache:Map<string,ReliefBand[]>=new Map<string,ReliefBand[]>();
-  private bands(radius:number,color:string):ReliefBand[]{const key=radius+color;if(!this.reliefCache.has(key))this.reliefCache.set(key,contourReliefBands(radius,parseInt(color.slice(1,3),16)/255));return this.reliefCache.get(key)!;}
   private pathKey: string = '';
   private outlineRef: Object | null = null;
   private pathCommands: string = '';
@@ -38,34 +36,31 @@ export struct CardFace {
   private edge(): string { return cardEdgeColor(this.paper(),this.card.shape==='subject'&&this.card.subjectPhoto); }
   @Builder
   backing(color: string, offset: number, radius: number, shadowColor: string, shadowY: number) {
-    if(this.card.shape==='subject' && this.commands().length>0) {
-      if(radius>0){
-        ForEach(this.bands(radius,shadowColor),(band:ReliefBand)=>{
-          Path().commands(this.commands()).fill(shadowColor).stroke(shadowColor)
-            .strokeWidth((this.card.subjectBorder?6*this.scaleFactor:0)+band.extra)
-            .strokeLineJoin(LineJoinStyle.Round).antiAlias(true).opacity(band.opacity)
-            .width('100%').height('100%').translate({y:offset+shadowY}).hitTestBehavior(HitTestMode.None)
-        },(band:ReliefBand)=>band.extra.toString())
-      }else{
-        Path().commands(this.commands()).fill(color).stroke(color)
-          .strokeWidth(this.card.subjectBorder?6*this.scaleFactor:0).strokeLineJoin(LineJoinStyle.Round).antiAlias(true)
-          .width('100%').height('100%').translate({y:offset}).hitTestBehavior(HitTestMode.None)
-      }
-    } else {
-      Column().width('100%').height('100%').backgroundColor(color).borderRadius(cardCornerRadius(this.card,this.scaleFactor))
-        .translate({y:offset}).shadow({radius:vp2px(radius),color:shadowColor,offsetY:vp2px(shadowY)}).hitTestBehavior(HitTestMode.None)
-    }
+    Column().width('100%').height('100%').backgroundColor(color).borderRadius(cardCornerRadius(this.card,this.scaleFactor))
+      .translate({y:offset}).shadow({radius:vp2px(radius),color:shadowColor,offsetY:vp2px(shadowY)}).hitTestBehavior(HitTestMode.None)
   }
+
   build() {
     Stack() {
       // Soft cast shadow + tight contact shadow + a solid, slightly warm sidewall.
       // The cached face owns these layers; pan/rotation only transform its texture.
+      if(this.card.shape==='subject'&&(this.card.reliefSrc.length>0||this.commands().length>0)){
+        if(this.card.reliefSrc){
+          Image(this.card.reliefSrc).width((this.card.w+48)*this.scaleFactor).height((this.card.h+48)*this.scaleFactor)
+            .position({x:-24*this.scaleFactor,y:-24*this.scaleFactor}).objectFit(ImageFit.Fill).draggable(false).hitTestBehavior(HitTestMode.None)
+        }else{
+          // Visible fallback while an off-thread cache is prepared: no shadow nodes.
+          Path().commands(this.commands()).fill(this.card.subjectPhoto?'#FFFFFF':this.paper()).stroke(this.card.subjectPhoto?'#FFFFFF':this.paper())
+            .strokeWidth(this.card.subjectBorder?6*this.scaleFactor:0).strokeLineJoin(LineJoinStyle.Round).antiAlias(true).width('100%').height('100%').hitTestBehavior(HitTestMode.None)
+        }
+      }else{
       Stack() {
         this.backing(this.edge(),CARD_SIDE*this.depthScale(),(this.lifted?13:CARD_CAST_RADIUS)*this.depthScale(),CARD_CAST_COLOR,(this.lifted?8:CARD_CAST_Y)*this.depthScale())
         this.backing(this.edge(),CARD_SIDE*this.depthScale(),CARD_CONTACT_RADIUS*this.depthScale(),CARD_CONTACT_COLOR,CARD_CONTACT_Y*this.depthScale())
         this.backing(this.edge(),CARD_SIDE*this.depthScale(),0,'#00000000',0)
         this.backing(this.card.shape==='subject'&&this.card.subjectPhoto?'#FFFFFF':this.paper(),0,0,'#00000000',0)
       }.width('100%').height('100%')
+      }
       CardCanvas({ layerMotion:this.layerMotion, card: this.card, scaleFactor: this.scaleFactor, tick: this.tick, widget: this.widget, hideContent: this.hideContent, animateContent:this.animateContent,
         movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
         .width((subjectSurfaceFactor(this.card) * 100) + '%').height((subjectSurfaceFactor(this.card) * 100) + '%')

@@ -8,7 +8,7 @@ import { cardRenderSnapshot } from './CardViewSnapshot';
 import { cardOutline } from './RenderContours';
 import { contourPath } from './ContourPath';
 import { subjectSurfaceFactor } from './CanvasLayout';
-import { cardEdgeColor } from './CardDepth';
+import { cardEdgeColor, CARD_SIDE, CARD_CAST_RADIUS, CARD_CAST_Y, CARD_CAST_COLOR, CARD_CONTACT_RADIUS, CARD_CONTACT_Y, CARD_CONTACT_COLOR } from './CardDepth';
 
 const ready = new Map<string,string>();
 function key(card: FridgeCard, scale: number): string {
@@ -19,7 +19,7 @@ export function subjectDepthImage(card: FridgeCard, scale: number): string { ret
 export async function bakeSubjectDepth(json:string, cacheDir:string, density:number, retainedJson:string='[]'):Promise<string> {
   const inputs=JSON.parse(json) as DepthInput[],result:Record<string,string>={};
   for(const input of inputs) {
-    const target=cacheDir+'/depth_v2_'+depthHash(JSON.stringify(input)+':'+density)+'.png';
+    const target=cacheDir+'/depth_v3_'+depthHash(JSON.stringify(input)+':'+density)+'.png';
     if(await fileIo.access(target)){result[input.key]='file://'+target;continue;}
     let pixel:image.PixelMap|null=null,packer:image.ImagePacker|null=null,file:fileIo.File|null=null;
     try {
@@ -34,12 +34,15 @@ export async function bakeSubjectDepth(json:string, cacheDir:string, density:num
         if(line>0){pen.setColor(depthArgb(color,opacity));pen.setStrokeWidth(line*density);canvas.attachPen(pen);}
         canvas.drawPath(path);canvas.detachBrush();canvas.detachPen();canvas.restore();
       };
-      const border=6*input.scale,side=2*input.scale;
+      const border=6*input.scale,side=CARD_SIDE*input.scale;
       const shadow=(radius:number,color:string,y:number):void=>{
-        band(color,border+radius*2,.15,y);band(color,border+radius,.25,y);band(color,border,.6,y);
+        const filter=drawing.MaskFilter.createBlurMaskFilter(drawing.BlurType.NORMAL,radius*density/2);
+        brush.setMaskFilter(filter);pen.setMaskFilter(filter);
+        band(color,border,1,y);
+        brush.setMaskFilter(null);pen.setMaskFilter(null);
       };
-      shadow(5.5*input.scale,'#30000000',side+4*input.scale);
-      shadow(1.4*input.scale,'#48000000',side+1.2*input.scale);
+      shadow(CARD_CAST_RADIUS*input.scale,CARD_CAST_COLOR,side+CARD_CAST_Y*input.scale);
+      shadow(CARD_CONTACT_RADIUS*input.scale,CARD_CONTACT_COLOR,side+CARD_CONTACT_Y*input.scale);
       band(input.edge,border,1,side);band(input.surface,border,1,0);
       packer=image.createImagePacker();file=await fileIo.open(target+'.pending',fileIo.OpenMode.CREATE|fileIo.OpenMode.READ_WRITE|fileIo.OpenMode.TRUNC);
       await packer.packToFile(pixel,file.fd,{format:'image/png',quality:100});
@@ -71,4 +74,19 @@ export async function prepareSubjectDepth(cards:FridgeCard[],scale:number,cacheD
     const json=await taskpool.execute(new taskpool.Task(bakeSubjectDepth,JSON.stringify(inputs),cacheDir,density,JSON.stringify(Array.from(ready.values())))) as string;
     const entries=JSON.parse(json) as Record<string,string>;for(const k of Object.keys(entries))ready.set(k,entries[k]);
   } catch(_) {} // Fall back to the existing vector surface if a disposable cache fails.
+}
+
+const basePaths=new Map<string,string>();
+export function subjectDepthInputs(cards:FridgeCard[]):DepthInput[]{
+ const inputs:DepthInput[]=[];
+ for(const source of cards){
+  if(source.shape!=='subject'||!source.cutout||cardOutline(source).length===0)continue;
+  const input=new DepthInput();input.key=source.id;input.w=source.w;input.h=source.h;input.scale=1;
+  const geometryKey=[source.cutout,source.subjectVersion,source.w,source.h,source.subjectBorder].join(':');
+  let path=basePaths.get(geometryKey);
+  if(path===undefined){path=contourPath(cardOutline(source),input.w*2,input.h*2,subjectSurfaceFactor(source));if(basePaths.size>=128)basePaths.delete(basePaths.keys().next().value as string);basePaths.set(geometryKey,path);}
+  input.path=path;
+  input.surface=source.subjectPhoto?'#FFFFFF':materialColors(source.material,source.paper,source.ink)[0];input.edge=cardEdgeColor(input.surface,source.subjectPhoto);inputs.push(input);
+ }
+ return inputs;
 }

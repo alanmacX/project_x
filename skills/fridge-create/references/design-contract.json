@@ -26,10 +26,10 @@
     "htmlTemplateVersion": 1
   },
   "identity": {
-    "models": "e2d7a55412e4afb54bf45a58f21fafa8f21944761e33ad00fa28a1fd514fe3a4",
+    "models": "540a5c359264d6b0a37a6cc9a59890fbdf80afb2a0578147c4a5db4aac99be00",
     "materials": "868838622c193570cd7922a284d3cc26ddd73789614693be4ebd6dffd5ada39d",
-    "browserAdapter": "65e494dd8cf55e393322c46a73e92395b602b839f0a1937781572129f29af4e3",
-    "nativeViews": "5c53dfbeff1d2ee14307bf4bd05d742721d9d58b545e927c9a0da8a83a3addae"
+    "browserAdapter": "75a182b916951bc5ff8805106077c3b029928dc58597102190576475d4c0a47d",
+    "nativeViews": "d250f6e229dad5a2c8e591ef83062d786b258f24aa25a51a59473bbd3fcde606"
   },
   "coordinates": {
     "boardWidth": 344,
@@ -68,7 +68,10 @@
         "dark",
         "none"
       ],
-      "hollow": true
+      "hollow": true,
+      "width": 12,
+      "material": "sculpted-marble",
+      "socialCorners": "square"
     },
     "relief": {
       "side": 1.35,
@@ -252,6 +255,7 @@
       "cards"
     ],
     "card": [
+      "reliefSrc",
       "html",
       "groupId",
       "id",

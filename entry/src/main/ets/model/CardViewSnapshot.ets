@@ -7,6 +7,7 @@ export function cardViewSnapshot(source: FridgeCard): FridgeCard { return snapsh
 export function cardStorageShell(source: FridgeCard): FridgeCard { return snapshotCard(source,false); }
 function snapshotCard(source: FridgeCard, detached: boolean): FridgeCard {
   const copy = new FridgeCard();
+  copy.reliefSrc=detached?source.reliefSrc:'';
   copy.id = source.id; copy.groupId = source.groupId;
   copy.x = source.x;
   copy.y = source.y;
@@ -45,7 +46,7 @@ export function cardRenderSnapshot(source: FridgeCard, prepared: boolean = false
   // not deep-copy every unchanged capability, course list and background layer.
   const signature = JSON.stringify([source.id, source.groupId, source.x, source.y, source.w, source.h, source.rot, source.z,
     source.shape, source.frame, source.material, source.paper, source.ink, source.subjectPhoto, source.subjectAspect,
-    source.subjectInk, source.subjectVersion, source.cutout, source.inDoor, contourKey, source.capability, source.capBox, source.capFree, source.elements]);
+    source.subjectInk, source.subjectVersion, source.cutout,source.reliefSrc, source.inDoor, contourKey, source.capability, source.capBox, source.capFree, source.elements]);
   const previous = renderSnapshots.get(source.id);
   if (previous !== undefined && renderSignatures.get(source.id) === signature) return previous;
   const copy = cardViewSnapshot(source); copy.renderContourKey = contourKey; copy.outline = [];

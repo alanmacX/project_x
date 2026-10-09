@@ -299,6 +299,7 @@ class CanvasElement extends ElementBox {
 exports.CanvasElement = CanvasElement;
 class FridgeCard {
     constructor() {
+        this.reliefSrc = ''; // Host-derived only; ignored by import and omitted from editable storage.
         this.groupId = '';
         this.id = '';
         this.x = 24;
@@ -3568,6 +3569,7 @@ function cardStorageShell(source) { return snapshotCard(source, false); }
 exports.cardStorageShell = cardStorageShell;
 function snapshotCard(source, detached) {
     const copy = new CardSchema_1.FridgeCard();
+    copy.reliefSrc = detached ? source.reliefSrc : '';
     copy.id = source.id;
     copy.groupId = source.groupId;
     copy.x = source.x;
@@ -3605,7 +3607,7 @@ function cardRenderSnapshot(source, prepared = false) {
     // not deep-copy every unchanged capability, course list and background layer.
     const signature = JSON.stringify([source.id, source.groupId, source.x, source.y, source.w, source.h, source.rot, source.z,
         source.shape, source.frame, source.material, source.paper, source.ink, source.subjectPhoto, source.subjectAspect,
-        source.subjectInk, source.subjectVersion, source.cutout, source.inDoor, contourKey, source.capability, source.capBox, source.capFree, source.elements]);
+        source.subjectInk, source.subjectVersion, source.cutout, source.reliefSrc, source.inDoor, contourKey, source.capability, source.capBox, source.capFree, source.elements]);
     const previous = renderSnapshots.get(source.id);
     if (previous !== undefined && renderSignatures.get(source.id) === signature)
         return previous;
@@ -3623,4 +3625,4 @@ function cardRenderSnapshot(source, prepared = false) {
 }
 exports.cardRenderSnapshot = cardRenderSnapshot;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"e2d7a55412e4afb54bf45a58f21fafa8f21944761e33ad00fa28a1fd514fe3a4"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"540a5c359264d6b0a37a6cc9a59890fbdf80afb2a0578147c4a5db4aac99be00"};})(globalThis);

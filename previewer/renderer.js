@@ -121,8 +121,8 @@
   });
   let frame='';if(scene.background.mode==='transparent'&&scene.background.transparentFrame!=='none'){
    const theme=scene.background.transparentFrame==='dark'||scene.background.transparentFrame==='auto'&&options.dark;
-   const rim=theme?'#292B2D':'#F4F0E8';
-   frame=`<g data-canvas-frame="${scene.background.transparentFrame}"><rect x="2.25" y="2.25" width="${Math.max(0,width-4.5)}" height="${Math.max(0,height-4.5)}" rx="22" fill="none" stroke="${rim}" stroke-width="4.5"/><rect x=".4" y=".4" width="${Math.max(0,width-.8)}" height="${Math.max(0,height-.8)}" rx="24" fill="none" stroke="#FFFFFF66" stroke-width=".65"/><rect x="4" y="4" width="${Math.max(0,width-8)}" height="${Math.max(0,height-8)}" rx="20" fill="none" stroke="#00000022" stroke-width=".6"/></g>`;
+   const rim=theme?'rgba(66,70,75,1)':'rgba(250,250,248,1)';
+   frame=`<g data-canvas-frame="${scene.background.transparentFrame}"><rect x="6" y="6" width="${Math.max(0,width-12)}" height="${Math.max(0,height-12)}" rx="18" fill="none" stroke="${rim}" stroke-width="12"/><rect x=".9" y=".9" width="${Math.max(0,width-1.8)}" height="${Math.max(0,height-1.8)}" rx="23.1" fill="none" stroke="#FFFFFFAA" stroke-width="1.8"/><rect x="5.5" y="5.5" width="${Math.max(0,width-11)}" height="${Math.max(0,height-11)}" rx="18.5" fill="none" stroke="#E2E7EB8C" stroke-width="3"/><rect x="12.8" y="12.8" width="${Math.max(0,width-25.6)}" height="${Math.max(0,height-25.6)}" rx="11.2" fill="none" stroke="#DFF4FA88" stroke-width="1.6"/></g>`;
   }
   return {svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="system-ui,sans-serif"><defs>${defs}<clipPath id="${namespace}board"><rect width="${width}" height="${height}" rx="20"/></clipPath></defs><g clip-path="url(#${namespace}board)">${body}${frame}</g></svg>`,issues:diagnostics,width,height,layers:{version:1,namespace,defs,background,cards,frame}};
  }

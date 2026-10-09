@@ -102,9 +102,13 @@ export struct CardCanvas {
   @Prop movingLayerId: string = '';
   @Prop moveX: number = 0;
   @Prop moveY: number = 0;
+  private photoOnly():boolean{return this.card.shape==='subject'&&this.card.subjectPhoto&&this.card.cutout.length>0&&this.card.elements.length===0&&(this.card.capability===null||this.freeCapability()||this.hideContent);}
   private freeCapability():boolean {return this.card.capFree || isReadingComposition(this.card.capability?.readingBlend??'') || this.layerMotion.id==='capability';}
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
+      if(this.photoOnly()){
+        Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
+      }else{
       Stack({ alignContent: Alignment.TopStart }) {
       if(this.card.capability?.k==='album') {
         AlbumCapability({tick:this.tick,widget:this.widget,cap:this.card.capability!,cardWidth:this.card.w,cardHeight:this.card.h,scaleFactor:this.scaleFactor})
@@ -124,6 +128,7 @@ export struct CardCanvas {
       }
     }.width('100%').height('100%').borderRadius(cardCornerRadius(this.card,this.scaleFactor)).clip(true)
       .blendMode(BlendMode.SRC_OVER, this.card.shape === 'subject' ? BlendApplyType.OFFSCREEN : BlendApplyType.FAST)
+      }
       if(this.freeCapability() && !this.hideContent && this.card.capability!==null && this.card.capability.k!=='album') {
         CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}).transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY)
       }

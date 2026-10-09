@@ -35,12 +35,14 @@ const kits = {
 };
 const jobs = [];
 kits['@kit.ArkTS'] = { taskpool: { Task: class { constructor(fn,...args){this.fn=fn;this.args=args;} setTransferList(list){this.transfer=list;} }, execute: async task => { jobs.push(task.fn.name); await new Promise(resolve=>setImmediate(resolve)); return task.fn(...task.args); } } };
+kits['@kit.ArkGraphics2D']={drawing:{}};
+kits['@kit.ImageKit']={image:{}};
 const cache = new Map();
 function load(name) {
   const file = path.resolve(root, name + '.ets');
   if (cache.has(file)) return cache.get(file).exports;
   const module = {exports: {}}; cache.set(file, module);
-  const code = ts.transpileModule(fs.readFileSync(file, 'utf8').replace(/^@Concurrent\s*$/gm, ''), {
+  const code = ts.transpileModule(fs.readFileSync(file, 'utf8').replace(/^@Concurrent\s*$/gm, '').replace(/import lazy /g,'import '), {
     compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020},
   }).outputText;
   const requireMock = spec => kits[spec] || load(path.relative(root, path.resolve(path.dirname(file), spec)));

@@ -1,0 +1,12 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
+const source=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
+const method=source.slice(source.indexOf('  private renderBoard(): void {'),source.indexOf('  private render(): void {'));
+const context={exports:{},cardRenderSnapshot:c=>c.view};
+vm.runInNewContext(ts.transpileModule('class Fixture{cards=[];cardMap={};cardIds=[];store={state:{cards:[]}};timedScene=null;'+method+'}exports.Fixture=Fixture;',{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,context);
+const f=new context.exports.Fixture();f.store.state.cards=Array.from({length:20},(_,i)=>({view:{id:String(i),w:100}}));f.renderBoard();
+const cards=f.cards,map=f.cardMap,ids=f.cardIds,unchanged=cards[4];f.store.state.cards[7].view={id:'7',w:120};f.renderBoard();
+assert.equal(f.cards,cards);assert.equal(f.cardMap,map);assert.equal(f.cardIds,ids);assert.equal(cards[4],unchanged);assert.equal(map['7'].w,120);assert.equal(cards[7],map['7']);
+f.renderBoard();assert.equal(f.cards,cards,'unchanged scene publishes nothing');
+f.store.state.cards.pop();f.renderBoard();assert.notEqual(f.cards,cards);assert.equal(f.cardMap['19'],undefined,'structural changes rebuild without stale cards');
+console.log('PASS board release publishes only changed card; geometry retains collections and structural changes clear removed IDs');

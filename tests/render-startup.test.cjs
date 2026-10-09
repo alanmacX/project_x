@@ -1,8 +1,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
-const root=path.resolve(__dirname,'../entry/src/main/ets/model'),cache=new Map();let jobs=0;
+const root=path.resolve(__dirname,'../entry/src/main/ets/model'),cache=new Map();let jobs=0;const testFiles=new Set();let opens=0;
 const pool={Task:class{constructor(fn,...args){this.fn=fn;this.args=args;}},execute:async task=>{jobs++;return task.fn(...task.args);}};
-function load(name){const file=path.resolve(root,name+'.ets');if(cache.has(file))return cache.get(file).exports;const mod={exports:{}};cache.set(file,mod);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;vm.runInThisContext('(function(require,module,exports){'+code+'\n})',{filename:file})(s=>s==='@kit.ArkTS'?{taskpool:pool}:s==='@kit.CoreFileKit'?{fileIo:{OpenMode:{READ_ONLY:0},open:async()=>{throw Error('no test files');},closeSync:()=>{}}}:load(path.relative(root,path.resolve(path.dirname(file),s))),mod,mod.exports);return mod.exports;}
+function load(name){const file=path.resolve(root,name+'.ets');if(cache.has(file))return cache.get(file).exports;const mod={exports:{}};cache.set(file,mod);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;vm.runInThisContext('(function(require,module,exports){'+code+'\n})',{filename:file})(s=>s==='@kit.ArkTS'?{taskpool:pool}:s==='@kit.CoreFileKit'?{fileIo:{OpenMode:{READ_ONLY:0},open:async name=>{if(!testFiles.has(name))throw Error('no test files');return {fd:++opens};},closeSync:()=>{}}}:load(path.relative(root,path.resolve(path.dirname(file),s))),mod,mod.exports);return mod.exports;}
 (async()=>{
 const r=load('RenderContours'),s=load('CardSchema');
 const source=new s.FridgeCard();source.id='photo';source.cutout='file://local.png';source.subjectVersion=2;source.shape='subject';source.outline=[[{x:.1,y:.1},{x:.9,y:.1},{x:.9,y:.9},{x:.1,y:.9}]];
@@ -45,6 +45,13 @@ const stale=JSON.parse(r.serializeContourCache(state.cards));Object.values(stale
 await payload.prepareWidgetPayload(JSON.stringify(state),JSON.stringify(stale));
 assert.equal(compactions,beforePayload+2,'stale geometry cannot be reused');
 geometry.compactContours=originalCompact;
+testFiles.add('local.png');testFiles.add('/cache/relief.png');const reliefMap=JSON.stringify({[changed.id]:'file:///cache/relief.png'});
+const initial=await payload.prepareWidgetPayload(JSON.stringify(state),'','',reliefMap);
+assert.equal(Object.keys(initial.images).length,2,'Form sends subject and relief together');assert.ok(JSON.parse(initial.cards)[0].reliefSrc.startsWith('memory://'));
+const count=opens,reused=await payload.prepareWidgetPayload(JSON.stringify(state),'',initial.manifest,reliefMap);
+assert.equal(opens,count,'unchanged relief reuses native Form cache without reopening files');assert.deepEqual(reused.images,{});
+testFiles.add('/cache/resized.png');const resized=await payload.prepareWidgetPayload(JSON.stringify(state),'',initial.manifest,JSON.stringify({[changed.id]:'file:///cache/resized.png'}));
+assert.equal(Object.keys(resized.images).length,2,'geometry changes atomically replace all Form images');
 const layout=load('CanvasLayout'),photo=new s.FridgeCard();
 photo.id='layout-photo';photo.shape='subject';photo.cutout='file://layout-photo.png';photo.subjectVersion=4;photo.w=240;photo.h=300;photo.capability={k:'clock'};
 photo.outline=[Array.from({length:512},(_,i)=>({x:.5+.48*Math.cos(i*Math.PI/256),y:.5+.48*Math.sin(i*Math.PI/256)}))];
