@@ -485,13 +485,21 @@ struct Index {
   }
   @Builder
   scheduleEditor() {
+    Column() {
+      Row({space:8}) {
+        Text('定时').fontSize(18).fontWeight(FontWeight.Medium).fontColor(this.appText()).layoutWeight(1)
+        Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
+          SymbolGlyph($r('sys.symbol.xmark')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
+        }.width(44).height(44).backgroundColor(Color.Transparent).accessibilityText('关闭定时菜单').onClick(()=>this.scheduleOpen=false)
+      }.width('100%').padding({left:16,right:16})
     SceneSchedulePanel({rules:this.scheduleRules,scenes:this.sceneEntries,canvases:this.canvasEntries,rotation:this.store.catalog.rotation,appDark:this.appDark,initialTab:this.scenePanelTab,
       onCreate:()=>this.editTimedScene('',true),onEditCard:id=>this.editTimedScene(id),
       onRotation:rotation=>{this.store.catalog.rotation=rotation;this.persist(true);this.updateScheduledScene(true);},
       onSave:source=>{const rule=normalizeSceneRules([source])[0];if(!rule)return;rule.centralOnly=true;rule.kind='focus';rule.untilDismissed=false;rule.dismissed='';rule.createdAt=Date.now();const i=this.store.catalog.sceneRules.findIndex(r=>r.id===rule.id);if(i>=0)this.store.catalog.sceneRules[i]=rule;const entry=this.store.catalog.scenes.find(c=>c.id===rule.targetId);if(entry)entry.name=rule.name;this.syncSchedules();this.refreshCanvasList();this.persist(true);},
       onToggle:(id,value)=>this.toggleSceneRule(id,value),
       onRemove:id=>{this.getUIContext().showAlertDialog({title:'删除定时场景？',message:'中央卡片和时间规则会一起删除。',primaryButton:{value:'取消',action:()=>{}},secondaryButton:{value:'删除',fontColor:'#C43A35',action:()=>{this.store.deleteTimedScene(id).then(()=>{this.refreshCanvasList();this.syncSchedules();});}}});},
-      onPreview:rule=>{this.scheduleOpen=false;this.scheduleOverride=rule;setTimeout(()=>{if(this.alive)this.updateScheduledScene(true);},240);}})
+      onPreview:rule=>{this.scheduleOpen=false;this.scheduleOverride=rule;setTimeout(()=>{if(this.alive)this.updateScheduledScene(true);},240);}}).layoutWeight(1)
+    }.width('100%').height('100%').padding({top:16})
   }
 
   private async chooseCanvas(id: string): Promise<void> {
@@ -1385,7 +1393,7 @@ struct Index {
         }
       }
     }.width('100%').height('100%').backgroundColor(this.appBackground())
-      .bindSheet(this.backgroundOpen||this.scheduleOpen||this.canvasPickerOpen,this.homeTaskSheet,{height:this.taskSheetHeight(),detents:[this.taskSheetHeight(),this.taskSheetHeight(true)],preferType:this.screenWidth>=600?SheetType.CENTER:SheetType.BOTTOM,width:Math.min(620,this.screenWidth-24),showClose:true,backgroundColor:this.appBackground(),onDisappear:()=>{this.backgroundOpen=false;this.backgroundPreviewReady=false;this.backgroundPreviewGeneration++;this.scheduleOpen=false;this.canvasPickerOpen=false;this.canvasCreating=false;this.updateScheduledScene(true);}})
+      .bindSheet(this.backgroundOpen||this.scheduleOpen||this.canvasPickerOpen,this.homeTaskSheet,{height:this.taskSheetHeight(),detents:this.backgroundOpen?[this.taskSheetHeight(),this.taskSheetHeight(true)]:[this.taskSheetHeight()],preferType:SheetType.BOTTOM,width:this.screenWidth,dragBar:true,showClose:this.backgroundOpen,backgroundColor:this.appBackground(),onDisappear:()=>{this.backgroundOpen=false;this.backgroundPreviewReady=false;this.backgroundPreviewGeneration++;this.scheduleOpen=false;this.canvasPickerOpen=false;this.canvasCreating=false;this.updateScheduledScene(true);}})
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_: Area, area: Area) => {
         const width = Number(area.width), height = Number(area.height);
