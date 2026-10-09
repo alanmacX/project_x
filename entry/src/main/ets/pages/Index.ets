@@ -144,6 +144,7 @@ struct Index {
   private movingGroupIds: string[] = [];
   private store: FridgeStore = new FridgeStore();
   @State @Watch('homeToolsChanged') scheduleOpen:boolean=false;
+  @State timingHeaderActive:boolean=false;
   @State sceneEditing:boolean=false;
   @State scenePanelTab:number=0;
   @State sceneEntries:CanvasEntry[]=[];
@@ -485,21 +486,14 @@ struct Index {
   }
   @Builder
   scheduleEditor() {
-    Column() {
-      Row({space:8}) {
-        Text('定时').fontSize(18).fontWeight(FontWeight.Medium).fontColor(this.appText()).layoutWeight(1)
-        Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
-          SymbolGlyph($r('sys.symbol.xmark')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
-        }.width(44).height(44).backgroundColor(Color.Transparent).accessibilityText('关闭定时菜单').onClick(()=>this.scheduleOpen=false)
-      }.width('100%').padding({left:16,right:16})
     SceneSchedulePanel({rules:this.scheduleRules,scenes:this.sceneEntries,canvases:this.canvasEntries,rotation:this.store.catalog.rotation,appDark:this.appDark,initialTab:this.scenePanelTab,
       onCreate:()=>this.editTimedScene('',true),onEditCard:id=>this.editTimedScene(id),
       onRotation:rotation=>{this.store.catalog.rotation=rotation;this.persist(true);this.updateScheduledScene(true);},
       onSave:source=>{const rule=normalizeSceneRules([source])[0];if(!rule)return;rule.centralOnly=true;rule.kind='focus';rule.untilDismissed=false;rule.dismissed='';rule.createdAt=Date.now();const i=this.store.catalog.sceneRules.findIndex(r=>r.id===rule.id);if(i>=0)this.store.catalog.sceneRules[i]=rule;const entry=this.store.catalog.scenes.find(c=>c.id===rule.targetId);if(entry)entry.name=rule.name;this.syncSchedules();this.refreshCanvasList();this.persist(true);},
       onToggle:(id,value)=>this.toggleSceneRule(id,value),
       onRemove:id=>{this.getUIContext().showAlertDialog({title:'删除定时场景？',message:'中央卡片和时间规则会一起删除。',primaryButton:{value:'取消',action:()=>{}},secondaryButton:{value:'删除',fontColor:'#C43A35',action:()=>{this.store.deleteTimedScene(id).then(()=>{this.refreshCanvasList();this.syncSchedules();});}}});},
-      onPreview:rule=>{this.scheduleOpen=false;this.scheduleOverride=rule;setTimeout(()=>{if(this.alive)this.updateScheduledScene(true);},240);}}).layoutWeight(1)
-    }.width('100%').height('100%').padding({top:16})
+      onPreview:rule=>{this.scheduleOpen=false;this.scheduleOverride=rule;setTimeout(()=>{if(this.alive)this.updateScheduledScene(true);},240);}})
+
   }
 
   private async chooseCanvas(id: string): Promise<void> {
@@ -705,7 +699,7 @@ struct Index {
     const generation=++this.homeToolsMotionGeneration;this.homeToolsMoving=true;
     const motion=canvasToolsMotion(this.homeToolsOpen||this.scheduleOpen);
     motion.onFinish=()=>{if(this.alive&&generation===this.homeToolsMotionGeneration)this.homeToolsMoving=false;};
-    this.getUIContext().animateTo(motion,()=>{this.boardTop=target;});
+    this.getUIContext().animateTo(motion,()=>{this.boardTop=target;this.timingHeaderActive=this.scheduleOpen;});
   }
   private layoutBoard(): void {
     const layout=workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect);
@@ -1490,7 +1484,7 @@ struct Index {
         SymbolGlyph($r('sys.symbol.timer')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
         Text('定时').fontSize(13).fontColor(this.appText()).hitTestBehavior(HitTestMode.None)
       }
-    }.height(size).padding({left:12,right:12}).backgroundColor(this.appControl()).attributeModifier(immersiveChrome(this.appDark))
+    }.height(size).layoutWeight(!this.floatingHome()&&this.timingHeaderActive?1:0).padding({left:12,right:12}).backgroundColor(this.appControl()).attributeModifier(immersiveChrome(this.appDark))
       .accessibilityText(this.sceneEditing?'完成定时场景编辑':'定时：场景与画布轮换').onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}if(this.scheduleOpen){this.scheduleOpen=false;this.updateScheduledScene(true);}else this.openScenePanel();})
       .bindPopup(this.floatingHome()&&this.scheduleOpen,{builder:this.phoneTimingTools,placement:Placement.Top,width:this.screenWidth-32,radius:24,transition:canvasToolsTransition(),systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:false,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible){this.scheduleOpen=false;this.updateScheduledScene(true);}}})
   }
@@ -1593,10 +1587,10 @@ struct Index {
 
           Button({type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
             Row({space:6}) {
-              Text(this.sceneEditing?'定时场景 · '+this.canvasName:this.canvasName).fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
-              SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
-            }.width('100%')
-          }.id('shareCanvas').padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).layoutWeight(1).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}if(this.canvasChanging)return;this.refreshCanvasList();this.canvasCreating=false;this.homeToolsOpen=false;this.scheduleOpen=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
+              Text(this.sceneEditing?'定时场景 · '+this.canvasName:this.canvasName).fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(!floating&&this.timingHeaderActive?0:1)
+              if(floating||!this.timingHeaderActive){SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}
+            }.width(!floating&&this.timingHeaderActive?'auto':'100%')
+          }.id('shareCanvas').padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).layoutWeight(!floating&&this.timingHeaderActive?0:1).constraintSize({maxWidth:!floating&&this.timingHeaderActive?this.panelWidth*.45:this.panelWidth}).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}if(this.canvasChanging)return;if(this.scheduleOpen){this.scheduleOpen=false;return;}this.refreshCanvasList();this.canvasCreating=false;this.homeToolsOpen=false;this.scheduleOpen=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
             .bindPopup(this.canvasPickerOpen,{builder:this.canvasPicker,placement:Placement.Top,width:this.canvasPopupWidth(),radius:20,transition:canvasToolsTransition(),systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:true,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible){this.canvasPickerOpen=false;this.canvasCreating=false;}}})
           if(!floating){this.timingButton(44)}
           Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.scheduledName&&!this.scheduleOpen).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
