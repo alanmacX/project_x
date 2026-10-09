@@ -1340,7 +1340,7 @@ struct Index {
           }.width('100%').height('100%').opacity(this.editorOpacity).hitTestBehavior(HitTestMode.None)
         }
         this.editingScene()
-        if(!this.editing&&!this.viewing&&this.canvasBackground.frameStyle!=='none'){CanvasFrame({material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle,widthVp:BOARD_W*this.boardScale,heightVp:this.boardHeight}).width(BOARD_W*this.boardScale).height(this.boardHeight).position({x:this.boardLeft,y:this.boardTop}).opacity(this.boardOpacity).zIndex(100003).hitTestBehavior(HitTestMode.None)}
+        if(!this.editing&&!this.viewing&&this.canvasBackground.frameStyle!=='none'){CanvasFrame({material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle}).width(BOARD_W*this.boardScale).height(this.boardHeight).position({x:this.boardLeft,y:this.boardTop}).opacity(this.boardOpacity).zIndex(100003).hitTestBehavior(HitTestMode.None)}
         if(this.scheduledFocusId && !this.editing) {
           ForEach(this.cards.filter((card:FridgeCard)=>card.id===this.scheduledFocusId),(card:FridgeCard)=>{
             Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {}
@@ -1767,7 +1767,7 @@ struct Index {
               .rotate({ angle: card.rot, centerX: 0, centerY: '100%' }).zIndex(card.z)
           }, (card: FridgeCard) => card.id)
           }.width('100%').height('100%').opacity(this.backgroundPreviewReady?1:0)
-          CanvasFrame({material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle,widthVp:240,heightVp:240/this.canvasAspect}).width('100%').height('100%').zIndex(100000)
+          CanvasFrame({material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle}).width('100%').height('100%').zIndex(100000)
         }.width(240).height(240 / this.canvasAspect).borderRadius(this.canvasBackground.frameStyle==='none'?20:240*31/600).clip(true)
         Column({ space: 16 }) {
           if(this.backgroundSettingsStage>=1){
@@ -1841,7 +1841,7 @@ struct Index {
             .position({ x: this.shareSingle ? this.shareX : card.x, y: this.shareSingle ? this.shareY : card.y * this.shareCanvasHeight / BOARD_H })
             .rotate({ angle: card.rot, centerX: 0, centerY: '100%' }).zIndex(card.z)
         }, (card: FridgeCard) => card.id)
-        if(!this.shareSingle&&this.shareBackground.frameStyle!=='none'){CanvasFrame({material:this.shareBackground.frameMaterial,style:this.shareBackground.frameStyle,square:true,widthVp:this.shareWidth,heightVp:this.shareCanvasHeight}).width('100%').height('100%').zIndex(100000)}
+        if(!this.shareSingle&&this.shareBackground.frameStyle!=='none'){CanvasFrame({material:this.shareBackground.frameMaterial,style:this.shareBackground.frameStyle,square:true}).width('100%').height('100%').zIndex(100000)}
       }.width(this.shareWidth).height(this.shareCanvasHeight).backgroundColor(this.shareOpaque ? Color.White : Color.Transparent).clip(true)
       if (!this.shareSingle) {
         Row({space:2}) {

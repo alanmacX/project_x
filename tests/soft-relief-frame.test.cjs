@@ -16,7 +16,8 @@ state.background.frameStyle='none';assert.equal(FridgeWeb.renderPackage({state,a
 console.log('PASS hollow frame normalization and transparent renderer; Gaussian contour relief alpha conservation.');
 
 const nativeFrame=fs.readFileSync('entry/src/main/ets/views/CanvasFrame.ets','utf8'),index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
-assert(nativeFrame.includes('48/600'));assert.equal((nativeFrame.match(/this.tile\(/g)||[]).length,8);assert(!nativeFrame.includes('.blur('));
+assert(nativeFrame.includes('48/600'));assert.equal((nativeFrame.match(/this.(?:corner|strip)\(/g)||[]).length,8);assert(!nativeFrame.includes('.blur('));
+assert(!/@State|onAreaChange|onSizeChange|widthVp|heightVp/.test(nativeFrame),'frame geometry cannot depend on a previous layout measurement');
 const share=index.slice(index.indexOf('  shareScene() {'),index.indexOf('  private templateError'));assert(share.includes('showFrame:false'));assert(share.includes('square:true'));assert(share.indexOf('square:true')>share.indexOf('ForEach(this.shareCards'),'share frame overlays cards with straight corners');
 
 for(const mode of ['solid','smart','blend','photo','preset','transparent']){
