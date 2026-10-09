@@ -90,6 +90,15 @@ function load(name) {
  assert.ok(updates.slice(beforeRebind).some(u=>u.id==='second'&&u.data.canvasId==='canvas_main'),'deletion immediately delivers the fallback to its newly rebound form');
  await reloaded.save();assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).second,'canvas_main','deleted source is explicitly rebound');assert.ok(!disk.has(canvasKey(second)));
  assert.equal(boundCanvas({a:'canvas_main'},'a',reloaded.catalog),'canvas_main');assert.throws(()=>readCatalog('{"version":1,"canvases":[]}'));
+ await reloaded.selectCanvas(duplicate);
+ assert.equal(readCatalog(disk.get('fridge_canvases_json')).activeId,duplicate,'manual selection is durable before returning');
+ assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).home,duplicate);
+ assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).second,duplicate,'all installed widgets follow the explicit selection');
+ assert.equal(updates.at(-1).data.canvasId,duplicate,'manual selection delivers the selected canvas');assert.equal(boundCanvas({home:'canvas_main'},'home',readCatalog(disk.get('fridge_canvases_json'))),duplicate,'stale legacy bindings cannot undo the current canvas');
+ const selectedRestart=new FridgeStore();await selectedRestart.init({});assert.equal(selectedRestart.state.canvasId,duplicate,'relaunch never restores old selection');
+ const unchangedUpdates=updates.length;await selectedRestart.refreshWidgets();await selectedRestart.refreshWidgets();assert.ok(updates.length>=unchangedUpdates+4,'time projection changes publish even with identical editable bytes');
+ selectedRestart.catalog.rotation.mode='time';selectedRestart.catalog.rotation.enabled=true;selectedRestart.catalog.rotation.slots=[{start:0,canvasId:duplicate},{start:600,canvasId:'canvas_main'}];
+ await selectedRestart.selectCanvas('canvas_main');assert.equal(selectedRestart.catalog.rotation.enabled,false,'manual choice pauses automatic rotation');assert.equal(selectedRestart.catalog.rotation.slots.length,2,'rotation settings retained');
  const corrupt=JSON.stringify({version:1,activeId:'missing',canvases:[{id:'missing',name:'Missing'}]});disk.set('fridge_canvases_json',corrupt);await assert.rejects(new FridgeStore().init({}),/已保留原始记录/);assert.equal(disk.get('fridge_canvases_json'),corrupt);disk.clear();
  // Each canvas retains its own disposable geometry cache across cold starts.
  const contours=load('RenderContours'),outline=[[{x:.1,y:.1},{x:.9,y:.1},{x:.9,y:.9},{x:.1,y:.9}]];

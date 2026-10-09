@@ -515,6 +515,8 @@ function load(name) {
   assert.equal(schedules,1,'five-minute system minimum remains acknowledged after the logical event deadline');
   await scheduleWidget(prefs,'schedule-test',Infinity,boundaryNow);assert.equal(schedules,1);
   await scheduleWidget(prefs,'schedule-test',boundaryNow+7*60000,boundaryNow+6*60000);assert.equal(schedules,2,'expired wake-up permits a fresh request');
+  let longMinutes=0;kits['@kit.FormKit'].formProvider.setFormNextRefreshTime=async(id,minutes)=>{longMinutes=minutes;};
+  await scheduleWidget(prefs,'schedule-long-test',boundaryNow+120*60000,boundaryNow);assert.equal(longMinutes,120,'far future scene is armed immediately instead of depending on hourly refresh');
   kits['@kit.FormKit'].formProvider.setFormNextRefreshTime=scheduler;
   assert.equal(formConfig.forms[0].updateDuration,2,'hourly fallback reserves quota for actual content boundaries');
   const FormAbility=load('../form/FridgeFormAbility').default, formAbility=new FormAbility();

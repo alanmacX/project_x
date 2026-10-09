@@ -1,3 +1,4 @@
+import { canvasRotationEnabled } from './CanvasRotation';
 import { systemIsDark } from './SystemAppearance';
 import { widgetBoundary, scheduleWidget } from './WidgetSchedule';
 import { resolveScheduledScene, sceneWidgetContext, activeSceneRule } from './SceneSchedule';
@@ -63,7 +64,7 @@ export async function pushWidgets(context: Context, json: string): Promise<void>
       if(baseId!==canvasId){hilog.warn(0,'WidgetSync','skipping unreadable bound canvas');return;}
       throw e as Error;
     }
-    if(baseId!==canvasId && catalog.sceneRules.length===0 && catalog.rotation.mode==='off' && !catalog.scenes.some(c=>c.id===canvasId)){const legacy=activeSceneRule(base,Date.now());if(legacy?.rule.kind!=='canvas'||legacy.rule.targetId!==canvasId)return;}
+    if(baseId!==canvasId && catalog.sceneRules.length===0 && !canvasRotationEnabled(catalog.rotation) && !catalog.scenes.some(c=>c.id===canvasId)){const legacy=activeSceneRule(base,Date.now());if(legacy?.rule.kind!=='canvas'||legacy.rule.targetId!==canvasId)return;}
     const scene=await resolveScheduledScene(base,Date.now(),async(targetId:string):Promise<FridgeState|null>=>{
       if(!sceneDocumentExists(catalog,targetId))return null;
       const targetJson=targetId===canvasId?json:await prefs.get(canvasKey(targetId),'') as string;return targetJson?normalizeState(JSON.parse(targetJson) as FridgeState):null;

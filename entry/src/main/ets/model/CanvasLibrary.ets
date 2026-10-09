@@ -2,7 +2,7 @@ import { CanvasRotation, normalizeCanvasRotation } from './CanvasRotation';
 import { SceneRule, normalizeSceneRules } from './SceneScheduleSchema';
 import { FridgeState, defaultState, normalizeState } from './CardSchema';
 export class CanvasEntry { id: string = ''; name: string = ''; }
-export class CanvasCatalog { scenes:CanvasEntry[]=[]; sceneRules:SceneRule[]=[]; rotation:CanvasRotation=new CanvasRotation(); scenePolicyVersion:number=2; version: number = 1; activeId: string = 'canvas_main'; canvases: CanvasEntry[] = [{ id: 'canvas_main', name: '我的画布' }]; }
+export class CanvasCatalog { desktopFollowsSelection:boolean=false; scenes:CanvasEntry[]=[]; sceneRules:SceneRule[]=[]; rotation:CanvasRotation=new CanvasRotation(); scenePolicyVersion:number=2; version: number = 1; activeId: string = 'canvas_main'; canvases: CanvasEntry[] = [{ id: 'canvas_main', name: '我的画布' }]; }
 export class CanvasDocument extends CanvasEntry { state: FridgeState = defaultState(); }
 export function canvasKey(id: string): string { return 'fridge_canvas_' + id; }
 export function readCatalog(json: string): CanvasCatalog {
@@ -17,11 +17,12 @@ export function readCatalog(json: string): CanvasCatalog {
   out.scenes=(Array.isArray(source.scenes)?source.scenes:[]).filter(c=>c&&/^[a-zA-Z0-9_-]{1,96}$/.test(c.id)&&!out.canvases.some(n=>n.id===c.id)).slice(0,12).filter((c,i,a)=>a.findIndex(n=>n.id===c.id)===i).map((c):CanvasEntry=>({id:c.id,name:typeof c.name==='string'?c.name.slice(0,40):'定时场景'}));
   out.sceneRules=normalizeSceneRules(source.sceneRules).filter(r=>r.centralOnly&&out.scenes.some(c=>c.id===r.targetId));
   out.rotation=normalizeCanvasRotation(source.rotation,out.canvases.map(c=>c.id));
-  out.scenePolicyVersion=source.scenePolicyVersion===2?2:1;
+  out.scenePolicyVersion=source.scenePolicyVersion===2?2:1;out.desktopFollowsSelection=source.desktopFollowsSelection===true;
   out.activeId = out.canvases.some((c) => c.id === source.activeId) ? source.activeId : out.canvases[0].id;
   return out;
 }
 export function boundCanvas(bindings: Record<string,string>, formId: string, catalog: CanvasCatalog): string {
+  if(catalog.desktopFollowsSelection)return catalog.activeId;
   const id = bindings[formId];
   return catalog.canvases.some((c) => c.id === id) ? id : catalog.activeId;
 }

@@ -1,0 +1,24 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
+const core=vm.createContext({});vm.runInContext(fs.readFileSync('previewer/shared-models.js','utf8'),core);
+const load=core.FridgeCore.load,lib=load('CanvasLibrary'),schema=load('CardSchema'),engine=load('SceneSchedule');
+const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
+function method(a,b){return index.slice(index.indexOf(a),index.indexOf(b,index.indexOf(a)));}
+let now=new Date(2026,9,10,9,0).getTime(),timer,delay;
+const RealDate=Date;class TestDate extends RealDate {constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
+const main=new schema.FridgeState();main.canvasId='main';const card=new schema.FridgeCard();card.id='base';main.cards=[card];
+const target=new schema.FridgeState();target.canvasId='central';target.cards=[new schema.FridgeCard()];target.cards[0].id='focus';
+const catalog=new lib.CanvasCatalog();catalog.activeId='main';catalog.canvases=[{id:'main',name:'主画布'}];catalog.scenes=[{id:'central',name:'提醒'}];
+const rule=new (load('SceneScheduleSchema').SceneRule)();Object.assign(rule,{id:'due',centralOnly:true,kind:'focus',targetId:'central',start:541,timeoutMinutes:1,createdAt:now});catalog.sceneRules=[rule];
+const mod={exports:{}};const source=`class Fixture {
+ alive=true;ready=true;pageVisible=true;appWindowFocused=true;appBackgrounded=false;sceneEditing=false;appDark=false;
+ scheduleTimer=-1;scheduleGeneration=0;timedScene=null;scheduleOverride=null;scheduling=false;scheduleTransition=false;schedulePhase=0;scheduleVisualGeneration=0;
+ scheduleOpen=true;backgroundGeneration=0;backgroundTimer=-1;selectedId='base';groupSelection=[];
+ store={state:main,catalog,canvasSnapshot:async id=>id==='central'?target:main,refreshWidgets:async()=>{this.deliveries++;}};deliveries=0;
+ renderBoard(){}scheduleBackground(){}templateError(...args){throw new Error(args[0]);}
+ getUIContext(){return {animateTo:(options,update)=>{update();options.onFinish?.();},postFrameCallback:frame=>frame.callback()};}
+ ${method('  private armScheduleTimer():','  private scheduleOffset(')}
+}module.exports=Fixture;`;
+class PreparedTransition{constructor(callback){this.callback=callback;}}
+vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,{module:mod,main,target,catalog,Date:TestDate,setTimeout:(fn,ms)=>{timer=fn;delay=ms;return 1;},clearTimeout:()=>{},...lib,...engine,...load('CanvasRotation'),SceneOccurrence:engine.SceneOccurrence,primeRenderContours:async()=>{},storageSnapshot:JSON.stringify,PreparedTransition,Curve:{EaseIn:0,Friction:1}});
+(async()=>{const f=new mod.exports();await f.updateScheduledScene();assert.equal(delay,60000);assert.equal(f.timedScene,null);now+=60000;timer();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.timedScene.ruleId,'due','due scene fires while timing panel is open');assert.equal(f.deliveries,1,'boundary publishes desktop despite unchanged editable canvas');assert.equal(f.store.state.cards[0].id,'base','temporary projection never overwrites editable canvas');now+=60000;timer();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.timedScene,null,'timeout restores normal canvas');assert.equal(f.deliveries,2,'timeout refreshes desktop');console.log('PASS real foreground scheduling: due boundary, open panel, timeout, desktop delivery and source isolation');})().catch(e=>{console.error(e);process.exitCode=1;});

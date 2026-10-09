@@ -56,7 +56,10 @@ export default class EntryAbility extends UIAbility {
 
   private routeCard(want: Want): void {
     const canvasId = want.parameters?.['canvasId'];
-    AppStorage.setOrCreate('routeCanvasId', typeof canvasId === 'string' ? canvasId : '');
+    // Ordinary widget taps open the latest durable selection, not a cached display revision.
+    const viewTarget=want.parameters?.['viewCardId'],editTarget=want.parameters?.['cardId'];
+    const targetsCard=(typeof viewTarget==='string'&&viewTarget.length>0)||(typeof editTarget==='string'&&editTarget.length>0);
+    AppStorage.setOrCreate('routeCanvasId', targetsCard&&typeof canvasId === 'string' ? canvasId : '');
     const dim = want.parameters?.['canvasDimension'];
     AppStorage.setOrCreate('launchFromWidget',typeof canvasId==='string'&&canvasId.length>0&&typeof dim==='string'&&['2*4','4*4','6*4'].includes(dim));
     AppStorage.setOrCreate('widgetDimension', typeof dim === 'string' && ['2*4', '4*4', '6*4'].includes(dim) ? dim : '');

@@ -10,7 +10,7 @@ const fixture=`class Fixture {
  shown(){return true;}controlPosition(right,bottom){return {x:right?100:0,y:bottom?100:0};}
  ${method(board,'  private controlRegions():', '  private publishControlPose():')}
  ${method(board,'  private publishControlPose():','  private shadowFringe():')}
- alive=true;timedScene=null;store={state:{canvasId:'home'}};selectedId='a';groupSelecting=true;groupSelection=['a','b'];backgroundGeneration=0;backgroundTimer=-1;scheduledFocusId='';scheduleVisualGeneration=0;
+ alive=true;timedScene=null;widgetRefreshes=0;store={state:{canvasId:'home'},refreshWidgets:()=>{this.widgetRefreshes++;return Promise.resolve();}};selectedId='a';groupSelecting=true;groupSelection=['a','b'];backgroundGeneration=0;backgroundTimer=-1;scheduledFocusId='';scheduleVisualGeneration=0;
  renderBoard(){}scheduleBackground(){}getUIContext(){return {animateTo:(options,update)=>{update();options.onFinish?.();}};}
  ${method(index,'  private applyScheduledScene(', '  private scheduleOffset(')}
  ${method(index,'  private capabilityHasEditableData():','  private openEditorSection(')}
@@ -26,7 +26,7 @@ f.motion.controlId='a';f.clearControlPose();f.controlsOnly=false;assert.equal(f.
 for(const k of ['clock','date','calendar','lunar','battery','dayprogress','yearprogress']){f.preview.capability={k};assert.ok(!f.editorTools().includes('数据'),k);}
 for(const k of ['countdown','anniversary','worldclock','agenda','timetable']){f.preview.capability={k};assert.ok(f.editorTools().includes('数据'),k);}
 f.preview.capability={k:'album'};assert.equal(f.editorTools()[1],'封面与资料');
-const scene={key:'base',normalState:{canvasId:'home'},state:{canvasId:'home',background:{}},ruleId:'',focusId:''};f.applyScheduledScene(scene);assert.equal(f.selectedId,'a','same-scene refresh preserves selection');assert.equal(f.groupSelection.length,2);f.applyScheduledScene({...scene,key:'scene:alert',ruleId:'alert'});assert.equal(f.selectedId,'','actual scene change clears selection');
+const scene={key:'base',normalState:{canvasId:'home'},state:{canvasId:'home',background:{}},ruleId:'',focusId:''};f.applyScheduledScene(scene);assert.equal(f.selectedId,'a','same-scene refresh preserves selection');assert.equal(f.groupSelection.length,2);f.applyScheduledScene({...scene,key:'scene:alert',ruleId:'alert'});assert.equal(f.selectedId,'','actual scene change clears selection');assert.equal(f.widgetRefreshes,1,'time projection triggers widget IPC even without scene-data edits');
 const commit=method(index,'  private commitGeometry(','  private async pickImage(');
 assert.ok(!commit.includes('bringToFront'),'controls must not permanently change card stacking');
 assert.match(board,/aboutToDisappear\(\): void \{ this.alive = false; this.clearControlPose\(\)/);

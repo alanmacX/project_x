@@ -3642,7 +3642,7 @@ exports.cardRenderSnapshot = cardRenderSnapshot;
 "CanvasRotation":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.nextCanvasBoundary = exports.rotatedCanvas = exports.normalizeCanvasRotation = exports.CanvasRotation = exports.CanvasTimeSlot = void 0;
+exports.canvasRotationEnabled = exports.nextCanvasBoundary = exports.rotatedCanvas = exports.normalizeCanvasRotation = exports.CanvasRotation = exports.CanvasTimeSlot = void 0;
 /** One complete local day. Starts are boundaries, so gaps and overlaps cannot exist. */
 class CanvasTimeSlot {
     constructor() {
@@ -3653,6 +3653,7 @@ class CanvasTimeSlot {
 exports.CanvasTimeSlot = CanvasTimeSlot;
 class CanvasRotation {
     constructor() {
+        this.enabled = true;
         this.mode = 'off';
         this.lightId = '';
         this.darkId = '';
@@ -3664,6 +3665,7 @@ function normalizeCanvasRotation(raw, ids) {
     const out = new CanvasRotation();
     if (!raw)
         return out;
+    out.enabled = raw.enabled !== false;
     out.mode = ['time', 'theme'].includes(raw.mode) ? raw.mode : 'off';
     out.lightId = ids.includes(raw.lightId) ? raw.lightId : ids[0] ?? '';
     out.darkId = ids.includes(raw.darkId) ? raw.darkId : out.lightId;
@@ -3680,7 +3682,7 @@ function normalizeCanvasRotation(raw, ids) {
 }
 exports.normalizeCanvasRotation = normalizeCanvasRotation;
 function rotatedCanvas(rotation, now, dark, fallback) {
-    if (!rotation)
+    if (!rotation || !canvasRotationEnabled(rotation))
         return fallback;
     if (rotation.mode === 'theme')
         return (dark ? rotation.darkId : rotation.lightId) || fallback;
@@ -3695,7 +3697,7 @@ function rotatedCanvas(rotation, now, dark, fallback) {
 }
 exports.rotatedCanvas = rotatedCanvas;
 function nextCanvasBoundary(rotation, now) {
-    if (!rotation || rotation.mode !== 'time')
+    if (!rotation || !canvasRotationEnabled(rotation) || rotation.mode !== 'time')
         return Infinity;
     const d = new Date(now);
     let next = Infinity;
@@ -3709,6 +3711,8 @@ function nextCanvasBoundary(rotation, now) {
     return Math.min(next, midnight.getTime());
 }
 exports.nextCanvasBoundary = nextCanvasBoundary;
+function canvasRotationEnabled(rotation) { return rotation !== undefined && rotation.enabled !== false && (rotation.mode === 'time' || rotation.mode === 'theme'); }
+exports.canvasRotationEnabled = canvasRotationEnabled;
 
 },
 "SceneSchedule":function(require,module,exports){
@@ -3779,7 +3783,7 @@ function activeSceneRule(state, now) {
                     }
                 }
             // Include expired and acknowledged starts in priority: an older scene must never resume.
-            if (current && current.start <= now && current.start >= rule.createdAt && (!latest || current.start >= latest.start))
+            if (current && current.start <= now && current.start >= Math.floor(rule.createdAt / 60000) * 60000 && (!latest || current.start >= latest.start))
                 latest = current;
         }
         return latest && latest.end > now && latest.token !== latest.rule.dismissed ? latest : null;
@@ -4054,6 +4058,7 @@ class CanvasEntry {
 exports.CanvasEntry = CanvasEntry;
 class CanvasCatalog {
     constructor() {
+        this.desktopFollowsSelection = false;
         this.scenes = [];
         this.sceneRules = [];
         this.rotation = new CanvasRotation_1.CanvasRotation();
@@ -4090,11 +4095,14 @@ function readCatalog(json) {
     out.sceneRules = (0, SceneScheduleSchema_1.normalizeSceneRules)(source.sceneRules).filter(r => r.centralOnly && out.scenes.some(c => c.id === r.targetId));
     out.rotation = (0, CanvasRotation_1.normalizeCanvasRotation)(source.rotation, out.canvases.map(c => c.id));
     out.scenePolicyVersion = source.scenePolicyVersion === 2 ? 2 : 1;
+    out.desktopFollowsSelection = source.desktopFollowsSelection === true;
     out.activeId = out.canvases.some((c) => c.id === source.activeId) ? source.activeId : out.canvases[0].id;
     return out;
 }
 exports.readCatalog = readCatalog;
 function boundCanvas(bindings, formId, catalog) {
+    if (catalog.desktopFollowsSelection)
+        return catalog.activeId;
     const id = bindings[formId];
     return catalog.canvases.some((c) => c.id === id) ? id : catalog.activeId;
 }
@@ -4137,4 +4145,4 @@ function scenePolicyShell(base) {
 }
 exports.scenePolicyShell = scenePolicyShell;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"b732499716ec8c6e23c0de8b5d92136f8f75ce73593fb265682a2d53f1d4c1d0"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"564e2598a1048ec75f79b8f112bff2aa3775993d4a17e7d5e07770ed013ece0e"};})(globalThis);

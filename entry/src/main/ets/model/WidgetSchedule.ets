@@ -24,7 +24,7 @@ const requests:Map<string,Promise<void>>=new Map();
  * requested boundary; the persisted timestamp also deduplicates process restarts. */
 export async function scheduleWidget(prefs:preferences.Preferences,formId:string,deadline:number,now:number=Date.now()):Promise<void> {
   const pending=(requests.get(formId)??Promise.resolve()).catch(()=>{}).then(async()=>{
-    if(!Number.isFinite(deadline)||deadline<=now||deadline-now>=60*60000)return;
+    if(!Number.isFinite(deadline)||deadline<=now)return;
     const key='fridge_next_refresh_'+formId;
     const previous=await prefs.get(key,0) as number;
     const minutes=Math.max(5,Math.ceil((deadline-now)/60000));

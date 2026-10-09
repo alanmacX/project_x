@@ -48,6 +48,30 @@ export class FridgeStore {
     const doc=new CanvasDocument();doc.id=id;doc.name=entry.name;doc.state=normalizeState(raw);doc.state.canvasId=id;
     cleanGroups(doc.state.cards);clampCanvasGroups(doc.state.cards,BOARD_W/doc.state.canvasAspect);this.documents=this.documents.filter((c)=>c.id!==id);this.documents.push(doc);this.savedScenes[id]=json;await this.restoreContours(doc.state);return this.switchCanvas(id);
   }
+  /** Manual selection commits the catalog before any rendering or widget IPC.
+   * All installed forms follow this explicit choice; opening/exporting documents does not rebind them. */
+  async selectCanvas(id:string):Promise<boolean> {
+    if(!this.catalog.canvases.some(c=>c.id===id))return false;
+    await this.save(false);
+    if(!await this.openCanvas(id))return false;
+    // An explicit choice takes precedence over automatic rotation, retaining its configuration.
+    this.catalog.rotation.enabled=false;this.catalog.desktopFollowsSelection=true;
+    await this.save(false);
+    await Promise.all(Object.values(this.widgetQueues).map(queue=>queue.waitForIdle()));
+    if(this.prefs===null)throw new Error('本地存储尚未就绪');
+    const dims=JSON.parse(await this.prefs.get('fridge_form_dims_json','{}') as string) as Record<string,string>;
+    const bindings=JSON.parse(await this.prefs.get('fridge_form_bindings_json','{}') as string) as Record<string,string>;
+    for(const formId of Object.keys(dims))bindings[formId]=id;
+    await this.prefs.put('fridge_form_bindings_json',JSON.stringify(bindings));await this.prefs.flush();
+    for(const queue of Object.values(this.widgetQueues))queue.invalidate();
+    await this.save(true);return true;
+  }
+  /** Time changes the projection even when editable scene bytes are identical. */
+  async refreshWidgets():Promise<void> {
+    await this.save(false);
+    const queue=this.queueFor(this.state.canvasId);await queue.waitForIdle();queue.invalidate();
+    await queue.submit(storageSnapshot(this.state));
+  }
   /** Export a detached snapshot; sharing an inactive canvas never changes widget bindings. */
   async canvasSnapshot(id: string): Promise<FridgeState> {
     if (id === this.state.canvasId) return normalizeState(JSON.parse(storageSnapshot(this.state)) as FridgeState);

@@ -36,7 +36,6 @@ export struct CapabilityPicker {
           },(item:CapabilityDescriptor)=>item.key)
           if(this.items().length===0) {ListItem(){Text('没有匹配的能力，试试其他关键词').fontSize(14).fontColor(AppDesign.muted(this.appDark)).padding(24).width('100%').textAlign(TextAlign.Center)}}
       }.width('100%').layoutWeight(1).scrollBar(BarState.Auto)
-      Button('纯创作 · 不添加能力',{type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).width('100%').height(48).fontSize(14).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.choose('none'))
     }.padding({left:20,right:20,top:16,bottom:16}).width('100%').height('100%').backgroundColor(AppDesign.background(this.appDark))
   }
 }

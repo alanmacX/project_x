@@ -21,7 +21,7 @@ export function activeSceneRule(state:FridgeState,now:number):SceneOccurrence|nu
       if(rule.repeat==='once'){const p=rule.date.split('-').map(Number);if(p.length===3)current=occurrence(rule,new Date(p[0],p[1]-1,p[2]));}
       else for(let back=0;back<8;back++){const d=new Date(now);d.setDate(d.getDate()-back);if(!rule.weekdays.includes(d.getDay()))continue;const o=occurrence(rule,d);if(o.start<=now){current=o;break;}}
       // Include expired and acknowledged starts in priority: an older scene must never resume.
-      if(current&&current.start<=now&&current.start>=rule.createdAt&&(!latest||current.start>=latest.start))latest=current;
+      if(current&&current.start<=now&&current.start>=Math.floor(rule.createdAt/60000)*60000&&(!latest||current.start>=latest.start))latest=current;
     }
     return latest&&latest.end>now&&latest.token!==latest.rule.dismissed?latest:null;
   }

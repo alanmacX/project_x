@@ -1,0 +1,8 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
+const source=fs.readFileSync('entry/src/main/ets/entryability/EntryAbility.ets','utf8'),start=source.indexOf('  private routeCard('),end=source.indexOf('  private incomingGeneration:',start),values=new Map(),moduleMock={exports:{}};
+vm.runInNewContext(ts.transpileModule('class Ability {'+source.slice(start,end)+'}module.exports=Ability;',{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,{module:moduleMock,AppStorage:{setOrCreate:(key,value)=>values.set(key,value)}});
+const ability=new moduleMock.exports();ability.routeCard({parameters:{canvasId:'stale-canvas',canvasDimension:'4*4',canvasAspect:1}});assert.equal(values.get('routeCanvasId'),'','generic widget launch cannot restore an old cached canvas');assert.equal(values.get('launchFromWidget'),true,'widget entrance still retains its optimized launch path');assert.equal(values.get('widgetDimension'),'4*4');
+ability.routeCard({parameters:{canvasId:'stale-canvas',canvasDimension:'4*4',viewCardId:'',cardId:''}});assert.equal(values.get('routeCanvasId'),'','empty targets never activate cached routes');
+ability.routeCard({parameters:{canvasId:'explicit-canvas',viewCardId:'card'}});assert.equal(values.get('routeCanvasId'),'explicit-canvas','explicit targeted card links retain routing');assert.equal(values.get('viewCardId'),'card');
+console.log('PASS stale widget launch cannot override durable selection; explicit card routes and widget entrance geometry retained');

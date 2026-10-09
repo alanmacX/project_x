@@ -1,6 +1,6 @@
 import { SceneRule, sceneDay, sceneClock } from '../model/SceneScheduleSchema';
 import { CanvasEntry } from '../model/CanvasLibrary';
-import { CanvasRotation, CanvasTimeSlot, normalizeCanvasRotation } from '../model/CanvasRotation';
+import { CanvasRotation, CanvasTimeSlot, normalizeCanvasRotation, canvasRotationEnabled } from '../model/CanvasRotation';
 import { AppDesign } from '../model/AppDesign';
 import { SettingsSegmented } from './SettingsSegmented';
 import { SettingsSelect } from './SettingsSelect';
@@ -36,6 +36,7 @@ export struct SceneSchedulePanel {
   timing() {
     Column({space:10}) {
       Row(){Text('出现时间').fontSize(17).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark));Blank();this.action('返回',()=>{this.contentScroller.scrollTo({xOffset:0,yOffset:0});this.editingRule=false;})}.width('100%')
+      Row(){Text('启用场景').fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:this.draft.enabled}).onChange(value=>this.draft.enabled=value)}.width('100%')
       TextInput({text:this.draft.name,placeholder:'场景名称'}).height(44).maxLength(30).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onChange(v=>this.draft.name=v)
       SettingsSegmented({labels:['每周重复','仅一次'],selectedIndex:this.draft.repeat==='once'?1:0,appDark:this.appDark,onSelect:i=>{this.draft.repeat=i===1?'once':'daily';if(!this.draft.date)this.draft.date=sceneDay(new Date());}})
       if(this.draft.repeat==='once'){this.action(this.draft.date,()=>this.pickDate())}
@@ -49,7 +50,10 @@ export struct SceneSchedulePanel {
   @Builder
   rotationEditor() {
     Column({space:10}) {
-      SettingsSegmented({labels:['手动','按时间','跟随深浅'],selectedIndex:['off','time','theme'].indexOf(this.rotationDraft.mode),appDark:this.appDark,onSelect:i=>{this.rotationDraft.mode=['off','time','theme'][i];this.saveRotation();}})
+      Row(){Text('画布轮换').fontSize(16).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:canvasRotationEnabled(this.rotationDraft)}).accessibilityText('启用画布轮换').onChange(value=>{this.rotationDraft.enabled=value;if(value&&this.rotationDraft.mode==='off')this.rotationDraft.mode='time';this.saveRotation();})}.width('100%')
+      SettingsSegmented({labels:['按时间','跟随深浅'],selectedIndex:this.rotationDraft.mode==='theme'?1:0,appDark:this.appDark,onSelect:i=>{this.rotationDraft.mode=i===1?'theme':'time';this.saveRotation();}})
+      if(!canvasRotationEnabled(this.rotationDraft)){Text('已暂停，保留以下轮换设置。手动切换画布也会暂停轮换。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
+
       if(this.rotationDraft.mode==='theme') {
         Text('浅色模式').fontColor(AppDesign.text(this.appDark)).width('100%')
         SettingsSelect({labels:this.canvases.map(c=>c.name),selectedIndex:this.canvases.findIndex(c=>c.id===this.rotationDraft.lightId),appDark:this.appDark,onSelect:i=>{this.rotationDraft.lightId=this.canvases[i].id;this.saveRotation();}})
