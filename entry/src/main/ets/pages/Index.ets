@@ -767,10 +767,10 @@ struct Index {
     }
     this.layerId=this.preview.capability!==null?'capability':(this.preview.elements.find((el:CanvasElement)=>el.behindCapability)?.id??'');this.syncFields();
     this.creatingTransition = created; this.heroBase = this.editorRect(); this.setHeroPose(this.heroRect); this.setTransitionClip(true);
-    this.editorMounted = true; this.editorReady = true; this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.editorOpacity = 0; this.boardOpacity = 1; this.heroActive = true; this.editing = true;this.editorSheetOpen=!this.editorLandscape();this.homeToolsOpen=false;
+    this.editorMounted = true; this.editorReady = true; this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.editorOpacity = 0; this.boardOpacity = 1; this.heroActive = true; this.editing = true;this.editorSheetOpen=false;this.homeToolsOpen=false;
     this.prepareEditorMotion(() => {
       if (!this.alive || !this.editing || !this.heroActive) return;
-      this.getUIContext().animateTo({ duration: 380, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: () => { if (this.alive) { this.heroActive = false; this.creatingTransition = false; this.retireChrome();this.layoutBoard();if(this.editorBackPending){this.editorBackPending=false;this.closeEditor();} } } }, () => {
+      this.getUIContext().animateTo({ duration: 380, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: () => { if (this.alive) { this.heroActive = false; this.creatingTransition = false; this.retireChrome();this.layoutBoard();if(this.editorBackPending){this.editorBackPending=false;this.closeEditor();}else{this.editorSheetOpen=!this.editorLandscape();} } } }, () => {
         this.setHeroPose(this.editorRect()); this.setTransitionClip(false); this.scatter = 1; this.boardOpacity = 0; this.editorOpacity = 1;
       });
     });
@@ -1374,7 +1374,7 @@ struct Index {
               detents:[this.editorWorkspace().body*.40+this.safeBottom,this.editorWorkspace().body*.78+this.safeBottom],
               detentSelection:this.editorControlHeight()+this.safeBottom,
               showClose:false,dragBar:true,enableOutsideInteractive:true,maskColor:Color.Transparent,
-              backgroundColor:Color.Transparent,blurStyle:BlurStyle.NONE,scrollSizeMode:ScrollSizeMode.CONTINUOUS,
+              backgroundColor:this.appSurface(),blurStyle:BlurStyle.NONE,scrollSizeMode:ScrollSizeMode.CONTINUOUS,
               onHeightDidChange:(height:number)=>this.editorSheetHeightChanged(height),
               onDetentsDidChange:(height:number)=>{const expanded=this.getUIContext().px2vp(height)>this.editorWorkspace().body*.60;this.editorExpanded=expanded;},
               onWillDismiss:(action:DismissSheetAction)=>this.dismissEditorSheet(action),onWillSpringBackWhenDismiss:(action:SpringBackAction)=>action.springBack()
@@ -2140,7 +2140,9 @@ struct Index {
         .nestedScroll({scrollForward:this.editorLandscape()?NestedScrollMode.SELF_ONLY:NestedScrollMode.PARENT_FIRST,scrollBackward:this.editorLandscape()?NestedScrollMode.SELF_ONLY:NestedScrollMode.SELF_FIRST})
     }.width(this.editorLandscape()?this.editorWorkspace().panelW:this.screenWidth)
       .height(this.editorLandscape()?this.editorWorkspace().body:'100%')
-      .padding({left:12,right:12,top:8,bottom:4}).backgroundColor(this.appSurface()).borderRadius({topLeft:24,topRight:24}).clip(true)
+      // The native sheet paints/clips its entire surface, including grabber and bottom safe area.
+      // A second rounded background here would create a rectangular seam below the grabber.
+      .padding({left:12,right:12,top:8,bottom:4}).backgroundColor(this.editorLandscape()?this.appSurface():Color.Transparent).clip(true)
   }
   @Builder
   albumStyleChoices() {
