@@ -20,3 +20,12 @@ console.log('PASS Form backdrop: immediate cold load, decode-gated fade, repeate
 
 assert.ok(form.trimEnd().endsWith(".accessibilityText('打开冰箱贴画布')\n      .onClick(() => this.open())\n  }\n}"), 'root Form directly owns the launch action');
 assert.ok(!form.includes('HitTestMode.Block')&&!form.includes(".accessibilityLevel('no')"), 'no separate blocking overlay or inaccessible root');
+const clockSource=form.slice(form.indexOf('  private syncRenderClock()'),form.indexOf("  @LocalStorageProp('canvasId')"));
+const clockEnv={exports:{},Date};vm.runInNewContext(ts.transpileModule('export class Clock {'+clockSource+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,clockEnv);
+const clock=new clockEnv.exports.Clock();let writes=0,value=120000;
+Object.defineProperty(clock,'renderTick',{get:()=>value,set:v=>{value=v;writes++;}});
+clock.rev=120100;clock.syncRenderClock();clock.rev=150000;clock.syncRenderClock();assert.equal(writes,0,'identical minute revisions do not dirty every Form card');
+clock.rev=180001;clock.syncRenderClock();assert.equal(writes,1);assert.equal(value,180000,'time-based cards still advance at the next minute');
+assert.match(form,/tick:capabilityRenderTick\(this.cardMap\[id\]\.capability,this.renderTick\)/);
+assert.match(form,/\.renderGroup\(this.incoming===null\)/,'whole bounded Form caches native launch scaling, background fades stay live');
+console.log('PASS Form render clock: repeated revisions do not rerender unchanged artwork; minute boundaries still update.');

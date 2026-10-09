@@ -15,7 +15,7 @@ export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     startStartupTrace(); startupMark('ability');
     hilog.info(0x0000, TAG, 'onCreate');
-    AppStorage.setOrCreate('appBackgrounded', false); this.updateAppearance(this.context.config.colorMode);
+    AppStorage.setOrCreate('appWindowFocused',true);AppStorage.setOrCreate('appBackgrounded', false); this.updateAppearance(this.context.config.colorMode);
     this.routeCard(want);
     this.routeTemplate(want);
     if (want.parameters?.['demo'] === 'sketch') this.launchPage = 'pages/SketchLab';
@@ -38,15 +38,17 @@ export default class EntryAbility extends UIAbility {
 
   private mainWindow: window.Window | null = null;
   private windowReady: boolean = false;
+  private appliedAppearance: boolean | null = null;
   private updateAppearance(mode: ConfigurationConstant.ColorMode | undefined): void {
     const dark = mode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
     AppStorage.setOrCreate('appDark', dark);
-    if (this.windowReady && this.mainWindow !== null) {
+    if (this.windowReady && this.mainWindow !== null && this.appliedAppearance !== dark) {
       try {
         this.mainWindow.setWindowBackgroundColor(dark ? '#101113' : '#FFFFFF');
         this.mainWindow.setWindowSystemBarProperties({ statusBarColor: '#00000000', navigationBarColor: '#00000000',
           statusBarContentColor: dark ? '#F1F2F3' : '#202020', navigationBarContentColor: dark ? '#F1F2F3' : '#202020' })
-          .catch((e: Error) => hilog.warn(0x0000, TAG, 'appearance %{public}s', e.message));
+          .catch((e: Error) => {if(this.appliedAppearance===dark)this.appliedAppearance=null;hilog.warn(0x0000, TAG, 'appearance %{public}s', e.message);});
+        this.appliedAppearance=dark;
       } catch (e) { hilog.warn(0x0000, TAG, 'appearance window %{public}s', (e as Error).message); }
     }
   }
@@ -56,6 +58,7 @@ export default class EntryAbility extends UIAbility {
     const canvasId = want.parameters?.['canvasId'];
     AppStorage.setOrCreate('routeCanvasId', typeof canvasId === 'string' ? canvasId : '');
     const dim = want.parameters?.['canvasDimension'];
+    AppStorage.setOrCreate('launchFromWidget',typeof canvasId==='string'&&canvasId.length>0&&typeof dim==='string'&&['2*4','4*4','6*4'].includes(dim));
     AppStorage.setOrCreate('widgetDimension', typeof dim === 'string' && ['2*4', '4*4', '6*4'].includes(dim) ? dim : '');
     const aspect = Number(want.parameters?.['canvasAspect'] ?? 0);
     AppStorage.setOrCreate('widgetAspect', Number.isFinite(aspect) && aspect >= .3 && aspect <= 3 ? aspect : 0);
@@ -121,6 +124,10 @@ export default class EntryAbility extends UIAbility {
           AppStorage.setOrCreate('safeBottom', ui.px2vp(mainWindow.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR).bottomRect.height));
         };
         updateInsets();
+        mainWindow.on('windowEvent',(event:window.WindowEventType)=>{
+          if(event===window.WindowEventType.WINDOW_ACTIVE)AppStorage.setOrCreate('appWindowFocused',true);
+          else if(event===window.WindowEventType.WINDOW_INACTIVE||event===window.WindowEventType.WINDOW_HIDDEN)AppStorage.setOrCreate('appWindowFocused',false);
+        });
         mainWindow.on('avoidAreaChange', () => updateInsets());
       } catch (e) { hilog.error(0x0000, TAG, 'immersive %{public}s', (e as Error).message); }
       startupMark('content-loaded');
@@ -129,7 +136,7 @@ export default class EntryAbility extends UIAbility {
     });
   }
 
-  onWindowStageDestroy(): void { cancelStartupReveal(); this.windowReady = false; this.mainWindow = null; }
+  onWindowStageDestroy(): void { cancelStartupReveal(); this.appliedAppearance=null;this.windowReady = false; this.mainWindow = null; }
 
   onForeground(): void { AppStorage.setOrCreate('appBackgrounded', false); this.updateAppearance(this.context.config.colorMode); }
 

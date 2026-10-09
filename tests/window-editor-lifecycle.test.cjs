@@ -6,7 +6,7 @@ assert.match(source, /@State tick: number = Math\.floor\(Date\.now\(\)\/60000\)\
 const routes=[],reads=[],saves=[];
 const context={exports:{},AppStorage:{setOrCreate:(key,value)=>routes.push([key,value])},DismissReason:{PRESS_BACK:0,SLIDE_DOWN:3},needsDataRefresh:cap=>!!cap,capabilityRequestKey:cap=>cap.k,readCapability:async cap=>{reads.push(cap.k);return {...cap,percent:cap.percent+1};}};
 const fixture=`class Fixture {
- alive=true;ready=true;context={};appBackgrounded=false;editing=false;viewing=false;
+ alive=true;ready=true;context={};appBackgrounded=false;editing=false;viewing=false;pageVisible=true;appWindowFocused=true;foregroundGeneration=0;
  editorSheetOpen=true;editorBackPending=false;arriving=false;heroActive=false;activeBoardId='';layerDrag='';gestureGroup='';refreshingCapabilities=false;
  routeCanvasId='canvas_a';viewRouteId='';routedId='';closed=0;collapsed=0;refreshes=0;renders=0;
  store={state:{canvasId:'canvas_a',cards:[{id:'a',capability:{k:'battery',percent:30}},{id:'b',capability:{k:'battery',percent:40}}]},init(){throw Error('unexpected full reload');},findCard(id){return this.state.cards.find(c=>c.id===id);}};

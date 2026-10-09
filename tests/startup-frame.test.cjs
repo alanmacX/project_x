@@ -19,11 +19,17 @@ for(let i=1;i<=3;i++){next();assert.equal(f.startupCardCount,i);assert.equal(ani
 next();assert.equal(f.startupCardCount,-1);assert.equal(f.arrival,1);assert.equal(f.boardOpacity,0);assert.equal(animations.length,0,'commit the offscreen pose before animation');
 next();await new Promise(setImmediate);assert.equal(animations.length,1);assert.equal(f.arrival,0);assert.equal(f.boardOpacity,1);assert.deepEqual(marks,['surfaces-ready','arrival-start']);animations[0].onFinish();assert.equal(f.arriving,false);
 const stopped=new sandbox.exports.Fixture();stopped.startArrival();stopped.alive=false;next();assert.equal(animations.length,1,'destroyed pages cannot launch pending animations');assert.equal(frames.length,0);
+const widget=new sandbox.exports.Fixture();widget.prepareWidgetScene();
+assert.equal(widget.startupCardCount,0);assert.equal(widget.arrival,0,'widget native transition uses the final card pose');
+for(let i=1;i<=3;i++){next();assert.equal(widget.startupCardCount,i);}
+next();assert.equal(widget.startupCardCount,-1);assert.equal(widget.boardOpacity,1);assert.equal(widget.arriving,false);
+next();assert.equal(animations.length,1,'widget preparation never starts another scatter animation');
+assert.ok(marks.includes('widget-surfaces-ready'));
 console.log('PASS startup: frame callbacks progress without idle budget; one card per prepared frame; warm textures before coordinated arrival; destroyed-page cancellation');
 const foreground=source.slice(source.indexOf('  private scheduleForegroundRefresh():'),source.indexOf('  private syncSchedules():'));
 const pending=new Map();let sequence=0,refreshes=0;
-const resume={exports:{},Date,setTimeout:(fn,delay)=>{assert.equal(delay,350);pending.set(++sequence,fn);return sequence;},clearTimeout:id=>pending.delete(id)};
-vm.runInNewContext(ts.transpileModule('class Resume {alive=true;appBackgrounded=false;arriving=false;heroActive=false;activeBoardId="";gestureGroup="";foregroundRefreshTimer=-1;tick=0;foregroundSchedules(){refresh();}'+foreground+'}\nexports.Resume=Resume;', {compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,{...resume,refresh:()=>refreshes++});
+const resume={exports:{},Date,setTimeout:(fn,delay)=>{assert.equal(delay,700);pending.set(++sequence,fn);return sequence;},clearTimeout:id=>pending.delete(id)};
+vm.runInNewContext(ts.transpileModule('class Resume {pageVisible=true;appWindowFocused=true;foregroundGeneration=0;cancelForegroundRefresh(){this.foregroundGeneration++;if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer);this.foregroundRefreshTimer=-1;}alive=true;appBackgrounded=false;arriving=false;heroActive=false;activeBoardId="";gestureGroup="";foregroundRefreshTimer=-1;tick=0;foregroundSchedules(){refresh();}'+foreground+'}\nexports.Resume=Resume;', {compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,{...resume,refresh:()=>refreshes++});
 const resumed=new resume.exports.Resume();resumed.scheduleForegroundRefresh();resumed.scheduleForegroundRefresh();assert.equal(pending.size,1,'PageShow and Foreground coalesce');assert.equal(refreshes,0,'no scene reconciliation during system entrance');
 function runPending(){const [id,fn]=pending.entries().next().value;pending.delete(id);fn();}
 resumed.heroActive=true;runPending();assert.equal(refreshes,0);assert.equal(pending.size,1,'do not refresh during an app transition');

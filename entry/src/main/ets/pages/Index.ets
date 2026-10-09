@@ -70,7 +70,7 @@ import lazy { ColorSetting } from '../views/ColorSetting';
 import lazy { ColorSelector } from '../views/ColorSelector';
 import { FridgeStore, FridgeCard, CanvasElement, ElementBox, ShapePoint, CapBlock, BOARD_W, BOARD_H, materialColors, shapeRadius, typeLabel } from '../model/FridgeModel';
 import { CardCanvas } from '../views/CardCanvas';
-import { cardViewSnapshot, cardRenderSnapshot } from '../model/CardViewSnapshot';
+import { cardStorageShell, cardViewSnapshot, cardRenderSnapshot } from '../model/CardViewSnapshot';
 import { CardFace } from '../views/CardFace';
 import { sceneRect, SceneRect, layerLabel } from '../model/SceneLayout';
 import lazy { extractSubject, repairSubject } from '../model/SubjectShape';
@@ -275,7 +275,29 @@ struct Index {
   private backgroundGeneration: number = 0;
   private backgroundTimer: number = -1;
   @StorageLink('appBackgrounded') @Watch('appWentBackground') appBackgrounded: boolean = false;
-  private appWentBackground(): void { if(this.appBackgrounded)this.finishCardDeletion(); if(!this.appBackgrounded && this.ready) {this.scheduleForegroundRefresh();this.incomingTemplateChanged();} if (this.appBackgrounded && this.ready) { if(this.scheduleTransition){this.scheduleVisualGeneration++;this.scheduleTransition=false;this.schedulePhase=0;this.timedScene=null;this.scheduledName='';this.scheduledFocusId='';this.renderBoard();} if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); } }
+  private appWentBackground(): void {
+    if(this.appBackgrounded) {
+      this.cancelForegroundRefresh();this.finishCardDeletion();
+      if(!this.ready)return;
+      if(this.scheduleTransition){this.scheduleVisualGeneration++;this.scheduleTransition=false;this.schedulePhase=0;this.timedScene=null;this.scheduledName='';this.scheduledFocusId='';this.renderBoard();}
+      this.flushPendingEdits();
+    } else if(this.ready) {this.scheduleForegroundRefresh();this.incomingTemplateChanged();}
+  }
+  private flushPendingEdits():void {
+    if(this.previewTimer>=0||this.gestureGroup.length>0)this.flushPreview();
+    // Changes already publish at their commit. A pure window roundtrip has no
+    // edits to serialize or deliver, and page-hide/background must not duplicate it.
+    if(this.saveTimer>=0)this.persist(true);
+  }
+  @StorageLink('appWindowFocused') @Watch('windowFocusChanged') appWindowFocused:boolean=true;
+  private windowFocusChanged():void {if(!this.appWindowFocused)this.cancelForegroundRefresh();else if(this.ready)this.scheduleForegroundRefresh();}
+  private foregroundGeneration:number=0;
+  private pageVisible:boolean=true;
+  private cancelForegroundRefresh():void {
+    this.foregroundGeneration++;
+    if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer);
+    this.foregroundRefreshTimer=-1;
+  }
 
   @State repairingSubjects: boolean = false;
   @State tick: number = Math.floor(Date.now()/60000)*60000;
@@ -285,7 +307,7 @@ struct Index {
     this.alive = true;
     this.context = this.getUIContext().getHostContext() ?? null;
     this.initialize();
-    this.clockTimer = setInterval(() => { if(this.deletionId || this.readingComparisonOpen || this.gestureGroup || this.activeBoardId || this.heroActive || this.arriving)return;this.tick = Math.floor(Date.now()/60000)*60000;this.refreshCapabilities();this.updateScheduledScene(true); }, 60000);
+    this.clockTimer = setInterval(() => { if(!this.alive||!this.ready||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||this.deletionId || this.readingComparisonOpen || this.gestureGroup || this.activeBoardId || this.heroActive || this.arriving)return;this.tick = Math.floor(Date.now()/60000)*60000;this.refreshCapabilities();this.updateScheduledScene(true); }, 60000);
     this.batteryObserver.start(()=>this.refreshCapabilities());
   }
   private initialize(): void {
@@ -305,7 +327,10 @@ struct Index {
       this.canvasDimension = this.widgetDimension || '4*4';
       this.canvasAspect = this.widgetAspect > 0 ? this.widgetAspect : (this.store.canvasSpecs[this.canvasDimension] ?? (this.canvasDimension === '6*4' ? 2 / 3 : (this.canvasDimension === '2*4' ? 2 : 1)));
       clampCanvasGroups(this.store.state.cards,BOARD_W/this.canvasAspect);
-      const routedLaunch = this.routedId.length > 0 || this.viewRouteId.length > 0;
+      // The launcher already animates the form into this window. A second cold
+      // scatter/prepare sequence underneath it fights quick gesture cancellation.
+      const widgetLaunch=AppStorage.get<boolean>('launchFromWidget')===true;
+      const routedLaunch = widgetLaunch || this.routedId.length > 0 || this.viewRouteId.length > 0;
       this.canvasBackground = this.store.state.background; this.layoutBoard();
       startupMark('geometry-ready');
       await prepareSubjectDepth(this.store.state.cards,this.boardScale,this.context!.cacheDir,this.getUIContext().vp2px(1));
@@ -314,7 +339,8 @@ struct Index {
       this.getUIContext().postFrameCallback(new PreparedTransition(()=>startupMark('scene-idle'),true));
       this.scheduleBackground(); this.routeChanged(); this.viewRouteChanged(); this.incomingTemplateChanged();
       if(!this.viewRouteId && this.routeCanvasId===this.store.state.canvasId)AppStorage.setOrCreate('routeCanvasId','');
-      if (!routedLaunch && this.cardIds.length > 0) this.startArrival();
+      if(widgetLaunch && !this.editing && !this.viewing && this.cardIds.length>0)this.prepareWidgetScene();
+      else if (!routedLaunch && this.cardIds.length > 0) this.startArrival();
       else this.getUIContext().postFrameCallback(new PreparedTransition(() => { revealStartup(); }));
       this.scheduleMaintenance();
 
@@ -324,6 +350,7 @@ struct Index {
     this.maintenanceTimer = setTimeout(() => {
       this.maintenanceTimer = -1;
       if (!this.alive) return;
+      if(!this.pageVisible||!this.appWindowFocused||this.appBackgrounded)return;
       if (this.arriving || this.heroActive || this.activeBoardId || this.gestureGroup || this.editing || this.busy) {
         this.scheduleMaintenance(); return;
       }
@@ -338,19 +365,21 @@ struct Index {
     this.canvasName = this.store.activeName; this.renameValue = this.canvasName;
   }
   private canvasRouteChanged(): void { if(this.ready && this.routeCanvasId) this.scheduleWidgetRoute(); }
-  private async foregroundSchedules():Promise<void> {
+  private async foregroundSchedules(generation:number):Promise<void> {
     try{await this.store.reloadSceneAcknowledgements();}catch(_){}
-    if(!this.alive)return;this.syncSchedules();this.refreshCapabilities();this.updateScheduledScene(true);
+    if(!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||generation!==this.foregroundGeneration)return;this.syncSchedules();this.refreshCapabilities();this.updateScheduledScene();this.scheduleMaintenance();
   }
   private scheduleForegroundRefresh():void {
-    if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer);
+    this.cancelForegroundRefresh();
+    if(!this.pageVisible||!this.appWindowFocused||this.appBackgrounded)return;
+    const generation=this.foregroundGeneration;
     this.foregroundRefreshTimer=setTimeout(()=>{
-      this.foregroundRefreshTimer=-1;if(!this.alive||this.appBackgrounded)return;
+      this.foregroundRefreshTimer=-1;if(!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||generation!==this.foregroundGeneration)return;
       if(this.deletionId||this.arriving||this.heroActive||this.activeBoardId||this.layerDrag||this.gestureGroup){this.scheduleForegroundRefresh();return;}
       // Resume/PageShow arrive together. Reconcile once after the system's
       // window entrance, instead of invalidating the entire scene twice in it.
-      this.tick=Math.floor(Date.now()/60000)*60000;this.foregroundSchedules();
-    },350);
+      const tick=Math.floor(Date.now()/60000)*60000;if(tick!==this.tick)this.tick=tick;this.foregroundSchedules(generation);
+    },700);
   }
   private syncSchedules():void {
     this.normalLayoutId=this.store.state.sceneBaseLayoutId;
@@ -358,7 +387,7 @@ struct Index {
     if(this.savedLayouts.length>0||this.store.state.sceneLayouts.length>0)this.savedLayouts=this.store.state.sceneLayouts.slice();
   }
   private armScheduleTimer():void {
-    if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer);if(!this.alive||!this.ready||!this.store.state.sceneRules.some(r=>r.enabled))return;
+    if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer);if(!this.alive||!this.ready||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||!this.store.state.sceneRules.some(r=>r.enabled))return;
     const wait=Math.min(60000,Math.max(100,nextSceneBoundary(this.store.state,Date.now())-Date.now()));
     this.scheduleTimer=setTimeout(()=>{this.scheduleTimer=-1;this.updateScheduledScene();},wait);
   }
@@ -379,10 +408,10 @@ struct Index {
       } else next=await resolveScheduledScene(this.store.state,Date.now(),async(id:string):Promise<FridgeState|null>=>{
         if(!this.store.catalog.canvases.some(c=>c.id===id))return null;return this.store.canvasSnapshot(id);
       });
-      if(!this.alive||generation!==this.scheduleGeneration||baseId!==this.store.state.canvasId)return;
+      if(!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||generation!==this.scheduleGeneration||baseId!==this.store.state.canvasId)return;
       if(!force&&next.key===(this.timedScene?.key??'base'))return;
       await primeRenderContours(next.state.cards,storageSnapshot(next.state));
-      if(!this.alive||generation!==this.scheduleGeneration||baseId!==this.store.state.canvasId)return;
+      if(!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||generation!==this.scheduleGeneration||baseId!==this.store.state.canvasId)return;
       this.applyScheduledScene(next);
     } catch(_) {if(this.scheduleOverride){this.scheduleOverride=null;this.getUIContext().getPromptAction().showToast({message:'目标已移除，请重新选择'});}}
     finally {this.scheduling=false;this.armScheduleTimer();}
@@ -536,7 +565,15 @@ struct Index {
   }
   private arrivalOffsets: Record<string, ShapePoint> = {};
   @State private startupCardCount: number = -1;
+  private startupFromWidget:boolean=false;
+  private prepareWidgetScene():void {
+    // Keep the native starting surface during preparation, with cards already
+    // in their final positions. Spread first construction across frames.
+    this.startupFromWidget=true;this.arriving=true;this.arrival=0;this.boardOpacity=.01;
+    this.startupCardCount=0;this.prepareStartupCard();
+  }
   private startArrival(): void {
+    this.startupFromWidget=false;
     if (this.editing || this.viewing || this.cardIds.length === 0) return;
     this.arrivalOffsets = {};
     this.cards.forEach((card: FridgeCard) => { this.arrivalOffsets[card.id] = arrivalOffset(card, BOARD_W * this.boardScale, this.boardHeight); });
@@ -554,6 +591,10 @@ struct Index {
         this.startupCardCount++;this.prepareStartupCard();return;
       }
       this.startupCardCount=-1;
+      if(this.startupFromWidget){
+        this.boardOpacity=1;this.arriving=false;this.startupFromWidget=false;startupMark('widget-surfaces-ready');
+        this.getUIContext().postFrameCallback(new PreparedTransition(()=>revealStartup()));return;
+      }
       startupMark('surfaces-ready');this.arrival=1;this.boardOpacity=0;
       this.getUIContext().postFrameCallback(new PreparedTransition(async ()=>{
         await revealStartup();
@@ -643,11 +684,18 @@ struct Index {
   }
   private editorControlHeight():number {return this.editorWorkspace().body*(this.editorExpanded?.78:.40);}
   private editingAngle(): number { return this.preview.rot; }
+  private previewViewportCard:FridgeCard|null=null;
+  private previewViewportKey:string='';
+  private previewViewportValue:EditorViewport=new EditorViewport();
   private previewViewport(): EditorViewport {
+    const width=this.editorViewportWidth(),landscape=this.editorLandscape(),pane=this.previewPaneHeight();
+    const key=[this.screenHeight,this.safeTop,this.safeBottom,width,landscape,pane,this.settingsTab].join(':');
+    if(this.previewViewportCard===this.preview&&this.previewViewportKey===key)return this.previewViewportValue;
     const overflow=compositionOverflow(this.preview,1);
     if(this.settingsTab===0){overflow.left=0;overflow.top=0;overflow.right=0;overflow.bottom=0;}
-    return editorViewport(this.preview.w, this.preview.h, this.editingAngle(), this.editorViewportWidth(),
-      this.screenHeight, this.safeTop, this.safeBottom, this.editorLandscape(), this.previewPaneHeight(),[overflow.left,overflow.top,overflow.right,overflow.bottom]);
+    this.previewViewportValue=editorViewport(this.preview.w, this.preview.h, this.editingAngle(),width,
+      this.screenHeight, this.safeTop, this.safeBottom,landscape,pane,[overflow.left,overflow.top,overflow.right,overflow.bottom]);
+    this.previewViewportCard=this.preview;this.previewViewportKey=key;return this.previewViewportValue;
   }
   private editorScale(): number { return this.previewViewport().scale; }
   private editorRect(): SceneRect {
@@ -1096,12 +1144,12 @@ struct Index {
       }
     });
   }
-  onPageHide(): void { if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.persist(true); }
+  onPageHide(): void { this.pageVisible=false;this.cancelForegroundRefresh();this.flushPendingEdits(); }
   private compareReading():void {
     if(!this.current()?.capability||this.readingComparisonOpen||this.capabilityPickerOpen)return;
     this.readingComparisonOpen=true;
   }
-  onPageShow(): void { if(this.ready)this.scheduleForegroundRefresh(); }
+  onPageShow(): void { this.pageVisible=true;if(this.ready)this.scheduleForegroundRefresh(); }
   private taskSheetHeight(expanded:boolean=false):number {
     return Math.min(expanded?720:560,this.screenHeight*(expanded?.88:.70));
   }
@@ -1130,14 +1178,14 @@ struct Index {
     }catch(e){if(this.alive)this.getUIContext().getPromptAction().showToast({message:(e as Error).message});}
   }
   private async refreshCapabilities():Promise<void> {
-    if(!this.ready||!this.alive||this.appBackgrounded||this.arriving||this.heroActive||this.activeBoardId||this.layerDrag||this.gestureGroup.length>0||this.refreshingCapabilities||!this.context)return;
-    this.refreshingCapabilities=true;const canvasId=this.store.state.canvasId;
+    if(!this.ready||!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||this.arriving||this.heroActive||this.activeBoardId||this.layerDrag||this.gestureGroup.length>0||this.refreshingCapabilities||!this.context)return;
+    this.refreshingCapabilities=true;const canvasId=this.store.state.canvasId,generation=this.foregroundGeneration;
     const sources:FridgeCard[]=[],previous:CapBlock[]=[],results:CapBlock[]=[],keys:string[]=[];
     try {
       for(const card of this.store.state.cards.slice()) {
         const cap=card.capability;if(!needsDataRefresh(cap)||!cap)continue;
         const key=capabilityRequestKey(cap),next=await readCapability(cap,this.context);
-        if(!this.alive||this.store.state.canvasId!==canvasId)return;
+        if(!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||generation!==this.foregroundGeneration||this.store.state.canvasId!==canvasId)return;
         sources.push(card);previous.push(cap);results.push(next);keys.push(key);
       }
       if(this.gestureGroup||this.layerDrag||this.activeBoardId||this.arriving||this.heroActive||this.appBackgrounded){this.scheduleForegroundRefresh();return;}
@@ -2163,7 +2211,13 @@ struct Index {
     else {SymbolGlyph($r('sys.symbol.calendar')).fontSize(30).fontColor([this.appText()])}
   }
   private layerBaseScale():number {return Math.min(48/this.preview.w,48/this.preview.h);}
-  private layerBaseCard():FridgeCard {const card=cardViewSnapshot(this.preview);card.capability=null;card.elements=[];return card;}
+  private layerBaseSource:FridgeCard|null=null;
+  private layerBaseValue:FridgeCard=new FridgeCard();
+  private layerBaseCard():FridgeCard {
+    if(this.layerBaseSource===this.preview)return this.layerBaseValue;
+    const card=cardStorageShell(this.preview);card.capability=null;card.capBox=new ElementBox();card.elements=[];
+    this.layerBaseSource=this.preview;this.layerBaseValue=card;return card;
+  }
   @Builder
   layerThumbnail(id:string) {
     Stack() {

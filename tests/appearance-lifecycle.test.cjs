@@ -22,7 +22,9 @@ const kits = {
  '../model/IncomingTemplate':{incomingTemplateUri:u=>u?.startsWith('file://')?u:'',stageIncomingTemplate:async()=>'',removeStagedTemplate:(u)=>{if(u)removed.push(u);}},
  '@kit.ArkTS':{taskpool:{Task:class{constructor(fn,...args){this.fn=fn;this.args=args;}},execute:task=>new Promise(resolve=>jobs.push({task,resolve}))}},
  '@kit.AbilityKit': {UIAbility, ConfigurationConstant:{ColorMode:{COLOR_MODE_DARK:0,COLOR_MODE_LIGHT:1}}},
- '@kit.ArkUI': {window:{Orientation:{AUTO_ROTATION_UNSPECIFIED:0},AvoidAreaType:{TYPE_SYSTEM:0,TYPE_NAVIGATION_INDICATOR:1}}},
+ '../model/DevicePolicy':{lockPhonePortrait:(type,fold)=>type==='phone'&&!fold},
+ '@kit.BasicServicesKit':{deviceInfo:{deviceType:'tablet'}},
+ '@kit.ArkUI': {display:{isFoldable:()=>false},window:{Orientation:{AUTO_ROTATION_UNSPECIFIED:0},AvoidAreaType:{TYPE_SYSTEM:0,TYPE_NAVIGATION_INDICATOR:1}}},
  '@kit.PerformanceAnalysisKit': {hilog:{info(){},warn(){},error(){}}},
 };
 vm.runInNewContext(code, {require:s=>kits[s],exports:moduleMock.exports, AppStorage:{get:k=>values.get(k),setOrCreate:(k,v)=>values.set(k,v)}});
@@ -36,6 +38,7 @@ assert.equal(backgrounds.at(-1),'#FFFFFF');
 ability.onConfigurationUpdate({colorMode:0});
 assert.equal(values.get('appDark'),true);assert.equal(backgrounds.at(-1),'#101113');
 assert.equal(bars.at(-1).statusBarContentColor,'#F1F2F3');
+ability.context.config.colorMode=0;const repeated=bars.length;ability.onForeground();ability.onForeground();assert.equal(bars.length,repeated,'unchanged warm entrance must not send redundant system bar IPC');
 ready=false;assert.doesNotThrow(()=>ability.onForeground(),'hidden/closing windows must not crash the ability');
 ability.onWindowStageDestroy();const count=backgrounds.length;
 ability.onConfigurationUpdate({colorMode:1});assert.equal(values.get('appDark'),false);assert.equal(backgrounds.length,count);

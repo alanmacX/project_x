@@ -1,3 +1,4 @@
+import { capabilityRenderTick } from '../../model/CapabilityClock';
 import { cardRenderSnapshot } from '../../model/CardViewSnapshot';
 import { FridgeCard, CanvasBackground, normalizeBackground, BOARD_W } from '../../model/CardSchema';
 import { scenePercent } from '../../model/SceneLayout';
@@ -84,7 +85,12 @@ struct FridgeWidgetCard {
   @State cardMap: Record<string, FridgeCard> = {};
   @LocalStorageProp('faceCards') @Watch('syncLegacyCards') faceCardsJson: string = '[]';
   @LocalStorageProp('doorCards') @Watch('syncLegacyCards') doorCardsJson: string = '[]';
-  @LocalStorageProp('rev') rev: number = 0;
+  @LocalStorageProp('rev') @Watch('syncRenderClock') rev: number = 0;
+  @State renderTick:number=Math.floor(Date.now()/60000)*60000;
+  private syncRenderClock():void {
+    const tick=Math.floor((this.rev>0?this.rev:Date.now())/60000)*60000;
+    if(tick!==this.renderTick)this.renderTick=tick;
+  }
   @LocalStorageProp('canvasId') canvasId: string = 'canvas_main';
   @LocalStorageProp('dim') dim: string = '4*4';
   @LocalStorageProp('canvasWidth') canvasWidth: number = 344;
@@ -96,7 +102,7 @@ struct FridgeWidgetCard {
   private parse(json: string): FridgeCard[] {
     try { return JSON.parse(json) as FridgeCard[]; } catch (_) { return []; }
   }
-  aboutToAppear(): void {this.alive=true; this.syncPacket();this.syncBackground(); this.syncCards(); }
+  aboutToAppear(): void {this.alive=true;this.syncRenderClock(); this.syncPacket();this.syncBackground(); this.syncCards(); }
   aboutToDisappear():void {this.alive=false;this.sceneGeneration++;this.sceneAnimating=false;this.appliedPacket='';this.scenePhase=0;this.generation++;this.blending=false;this.incoming=null;this.mix=0;this.hasArtwork=false;}
   private syncLegacyCards(): void { if (this.cardsJson.length === 0) this.syncCards(); }
   private syncCards(): void {
@@ -133,7 +139,7 @@ struct FridgeWidgetCard {
       }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
       ForEach(this.cardIds, (id: string) => {
         Stack({alignContent:Alignment.TopStart}) {
-          CardFace({card:this.cardMap[id],scaleFactor:this.widthValue()/BOARD_W,tick:this.rev,widget:true})
+          CardFace({card:this.cardMap[id],scaleFactor:this.widthValue()/BOARD_W,tick:capabilityRenderTick(this.cardMap[id].capability,this.renderTick),widget:true})
             .width('100%').height('100%').hitTestBehavior(HitTestMode.None)
         }.width(scenePercent(this.cardMap[id],this.widthValue()/this.heightValue()).w+'%')
           .height(scenePercent(this.cardMap[id],this.widthValue()/this.heightValue()).h+'%')
@@ -142,6 +148,9 @@ struct FridgeWidgetCard {
           .zIndex(this.cardMap[id].z).hitTestBehavior(HitTestMode.None)
       }, (id: string) => id)
     }.width('100%').height('100%').backgroundColor(Color.White).borderRadius(24).clip(true)
+      // Cache the complete clipped form, including shadow fringes, while its
+      // host scales it during launch/return. Crossfades render live until settled.
+      .renderGroup(this.incoming===null)
       .onSizeChange((_: SizeOptions, size: SizeOptions) => {
         const width = Number(size.width), height = Number(size.height);
         if (width > 0 && height > 0 && (Math.abs(width - this.measuredWidth) > .1 || Math.abs(height - this.measuredHeight) > .1)) {
