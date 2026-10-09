@@ -920,7 +920,8 @@ function lunarReading(now) {
     const date = new Date(now), key = date.getFullYear() + ':' + date.getMonth() + ':' + date.getDate() + ':' + date.getTimezoneOffset();
     if (key === lunarKey)
         return lunarValue;
-    lunarFormatter = new Intl.DateTimeFormat('zh-CN-u-ca-chinese', { year: 'numeric', month: 'long', day: 'numeric' });
+    if (!lunarFormatter)
+        lunarFormatter = new Intl.DateTimeFormat('zh-CN-u-ca-chinese', { year: 'numeric', month: 'long', day: 'numeric' });
     const parts = lunarFormatter.formatToParts(date), day = Number(parts.find((part) => part.type === 'day')?.value ?? 0);
     const names = ['', '初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十', '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十', '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
     const result = new LunarReading();
@@ -2116,7 +2117,7 @@ exports.capabilityReadableMinimum = capabilityReadableMinimum;
 function capabilityContentScale(cap, width, height) {
     const compact = compactCapability(cap, width, height);
     const min = capabilityMinimum(cap, compact, compact ? width / exports.MIN_CAPABILITY_SCALE : width);
-    return Math.min(2, width / min.w, height / min.h);
+    return Math.min(['agenda', 'timetable', 'calendar'].includes(cap.k) ? 1 : 2, width / min.w, height / min.h);
 }
 exports.capabilityContentScale = capabilityContentScale;
 /** Fit a fixed-format readout before native layout; TextClock has no single-line adaptive sizing. */
@@ -2129,7 +2130,7 @@ exports.boundedReadoutFont = boundedReadoutFont;
 "TimetableLayout":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.minuteOf = exports.weekLessons = exports.weekStart = exports.WeekLesson = exports.briefHeight = exports.briefColumns = exports.timetableCapacity = exports.BRIEF_HEADER_HEIGHT = exports.LESSON_CELL_HEIGHT = exports.LESSON_MIN_WIDTH = void 0;
+exports.minuteOf = exports.weekLessons = exports.weekStart = exports.WeekLesson = exports.briefHeight = exports.lessonContext = exports.lessonRowHeight = exports.briefColumns = exports.timetableCapacity = exports.BRIEF_HEADER_HEIGHT = exports.LESSON_CELL_HEIGHT = exports.LESSON_MIN_WIDTH = void 0;
 const CapabilityData_1 = require("./CapabilityData");
 exports.LESSON_MIN_WIDTH = 104;
 exports.LESSON_CELL_HEIGHT = 32;
@@ -2187,6 +2188,20 @@ function timetableCapacity(cap) {
 exports.timetableCapacity = timetableCapacity;
 function briefColumns(width) { return width >= 312 ? 3 : width >= 208 ? 2 : 1; }
 exports.briefColumns = briefColumns;
+/** Extra height buys readable title/room lines, never a larger copy of the same tile. */
+function lessonRowHeight(height, count, columns) {
+    const available = (height - exports.BRIEF_HEADER_HEIGHT) / Math.ceil(Math.max(1, count) / Math.max(1, columns));
+    return available >= 60 ? 60 : available >= 48 ? 48 : exports.LESSON_CELL_HEIGHT;
+}
+exports.lessonRowHeight = lessonRowHeight;
+function lessonContext(event, now) {
+    if (event.start > now) {
+        const minutes = Math.ceil((event.start - now) / 60000);
+        return minutes < 60 ? '距上课 ' + minutes + ' 分钟' : '课程时长 ' + Math.round((event.end - event.start) / 60000) + ' 分钟';
+    }
+    return event.end > now ? '剩余 ' + Math.ceil((event.end - now) / 60000) + ' 分钟' : '';
+}
+exports.lessonContext = lessonContext;
 function briefHeight(count, columns) { return exports.BRIEF_HEADER_HEIGHT + Math.ceil(Math.max(1, count) / columns) * exports.LESSON_CELL_HEIGHT; }
 exports.briefHeight = briefHeight;
 class WeekLesson {
@@ -2481,7 +2496,7 @@ exports.mergePickupParcels = mergePickupParcels;
 "CapabilityPresentation":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.paperReadingRadius = exports.paperReadingInk = exports.paperReadingBackground = exports.READING_PAPER_FILL = exports.READING_PAPER_COLOR = exports.readingHalo = exports.readingVeilColor = exports.readingWarning = exports.readingSurfaceColor = exports.textContrast = exports.readingSurface = exports.summaryPresentation = exports.summaryRowCapacity = exports.SummaryPresentation = void 0;
+exports.paperReadingRadius = exports.paperReadingInk = exports.paperReadingBackground = exports.READING_PAPER_FILL = exports.READING_PAPER_COLOR = exports.readingHalo = exports.readingVeilColor = exports.readingWarning = exports.readingSurfaceColor = exports.textContrast = exports.readingSurface = exports.summaryPresentation = exports.summaryColumns = exports.summaryRowCapacity = exports.SummaryPresentation = void 0;
 const CardSchema_1 = require("./CardSchema");
 /** Stable type hierarchy in card coordinates. Larger cards gain content, not inflated typography. */
 class SummaryPresentation {
@@ -2490,15 +2505,20 @@ class SummaryPresentation {
         this.empty = '';
         this.events = [];
         this.remaining = 0;
+        this.columns = 1;
     }
 }
 exports.SummaryPresentation = SummaryPresentation;
 function summaryRowCapacity(height) {
-    return Math.max(1, Math.min(3, Math.floor((height - 26) / 48)));
+    return Math.max(1, Math.min(12, Math.floor((height - 26) / 48)));
 }
 exports.summaryRowCapacity = summaryRowCapacity;
-function summaryPresentation(cap, height, now) {
-    const out = new SummaryPresentation(), capacity = summaryRowCapacity(height);
+function summaryColumns(width) { return width >= 352 ? 2 : 1; }
+exports.summaryColumns = summaryColumns;
+function summaryPresentation(cap, height, now, width = 0) {
+    const out = new SummaryPresentation();
+    out.columns = summaryColumns(width);
+    const capacity = Math.min(12, summaryRowCapacity(height) * out.columns);
     {
         const all = (cap.events ?? []).filter((event) => event.end > now).slice().sort((a, b) => a.start - b.start);
         out.heading = '接下来';
@@ -3004,7 +3024,9 @@ exports.paperTextWidth = paperTextWidth;
 "CapabilityCalendar":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.progressOf = exports.calendarCells = exports.daysLeftOf = void 0;
+exports.calendarDetails = exports.detailedCalendar = exports.progressOf = exports.calendarCells = exports.daysLeftOf = void 0;
+const TimeCapabilities_1 = require("./TimeCapabilities");
+const HolidayCalendar_1 = require("./HolidayCalendar");
 /** Shared local-only readout data. Native and independent preview use the same calculations. */
 function daysLeftOf(date, tick = Date.now()) {
     const target = new Date(date + 'T00:00:00'), now = new Date(tick);
@@ -3027,6 +3049,33 @@ function progressOf(k, now) {
     return (now.getTime() - start.getTime()) / (end.getTime() - start.getTime());
 }
 exports.progressOf = progressOf;
+/** Native and browser share both the density threshold and cached local labels. */
+function detailedCalendar(width, height, weeks, backed) {
+    return width >= 224 && height >= (backed ? 20 : 44) + 24 + weeks * 34;
+}
+exports.detailedCalendar = detailedCalendar;
+const monthDetails = new Map();
+function calendarDetails(month) {
+    const key = month.getFullYear() + ':' + month.getMonth() + ':' + month.getTimezoneOffset();
+    const cached = monthDetails.get(key);
+    if (cached)
+        return cached;
+    const labels = calendarCells(month).map((day) => {
+        if (!day)
+            return '';
+        const date = new Date(month.getFullYear(), month.getMonth(), day, 12);
+        const holiday = (0, HolidayCalendar_1.holidayName)(date);
+        if (holiday)
+            return holiday;
+        const parts = (0, TimeCapabilities_1.lunarReading)(date.getTime()).date.split(' ');
+        return parts[1] === '初一' ? parts[0] : parts[parts.length - 1];
+    });
+    if (monthDetails.size >= 24)
+        monthDetails.clear();
+    monthDetails.set(key, labels);
+    return labels;
+}
+exports.calendarDetails = calendarDetails;
 
 },
 "SubjectGeometry":function(require,module,exports){
@@ -3354,4 +3403,4 @@ function traceMask(mask, width, height) {
 }
 exports.traceMask = traceMask;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"aeb0da8eb44a619d83247e44248cf1bf23510505493e422f69a6c60f1d2a5fd2"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"5f86ed4129866ff45e7e031ab76f2ed2cbff9a2fcec11fd1b5ae843198e7db07"};})(globalThis);

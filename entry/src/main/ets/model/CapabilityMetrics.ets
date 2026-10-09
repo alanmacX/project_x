@@ -53,7 +53,7 @@ export function capabilityReadableMinimum(cap: CapBlock | null, width: number = 
 export function capabilityContentScale(cap: CapBlock, width: number, height: number): number {
   const compact=compactCapability(cap,width,height);
   const min=capabilityMinimum(cap,compact,compact?width/MIN_CAPABILITY_SCALE:width);
-  return Math.min(2,width/min.w,height/min.h);
+  return Math.min(['agenda','timetable','calendar'].includes(cap.k)?1:2,width/min.w,height/min.h);
 }
 
 /** Fit a fixed-format readout before native layout; TextClock has no single-line adaptive sizing. */

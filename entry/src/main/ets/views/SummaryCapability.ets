@@ -26,10 +26,11 @@ export struct SummaryCapability {
   @Prop scaleFactor: number = 1;
   @State presentation: SummaryPresentation = new SummaryPresentation();
   aboutToAppear(): void { this.refresh(); }
-  private refresh(): void { this.presentation = summaryPresentation(this.cap, this.contentHeight / this.contentScale(), this.tick || Date.now()); }
+  private refresh(): void { this.presentation = summaryPresentation(this.cap, this.contentHeight / this.contentScale(), this.tick || Date.now(),this.contentWidth / this.contentScale()); }
   private contentScale(): number { return Math.max(.001,capabilityContentScale(this.cap,this.contentWidth,this.contentHeight)); }
   private s(): number { return this.scaleFactor*this.contentScale(); }
   private backingWidth():number {
+    if(this.presentation.columns>1)return (this.contentWidth+2*compositionPadding(this.cap.readingBlend??'')+this.backingGutter)*this.scaleFactor;
     if(this.backingProfile.length)return (this.contentWidth+2*compositionPadding(this.cap.readingBlend??'')+this.backingGutter)*this.scaleFactor;
     const s=this.s(),measure=(text:string,font:number):number=>paperTextWidth(text,font);
     let width=measure(this.presentation.heading,11*s)+(this.presentation.remaining?measure('+'+this.presentation.remaining,11*s)+8*s:0);
@@ -53,12 +54,15 @@ export struct SummaryCapability {
       if(!this.presentation.events.length) {
         Text(this.presentation.empty).fontSize(16*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.s(), this.readingHaloEnabled,this.cap.readingBlend)).maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
       }
+      Grid() {
       ForEach(this.presentation.events,(e:AgendaItem)=>{
-        Column({space:3*this.s()}) {
+        GridItem() {Column({space:3*this.s()}) {
           Text(e.title).fontSize(16*this.s()).minFontSize(14*this.s()).maxFontSize(16*this.s()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.s(), this.readingHaloEnabled,this.cap.readingBlend)).width('100%')
           Text(eventWhen(e,this.tick||Date.now())+(e.location?' · '+e.location:'')).fontSize(11*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.s(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.65).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
-        }.width('100%').height(this.contentBackingEnabled?undefined:40*this.s()).alignItems(HorizontalAlign.Start)
+        }.width('100%').height(40*this.s()).alignItems(HorizontalAlign.Start)}
       },(e:AgendaItem)=>e.id)
+      }.columnsTemplate(this.presentation.columns===2?'1fr 1fr':'1fr').columnsGap(12*this.s()).rowsGap(8*this.s()).width('100%')
+        .height(Math.max(0,Math.ceil(this.presentation.events.length/this.presentation.columns)*48-8)*this.s()).scrollBar(BarState.Off)
     }.width(this.contentBackingEnabled?Math.max(1,this.backingWidth()-2*compositionPadding(this.cap.readingBlend??'')*this.s()-this.backingGutter*this.scaleFactor):'100%').constraintSize({maxHeight:this.contentBackingEnabled?Math.max(1,this.contentHeight*this.scaleFactor):undefined}).clip(this.contentBackingEnabled)
     }.width(this.contentBackingEnabled?this.backingWidth():'100%').height(this.backingProfile.length?'100%':this.contentBackingEnabled?undefined:'100%').padding({left:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s()+(this.backingLeft?this.backingGutter*this.scaleFactor:0):0,right:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s()+(!this.backingLeft?this.backingGutter*this.scaleFactor:0):0,bottom:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0,top:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s()+hookReserve(this.cap.readingBlend??'')*this.s():0})
       .onSizeChange((_:SizeOptions,size:SizeOptions)=>{const h=Number(size.height);if(h>0&&Math.abs(h-this.backingHeight)>.01)this.backingHeight=h;}).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Start)

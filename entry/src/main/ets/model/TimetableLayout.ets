@@ -36,6 +36,15 @@ export function timetableCapacity(cap: CapBlock): number {
   if (counts.size >= 64) counts.clear(); counts.set(key, maximum); return remember(cap,maximum);
 }
 export function briefColumns(width: number): number { return width >= 312 ? 3 : width >= 208 ? 2 : 1; }
+/** Extra height buys readable title/room lines, never a larger copy of the same tile. */
+export function lessonRowHeight(height:number,count:number,columns:number):number {
+  const available=(height-BRIEF_HEADER_HEIGHT)/Math.ceil(Math.max(1,count)/Math.max(1,columns));
+  return available>=60?60:available>=48?48:LESSON_CELL_HEIGHT;
+}
+export function lessonContext(event:AgendaItem,now:number):string {
+  if(event.start>now){const minutes=Math.ceil((event.start-now)/60000);return minutes<60?'距上课 '+minutes+' 分钟':'课程时长 '+Math.round((event.end-event.start)/60000)+' 分钟';}
+  return event.end>now?'剩余 '+Math.ceil((event.end-now)/60000)+' 分钟':'';
+}
 export function briefHeight(count: number, columns: number): number { return BRIEF_HEADER_HEIGHT + Math.ceil(Math.max(1, count) / columns) * LESSON_CELL_HEIGHT; }
 export class WeekLesson {
   event: AgendaItem = {id: '', title: '', start: 0, end: 0, location: '', allDay: false};

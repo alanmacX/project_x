@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>冰箱贴 · 信息密度验收</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f6f3eb;color:#292c27;font:15px system-ui,sans-serif;padding:32px}main{max-width:1160px;margin:auto}h1{font-size:25px;margin:0 0 8px}p{color:#686b63;line-height:1.6}nav{display:flex;gap:8px;margin:22px 0}button{border:0;border-radius:24px;padding:12px 20px;background:#e6e3d9;font:inherit;color:inherit;cursor:pointer}button[aria-pressed=true]{background:#30362e;color:#fff}.samples{display:flex;gap:30px;align-items:start;flex-wrap:wrap;padding:24px;background:#eae6d9;border-radius:24px}article h2{font-size:14px;margin:0 0 12px;font-weight:500}.face{filter:drop-shadow(0 4px 4px #7d725318)}.face svg{display:block}small{display:block;color:#65695f;margin-top:10px}footer{margin-top:28px;font-size:13px;color:#74786e}
+</style>
+<main><h1>空间增加，信息增加</h1><p>同一份本地数据、同一套字号。切换能力，对比小版、长版与宽版。</p>
+<nav><button aria-pressed="true" data-kind="agenda">日程</button><button aria-pressed="false" data-kind="timetable">每日课程</button><button aria-pressed="false" data-kind="next">下一课</button><button aria-pressed="false" data-kind="calendar">月历</button></nav>
+<div class="samples" id="samples"></div><footer>使用 App 的生产数据与尺寸模型，通过独立 previewer 绘制。浏览器字体与系统符号不代表真机像素级效果。所有数据均为虚构验收样例。</footer></main>
+<script src="shared-models.js"></script><script src="shared-materials.js"></script><script src="capabilities.js"></script>
+<script>
+const core=FridgeCore.load,schema=core('CardSchema'),now=new Date('2026-09-07T08:00:00').getTime();
+const titles=['产品设计评审','线性代数与工程应用','交互设计原理与方法','计算机网络','项目研讨','体育训练','图书馆自习','小组讨论','晚间阅读','材料整理','阶段复盘','下周安排'];
+const agenda={k:'agenda',agendaSource:'manual',events:titles.map((title,i)=>({id:'e'+i,title,start:now+(i+1)*3600000,end:now+(i+2)*3600000,location:['行政楼 A203','屏峰校区 教学楼 3-401','会议室 B201'][i%3],allDay:false}))};
+const timetable={k:'timetable',timetableMode:'day',semester:'2026-08-31',courses:titles.slice(0,6).map((name,i)=>({id:'c'+i,name,room:'屏峰校区 教学楼 '+(i+1)+'-401',day:1,start:(9+i*2).toString().padStart(2,'0')+':00',end:(10+i*2).toString().padStart(2,'0')+':00',firstWeek:1,lastWeek:20,parity:0}))};
+function show(kind){
+ document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.kind===kind)));
+ const sizes=kind==='next'?[[120,70],[224,130],[320,160]]:kind==='calendar'?[[132,82],[188,222],[280,294]]:kind==='timetable'?[[136,226],[256,226],[352,226]]:[[184,152],[184,300],[384,300]];
+ document.getElementById('samples').innerHTML=sizes.map(([w,h],i)=>{
+  const card=new schema.FridgeCard();card.id=kind+i;card.w=w;card.h=h;card.capFree=true;card.capBox={x:0,y:0,w:1,h:1,rot:0,opacity:1};card.paper='#F1E4BD';card.ink='#292C27';card.capability={...(kind==='agenda'?agenda:kind==='calendar'?{k:'calendar'}:timetable),...(kind==='next'?{timetableMode:'next'}:{}),readingBlend:'cloud',readingStyle:'surface'};
+  const info=FridgeReadouts.inspectCard(card),s=info.contentScale;
+  let note='内容字号倍率 '+s.toFixed(2);
+  if(kind==='agenda'){const view=core('CapabilityPresentation').summaryPresentation(card.capability,info.contentHeight/s,now,info.contentWidth/s);note+=' · '+view.events.length+' 条 · '+view.columns+' 列';}
+  return '<article><h2>'+(kind==='timetable'?['小版','双列 / 完整信息','三列 / 更多空间']:kind==='next'?['小版','完整信息 / 时间状态','加宽 / 完整地点']:kind==='calendar'?['本周','整月','农历 / 节日']:['小版','增加高度 / 完整信息','增加宽度 / 更多列'])[i]+' · '+w+' × '+h+'</h2><div class="face"><svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" font-family="system-ui,sans-serif">'+FridgeReadouts.capability(card,now,card.id)+'</svg></div><small>'+note+'</small></article>';
+ }).join('');
+}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.kind));show('agenda');
+</script></html>

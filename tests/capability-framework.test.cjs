@@ -159,7 +159,8 @@ const freeDrag=g.constrainCapabilityDrag(free,{...freeBox,x:.6,y:.5},freeBox);as
 const freeEdge=g.constrainCapabilityDrag(free,{...freeBox,x:2,y:-1},freeBox);assert.equal(freeEdge.x,1-freeBox.w);assert.equal(freeEdge.y,0);
 assert.ok(g.minimumCardSize(free).w<g.minimumCardSize(shape).w,'free foreground does not require a large interior rectangle');
 const freeState=new s.FridgeState();freeState.cards=[free];assert.equal(s.normalizeState(JSON.parse(JSON.stringify(freeState))).cards[0].capFree,true);assert.equal(snap.cardViewSnapshot(free).capFree,true);
-for(const k of ['clock','date','battery','agenda','timetable']){const cap={k};const full=m.capabilityMinimum(cap,false);assert.ok(m.capabilityContentScale(cap,full.w*1.5,full.h*1.5)>1,'larger boxes enlarge content '+k);assert.ok(m.capabilityContentScale(cap,full.w*10,full.h*10)<=2,'readout enlargement stays bounded '+k);}
+for(const k of ['clock','date','battery']){const cap={k};const full=m.capabilityMinimum(cap,false);assert.ok(m.capabilityContentScale(cap,full.w*1.5,full.h*1.5)>1,'larger boxes enlarge content '+k);assert.ok(m.capabilityContentScale(cap,full.w*10,full.h*10)<=2,'readout enlargement stays bounded '+k);}
+for(const k of ['agenda','timetable','calendar']){const cap={k},full=m.capabilityMinimum(cap);assert.equal(m.capabilityContentScale(cap,full.w*2,full.h*2),1,'dense content uses extra space for information '+k);}
 console.log('PASS free foreground placement, edge recovery, readable size, storage/snapshot roundtrip and enlarged content');
 
 const cardHit=load('CardHitTest');assert.equal(cardHit.cardContainsPoint(free,.7*free.w,.7*free.h,1),true,'foreground over a transparent silhouette is selectable');assert.equal(cardHit.cardContainsPoint(free,.98*free.w,.98*free.h,1),false,'remaining transparent space stays inert');

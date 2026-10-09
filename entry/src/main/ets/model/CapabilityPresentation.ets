@@ -5,12 +5,15 @@ export class SummaryPresentation {
   empty: string = '';
   events: AgendaItem[] = [];
   remaining: number = 0;
+  columns: number = 1;
 }
 export function summaryRowCapacity(height: number): number {
-  return Math.max(1, Math.min(3, Math.floor((height - 26) / 48)));
+  return Math.max(1, Math.min(12, Math.floor((height - 26) / 48)));
 }
-export function summaryPresentation(cap: CapBlock, height: number, now: number): SummaryPresentation {
-  const out = new SummaryPresentation(), capacity = summaryRowCapacity(height);
+export function summaryColumns(width:number):number {return width>=352?2:1;}
+export function summaryPresentation(cap: CapBlock, height: number, now: number, width:number=0): SummaryPresentation {
+  const out = new SummaryPresentation();out.columns=summaryColumns(width);
+  const capacity = Math.min(12,summaryRowCapacity(height)*out.columns);
   {
     const all = (cap.events??[]).filter((event)=>event.end>now).slice().sort((a,b)=>a.start-b.start); out.heading = '接下来'; out.events = all.slice(0, capacity);
     out.remaining = all.length - out.events.length;

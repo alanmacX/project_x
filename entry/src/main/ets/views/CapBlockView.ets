@@ -1,4 +1,4 @@
-import { daysLeftOf, calendarCells, progressOf } from '../model/CapabilityCalendar';
+import { daysLeftOf, calendarCells, progressOf, detailedCalendar, calendarDetails } from '../model/CapabilityCalendar';
 import { hookReserve } from '../model/MicaGeometry';
 import { ReadingHook } from './ReadingHook';
 import { compositionPadding } from '../model/ReadingComposition';
@@ -38,7 +38,7 @@ export struct CapabilityView {
   private now(): Date { return new Date(this.tick > 0 ? this.tick : Date.now()); }
   private unit(): number {
     const min = capabilityMinimum(this.cap, this.compact(), this.contentWidth);
-    return Math.min(2, this.contentWidth / min.w, this.contentHeight / min.h) * this.scaleFactor;
+    return Math.min(this.cap.k==='calendar'?1:2, this.contentWidth / min.w, this.contentHeight / min.h) * this.scaleFactor;
   }
   private dateCaption():string {
     const now=this.now(), holiday=holidayName(now);
@@ -60,9 +60,12 @@ export struct CapabilityView {
     const digits = (Math.abs(daysLeftOf(this.cap.date ?? '')) + '').length;
     return Math.max(16*this.unit(),Math.min((this.compact() ? 24 : 44) * this.unit(), (this.contentWidth * this.scaleFactor - 32 * this.unit()) / (digits * .6)));
   }
+  private detailedMonth():boolean {return !this.compact()&&detailedCalendar(this.contentWidth,this.contentHeight,Math.ceil(calendarCells(this.calendarDate()).length/7),this.ownBacking());}
+  private monthRowHeight():number {return this.detailedMonth()?34:22;}
   private ownBacking():boolean {return this.contentBackingEnabled&&!['battery','timetable','agenda'].includes(this.cap.k);}
   private measured(text:string,font:number,weight:number=400):number {return paperTextWidth(text,font,weight);}
   private backingWidth():number {
+    if(this.cap.k==='calendar'&&this.detailedMonth())return (this.contentWidth+2*compositionPadding(this.cap.readingBlend??'')+this.backingGutter)*this.scaleFactor;
     if(this.backingProfile.length)return (this.contentWidth+2*compositionPadding(this.cap.readingBlend??'')+this.backingGutter)*this.scaleFactor;
     const u=this.unit(),max=this.contentWidth*this.scaleFactor;let width=max;
     if(this.cap.k==='clock')width=this.measured('88:88',this.clockFont(),500);
@@ -130,6 +133,7 @@ export struct CapabilityView {
         Grid() {
           ForEach(calendarCells(this.calendarDate()), (day: number, index: number) => {
             GridItem() {
+              Column({space:1*this.unit()}) {
               Stack({alignContent:Alignment.TopEnd}) {
               Text(day > 0 ? '' + day : '').fontSize((12 * this.unit()) + 'vp')
                 .fontColor(day === this.now().getDate() && (this.cap.calendarOffset ?? 0) === 0 ? contrastingInk(this.ink) : this.ink)
@@ -137,10 +141,12 @@ export struct CapabilityView {
                 .backgroundColor(day === this.now().getDate() && (this.cap.calendarOffset ?? 0) === 0 ? this.ink : Color.Transparent).borderRadius(4)
               Text(day>0?holidayMarker(new Date(this.calendarDate().getFullYear(),this.calendarDate().getMonth(),day)):'').fontSize((6*this.unit())+'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.65)
               }.width('100%')
+              if(this.detailedMonth()){Text(calendarDetails(this.calendarDate())[index]).fontSize(7*this.unit()).fontColor(this.ink).opacity(.6).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').height(10*this.unit()).textAlign(TextAlign.Center)}
+              }.width('100%')
             }
           }, (day: number, index: number) => this.now().getFullYear() + ':' + this.now().getMonth() + ':' + this.now().getDate() + ':' + index + ':' + day)
         }.columnsTemplate('1fr 1fr 1fr 1fr 1fr 1fr 1fr').rowsGap(2 * this.unit()).width('100%')
-          .height(Math.ceil(calendarCells(this.calendarDate()).length / 7) * (20 * this.unit() + 2 * this.unit()))
+          .height(Math.ceil(calendarCells(this.calendarDate()).length / 7) * this.monthRowHeight()*this.unit())
       } else if (this.cap.k === 'countdown' || this.cap.k === 'anniversary') {
         Text(this.cap.title || typeLabel(this.cap.k)).fontSize((12 * this.unit()) + 'vp').fontColor(this.ink).textShadow(readingHalo(this.ink, this.unit(), this.readingHaloEnabled,this.cap.readingBlend)).width('100%').textAlign(TextAlign.Center).maxLines(this.compact() ? 1 : 2).textOverflow({ overflow: TextOverflow.Ellipsis })
         Row({ space: 3 * this.unit() }) {

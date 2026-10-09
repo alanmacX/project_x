@@ -7,7 +7,7 @@ import { holidayKnown, dateKey } from '../model/HolidayCalendar';
 import { readingHalo } from '../model/CapabilityPresentation';
 import { CapBlock, AgendaItem } from '../model/CardSchema';
 import { timetableDisplay, TimetableDisplay, timeText } from '../model/CapabilityData';
-import { briefColumns, LESSON_CELL_HEIGHT, BRIEF_HEADER_HEIGHT } from '../model/TimetableLayout';
+import { briefColumns, LESSON_CELL_HEIGHT, BRIEF_HEADER_HEIGHT, lessonRowHeight, lessonContext } from '../model/TimetableLayout';
 import { capabilityFits, capabilityContentScale, compactCapability } from '../model/CapabilityMetrics';
 @Component
 export struct TimetableCapability {
@@ -35,6 +35,7 @@ export struct TimetableCapability {
   private compactUpcoming():boolean {return this.cap.timetableMode!=='day' && compactCapability(this.cap,this.contentWidth,this.contentHeight);}
   private fits(): boolean { return capabilityFits(this.cap,this.contentWidth,this.contentHeight); }
   private backingWidth():number {
+    if(this.rowHeight()>LESSON_CELL_HEIGHT)return (this.contentWidth+2*compositionPadding(this.cap.readingBlend??'')+this.backingGutter)*this.scaleFactor;
     if(this.backingProfile.length)return (this.contentWidth+2*compositionPadding(this.cap.readingBlend??'')+this.backingGutter)*this.scaleFactor;
     const s=this.s(),measure=(text:string,font:number):number=>paperTextWidth(text,font);
     let width=measure(this.calendarPending()?'假期待确认':this.display.heading,10*s)+measure(this.dateLabel(),8.5*s)+18*s;
@@ -45,7 +46,11 @@ export struct TimetableCapability {
     }
     return Math.min((this.contentWidth+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,Math.ceil(width)+2*compositionPadding(this.cap.readingBlend??'')*s);
   }
-  private dayCellHeight():number {return LESSON_CELL_HEIGHT*this.s();}
+  private rowHeight():number {return lessonRowHeight(this.contentHeight/Math.max(.001,this.contentScale()),this.cap.timetableMode==='day'?this.display.lessons.length:1,this.cap.timetableMode==='day'?this.columns():1);}
+  private dayCellHeight():number {return this.rowHeight()*this.s();}
+  private titleLines():number {return this.rowHeight()>=48?2:1;}
+  private roomLines():number {return this.rowHeight()>=60?2:1;}
+  private contextLabel():string {return this.display.lessons.length?lessonContext(this.display.lessons[0],this.tick||Date.now()):'';}
   private highlighted(e:AgendaItem):boolean {return e.id===this.display.lessons.find(lesson=>lesson.end>(this.tick||Date.now()))?.id;}
   @Builder private readingBackground() {if(this.contentBackingEnabled){ReadingBacking({study:this.cap.readingMaterialStudy??0,blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,profile:this.backingProfile,contactLeft:this.backingLeft,surfaceWidth:this.backingWidth(),surfaceHeight:(this.contentHeight+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,hook:this.cap.readingHook??.2,ink:this.ink,radius:8*this.s(),scaleFactor:this.s()})}}
   @Builder
@@ -64,8 +69,8 @@ export struct TimetableCapability {
         Text(timeText(e.end)).fontSize(8.5*this.s()).minFontSize(7.5*this.s()).maxFontSize(8.5*this.s()).heightAdaptivePolicy(TextHeightAdaptivePolicy.MIN_FONT_SIZE_FIRST).fontColor(this.ink).opacity(.6).height(11*this.s()).width('100%').maxLines(1)
       }.width(30*this.s()).alignItems(HorizontalAlign.Start)
       Column({space:1*this.s()}) {
-        Text(e.title).fontSize(11.5*this.s()).minFontSize(10.5*this.s()).maxFontSize(11.5*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
-        if(e.location){Text(e.location).fontSize(8.5*this.s()).fontColor(this.ink).opacity(.6).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')}
+        Text(e.title).lineHeight(14*this.s()).fontSize(11.5*this.s()).minFontSize(10.5*this.s()).maxFontSize(11.5*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(this.titleLines()).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
+        if(e.location){Text(e.location).lineHeight(10*this.s()).fontSize(8.5*this.s()).fontColor(this.ink).opacity(.6).maxLines(this.roomLines()).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')}
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
     }.width('100%').height(this.dayCellHeight()-3*this.s()).padding({left:5*this.s(),right:5*this.s()}).backgroundColor(this.highlighted(e)?'#45F5C94B':'#16A69A7C').borderRadius(7*this.s())
   }
@@ -96,6 +101,7 @@ export struct TimetableCapability {
           .height(Math.ceil(this.display.lessons.length/this.columns())*this.dayCellHeight()).scrollBar(BarState.Off)
       } else {
         Column(){this.lessonRow(this.display.lessons[0])}.width('100%').height(this.dayCellHeight())
+        if(this.contentHeight/Math.max(.001,this.contentScale())>=110&&this.contextLabel()){Text(this.contextLabel()).fontSize(8.5*this.s()).fontColor(this.ink).opacity(.6).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').margin({top:5*this.s()})}
       }
     }.width(this.contentBackingEnabled?Math.max(1,this.backingWidth()-2*compositionPadding(this.cap.readingBlend??'')*this.s()-this.backingGutter*this.scaleFactor):'100%').constraintSize({maxHeight:this.contentBackingEnabled?Math.max(1,this.contentHeight*this.scaleFactor):undefined}).clip(this.contentBackingEnabled)
     }.width(this.contentBackingEnabled?this.backingWidth():'100%').height(this.backingProfile.length?'100%':this.contentBackingEnabled?undefined:'100%').padding({left:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s()+(this.backingLeft?this.backingGutter*this.scaleFactor:0):0,right:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s()+(!this.backingLeft?this.backingGutter*this.scaleFactor:0):0,bottom:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0,top:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s()+hookReserve(this.cap.readingBlend??'')*this.s():0})
