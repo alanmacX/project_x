@@ -53,3 +53,8 @@ export function tactilePigment(tint:string,variant:number):string {return micaSt
 export function tactileTextureOpacity(variant:number):number {return variant===4?.14:.32;}
 export function tactileEdgeColor(variant:number):string {return variant===4?'#689B8967':'#809D8D70';}
 export function tactileThickness(variant:number):number {return variant===4?1.1:1.8;}
+
+/** Host-owned material: experimental IDs never become a portable package field. */
+export function readingMaterialVariant(study:number|undefined,material:string|undefined):number {
+ return study!==undefined?Math.max(0,Math.min(5,Math.floor(study))):material==='matte'?4:5;
+}

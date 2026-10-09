@@ -6,7 +6,7 @@ import { CapBlock } from './CardSchema';
 export function sharedCapability(cap:CapBlock):CapBlock {
   const next:CapBlock={k:cap.k,readingBlend:cap.readingBlend,readingEdge:cap.readingEdge,
     readingOutside:cap.readingOutside,readingHook:cap.readingHook,readingTint:cap.readingTint,
-    readingStyle:cap.readingStyle};
+    readingMaterial:cap.readingMaterial,readingStyle:cap.readingStyle};
   if(cap.k==='worldclock'){next.zone=cap.zone;next.city=cap.city;}
   if(cap.k==='calendar')next.calendarOffset=cap.calendarOffset;
   if(cap.k==='battery'){next.percent=-1;next.charging=false;}

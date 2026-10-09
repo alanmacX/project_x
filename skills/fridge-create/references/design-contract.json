@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "skillContractVersion": 3,
+  "skillContractVersion": 4,
   "app": {
     "bundleName": "com.fridgewidget.app",
     "vendor": "fridgememo",
@@ -26,10 +26,10 @@
     "htmlTemplateVersion": 1
   },
   "identity": {
-    "models": "a842cf4b1faa4ea39ae5e3649de2ab4f1f8dfb6ea2dcde80ba03424f2f5b5f6d",
-    "materials": "bdf4f906c73c835bcd5ac3a0b61f4c15b3c3ae4ca76a76794b74a96c72b56374",
-    "browserAdapter": "6b2e74821d123d383a37ceda1fb16c74d75c1029221f0b424d8d42fa0d4639d6",
-    "nativeViews": "555e701fd68b2dc9d18818b8446bfcedbac3497753a6dad4505dc73e2dfd9942"
+    "models": "f42a66e8847abd2912855a0812aa29f67de00998d22855be61d322fccc2a19b7",
+    "materials": "868838622c193570cd7922a284d3cc26ddd73789614693be4ebd6dffd5ada39d",
+    "browserAdapter": "f76a5f961cf282af90764d28e106472719f3eecc1f80e22d70a4a7b9a722bff3",
+    "nativeViews": "5e256e814d5324b6046b00dd14ad92e8eaf68d7412dc8af97d143a347f696fed"
   },
   "coordinates": {
     "boardWidth": 344,
@@ -42,6 +42,29 @@
     "canvasCards": 16
   },
   "design": {
+    "readingMaterials": {
+      "default": "paper",
+      "options": [
+        "paper",
+        "matte"
+      ],
+      "hostOwned": true,
+      "experimentalField": "readingMaterialStudy",
+      "persistExperimental": false
+    },
+    "canvasBackgroundModes": [
+      "solid",
+      "smart",
+      "blend",
+      "photo",
+      "preset",
+      "transparent"
+    ],
+    "transparentForm": {
+      "minimumApi": 22,
+      "requiresManualEntitlement": true,
+      "minimumVisibleFraction": 0.1
+    },
     "binding": "current-host",
     "persistedProfileField": false,
     "rectRadius": 16,
@@ -256,6 +279,7 @@
       "readingEdge",
       "readingOutside",
       "readingHook",
+      "readingMaterial",
       "readingMaterialStudy",
       "readingTintKey",
       "readingTint",

@@ -1,3 +1,4 @@
+import { readingMaterialVariant } from '../model/MicaMaterialStudy';
 import { daysLeftOf, calendarCells, progressOf, detailedCalendar, calendarDetails } from '../model/CapabilityCalendar';
 import { hookReserve } from '../model/MicaGeometry';
 import { ReadingHook } from './ReadingHook';
@@ -77,7 +78,7 @@ export struct CapabilityView {
     else if(this.cap.k==='dayprogress'||this.cap.k==='yearprogress')width=Math.max(64*u,this.measured(typeLabel(this.cap.k),12*u),this.measured('100%',(this.compact()?24:38)*u));
     return Math.min((this.contentWidth+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,Math.ceil(width)+2*compositionPadding(this.cap.readingBlend??'')*u);
   }
-  @Builder private readingBackground() {if(this.ownBacking()){ReadingBacking({study:this.cap.readingMaterialStudy??0,blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,profile:this.backingProfile,contactLeft:this.backingLeft,surfaceWidth:this.backingWidth(),surfaceHeight:(this.contentHeight+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,hook:this.cap.readingHook??.2,ink:this.ink,radius:Math.min(8*this.unit(),this.backingWidth()*.12),scaleFactor:this.unit()})}}
+  @Builder private readingBackground() {if(this.ownBacking()){ReadingBacking({study:readingMaterialVariant(this.cap.readingMaterialStudy,this.cap.readingMaterial),blend:this.cap.readingBlend??'feather',tint:this.backingTint,edge:this.backingEdge,profile:this.backingProfile,contactLeft:this.backingLeft,surfaceWidth:this.backingWidth(),surfaceHeight:(this.contentHeight+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,hook:this.cap.readingHook??.2,ink:this.ink,radius:Math.min(8*this.unit(),this.backingWidth()*.12),scaleFactor:this.unit()})}}
   @Builder private readingHook() {if(this.ownBacking()&&['tag','dock'].includes(this.cap.readingBlend??'')){ReadingHook({hook:this.cap.readingHook??.2,scaleFactor:this.unit()})}}
   @State private backingHeight:number=0;
   build() {

@@ -4,6 +4,7 @@ import { FridgeCard, CanvasBackground, normalizeBackground, BOARD_W } from '../.
 import { scenePercent } from '../../model/SceneLayout';
 import { CardFace } from '../../views/CardFace';
 
+function initialFormBackground():CanvasBackground {const bg=new CanvasBackground();bg.mode='transparent';return bg;}
 interface WidgetScenePacket {cards:string;background:string;canvasId:string;context:string;rev:number;}
 interface WidgetSceneContext {ruleId:string;occurrence:string;baseId:string;focusId:string;}
 @Entry
@@ -23,7 +24,7 @@ struct FridgeWidgetCard {
   private alive:boolean=false;
   private context:WidgetSceneContext|null=null;
   private hasArtwork:boolean=false;
-  @State displayed:CanvasBackground=new CanvasBackground();
+  @State displayed:CanvasBackground=initialFormBackground();
   @State incoming:CanvasBackground|null=null;
   @State mix:number=0;
   private signature:string='';
@@ -36,7 +37,7 @@ struct FridgeWidgetCard {
     this.signature=signature;this.generation++;this.blending=false;
     if(this.incoming&&this.mix>.5)this.displayed=this.incoming;
     this.incoming=this.canvasBackground;this.mix=0;
-    if(!this.incoming.src||this.incoming.mode==='solid'||this.incoming.mode==='smart')this.imageReady(this.incoming.src);
+    if(this.incoming.mode==='transparent'||!this.incoming.src||this.incoming.mode==='solid'||this.incoming.mode==='smart')this.imageReady(this.incoming.src);
   }
   private imageReady(src:string):void {
     if(!this.alive||!this.incoming||this.incoming.src!==src||this.blending)return;
@@ -77,8 +78,8 @@ struct FridgeWidgetCard {
   private sceneOffset(id:string,horizontal:boolean):number {
     return 0;
   }
-  @LocalStorageProp('background') @Watch('syncBackground') backgroundJson: string = '{}';
-  @State canvasBackground: CanvasBackground = new CanvasBackground();
+  @LocalStorageProp('background') @Watch('syncBackground') backgroundJson: string = '{"mode":"transparent"}';
+  @State canvasBackground: CanvasBackground = initialFormBackground();
   private syncBackground(): void { if(this.packetJson)return;try { this.canvasBackground = normalizeBackground(JSON.parse(this.backgroundJson) as CanvasBackground); } catch (_) { this.canvasBackground = new CanvasBackground(); } this.displayed=this.canvasBackground;this.signature=JSON.stringify(this.canvasBackground); }
   @LocalStorageProp('cards') @Watch('syncCards') cardsJson: string = '';
   @State cardIds: string[] = [];
@@ -120,12 +121,17 @@ struct FridgeWidgetCard {
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       Stack() {
+        if(this.displayed.mode!=='transparent'){
+        Stack(){
         Column().width('100%').height('100%').backgroundColor(this.displayed.color)
         if(this.displayed.src&&this.displayed.mode!=='solid'&&this.displayed.mode!=='smart') {
           Image(this.displayed.src).width('100%').height('100%').objectFit(ImageFit.Cover)
         }
+        }.width('100%').height('100%').opacity(this.incoming?1-this.mix:1)
+        }
         if(this.incoming) {
           Stack() {
+            if(this.incoming.mode!=='transparent'){
             Column().width('100%').height('100%').backgroundColor(this.incoming.color)
             if(this.incoming.src&&this.incoming.mode!=='solid'&&this.incoming.mode!=='smart') {
               ForEach([this.incoming.src],(src:string)=>{
@@ -134,9 +140,14 @@ struct FridgeWidgetCard {
                   .onError(()=>this.imageReady(src))
               },(src:string)=>src)
             }
+            }
           }.width('100%').height('100%').opacity(this.mix)
         }
       }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
+      if(this.canvasBackground.mode==='transparent'&&this.cardIds.length===0){
+        Column({space:8}){Text('冰箱贴').fontSize(18).fontWeight(FontWeight.Medium).fontColor('#302D23');Text('点击添加卡片').fontSize(13).fontColor('#696459')}
+         .width('72%').height('28%').justifyContent(FlexAlign.Center).backgroundColor('#F2FAF8EF').borderRadius(20).position({x:'14%',y:'36%'}).hitTestBehavior(HitTestMode.None)
+      }
       ForEach(this.cardIds, (id: string) => {
         Stack({alignContent:Alignment.TopStart}) {
           CardFace({card:this.cardMap[id],scaleFactor:this.widthValue()/BOARD_W,tick:capabilityRenderTick(this.cardMap[id].capability,this.renderTick),widget:true})
@@ -147,7 +158,7 @@ struct FridgeWidgetCard {
           .rotate({angle:this.cardMap[id].rot,centerX:0,centerY:'100%'})
           .zIndex(this.cardMap[id].z).hitTestBehavior(HitTestMode.None)
       }, (id: string) => id)
-    }.width('100%').height('100%').backgroundColor(Color.White).borderRadius(24).clip(true)
+    }.width('100%').height('100%').backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:Color.White).borderRadius(24).clip(true)
       // Cache the complete clipped form, including shadow fringes, while its
       // host scales it during launch/return. Crossfades render live until settled.
       .renderGroup(this.incoming===null)

@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 let ts;
 try{ts=require('typescript');}catch{ts=require(process.env.FRIDGE_TYPESCRIPT||'/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');}
 const root=path.resolve(__dirname,'../entry/src/main/ets/model'),modules=new Map();
-const entries=['TemplatePackage','AlbumLayout','AlbumRotation','CardDepth','ContourPath','CloudReadingGeometry','CanvasLayout','ContourRegistry','EdgeAttachment','CapabilityData','BatteryPresentation','MicaGeometry','MicaMaterialStudy','PaperTextWidth','CapabilityCalendar','SubjectGeometry'];
+const entries=['TemplatePackage','AlbumLayout','AlbumRotation','CardDepth','ContourPath','CloudReadingGeometry','CanvasLayout','ContourRegistry','EdgeAttachment','CapabilityData','BatteryPresentation','MicaGeometry','MicaMaterialStudy','PaperTextWidth','CapabilityCalendar','SubjectGeometry','EditorVisualChoices'];
 function collect(name){
  if(modules.has(name))return;
  if(!/^[A-Za-z][A-Za-z0-9]*$/.test(name))throw Error('Invalid dependency');
@@ -34,16 +34,16 @@ vm.runInContext(fs.readFileSync(path.join(__dirname,'capabilities.js'),'utf8'),c
 const schema=context.FridgeCore.load('CardSchema'),policy=context.FridgeCore.load('ReadingStylePolicy');
 const repository=path.resolve(__dirname,'..');
 const hashFiles=files=>{const hash=crypto.createHash('sha256');for(const file of files.sort())hash.update(file+'\0'+fs.readFileSync(path.join(repository,file))+'\0');return hash.digest('hex');};
-const nativeViews=['CardFace','CardCanvas','CapBlockView','ReadingBacking','ReadingEdgeBacking','ReadingHook','SummaryCapability','TimetableCapability','AlbumCapability','BatteryCapability','CanvasBackdrop'];
+const nativeViews=['CardFace','CardCanvas','CapBlockView','ReadingBacking','ReadingEdgeBacking','ReadingHook','SummaryCapability','TimetableCapability','AlbumCapability','BatteryCapability','CanvasBackdrop','EditorVisualChoices'];
 const schemaSource=modules.get('CardSchema').source;
 function fields(declaration){const body=schemaSource.split(declaration)[1]?.split('\n}')[0];if(!body)throw Error('Authoring declaration changed: '+declaration);return [...body.matchAll(/^\s*([a-zA-Z][\w]*)\??\s*:/gm)].map(match=>match[1]);}
 const contract={
- contractVersion:1,skillContractVersion:3,app:JSON.parse(fs.readFileSync(path.join(repository,'AppScope/app.json5'),'utf8')).app,
+ contractVersion:1,skillContractVersion:4,app:JSON.parse(fs.readFileSync(path.join(repository,'AppScope/app.json5'),'utf8')).app,
  package:{format:'fridgememo-template',version:2,readVersions:[1,2],schemaVersion:2,kinds:['card','canvas'],htmlSupported:true,htmlMode:'static-source-and-cache/native-capability',htmlTemplateVersion:1},
  identity:{models:fingerprint,materials:crypto.createHash('sha256').update(materialBundle).digest('hex'),browserAdapter:hashFiles(['previewer/renderer.js','previewer/capabilities.js']),nativeViews:hashFiles(nativeViews.map(name=>'entry/src/main/ets/views/'+name+'.ets'))},
  coordinates:{boardWidth:schema.BOARD_W,legacyPositionHeight:schema.BOARD_H,cardSizeUnits:'board_width',elementUnits:'card_fraction',rotationUnits:'degrees'},
  limits:{canvasCards:context.FridgeCore.load('CanvasCapacity').CANVAS_CARD_LIMIT},
- design:{binding:'current-host',persistedProfileField:false,rectRadius:schema.RECT_CORNER_RADIUS,album:{presentations:['cover','classic','row'],inset:schema.ALBUM_INSET,coverRadius:schema.ALBUM_CORNER_RADIUS,cardRadius:schema.ALBUM_CARD_CORNER_RADIUS,squareCover:true}},
+ design:{readingMaterials:{default:'paper',options:['paper','matte'],hostOwned:true,experimentalField:'readingMaterialStudy',persistExperimental:false},canvasBackgroundModes:['solid','smart','blend','photo','preset','transparent'],transparentForm:{minimumApi:22,requiresManualEntitlement:true,minimumVisibleFraction:.1},binding:'current-host',persistedProfileField:false,rectRadius:schema.RECT_CORNER_RADIUS,album:{presentations:['cover','classic','row'],inset:schema.ALBUM_INSET,coverRadius:schema.ALBUM_CORNER_RADIUS,cardRadius:schema.ALBUM_CARD_CORNER_RADIUS,squareCover:true}},
  capabilities:Array.from(schema.CAPABILITIES,kind=>({kind,readingStyles:Array.from(policy.readingStyles(kind)),legacyDefault:policy.defaultReadingStyle(kind),preferredStyle:policy.preferredReadingStyle(kind)})),
  fields:{state:fields('export class FridgeState {'),card:fields('export class FridgeCard {'),capability:fields('export interface CapBlock {'),element:[...fields('export class ElementBox {'),...fields('export class CanvasElement extends ElementBox {')]},
  retiredCapabilityFields:['url','field','sourceConfigured','parcels','parcelPlace','temp','desc'],

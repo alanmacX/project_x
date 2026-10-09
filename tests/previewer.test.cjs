@@ -21,7 +21,7 @@ assert.ok(fs.readFileSync(path.join(root,'entry/src/main/ets/model/PreviewDesign
 for(const kind of ctx.FridgeCore.load('CardSchema').CAPABILITIES){
  const fixture=JSON.parse(JSON.stringify(example));fixture.state.cards=[fixture.state.cards[0]];const card=fixture.state.cards[0];card.w=220;card.h=220;card.capability={k:kind,date:'2026-12-01',title:'长中文名称测试',semester:'2026-08-31',courses:[],timetableMode:'day',percent:67,charging:true,readingBlend:kind==='battery'?'badge':'cloud'};
  const scene=ctx.FridgeWeb.renderPackage(read(JSON.stringify(fixture)),300,1791439200000);
- assert.equal(scene.issues.length,0,kind);assert.ok(!scene.svg.includes('NaN'),kind);assert.ok(!scene.svg.includes('undefined'),kind);
+ assert.equal(scene.issues.length,0,kind);const geometry=scene.svg.replace(/data:image\/[^" ]+/g,'offline-image');assert.ok(!geometry.includes('NaN'),kind);assert.ok(!geometry.includes('undefined'),kind);
  if(kind!=='album')assert.ok(scene.svg.includes('data-capability="'+kind+'"'),kind);
 }
 const missing=JSON.parse(JSON.stringify(example));missing.state.cards[0].shape='subject';assert.ok(ctx.FridgeWeb.issuesFor(missing).length>0,'Missing masks cannot silently pass QA');
@@ -29,7 +29,7 @@ console.log('PASS all native readouts, assets, missing-mask blockers, safe metad
 
 for(const blend of ['bare','badge','sticker','tag','cloud']){
  const fixture=JSON.parse(JSON.stringify(example)),c=fixture.state.cards[0];fixture.state.cards=[c];c.shape='subject';c.w=180;c.h=240;c.cutout='asset://0';c.subjectPhoto=true;c.outline=[[{x:0,y:0},{x:1,y:0},{x:1,y:1},{x:0,y:1}]];c.capFree=true;c.capability={k:'date',readingBlend:blend,readingOutside:true,readingEdge:'right'};fixture.assets=[{key:'asset://0',extension:'.png',data:'iVBORw0KGgo='}];
- const scene=ctx.FridgeWeb.renderPackage(read(JSON.stringify(fixture)),300,1791439200000);assert.equal(scene.issues.length,0,blend);assert.ok(scene.svg.includes('mask-type:alpha'));assert.equal(scene.svg.split('base64,iVBORw0KGgo=').length-1,1,'Artwork is embedded once');assert.ok(!scene.svg.includes('NaN'),blend);
+ const scene=ctx.FridgeWeb.renderPackage(read(JSON.stringify(fixture)),300,1791439200000);assert.equal(scene.issues.length,0,blend);assert.ok(scene.svg.includes('mask-type:alpha'));assert.equal(scene.svg.split('base64,iVBORw0KGgo=').length-1,1,'Artwork is embedded once');assert.ok(!scene.svg.replace(/data:image\/[^" ]+/g,'offline-image').includes('NaN'),blend);
 }
 if(process.argv[2]){
  const real=read(fs.readFileSync(process.argv[2],'utf8')),scene=ctx.FridgeWeb.renderPackage(real,300,1791429300000);assert.equal(scene.issues.length,0);assert.ok(!/[=\s(",]NaN(?:[\s)",]|$)/.test(scene.svg));assert.ok(!scene.svg.includes('未支持的渲染'));console.log('PASS supplied package:',real.state.cards.length,'cards,',real.assets.length,'assets');

@@ -18,7 +18,7 @@ const comparison=fs.readFileSync('entry/src/main/ets/views/ReadingComparison.ets
 const update=comparison.slice(comparison.indexOf('private updateMaterial'),comparison.indexOf('aboutToDisappear'));
 assert(!update.includes('taskpool')&&!update.includes('queueDepth'),'switching presets neither decodes images nor rebuilds subject depth');
 const schema=fs.readFileSync('entry/src/main/ets/model/CardSchema.ets','utf8');
-assert(!schema.includes('cap.readingMaterialStudy='),'study selection never gets restored into user artwork');
+assert(schema.includes('cap.readingMaterialStudy=undefined;'),'restoration explicitly strips preview-only study IDs');
 console.log('PASS mica study: distinct sampled hues, increasing opacity, preview-only choices and decode-free switching.');
 const backing=fs.readFileSync('entry/src/main/ets/views/ReadingBacking.ets','utf8');
 const study=backing.slice(backing.indexOf('if(this.study>0)'),backing.indexOf("} else if(this.blend==='bare')"));

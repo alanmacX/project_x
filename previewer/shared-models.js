@@ -167,7 +167,7 @@ exports.sharedCapability = void 0;
 function sharedCapability(cap) {
     const next = { k: cap.k, readingBlend: cap.readingBlend, readingEdge: cap.readingEdge,
         readingOutside: cap.readingOutside, readingHook: cap.readingHook, readingTint: cap.readingTint,
-        readingStyle: cap.readingStyle };
+        readingMaterial: cap.readingMaterial, readingStyle: cap.readingStyle };
     if (cap.k === 'worldclock') {
         next.zone = cap.zone;
         next.city = cap.city;
@@ -360,7 +360,7 @@ function normalizeBackground(raw) {
     const bg = new CanvasBackground();
     if (raw === undefined || raw === null)
         return bg;
-    bg.mode = ['solid', 'smart', 'blend', 'photo', 'preset'].includes(raw.mode) ? raw.mode : 'solid';
+    bg.mode = ['solid', 'smart', 'blend', 'photo', 'preset', 'transparent'].includes(raw.mode) ? raw.mode : 'solid';
     bg.color = /^#[0-9a-fA-F]{6}$/.test(raw.color ?? '') ? raw.color : '#FFFFFF';
     bg.src = (raw.src ?? '').startsWith('file://') || (raw.src ?? '').startsWith('memory://') ? raw.src : '';
     bg.photo = (raw.photo ?? '').startsWith('file://') ? raw.photo : '';
@@ -654,6 +654,8 @@ function normalizeCapability(raw) {
     }
     if (raw.k === 'worldclock')
         cap.zone = (0, TimeCapabilities_1.clockZone)(typeof raw.zone === 'string' ? raw.zone : '');
+    cap.readingMaterialStudy = undefined;
+    cap.readingMaterial = raw.readingMaterial === 'matte' ? 'matte' : 'paper';
     cap.readingStyle = ['plain', 'surface'].includes(raw.readingStyle ?? '') ? raw.readingStyle : 'auto';
     cap.readingOutside = raw.readingOutside === true;
     cap.readingEdge = ['left', 'right', 'top', 'bottom'].includes(raw.readingEdge ?? '') ? raw.readingEdge : '';
@@ -2929,7 +2931,7 @@ exports.batteryPaperArcMask = batteryPaperArcMask;
 "MicaMaterialStudy":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tactileThickness = exports.tactileEdgeColor = exports.tactileTextureOpacity = exports.tactilePigment = exports.tactileFill = exports.micaStudyPigment = exports.micaStudyTint = exports.micaStudyFill = exports.MICA_STUDY_NOTES = exports.MICA_STUDY_LABELS = void 0;
+exports.readingMaterialVariant = exports.tactileThickness = exports.tactileEdgeColor = exports.tactileTextureOpacity = exports.tactilePigment = exports.tactileFill = exports.micaStudyPigment = exports.micaStudyTint = exports.micaStudyFill = exports.MICA_STUDY_NOTES = exports.MICA_STUDY_LABELS = void 0;
 /** Read-only study presets. No runtime blur, image decoding, or time-dependent noise. */
 exports.MICA_STUDY_LABELS = ['现有材质', 'A · 轻透云母', 'B · 云白采色', 'C · 奶油采色', 'D · 轻透磨砂', 'E · 暖白细纸'];
 exports.MICA_STUDY_NOTES = ['当前正式效果', '轻透基底 · 柔和色晕', '云白透光 · 局部融色', '较低透明度 · 更浓采色', '温润透光 · 薄边与细颗粒', '柔软暖白 · 纸面与接触厚度'];
@@ -2998,6 +3000,11 @@ function tactileEdgeColor(variant) { return variant === 4 ? '#689B8967' : '#809D
 exports.tactileEdgeColor = tactileEdgeColor;
 function tactileThickness(variant) { return variant === 4 ? 1.1 : 1.8; }
 exports.tactileThickness = tactileThickness;
+/** Host-owned material: experimental IDs never become a portable package field. */
+function readingMaterialVariant(study, material) {
+    return study !== undefined ? Math.max(0, Math.min(5, Math.floor(study))) : material === 'matte' ? 4 : 5;
+}
+exports.readingMaterialVariant = readingMaterialVariant;
 
 },
 "PaperTextWidth":function(require,module,exports){
@@ -3419,4 +3426,167 @@ function traceMask(mask, width, height) {
 }
 exports.traceMask = traceMask;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"a842cf4b1faa4ea39ae5e3649de2ab4f1f8dfb6ea2dcde80ba03424f2f5b5f6d"};})(globalThis);
+},
+"EditorVisualChoices":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.editorVisualChoices = exports.editorReadingPlacement = exports.EditorVisualChoice = void 0;
+const CardSchema_1 = require("./CardSchema");
+const CardViewSnapshot_1 = require("./CardViewSnapshot");
+const CanvasLayout_1 = require("./CanvasLayout");
+const ReadingComposition_1 = require("./ReadingComposition");
+const EdgeAttachment_1 = require("./EdgeAttachment");
+class EditorVisualChoice {
+    constructor() {
+        this.key = '';
+        this.label = '';
+        this.card = new CardSchema_1.FridgeCard();
+        this.scale = 1;
+        this.offsetX = 0;
+        this.offsetY = 0;
+    }
+}
+exports.EditorVisualChoice = EditorVisualChoice;
+/** Changing the backing reserves its inset without shrinking the user's readout. */
+function editorReadingPlacement(card, blend) {
+    const box = (0, ReadingComposition_1.compositionPlacement)(card, (0, CanvasLayout_1.capabilityPlacement)(card), blend);
+    for (let i = 0; i < 2; i++) {
+        const minimum = (0, CanvasLayout_1.cardCapabilityMinimum)(card, true, box.w * card.w);
+        box.w = Math.max(box.w, minimum.w / card.w);
+        box.h = Math.max(box.h, minimum.h / card.h);
+    }
+    return box;
+}
+exports.editorReadingPlacement = editorReadingPlacement;
+/** Build detached candidates once per inspector session, never during a gesture or clock tick. */
+function editorVisualChoices(source, mode) {
+    const keys = mode === 'material' ? ['paper', 'matte'] : mode === 'album' ? ['cover', 'classic', 'row'] : mode === 'shape' ? ['rect', 'round', 'pill', 'blob'].concat(source.cutout ? ['subject'] : []) : (0, ReadingComposition_1.readingStyles)(source.capability?.k ?? '');
+    // Detach large courses/elements once. Candidate variants only change scalar
+    // capability fields and replace their placement box, never nested payloads.
+    const detached = (0, CardViewSnapshot_1.cardViewSnapshot)(source);
+    const courses = detached.capability?.courses;
+    if (detached.capability)
+        detached.capability.courses = [];
+    const capabilityJSON = JSON.stringify(detached.capability);
+    return keys.map((key) => {
+        const choice = new EditorVisualChoice(), card = (0, CardViewSnapshot_1.cardStorageShell)(detached);
+        if (detached.capability) {
+            card.capability = JSON.parse(capabilityJSON);
+            card.capability.courses = courses;
+        }
+        choice.key = key;
+        card.rot = 0;
+        if (mode === 'material' && card.capability) {
+            card.capability.readingMaterial = key;
+            card.capability.readingMaterialStudy = undefined;
+            choice.label = key === 'paper' ? '暖白细纸' : '轻透磨砂';
+        }
+        else if (mode === 'album' && card.capability) {
+            card.capability.albumPresentation = key;
+            card.w = key === 'row' ? 300 : 180;
+            card.h = key === 'row' ? 150 : 180;
+            choice.label = ['纯封面', '经典信息', '横向信息'][keys.indexOf(key)];
+        }
+        else if (mode === 'shape') {
+            card.capability = null;
+            card.capFree = false;
+            card.elements = [];
+            card.shape = key;
+            if (key === 'subject')
+                card.h = card.w / card.subjectAspect;
+            choice.label = ['圆角矩形', '椭圆', '胶囊', '自由边角', '照片主体'][keys.indexOf(key)];
+        }
+        else if (card.capability) {
+            card.capability.readingBlend = key;
+            card.capability.readingStyle = 'surface';
+            card.capBox = editorReadingPlacement(card, key);
+            card.capFree = true;
+            card.capability.readingEdge = key === 'sticker' ? (source.capability?.readingEdge || 'left') : '';
+            if (key === 'sticker') {
+                const attached = (0, EdgeAttachment_1.edgeAttachment)(card, card.capBox, card.capability.readingEdge, card.capability.readingOutside === true);
+                card.capBox = attached.box;
+                card.capBox.rot = 0;
+            }
+            choice.label = ReadingComposition_1.READING_COMPOSITION_LABELS[ReadingComposition_1.READING_COMPOSITIONS.indexOf(key)];
+        }
+        const overflow = (0, ReadingComposition_1.compositionOverflow)(card, 1);
+        choice.card = card;
+        choice.scale = Math.min(82 / (card.w + overflow.left + overflow.right), 92 / (card.h + overflow.top + overflow.bottom));
+        choice.offsetX = (overflow.left - overflow.right) * choice.scale / 2;
+        choice.offsetY = (overflow.top - overflow.bottom) * choice.scale / 2;
+        return choice;
+    });
+}
+exports.editorVisualChoices = editorVisualChoices;
+
+},
+"CardViewSnapshot":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.cardRenderSnapshot = exports.cardStorageShell = exports.cardViewSnapshot = void 0;
+const ContourRegistry_1 = require("./ContourRegistry");
+const CardSchema_1 = require("./CardSchema");
+/** Contours are immutable after extraction. Keep them shared while editable values are snapshots. */
+function cardViewSnapshot(source) { return snapshotCard(source, true); }
+exports.cardViewSnapshot = cardViewSnapshot;
+/** Synchronously serialize this shell; its nested references must never escape into UI or undo. */
+function cardStorageShell(source) { return snapshotCard(source, false); }
+exports.cardStorageShell = cardStorageShell;
+function snapshotCard(source, detached) {
+    const copy = new CardSchema_1.FridgeCard();
+    copy.id = source.id;
+    copy.groupId = source.groupId;
+    copy.x = source.x;
+    copy.y = source.y;
+    copy.w = source.w;
+    copy.h = source.h;
+    copy.rot = source.rot;
+    copy.z = source.z;
+    copy.shape = source.shape;
+    copy.frame = source.frame;
+    copy.material = source.material;
+    copy.paper = source.paper;
+    copy.ink = source.ink;
+    copy.subjectPhoto = source.subjectPhoto;
+    copy.subjectBorder = true;
+    copy.subjectAspect = source.subjectAspect;
+    copy.subjectInk = source.subjectInk;
+    copy.subjectVersion = source.subjectVersion;
+    copy.cutout = source.cutout;
+    copy.inDoor = source.inDoor;
+    copy.outline = (0, ContourRegistry_1.cardOutline)(source);
+    copy.renderContourKey = '';
+    copy.capability = !detached || source.capability === null ? source.capability : JSON.parse(JSON.stringify(source.capability));
+    copy.capBox = detached ? JSON.parse(JSON.stringify(source.capBox)) : source.capBox;
+    copy.capFree = source.capFree;
+    copy.elements = detached ? source.elements.map((element) => JSON.parse(JSON.stringify(element))) : source.elements;
+    return copy;
+}
+const renderSnapshots = new Map();
+const renderSignatures = new Map();
+/** A lightweight render parameter. Storage and undo snapshots retain their original contours. */
+function cardRenderSnapshot(source, prepared = false) {
+    const contourKey = (0, ContourRegistry_1.registerRenderContour)(source, prepared);
+    // Compare mutable values before cloning. Reopening/committing one card should
+    // not deep-copy every unchanged capability, course list and background layer.
+    const signature = JSON.stringify([source.id, source.groupId, source.x, source.y, source.w, source.h, source.rot, source.z,
+        source.shape, source.frame, source.material, source.paper, source.ink, source.subjectPhoto, source.subjectAspect,
+        source.subjectInk, source.subjectVersion, source.cutout, source.inDoor, contourKey, source.capability, source.capBox, source.capFree, source.elements]);
+    const previous = renderSnapshots.get(source.id);
+    if (previous !== undefined && renderSignatures.get(source.id) === signature)
+        return previous;
+    const copy = cardViewSnapshot(source);
+    copy.renderContourKey = contourKey;
+    copy.outline = [];
+    if (!renderSnapshots.has(source.id) && renderSnapshots.size >= 128) {
+        const oldest = renderSnapshots.keys().next().value;
+        renderSnapshots.delete(oldest);
+        renderSignatures.delete(oldest);
+    }
+    renderSignatures.set(source.id, signature);
+    renderSnapshots.set(source.id, copy);
+    return copy;
+}
+exports.cardRenderSnapshot = cardRenderSnapshot;
+
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"f42a66e8847abd2912855a0812aa29f67de00998d22855be61d322fccc2a19b7"};})(globalThis);

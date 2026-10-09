@@ -16,7 +16,7 @@ export struct EditorVisualChoices {
   aboutToAppear():void {this.sourceChanged();}
   private sourceChanged():void {
     const cap=this.card.capability;
-    const signature=[this.mode,this.card.id,cap?.k,this.card.w,this.card.h,this.card.cutout,this.card.subjectVersion,this.card.subjectPhoto,this.card.material,this.card.paper,this.card.ink,cap?.albumCover,cap?.title,cap?.artist,cap?.courses?.length].join(':');
+    const signature=[this.mode,this.card.id,cap?.k,this.card.w,this.card.h,this.card.cutout,this.card.subjectVersion,this.card.subjectPhoto,this.card.material,this.card.paper,this.card.ink,cap?.readingMaterial,cap?.readingTint,cap?.readingBlend,cap?.readingEdge,cap?.readingOutside,cap?.readingHook,cap?.albumCover,cap?.title,cap?.artist,cap?.courses?.length].join(':');
     if(signature===this.sourceSignature)return;
     this.sourceSignature=signature;this.choices=editorVisualChoices(this.card,this.mode);
   }

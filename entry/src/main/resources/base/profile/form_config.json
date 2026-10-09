@@ -16,7 +16,8 @@
       "defaultDimension": "4*4",
       "updateEnabled": true,
       "updateDuration": 2,
-      "formConfigAbility": "ability://EntryAbility"
+      "formConfigAbility": "ability://EntryAbility",
+      "transparencyEnabled": true
     }
   ]
 }

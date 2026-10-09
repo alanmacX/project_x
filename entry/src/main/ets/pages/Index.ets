@@ -1,3 +1,5 @@
+import { prepareReadingTints, ReadingTintRequest, ReadingTintResult } from '../model/ReadingMaterialWorker';
+import { cardSource, hash } from '../model/BackgroundInputs';
 import { capabilityRenderTick } from '../model/CapabilityClock';
 import lazy { HookPlacement } from '../views/HookPlacement';
 import lazy { EditorVisualChoices } from '../views/EditorVisualChoices';
@@ -274,6 +276,8 @@ struct Index {
   @State sharing: boolean = false;
   private backgroundGeneration: number = 0;
   private backgroundTimer: number = -1;
+  private readingTintTimer:number=-1;
+  private readingTintBusy:boolean=false;
   @StorageLink('appBackgrounded') @Watch('appWentBackground') appBackgrounded: boolean = false;
   private appWentBackground(): void {
     if(this.appBackgrounded) {
@@ -335,7 +339,7 @@ struct Index {
       startupMark('geometry-ready');
       await prepareSubjectDepth(this.store.state.cards,this.boardScale,this.context!.cacheDir,this.getUIContext().vp2px(1));
       if(!this.alive)return;
-      this.ready = true; this.render(); startupMark('scene-ready');
+      this.ready = true; this.render(); this.queueReadingTints(); startupMark('scene-ready');
       this.getUIContext().postFrameCallback(new PreparedTransition(()=>startupMark('scene-idle'),true));
       this.scheduleBackground(); this.routeChanged(); this.viewRouteChanged(); this.incomingTemplateChanged();
       if(!this.viewRouteId && this.routeCanvasId===this.store.state.canvasId)AppStorage.setOrCreate('routeCanvasId','');
@@ -630,7 +634,7 @@ struct Index {
       }
     } finally { this.repairingSubjects = false; }
   }
-  aboutToDisappear(): void { this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; this.backgroundPreviewGeneration++;if(this.backgroundPreviewTimer>=0)clearTimeout(this.backgroundPreviewTimer); if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
+  aboutToDisappear(): void { this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; this.backgroundPreviewGeneration++;if(this.backgroundPreviewTimer>=0)clearTimeout(this.backgroundPreviewTimer); if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer); if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
     if(this.navMenuOpen){this.finishNavMenu(-1);return true;}
     if(this.deletionId)return true;
@@ -933,7 +937,32 @@ struct Index {
     refreshNormalSceneLayout(this.store.state);
     this.normalLayoutId=this.store.state.sceneBaseLayoutId;
     this.store.state.canvasAspect = this.canvasAspect; this.store.state.canvasDimension = this.canvasDimension;
+    this.queueReadingTints();
     this.store.save(syncWidgets).catch((e: Error) => { this.error = e.message === '桌面组件同步未完成' ? '桌面同步暂未完成，点此重试' : '保存失败，点此重试'; });
+  }
+  private readingTintKey(card:FridgeCard):string {return hash(cardSource(card)+'|'+card.subjectVersion);}
+  private queueReadingTints():void {
+    if(!this.alive||!this.ready||this.readingTintBusy)return;
+    if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer);
+    this.readingTintTimer=setTimeout(()=>{this.readingTintTimer=-1;this.refreshReadingTints();},900);
+  }
+  private async refreshReadingTints():Promise<void> {
+    if(!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded)return;
+    if(this.activeBoardId||this.gestureGroup||this.heroActive||this.layerDrag||this.arriving){this.queueReadingTints();return;}
+    const requests:ReadingTintRequest[]=this.store.state.cards.filter((c:FridgeCard)=>c.capability!==null&&c.capability.k!=='album'&&cardSource(c).startsWith('file://')&&c.capability.readingTintKey!==this.readingTintKey(c)).map((c:FridgeCard):ReadingTintRequest=>({id:c.id,src:cardSource(c),key:this.readingTintKey(c)}));
+    if(!requests.length)return;
+    const canvasId=this.store.state.canvasId;this.readingTintBusy=true;
+    try {
+      const json=await taskpool.execute(new taskpool.Task(prepareReadingTints,JSON.stringify(requests))) as string;
+      if(!this.alive||canvasId!==this.store.state.canvasId)return;
+      if(this.activeBoardId||this.gestureGroup||this.heroActive||this.layerDrag||this.arriving)return;
+      let changed=false;
+      for(const result of JSON.parse(json) as ReadingTintResult[]) {
+        const card=this.store.state.cards.find((c:FridgeCard)=>c.id===result.id);
+        if(card?.capability&&this.readingTintKey(card)===result.key){card.capability.readingTint=result.tint;card.capability.readingTintKey=result.key;changed=true;}
+      }
+      if(changed){this.render();this.store.save(true).catch(()=>{});}
+    }catch(_){}finally{this.readingTintBusy=false;}
   }
   private clamp(card: FridgeCard): void {
     clampCardGeometry(card,BOARD_W,BOARD_H,BOARD_W/this.canvasAspect);
@@ -1337,7 +1366,7 @@ struct Index {
         if (this.cards.length === 0) {
           Text('放一张自己的卡片').fontSize(16).fontColor('#989898').width('100%').height('100%').textAlign(TextAlign.Center).hitTestBehavior(HitTestMode.None)
         }
-      }.width(BOARD_W * this.boardScale).height(this.boardHeight).borderRadius(24).clip(true).backgroundColor(Color.White)
+      }.width(BOARD_W * this.boardScale).height(this.boardHeight).borderRadius(24).clip(true).backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:Color.White)
         .border({ width: .5, color: '#E9E9E9' }).id('homeCanvasSurface')
         .position({ x: this.boardLeft, y: this.boardTop })
       if(this.floatingHome()){this.homeDock()}else{this.homeLayers();this.homeBackground()}
@@ -1504,7 +1533,7 @@ struct Index {
   }
   private homeActionHeight():number {return this.groupSelecting?60:this.selectedId.length===0?0:56;}
   private backgroundLabel(): string {
-    return this.canvasBackground.mode === 'smart' ? '智能取色' : this.canvasBackground.mode === 'blend' ? '智能多色' : this.canvasBackground.mode === 'photo' ? '本地照片' : this.canvasBackground.mode === 'preset' ? '柔色预设' : '纯色';
+    return this.canvasBackground.mode === 'transparent' ? '桌面透明' : this.canvasBackground.mode === 'smart' ? '智能取色' : this.canvasBackground.mode === 'blend' ? '智能多色' : this.canvasBackground.mode === 'photo' ? '本地照片' : this.canvasBackground.mode === 'preset' ? '柔色预设' : '纯色';
   }
   private applyBackground(bg: CanvasBackground): void {
     this.backgroundGeneration += 1; this.backgroundBusy = false; this.canvasBackground = bg; this.store.state.background = bg;
@@ -1648,12 +1677,13 @@ struct Index {
         }.width(240).height(240 / this.canvasAspect).borderRadius(20).clip(true)
         Column({ space: 16 }) {
           if(this.backgroundSettingsStage>=1){
-          SettingsSegmented({labels:['纯色','智能取色','智能多色','照片'],selectedIndex:this.canvasBackground.mode==='preset'?2:Math.max(0,['solid','smart','blend','photo'].indexOf(this.canvasBackground.mode)),appDark:this.appDark,
-            onSelect:(index:number)=>{if(!this.backgroundBusy)this.chooseBackgroundMode(['solid','smart','blend','photo'][index]);}}).enabled(!this.backgroundBusy)
+          SettingsSegmented({labels:['纯色','取色','多色','照片','透明'],selectedIndex:this.canvasBackground.mode==='preset'?2:Math.max(0,['solid','smart','blend','photo','transparent'].indexOf(this.canvasBackground.mode)),appDark:this.appDark,
+            onSelect:(index:number)=>{if(!this.backgroundBusy)this.chooseBackgroundMode(['solid','smart','blend','photo','transparent'][index]);}}).enabled(!this.backgroundBusy)
           }
           if(this.backgroundSettingsStage>=2){
           ForEach([this.canvasBackground.mode],(_mode:string)=>{
           Column({space:16}) {
+          if(this.canvasBackground.mode==='transparent'){Text('只显示卡片，桌面壁纸透过空白处；卡片仍限制在小组件范围内。空画布会显示可见的添加提示。').fontSize(13).fontColor(this.appMuted()).width('100%')}
           if (this.canvasBackground.mode === 'solid') {
             ColorSetting({label:'背景颜色',color:this.canvasBackground.color,canReset:false,sourceKey:this.backgroundColorKey(),appDark:this.appDark,
               onPick:(color:string,key:string)=>this.setBackgroundColor(color,key),onFallback:()=>this.chooseBackgroundColor()})
@@ -2014,6 +2044,8 @@ struct Index {
   @Builder
   capabilityStyleChoices() {
     EditorVisualChoices({card:this.preview,selected:this.preview.capability?.readingBlend??'',appDark:this.appDark,onChoose:(key:string)=>this.chooseReadingComposition(key)})
+    Text('表面材质').fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
+    EditorVisualChoices({card:this.preview,mode:'material',selected:this.preview.capability?.readingMaterial??'paper',appDark:this.appDark,onChoose:(key:string)=>{const cap=this.current()?.capability;if(cap){cap.readingMaterial=key;this.change();}}})
     if(this.preview.capability?.readingBlend==='sticker') {
       Text('贴合方式').fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
       SettingsSegmented({labels:['左侧','右侧'],selectedIndex:this.preview.capability.readingEdge==='right'?1:0,appDark:this.appDark,onSelect:(i:number)=>this.setCapabilityAttachment(i===0?'left':'right',this.preview.capability?.readingOutside===true)})

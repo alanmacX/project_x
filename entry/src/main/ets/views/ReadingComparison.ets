@@ -16,7 +16,7 @@ export struct ReadingComparison {
   @Prop appDark:boolean=false;
   @State sample:FridgeCard=new FridgeCard();
   @State selected:number=0;
-  @State materialStudy:number=4;
+  @State materialStudy:number=5;
   private sampledTint:string='';
   @State panelWidth:number=320;
   @State panelHeight:number=420;
@@ -71,7 +71,6 @@ export struct ReadingComparison {
       Text(MICA_STUDY_NOTES[this.materialStudy]).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       Stack() {CardFace({card:this.sample,scaleFactor:this.sampleScale(),tick:this.tick}).width(this.sample.w*this.sampleScale()).height(this.sample.h*this.sampleScale()).translate({x:(compositionOverflow(this.sample,1).left-compositionOverflow(this.sample,1).right)*this.sampleScale()/2,y:(compositionOverflow(this.sample,1).top-compositionOverflow(this.sample,1).bottom)*this.sampleScale()/2})}
         .width('100%').height(this.previewHeight()).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
-      Button('并排查看三档材质',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).width('100%').backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>{AppStorage.setOrCreate('micaStudySource',cardSource(this.card));this.getUIContext().getRouter().pushUrl({url:'pages/MicaStudy'});})
       Text(READING_COMPOSITION_NOTES[READING_COMPOSITIONS.indexOf(this.styles()[this.selected])]).fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%').maxLines(2)
     }.width('100%').padding({left:20,right:20,top:16,bottom:24})
     }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)

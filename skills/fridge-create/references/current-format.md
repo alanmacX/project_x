@@ -14,7 +14,7 @@ UTF-8 JSON, not ZIP:
 
 `state`: canvasId (local placeholder), canvasAspect (>0), canvasDimension `4*4`, background, maxZ, cards, sceneLayouts, sceneRules, sceneBaseLayoutId. Start without schedules. Reader handles remapping IDs on import. Do not create undocumented scheduled transitions or cross-canvas references.
 
-Background: solid color (`#RRGGBB`) is easiest. Other current modes are smart/blend/photo/preset but they require host-generated images/palettes for faithful output; do not claim a hand-written list of colors reproduces the app gradient. Photo background references must be embedded asset keys.
+Background: solid color (`#RRGGBB`) is easiest. A transparent canvas uses mode `transparent`: the host omits the canvas fill/image and preserves card artwork; do not write a transparent color hex. Other current modes are smart/blend/photo/preset but they require host-generated images/palettes for faithful output; do not claim a hand-written list of colors reproduces the app gradient. Photo background references must be embedded asset keys.
 
 ## Coordinates
 
@@ -68,3 +68,5 @@ Use container version 2 only when a card has `html`. Native-only v1 works keep i
 `.fridge` transfers artwork and native provider intent, not sender runtime data. Production `SharedCapability.sharedCapability` is the export/import allowlist. Never embed calendar events, courses, semester dates, school exceptions, battery snapshots, countdown/anniversary targets, credentials, cached provider responses or private future fields in a template capability. Agenda binds to the recipient system calendar (with their existing permission); timetable binds to their saved local timetable or remains unconfigured. Clock/date/progress/battery use the recipient device. Deadline capabilities require the recipient to set their own title/date. World-clock city/zone are intentional design choices. Album titles/artists/covers are artwork; rotation restarts on import. HTML native bindings follow the same policy.
 
 Decorative text, photos, album covers, HTML source and its appearance cache are intentionally shared artwork. Do not bake personal provider records into those assets; automatic provider sanitization cannot remove information already painted into an image or static HTML. Preview fixtures may use synthetic data for QA, but exported/imported templates must use recipient bindings. Timed scene designs arrive disabled and without sender acknowledgement history.
+
+Reading material: `capability.readingMaterial` is `paper` (default, warm white fine paper) or `matte` (lighter translucent). It changes only the host-owned surface, not geometry or data. `readingTint` is an optional sampled `#RRGGBB` art color; leave `readingTintKey` empty in authored files because source paths are remapped on import. Do not author `readingMaterialStudy`; restoration strips it.

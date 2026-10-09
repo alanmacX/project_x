@@ -41,6 +41,7 @@ export interface CapBlock {
   readingEdge?: string;
   readingOutside?: boolean;
   readingHook?: number;
+  readingMaterial?: string; // paper (default) | matte; host-owned surface, local and portable
   readingMaterialStudy?: number; // read-only preview; intentionally not restored from saved cards
   readingTintKey?: string;
   readingTint?: string; // local photo palette, persisted; never sampled while moving
@@ -149,7 +150,7 @@ export class CanvasBackground {
 }
 export function normalizeBackground(raw: CanvasBackground | undefined): CanvasBackground {
   const bg = new CanvasBackground(); if (raw === undefined || raw === null) return bg;
-  bg.mode = ['solid', 'smart', 'blend', 'photo', 'preset'].includes(raw.mode) ? raw.mode : 'solid';
+  bg.mode = ['solid', 'smart', 'blend', 'photo', 'preset', 'transparent'].includes(raw.mode) ? raw.mode : 'solid';
   bg.color = /^#[0-9a-fA-F]{6}$/.test(raw.color ?? '') ? raw.color : '#FFFFFF';
   bg.src = (raw.src ?? '').startsWith('file://') || (raw.src ?? '').startsWith('memory://') ? raw.src : '';
   bg.photo = (raw.photo ?? '').startsWith('file://') ? raw.photo : '';
@@ -341,6 +342,8 @@ export function normalizeCapability(raw: CapBlock): CapBlock {
     cap.albumItems=(Array.isArray(raw.albumItems)?raw.albumItems:[]).filter((a:AlbumCover)=>a!==null&&a!==undefined&&typeof a.id==='string'&&a.id.length>0&&!!local(a.cover)&&!!local(a.background)&&!ids.includes(a.id.slice(0,96))&&(ids.push(a.id.slice(0,96))>0)).slice(0,12).map((a:AlbumCover):AlbumCover=>({id:a.id.slice(0,96),cover:local(a.cover),background:local(a.background),title:typeof a.title==='string'?a.title.slice(0,160):'',artist:typeof a.artist==='string'?a.artist.slice(0,160):''}));
   }
   if (raw.k === 'worldclock') cap.zone = clockZone(typeof raw.zone === 'string' ? raw.zone : '');
+  cap.readingMaterialStudy=undefined;
+  cap.readingMaterial=raw.readingMaterial==='matte'?'matte':'paper';
   cap.readingStyle = ['plain','surface'].includes(raw.readingStyle ?? '') ? raw.readingStyle : 'auto';
   cap.readingOutside=raw.readingOutside===true;
   cap.readingEdge=['left','right','top','bottom'].includes(raw.readingEdge??'')?raw.readingEdge:'';

@@ -10,7 +10,7 @@ import { PaperBacking } from './PaperBacking';
 @Component
 export struct ReadingBacking {
  @Prop blend:string='paper';
- @Prop study:number=0;
+ @Prop study:number=5;
  @Prop ink:string='#262824';
  @Prop tint:string='#E8D6B0';
  @Prop edge:string='';
@@ -70,7 +70,7 @@ export struct ReadingBacking {
    Stack() {
     Column().width('100%').height('100%').backgroundColor(tactileFill(this.tint,this.study))
     Column().width('100%').height('100%').radialGradient({center:['84%','90%'],radius:'96%',colors:[[tactilePigment(this.tint,this.study),0],['#00000000',1]]})
-    Image($r('app.media.reading_paper_fibres')).width('100%').height('100%').objectFit(ImageFit.Fill).opacity(tactileTextureOpacity(this.study)).draggable(false)
+    Image($r('app.media.reading_surface_paper')).width('100%').height('100%').objectFit(ImageFit.Fill).opacity(tactileTextureOpacity(this.study)).draggable(false)
     Column().width('100%').height('100%').linearGradient({angle:180,colors:[['#58FFFFFC',0],['#00FFFFFC',.48],['#0DAD9168',1]]})
    }.width('100%').height('100%').clipShape(new PathShape().commands(this.tactilePath()))
    Path().commands(this.tactilePath()).fill(Color.Transparent).stroke('#A8FFFDF7').strokeWidth(.7*this.scaleFactor).antiAlias(true).width('100%').height('100%')

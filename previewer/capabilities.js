@@ -17,12 +17,13 @@
  }
  function hook(x,s){const d=`M ${x-3*s} ${0} L ${x-3*s} ${-7*s} C ${x-3*s} ${-15*s} ${x+6*s} ${-15*s} ${x+6*s} ${-7*s} L ${x+6*s} ${5*s} C ${x+6*s} ${11*s} ${x} ${13*s} ${x} ${10*s}`;return [ ['rgba(29,35,42,.16)',3.4],['#90979E',2.6],['#E4E8EC',1.3] ].map(([color,width])=>`<path d="${d}" fill="none" stroke="${color}" stroke-width="${width*s}" stroke-linecap="round"/>`).join('');}
  function backing(w,h,blend,s,ink,tint,cap,contact,id){
+  const study=material.readingMaterialVariant(cap.readingMaterialStudy,cap.readingMaterial);
   let p=contact.profile.length?edge.attachedPath(w,h,contact.profile,contact.left,6*s):mica.micaPath(blend,w,h,s,cap.readingEdge||'');
   const reserve=mica.hookReserve(blend),hx=mica.hookCenter(cap.readingHook??.2,w,s);
   if(reserve){const r=3.3*s,y=10*s;p+=` M ${hx+r} ${y} A ${r} ${r} 0 1 0 ${hx-r} ${y} A ${r} ${r} 0 1 0 ${hx+r} ${y} Z`;}
-  if(composition.isReadingComposition(blend)&&(cap.readingMaterialStudy??0)>=4){
-   const v=cap.readingMaterialStudy,cloud=blend==='cloud',off=cloud?16*s:0,W=w+2*off,H=h+2*off,d=cloud?load('CloudReadingGeometry').cloudReadingPath(w,h,s):p;
-   return `<defs><clipPath id="${id}matte"><path d="${d}"/></clipPath><radialGradient id="${id}wash" cx="84%" cy="90%" r="96%"><stop stop-color="${col(material.tactilePigment(tint,v))}"/><stop offset="1" stop-color="transparent"/></radialGradient><linearGradient id="${id}glow" x2="0" y2="1"><stop stop-color="#FFFFFC58"/><stop offset=".48" stop-color="#FFFFFC00"/><stop offset="1" stop-color="#AD91680D"/></linearGradient></defs><g transform="translate(${-off} ${-off})"><path d="${d}" transform="translate(0 ${material.tactileThickness(v)*s})" fill="${col(material.tactileEdgeColor(v))}"/><g clip-path="url(#${id}matte)"><rect width="${W}" height="${H}" fill="${col(material.tactileFill(tint,v))}"/><rect width="${W}" height="${H}" fill="url(#${id}wash)"/><image href="${FridgeMaterials.reading_paper_fibres}" width="${W}" height="${H}" preserveAspectRatio="none" opacity="${material.tactileTextureOpacity(v)}"/><rect width="${W}" height="${H}" fill="url(#${id}glow)"/></g><path d="${d}" fill="none" stroke="#FFFDF7A8" stroke-width="${.7*s}"/></g>`;
+  if(composition.isReadingComposition(blend)&&study>=4){
+   const v=study,cloud=blend==='cloud',off=cloud?16*s:0,W=w+2*off,H=h+2*off,d=cloud?load('CloudReadingGeometry').cloudReadingPath(w,h,s):p;
+   return `<defs><clipPath id="${id}matte"><path d="${d}"/></clipPath><radialGradient id="${id}wash" cx="84%" cy="90%" r="96%"><stop stop-color="${col(material.tactilePigment(tint,v))}"/><stop offset="1" stop-color="transparent"/></radialGradient><linearGradient id="${id}glow" x2="0" y2="1"><stop stop-color="#FFFFFC58"/><stop offset=".48" stop-color="#FFFFFC00"/><stop offset="1" stop-color="#AD91680D"/></linearGradient></defs><g transform="translate(${-off} ${-off})"><path d="${d}" transform="translate(0 ${material.tactileThickness(v)*s})" fill="${col(material.tactileEdgeColor(v))}"/><g clip-path="url(#${id}matte)"><rect width="${W}" height="${H}" fill="${col(material.tactileFill(tint,v))}"/><rect width="${W}" height="${H}" fill="url(#${id}wash)"/><image href="${FridgeMaterials.reading_surface_paper}" width="${W}" height="${H}" preserveAspectRatio="none" opacity="${material.tactileTextureOpacity(v)}"/><rect width="${W}" height="${H}" fill="url(#${id}glow)"/></g><path d="${d}" fill="none" stroke="#FFFDF7A8" stroke-width="${.7*s}"/></g>`;
   }
   if(blend==='cloud'){
    const d=load('CloudReadingGeometry').cloudReadingPath(w,h,s),off=16*s;
@@ -34,7 +35,7 @@
    const color=present.readingSurfaceColor(ink),suffix=color==='#252824'?'dark':color==='#FFFFFF'?'white':color==='#000000'?'black':'warm',source=FridgeMaterials['reading_'+(blend==='scrim'?'scrim':'feather')+'_'+suffix];
    return `<image href="${source}" width="${w}" height="${h}" preserveAspectRatio="none"/>`;
   }
-  if((cap.readingMaterialStudy??0)>0){const variant=cap.readingMaterialStudy;
+  if(study>0){const variant=study;
    return `<defs><clipPath id="${id}mica"><path d="${p}"/></clipPath><radialGradient id="${id}pigment" cx="86%" cy="82%" r="92%"><stop stop-color="${col(material.micaStudyPigment(tint,variant))}"/><stop offset=".46" stop-color="${col(material.micaStudyPigment(tint,variant,.4))}"/><stop offset="1" stop-color="transparent"/></radialGradient><radialGradient id="${id}light" cx="15%" cy="22%" r="80%"><stop stop-color="#FFFFF8B8"/><stop offset=".35" stop-color="#FFFFF850"/><stop offset="1" stop-color="#FFFFF800"/></radialGradient></defs><path d="${p}" transform="translate(0 ${1.2*s})" fill="#B29D7428"/><g clip-path="url(#${id}mica)"><rect width="${w}" height="${h}" fill="${col(material.micaStudyFill(tint,variant))}"/><image href="${FridgeMaterials.reading_mica_cloud}" width="${w}" height="${h}" preserveAspectRatio="none" opacity=".55"/><rect width="${w}" height="${h}" fill="url(#${id}pigment)"/><rect width="${w}" height="${h}" fill="url(#${id}light)"/></g><path d="${p}" fill="none" stroke="${blend==='bare'?'#FFFCF142':'#FFFDF6C8'}" stroke-width="${(blend==='bare'?.6:1.5)*s}"/>`;
   }
   if(blend==='bare'){

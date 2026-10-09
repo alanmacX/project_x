@@ -1,0 +1,11 @@
+# Reading surfaces and transparent canvas
+
+Use production contours and current host defaults rather than painting finished UI into image assets. `readingMaterial: paper` gives warm white fine fibres, a restrained sampled colour pool, a thin light lip and 1.8 vp side thickness. `matte` is lighter, more translucent and 1.1 vp thick. Both retain the same content layout, original brush/cloud/edge/badge contours and actual hanging holes. Do not bake another white border, shadow, hole or substrate into the subject image. Album uses its own existing background and is unaffected.
+
+Prefer paper for dense text; choose matte when lighter translucency serves the artwork. Both retain readable dark foreground. Tint comes from the local subject image once after a committed image change, not from a timer/drag frame. Never invent a live wallpaper blur or use experimental study IDs in a portable work. Editor material thumbnails use actual native CardFace; browser surfaces consume the same parameters, paths and offline texture.
+
+A background with `mode: transparent` has no canvas-level fill/image. Every card and native capability remains visible; transparency does not allow drawing outside the widget slot or directly interacting with icons beneath it. A tap anywhere in the widget still opens the app. In-app blank space reveals the app surface; in the real desktop Form it reveals wallpaper. Keep clear contrast on both light and dark wallpaper, preserve negative space, and ensure visible content fills at least 10% of the slot without filling the whole slot. Empty canvases show a visible native add-card prompt rather than an invisible widget. Browser preview cannot certify actual pixel coverage or a platform entitlement; verify those separately before release.
+
+For export/QA distinguish editable transparent .fridge / native Form / social share image. A branded social share image deliberately uses a light matte and signature footer for readability; it is not proof that the Form has an opaque background.
+
+Huawei transparent Form requires API 22+, `transparencyEnabled: true`, the approved AGC capability switch saved, and a manual signing Profile containing the entitlement for debug as well as release. DevEco previewer does not demonstrate real transparency. Retain real desktop acceptance as pending until the signed native form is tested.
