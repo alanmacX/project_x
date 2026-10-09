@@ -123,7 +123,7 @@
    const theme=scene.background.frameStyle==='dark'||scene.background.frameStyle==='auto'&&options.dark;
    const geometry=options.squareFrame?'square':'round',edge=width*48/600;
    const tiles=[['tl',0,0,edge,edge],['top',edge,0,width-2*edge,edge],['tr',width-edge,0,edge,edge],['left',0,edge,edge,height-2*edge],['right',width-edge,edge,edge,height-2*edge],['bl',0,height-edge,edge,edge],['bottom',edge,height-edge,width-2*edge,edge],['br',width-edge,height-edge,edge,edge]];
-   frame=`<g data-canvas-frame="${scene.background.frameStyle}">`+tiles.map(([part,x,y,w,h])=>`<image href="${global.FridgeMaterials['frame_stone_'+(theme?'dark':'light')+'_'+geometry+'_'+part]}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"/>`).join('')+'</g>';
+   frame=`<g data-canvas-frame="${scene.background.frameStyle}">`+tiles.map(([part,x,y,w,h])=>`<image href="${global.FridgeMaterials['frame_'+scene.background.frameMaterial+'_'+(theme?'dark':'light')+'_'+geometry+'_'+part]}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"/>`).join('')+'</g>';
   }
   return {svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="system-ui,sans-serif"><defs>${defs}<clipPath id="${namespace}board"><rect width="${width}" height="${height}" rx="${options.squareFrame?0:scene.background.frameStyle!=='none'?width*31/600:20}"/></clipPath></defs><g clip-path="url(#${namespace}board)">${body}${frame}</g></svg>`,issues:diagnostics,width,height,layers:{version:1,namespace,defs,background,cards,frame}};
  }

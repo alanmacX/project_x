@@ -206,6 +206,16 @@ function load(name) {
  await legacyStore.deleteCanvas('legacy');
  assert.equal(JSON.parse(disk.get('fridge_saved_timetable_v1')).courses[0].name,'旧课表');assert(!disk.has(canvasKey('legacy')));
  console.log('PASS timetable migration: damaged inactive record, concurrent newer edit and complete canvas deletion retention.');
+
+ // Scene editing has a separate durable key and never binds a desktop to the scene document.
+ const timedBase=defaultState();timedBase.cards=[new FridgeCard()];timedBase.cards[0].id='timed-base';disk.set('fridge_canvases_json','');disk.set('fridge_state_json',JSON.stringify(timedBase));disk.set('fridge_form_dims_json',JSON.stringify({timed:'4*4'}));disk.set('fridge_form_bindings_json','{}');
+ const sceneStore=new FridgeStore();await sceneStore.init({});await sceneStore.save(true);const mainId=sceneStore.catalog.activeId,baseJSON=disk.get('fridge_state_json'),sourceCard=sceneStore.state.cards[0];
+ const sceneId=sceneStore.createTimedScene('喝水',sourceCard);assert.equal(sceneStore.catalog.activeId,mainId);assert.equal(sceneStore.state.cards.length,1);assert.notEqual(sceneStore.state.cards[0].id,sourceCard.id);await sceneStore.save(true);assert.equal(disk.get('fridge_state_json'),baseJSON,'editing central card cannot overwrite fallback main document');
+ assert.throws(()=>sceneStore.addCard(new FridgeCard()),/一张/);assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).timed,mainId);
+ await sceneStore.openCanvas(mainId);await assert.rejects(sceneStore.copyCardTo(sourceCard,sceneId),/已有/);await sceneStore.copyCardTo(sourceCard,sceneId,true);assert.equal((await sceneStore.canvasSnapshot(sceneId)).cards.length,1);
+ const Rule=load('SceneScheduleSchema').SceneRule,job=new Rule();Object.assign(job,{id:'owned-scene',kind:'focus',centralOnly:true,targetId:sceneId,createdAt:0,start:(new Date().getHours()*60+new Date().getMinutes()+1439)%1440,timeoutMinutes:120,enabled:true});sceneStore.catalog.sceneRules=[job];await sceneStore.save(true);const beforeRuleEdit=updates.length;job.timeoutMinutes=1;await sceneStore.save(true);assert(updates.length>beforeRuleEdit,'rule-only edit invalidates desktop publisher cache');
+ await sceneStore.deleteTimedScene(sceneId);assert(!disk.has(canvasKey(sceneId)));assert.equal(sceneStore.catalog.sceneRules.length,0);assert.equal(sceneStore.catalog.activeId,mainId);
+ console.log('PASS independent central-card storage, fallback isolation, one-card capacity, cross-scene replacement, bound desktop ownership and policy-only publishing.');
  console.log('PASS timed delivery: atomic packet, bound-source ownership, target fanout, original geometry during battery updates, persisted acknowledgement and foreground merge, refresh minimum/quota, imported schedule remapping and opt-in.');
  console.log('PASS: legacy migration, lazy multi-canvas storage, independent duplication, widget bindings/deletion and removed-form cleanup, preserved corruption, movement-stable palette, offline refresh guard, live battery/Form refresh, conservative pickup OCR, course week/parity/boundaries, bounded ICS/JSON imports with recurrence exceptions and calendar ACL gate.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

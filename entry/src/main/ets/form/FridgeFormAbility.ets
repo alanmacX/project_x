@@ -1,10 +1,11 @@
+import { systemIsDark } from '../model/SystemAppearance';
 import { resolveScheduledScene, sceneWidgetContext, dismissScene, ScheduledScene } from '../model/SceneSchedule';
 import { pushWidgets } from '../model/WidgetSync';
 import { widgetBoundary, scheduleWidget } from '../model/WidgetSchedule';
 import { needsDataRefresh, capabilityRequestKey, mergeCapabilityResult } from '../model/CapabilityData';
-import { readCatalog, canvasKey, boundCanvas } from '../model/CanvasLibrary';
+import { readCatalog, withScenePolicy, sceneDocumentExists, canvasKey, boundCanvas } from '../model/CanvasLibrary';
 import { FormExtensionAbility, formBindingData } from '@kit.FormKit';
-import { Want } from '@kit.AbilityKit';
+import { Want, Configuration } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import preferences from '@ohos.data.preferences';
 import { FridgeState, defaultState, normalizeState } from '../model/CardSchema';
@@ -18,6 +19,15 @@ const KEY_DIMS: string = 'fridge_form_dims_json';
 /** Local schedules are evaluated on system refresh; original documents remain unchanged. */
 export default class FridgeFormAbility extends FormExtensionAbility {
   private registrationQueue: Promise<void> = Promise.resolve();
+  private appearanceDark:boolean|null=null;
+  onConfigurationUpdate(config:Configuration):void {
+    if(config.colorMode===undefined)return;this.appearanceDark=config.colorMode===0;
+    this.actionQueue=this.actionQueue.catch(()=>{}).then(async()=>{
+      const prefs=await preferences.getPreferences(this.context,STORE_NAME),catalog=readCatalog(await prefs.get('fridge_canvases_json','') as string);
+      if(catalog.rotation.mode!=='theme')return;
+      for(const id of Object.keys(await this.loadDims())){await this.pushForm(id);await this.scheduleForm(id);}
+    }).catch((e:Error)=>hilog.warn(0,'FridgeForm','theme refresh %{public}s',e.message));
+  }
 
   private async loadState(formId: string = ''): Promise<FridgeState> {
     await preferences.removePreferencesFromCache(this.context, STORE_NAME);
@@ -26,7 +36,7 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     const catalog = readCatalog(catalogJson), bindings = JSON.parse(await prefs.get('fridge_form_bindings_json','{}') as string) as Record<string,string>;
     const id = boundCanvas(bindings,formId,catalog);
     const json = await prefs.get(catalogJson ? canvasKey(id) : KEY_STATE, '') as string;
-    return json.length > 0 ? normalizeState(JSON.parse(json) as FridgeState) : defaultState();
+    return withScenePolicy(json.length > 0 ? normalizeState(JSON.parse(json) as FridgeState) : defaultState(),catalog,(this.appearanceDark??systemIsDark(this.context)));
   }
 
   private async loadDims(): Promise<Record<string, string>> {
@@ -57,7 +67,7 @@ export default class FridgeFormAbility extends FormExtensionAbility {
   private async displayedScene(formId:string):Promise<ScheduledScene> {
     const base=await this.loadState(formId);
     const scene=await resolveScheduledScene(base,Date.now(),async(id:string):Promise<FridgeState|null>=>{
-      const prefs=await preferences.getPreferences(this.context,STORE_NAME);const catalog=readCatalog(await prefs.get('fridge_canvases_json','') as string);if(!catalog.canvases.some(c=>c.id===id))return null;
+      const prefs=await preferences.getPreferences(this.context,STORE_NAME);const catalog=readCatalog(await prefs.get('fridge_canvases_json','') as string);if(!sceneDocumentExists(catalog,id))return null;
       const json=await prefs.get(canvasKey(id),'') as string;return json?normalizeState(JSON.parse(json) as FridgeState):null;
     });
     return scene;
@@ -109,7 +119,7 @@ export default class FridgeFormAbility extends FormExtensionAbility {
 
   private async refreshDueData(formId:string):Promise<boolean> {
     let changed=false;
-    let state=(await this.displayedScene(formId)).state,canvasId=state.canvasId;
+    const visibleScene=await this.displayedScene(formId);let state=visibleScene.state,canvasId=state.canvasId;
     for(const original of state.cards.slice()) {
       const cap=original.capability;if(!cap||!needsDataRefresh(cap))continue;
       const key=capabilityRequestKey(cap),attempted=cap.attemptedAt??0;
@@ -119,7 +129,7 @@ export default class FridgeFormAbility extends FormExtensionAbility {
       state=(await this.displayedScene(formId)).state;const card=state.cards.find((c)=>c.id===original.id);
       if(state.canvasId!==canvasId||!card?.capability||capabilityRequestKey(card.capability)!==key||(card.capability.attemptedAt??0)!==attempted)continue;
       if(cap.k==='battery'&&card.capability.percent===next.percent&&card.capability.charging===next.charging&&card.capability.chargeState===next.chargeState&&card.capability.refreshState===next.refreshState)continue;
-      const prefs=await preferences.getPreferences(this.context,STORE_NAME);const raw=await prefs.get(canvasKey(canvasId),'') as string;
+      const prefs=await preferences.getPreferences(this.context,STORE_NAME);const sourceId=original.id===visibleScene.focusId?visibleScene.focusSourceId||canvasId:canvasId;const raw=await prefs.get(canvasKey(sourceId),'') as string;
       const originalState=raw?normalizeState(JSON.parse(raw) as FridgeState):await this.loadState(formId);const stored=originalState.cards.find(c=>c.id===original.id);
       if(!stored?.capability||capabilityRequestKey(stored.capability)!==key||(stored.capability.attemptedAt??0)!==attempted)continue;
       stored.capability=mergeCapabilityResult(stored.capability,next);await this.saveState(originalState);changed=true;
@@ -132,11 +142,11 @@ export default class FridgeFormAbility extends FormExtensionAbility {
       let message:Record<string,string>|null=null;try{message=JSON.parse(event) as Record<string,string>;}catch(_){}
       if(message?.operation==='dismissScene') {
         const base=await this.loadState(formId);
-        if(dismissScene(base,message.ruleId??'',message.occurrence??'',Date.now())){await this.saveStateAndWidgets(base);await this.scheduleForm(formId);}return;
+        if(dismissScene(base,message.ruleId??'',message.occurrence??'',Date.now())){if(!base.scenePolicyV2){await this.saveStateAndWidgets(base);await this.scheduleForm(formId);return;}const prefs=await preferences.getPreferences(this.context,STORE_NAME),catalog=readCatalog(await prefs.get('fridge_canvases_json','') as string);catalog.sceneRules=base.sceneRules;await prefs.put('fridge_canvases_json',JSON.stringify(catalog));await prefs.flush();await this.pushForm(formId);await this.scheduleForm(formId);}return;
       }
       const action = parseCapabilityAction(event); if (action === null) return;
       const visible=await this.displayedScene(formId),prefs=await preferences.getPreferences(this.context,STORE_NAME);
-      const json=await prefs.get(canvasKey(visible.state.canvasId),'') as string;
+      const json=await prefs.get(canvasKey(action.cardId===visible.focusId?visible.focusSourceId||visible.state.canvasId:visible.state.canvasId),'') as string;
       let state=json?normalizeState(JSON.parse(json) as FridgeState):await this.loadState(formId),card=state.cards.find((item)=>item.id===action.cardId);
       if (card === undefined) return;
       if (!applyCalendarAction(card, action.operation)) return;

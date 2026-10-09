@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "skillContractVersion": 4,
+  "skillContractVersion": 5,
   "app": {
     "bundleName": "com.fridgewidget.app",
     "vendor": "fridgememo",
@@ -26,10 +26,10 @@
     "htmlTemplateVersion": 1
   },
   "identity": {
-    "models": "852b723104669e39ecc614f56f1002926e896d9bad19130faa3c6f1684099831",
-    "materials": "16fb924cdc383c4ccd0b8a2a23cc9cec1159676ff254d497b4d5917b62f822bb",
-    "browserAdapter": "a38f89a6617e9cded18564ddf70de13d1d01592119e8b6bacb4140ac6a7a1263",
-    "nativeViews": "17d7bb650ae7dfad0e26355379d13c26c372ed9b4e9cc0c22f21562860e854ec"
+    "models": "b732499716ec8c6e23c0de8b5d92136f8f75ce73593fb265682a2d53f1d4c1d0",
+    "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
+    "browserAdapter": "ccd511694e05c026c6e8be83fb266691c83b72a8de0746839d3c50527e51e8a5",
+    "nativeViews": "9e97c5c8f640d8681ce0ee0b36dfd2ba33985dd35e9fdd6a5acaba8b421b9dd0"
   },
   "coordinates": {
     "boardWidth": 344,
@@ -75,6 +75,12 @@
       "depth": 16,
       "grain": 20,
       "bevel": 33,
+      "materials": [
+        "stone",
+        "walnut",
+        "oak"
+      ],
+      "materialField": "frameMaterial",
       "material": "sculptural-stone",
       "allBackgroundModes": true,
       "field": "frameStyle",
@@ -378,6 +384,11 @@
     "parcelPlace",
     "temp",
     "desc"
+  ],
+  "runtimeOnlyStateFields": [
+    "canvasRotation",
+    "scenePolicyV2",
+    "systemDark"
   ],
   "preview": {
     "supportedCapabilities": [

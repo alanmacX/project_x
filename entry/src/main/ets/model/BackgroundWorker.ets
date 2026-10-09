@@ -8,7 +8,7 @@ import { imageSwatches, imageColor, cardSource, backgroundSignature, hash } from
 export { backgroundSignature } from './BackgroundInputs';
 @Concurrent
 export async function createSmartBackground(json:string,filesDir:string):Promise<string> {
-  const state=JSON.parse(json) as FridgeState,bg=new CanvasBackground();bg.mode=state.background.mode;bg.frameStyle=state.background.frameStyle;bg.transparentFrame=state.background.transparentFrame;
+  const state=JSON.parse(json) as FridgeState,bg=new CanvasBackground();bg.mode=state.background.mode;bg.frameStyle=state.background.frameStyle;bg.frameMaterial=state.background.frameMaterial;bg.transparentFrame=state.background.transparentFrame;
   const colors:WeightedColor[]=[],anchors:BackgroundAnchor[]=[],cache=new Map<string,WeightedColor[]>();
   for(const card of state.cards){
     const samples:WeightedColor[]=[],paper=materialColors(card.material,card.paper)[0];

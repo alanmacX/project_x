@@ -13,7 +13,7 @@ export struct CanvasBackdrop {
         Image(this.sceneBackground.src).width('100%').height('100%').objectFit(ImageFit.Cover).draggable(false)
       }
       }
-      if(this.showFrame&&this.sceneBackground.frameStyle!=='none'){CanvasFrame({style:this.sceneBackground.frameStyle}).width('100%').height('100%')}
+      if(this.showFrame&&this.sceneBackground.frameStyle!=='none'){CanvasFrame({material:this.sceneBackground.frameMaterial,style:this.sceneBackground.frameStyle}).width('100%').height('100%')}
     }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
   }
 }

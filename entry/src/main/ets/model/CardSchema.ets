@@ -1,3 +1,4 @@
+import { CanvasRotation } from './CanvasRotation';
 import { HtmlCardTemplate, normalizeHtmlCard } from './HtmlCardTemplate';
 import { COMPOSITION_KEYS, validReadingStyle, defaultReadingStyle } from './ReadingStylePolicy';
 import { SceneRule, SavedSceneLayout, normalizeSceneLayouts, normalizeSceneRules } from './SceneScheduleSchema';
@@ -149,6 +150,7 @@ export class CanvasBackground {
   mode: string = 'solid'; color: string = '#FFFFFF'; src: string = ''; photo: string = '';
   transparentFrame: string = 'auto'; // Legacy transparent-only setting.
   frameStyle: string = 'none';
+  frameMaterial:string='stone';
   palette: string[] = []; anchors: BackgroundAnchor[] = []; signature: string = '';
 }
 export function normalizeBackground(raw: CanvasBackground | undefined): CanvasBackground {
@@ -156,6 +158,7 @@ export function normalizeBackground(raw: CanvasBackground | undefined): CanvasBa
   bg.mode = ['solid', 'smart', 'blend', 'photo', 'preset', 'transparent'].includes(raw.mode) ? raw.mode : 'solid';
   bg.transparentFrame = ['auto','light','dark','none'].includes(raw.transparentFrame) ? raw.transparentFrame : 'auto';
   bg.frameStyle = ['auto','light','dark','none'].includes(raw.frameStyle) ? raw.frameStyle : bg.mode === 'transparent' ? bg.transparentFrame : 'none';
+  bg.frameMaterial=['stone','walnut','oak'].includes(raw.frameMaterial)?raw.frameMaterial:'stone';
   bg.color = /^#[0-9a-fA-F]{6}$/.test(raw.color ?? '') ? raw.color : '#FFFFFF';
   bg.src = (raw.src ?? '').startsWith('file://') || (raw.src ?? '').startsWith('memory://') ? raw.src : '';
   bg.photo = (raw.photo ?? '').startsWith('file://') ? raw.photo : '';
@@ -166,6 +169,9 @@ export function normalizeBackground(raw: CanvasBackground | undefined): CanvasBa
 export class FridgeState {
   sceneLayouts:SavedSceneLayout[]=[];
   sceneRules:SceneRule[]=[];
+  canvasRotation:CanvasRotation|undefined=undefined;
+  scenePolicyV2:boolean|undefined=undefined;
+  systemDark:boolean|undefined=undefined;
   sceneBaseLayoutId:string=''; // Empty = current homepage; selecting a saved normal layout applies its geometry.
   schemaVersion: number = 2;
   canvasId: string = 'canvas_main';

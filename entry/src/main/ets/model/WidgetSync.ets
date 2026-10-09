@@ -1,8 +1,9 @@
+import { systemIsDark } from './SystemAppearance';
 import { widgetBoundary, scheduleWidget } from './WidgetSchedule';
 import { resolveScheduledScene, sceneWidgetContext, activeSceneRule } from './SceneSchedule';
 import { normalizeState } from './CardSchema';
 import { canvasKey } from './CanvasLibrary';
-import { readCatalog, boundCanvas } from './CanvasLibrary';
+import { readCatalog, withScenePolicy, sceneDocumentExists, boundCanvas } from './CanvasLibrary';
 import { FridgeState } from './CardSchema';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import preferences from '@ohos.data.preferences';
@@ -55,19 +56,19 @@ export async function pushWidgets(context: Context, json: string): Promise<void>
       const source=baseId===canvasId?json:await prefs.get(canvasKey(baseId),'') as string;
       const raw=JSON.parse(source) as FridgeState;
       if(!Array.isArray(raw.cards))throw new Error('画布数据损坏');
-      base=normalizeState(raw);
+      base=withScenePolicy(normalizeState(raw),catalog,systemIsDark(context));
     }catch(e) {
       // An unrelated damaged canvas must not reject this edit's healthy deliveries
       // or replace its own last displayed artwork with an empty default scene.
       if(baseId!==canvasId){hilog.warn(0,'WidgetSync','skipping unreadable bound canvas');return;}
       throw e as Error;
     }
-    if(baseId!==canvasId) {const current=activeSceneRule(base,Date.now());if(current?.rule.kind!=='canvas'||current.rule.targetId!==canvasId)return;}
+    if(baseId!==canvasId && catalog.sceneRules.length===0 && catalog.rotation.mode==='off' && !catalog.scenes.some(c=>c.id===canvasId)){const legacy=activeSceneRule(base,Date.now());if(legacy?.rule.kind!=='canvas'||legacy.rule.targetId!==canvasId)return;}
     const scene=await resolveScheduledScene(base,Date.now(),async(targetId:string):Promise<FridgeState|null>=>{
-      if(!catalog.canvases.some(c=>c.id===targetId))return null;
+      if(!sceneDocumentExists(catalog,targetId))return null;
       const targetJson=targetId===canvasId?json:await prefs.get(canvasKey(targetId),'') as string;return targetJson?normalizeState(JSON.parse(targetJson) as FridgeState):null;
     });
-    const sceneJson=scene.ruleId?JSON.stringify(scene.state):baseId===canvasId?json:JSON.stringify(base);
+    const sceneJson=JSON.stringify(scene.state);
     const now=Date.now();
     const deadline=Math.min(widgetBoundary(base,now),widgetBoundary(scene.state,now));
     for (let attempt = 0; attempt < 3; attempt++) {

@@ -1,6 +1,6 @@
 # Current .fridge authoring contract
 
-Verified against FridgeMemo TemplatePackage.ets/CardSchema.ets on 2026-10-08. The generated design-contract.json is the release snapshot for fields, capabilities and design tokens. This prose explains semantics. When working in the app repo, production source files are authoritative: run previewer/build.cjs --check and update this reference if semantics changed.
+Verified against FridgeMemo TemplatePackage.ets/CardSchema.ets on 2026-10-09. The generated design-contract.json is the release snapshot for fields, capabilities and design tokens. This prose explains semantics. When working in the app repo, production source files are authoritative: run previewer/build.cjs --check and update this reference if semantics changed.
 
 ## Container
 
@@ -70,3 +70,11 @@ Use container version 2 only when a card has `html`. Native-only v1 works keep i
 Decorative text, photos, album covers, HTML source and its appearance cache are intentionally shared artwork. Do not bake personal provider records into those assets; automatic provider sanitization cannot remove information already painted into an image or static HTML. Preview fixtures may use synthetic data for QA, but exported/imported templates must use recipient bindings. Timed scene designs arrive disabled and without sender acknowledgement history.
 
 Reading material: `capability.readingMaterial` is `paper` (default, warm white fine paper) or `matte` (lighter translucent). It changes only the host-owned surface, not geometry or data. `readingTint` is an optional sampled `#RRGGBB` art color; leave `readingTintKey` empty in authored files because source paths are remapped on import. Do not author `readingMaterialStudy`; restoration strips it.
+
+## Current customization, scheduling boundary
+
+- `background.frameStyle`: none/light/dark/auto; `frameMaterial`: stone/walnut/oak. None is the default. Materials use the same outer geometry and eight baked tiles, and apply to solid, smart/blend, photo, preset and transparent backgrounds. Auto follows recipient system appearance.
+- `capFree:true`, normalized `capBox`, `readingEdge` left/right/top/bottom and `readingOutside` let a host reading surface extend beyond a subject without shrinking its text. The same native content minimum still applies. `readingHook` 0–1 places the hole in the reserved upper zone; do not draw duplicate hooks/holes.
+- `albumPresentation`: cover/classic/row. Classic uses title below the square cover; row uses a full-height inset square cover on the left, title and artist on the right. Native two-line truncation and existing album radii apply. Never bake native album labels into a decorative image.
+- Density is host-adaptive: agenda/timetable gain more rows with available height. Do not emulate this by painting multiple live event records into HTML. Test small, large, empty and long-name fixtures.
+- Timed scenes now own one central card in the **local canvas catalog**, separate from normal canvases. Main canvas rotation partitions a full day, or follows system light/dark; only one mode is active. These catalog rules, local target IDs, acknowledgement history and runtime `canvasRotation`, `scenePolicyV2`, `systemDark` fields are NOT portable artwork. Author a one-card package for a central scene; users can copy it to a scene in App. Do not invent a global schedule field in `.fridge` or copy sender schedules/data. Legacy layouts/rules are retained only for migration.

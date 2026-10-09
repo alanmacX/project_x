@@ -7,6 +7,7 @@ export class SceneRule {
   repeat:string='daily'; date:string=''; weekdays:number[]=[0,1,2,3,4,5,6];
   start:number=1200; end:number=1380; untilDismissed:boolean=true;
   createdAt:number=0; dismissed:string='';
+  timeoutMinutes:number=15; centralOnly:boolean=false; migrationKey:string='';
 }
 export function sceneDay(date:Date):string {return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');}
 export function validSceneDate(value:string):boolean {
@@ -39,6 +40,7 @@ export function normalizeSceneRules(raw:SceneRule[]|undefined):SceneRule[] {
     rule.weekdays=Array.from(new Set((Array.isArray(source.weekdays)?source.weekdays:rule.weekdays).filter((n:number)=>Number.isInteger(n)&&n>=0&&n<7)));
     rule.start=Math.round(number(source.start,0,1439,1200));rule.end=Math.round(number(source.end,0,1439,1380));
     rule.untilDismissed=source.untilDismissed!==false;rule.createdAt=number(source.createdAt,0,Number.MAX_SAFE_INTEGER,0);
+    rule.timeoutMinutes=Math.round(number(source.timeoutMinutes,1,120,15));rule.centralOnly=source.centralOnly===true;rule.migrationKey=typeof source.migrationKey==='string'?source.migrationKey.slice(0,200):'';
     rule.dismissed=typeof source.dismissed==='string'?source.dismissed.slice(0,24):'';out.push(rule);
   }
   return out;

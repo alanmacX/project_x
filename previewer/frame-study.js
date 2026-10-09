@@ -72,7 +72,7 @@ function render(){
  const surface=document.createElement('canvas');surface.width=W;surface.height=H;surface.getContext('2d').putImageData(image,0,0);ctx.drawImage(surface,0,0);
  document.querySelector('#status').textContent=`${W} × ${H} · 本次绘制 ${Math.round(performance.now()-start)} ms · 空闲零重绘`;
  window.FrameStudy={state:()=>({...state}),render,canvas,bake:(dark=false)=>{
-  const previous=palette.stone;palette.stone=dark?[70,73,74]:[245,244,239];render();palette.stone=previous;return canvas.toDataURL('image/png');
+  const key=state.material,previous=palette[key];if(dark)palette[key]=key==='stone'?[70,73,74]:key==='walnut'?[80,54,37]:[125,102,69];render();palette[key]=previous;return canvas.toDataURL('image/png');
  }};
 }
 function schedule(){if(!scheduled)scheduled=requestAnimationFrame(render);}
