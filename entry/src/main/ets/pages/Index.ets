@@ -27,7 +27,7 @@ import lazy { EditorLayerTarget, EditorLayerHandles } from '../views/EditorLayer
 import { startupMark } from '../model/StartupTrace';
 import { image } from '@kit.ImageKit';
 import { assertCanvasCapacity, CANVAS_CARD_TARGET, CANVAS_CARD_LIMIT, canvasCapacityHint } from '../model/CanvasCapacity';
-import { SymbolGlyphModifier, FrameCallback } from '@kit.ArkUI';
+import { SymbolGlyphModifier, FrameCallback, LengthMetrics } from '@kit.ArkUI';
 import { chromeMaterial, popupMaterial, immersiveChrome, prepareChromeMaterial } from '../model/ChromeMaterial';
 import lazy { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
 import lazy { SettingsSelect } from '../views/SettingsSelect';
@@ -607,7 +607,7 @@ struct Index {
         Text('桌面组件保持各自绑定的画布').fontSize(12).fontColor(this.appMuted()).width('100%')
       }
     }.width('100%').padding(16).enabled(!this.canvasChanging)
-    }.width('100%').height('100%')
+    }.width(this.canvasPopupWidth()).constraintSize({maxHeight:Math.max(160,this.screenHeight-this.safeTop-this.safeBottom-32)})
       .scrollBar(BarState.Off).clip(true)
   }
   private arrivalOffsets: Record<string, ShapePoint> = {};
@@ -1394,7 +1394,7 @@ struct Index {
         }
       }
     }.width('100%').height('100%').backgroundColor(this.appBackground())
-      .bindSheet(this.backgroundOpen||this.canvasPickerOpen,this.homeTaskSheet,{height:this.taskSheetHeight(),detents:this.backgroundOpen?[this.taskSheetHeight(),this.taskSheetHeight(true)]:[this.taskSheetHeight()],preferType:SheetType.BOTTOM,width:this.screenWidth,dragBar:true,showClose:this.backgroundOpen,backgroundColor:this.appBackground(),onDisappear:()=>{this.backgroundOpen=false;this.backgroundPreviewReady=false;this.backgroundPreviewGeneration++;this.canvasPickerOpen=false;this.canvasCreating=false;this.updateScheduledScene(true);}})
+      .bindSheet(this.backgroundOpen,this.homeTaskSheet,{height:this.taskSheetHeight(),detents:this.backgroundOpen?[this.taskSheetHeight(),this.taskSheetHeight(true)]:[this.taskSheetHeight()],preferType:SheetType.BOTTOM,width:this.screenWidth,dragBar:true,showClose:this.backgroundOpen,backgroundColor:this.appBackground(),onDisappear:()=>{this.backgroundOpen=false;this.backgroundPreviewReady=false;this.backgroundPreviewGeneration++;this.canvasPickerOpen=false;this.canvasCreating=false;this.updateScheduledScene(true);}})
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_: Area, area: Area) => {
         const width = Number(area.width), height = Number(area.height);
@@ -1467,11 +1467,11 @@ struct Index {
       }.width(BOARD_W * this.boardScale).height(this.boardHeight).borderRadius(this.canvasBackground.frameStyle==='none'?24:BOARD_W*this.boardScale*31/600).clip(true).backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:Color.White)
         .border({ width: this.canvasBackground.frameStyle==='none'?.5:0, color: '#E9E9E9' }).id('homeCanvasSurface')
         .position({ x: this.boardLeft, y: this.boardTop })
-      if(this.floatingHome()){this.homeDock()}else if(this.scheduleOpen){Column(){this.scheduleEditor()}.width(this.panelWidth).height(this.panelHeight).position({x:this.panelLeft,y:this.panelTop}).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius)}else{this.homeLayers();this.homeBackground()}
+      if(this.floatingHome()){this.homeDock()}else{this.homeLayers();this.homeBackground()}
     }.width('100%').height('100%').opacity(this.arriving ? 1 : this.boardOpacity).accessibilityLevel(this.editing || this.viewing ? 'no-hide-descendants' : 'auto').hitTestBehavior(this.editing || this.viewing || this.canvasChanging ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Default)
   }
   @Builder
-  homeTaskSheet() {if(this.backgroundOpen){this.backgroundEditor()}else{this.canvasPicker()}}
+  homeTaskSheet() {this.backgroundEditor()}
   private floatingHome():boolean {return workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect).floating;}
   private homeToolsHeight():number {const limit=Math.min(560,Math.max(200,(this.screenHeight-this.safeTop-this.safeBottom)*(this.screenHeight<600?.78:.56)));return Math.min(limit,Math.max(232,216+Math.min(4,this.cards.length)*72));}
   @Builder
@@ -1582,19 +1582,24 @@ struct Index {
                 }
               }.width('100%').padding(8).borderRadius(12).backgroundColor(this.appSurface()).border({width:!this.groupSelecting&&this.selectedId===id?1.5:0,color:this.appMuted()})
   }
+  private homePanelTransition(timing:boolean):TransitionEffect {
+    return TransitionEffect.OPACITY.combine(TransitionEffect.scale({x:.92,y:.88,centerX:timing?'65%':'20%',centerY:0}))
+      .combine(TransitionEffect.translate({y:-16})).animation(canvasToolsMotion(true));
+  }
   @Builder
   homeLayers(floating:boolean=false) {
       Column({ space: 12 }) {
-        Row() {
+        Row({space:8}) {
 
           Button({type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
             Row({space:6}) {
               Text(this.sceneEditing?'定时场景 · '+this.canvasName:this.canvasName).fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
               SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
             }.width('100%')
-          }.id('shareCanvas').padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).layoutWeight(1).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).margin({right:8}).onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}if(this.canvasChanging)return;this.refreshCanvasList();this.canvasCreating=false;this.homeToolsOpen=false;this.scheduleOpen=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
+          }.id('shareCanvas').padding({left:12,right:12}).accessibilityText('切换画布 '+this.canvasName).height(44).layoutWeight(1).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>{if(this.sceneEditing){this.leaveTimedScene();return;}if(this.canvasChanging)return;this.refreshCanvasList();this.canvasCreating=false;this.homeToolsOpen=false;this.scheduleOpen=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
+            .bindPopup(this.canvasPickerOpen,{builder:this.canvasPicker,placement:Placement.Top,width:this.canvasPopupWidth(),radius:20,transition:canvasToolsTransition(),systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:true,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible){this.canvasPickerOpen=false;this.canvasCreating=false;}}})
           if(!floating){this.timingButton(44)}
-          Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).margin({ right: 8 }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.scheduledName).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
+          Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.scheduledName&&!this.scheduleOpen).onClick(() => { this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
           Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([Color.White]).hitTestBehavior(HitTestMode.None)}.width(44).height(AppDesign.controlHeight).fontSize(24).backgroundColor('#262626').fontColor(Color.White).accessibilityText('添加卡片').enabled(!this.scheduledName&&!this.scheduleTransition).onClick(() => this.addCard())
         }.width('100%')
         if (this.cards.length >= CANVAS_CARD_TARGET) {
@@ -1605,6 +1610,10 @@ struct Index {
           }.width('100%')
         }
         Stack({ alignContent: Alignment.Bottom }) {
+        if(!floating&&this.scheduleOpen) {
+          Column(){this.scheduleEditor()}.width('100%').height('100%').transition(this.homePanelTransition(true))
+        } else {
+        Column(){
         List({space:8}) {
           ForEach(layerSections(this.orderedCards()), (section: LayerSection) => {
             ForEach(section.ids,(id:string,index:number)=>{
@@ -1628,7 +1637,7 @@ struct Index {
           }.width('100%')
         }
         if (!this.groupSelecting && this.selectedId.length > 0) {
-          Row({ space: 12 }) {
+          Flex({wrap:FlexWrap.Wrap,space:{main:LengthMetrics.vp(8),cross:LengthMetrics.vp(8)}}) {
             Button('上移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).padding({left:6,right:6}).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(() => this.moveCardLayer(this.selectedId, true))
             Button('下移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).padding({left:6,right:6}).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(() => this.moveCardLayer(this.selectedId, false))
             Button('复制',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL})
@@ -1640,11 +1649,13 @@ struct Index {
         }
         }.width('100%').padding(8)
         }
+        }.width('100%').height('100%').transition(this.homePanelTransition(false))
+        }
         }.width('100%').layoutWeight(1)
       }.width(floating?this.screenWidth-32:this.panelWidth).height(floating?this.homeToolsHeight()-76:this.panelHeight-76).padding(12).backgroundColor(floating?Color.Transparent:this.appSurface()).borderRadius(AppDesign.sectionRadius)
         .position({x:floating?0:this.panelLeft,y:floating?0:this.panelTop})
   }
-  private homeActionHeight():number {return this.groupSelecting?60:this.selectedId.length===0?0:56;}
+  private homeActionHeight():number {return this.groupSelecting?60:this.selectedId.length===0?0:(this.cardMap[this.selectedId]?.groupId?108:56);}
   private backgroundLabel(): string {
     return this.canvasBackground.mode === 'transparent' ? '桌面透明' : this.canvasBackground.mode === 'smart' ? '智能取色' : this.canvasBackground.mode === 'blend' ? '智能多色' : this.canvasBackground.mode === 'photo' ? '本地照片' : this.canvasBackground.mode === 'preset' ? '柔色预设' : '纯色';
   }
