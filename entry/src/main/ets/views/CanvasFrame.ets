@@ -1,22 +1,41 @@
-/** Hollow sculpted mineral bevel. Borders only: no full-canvas blur/shadow render target. */
+/** Approved stone recipe, baked offline. Eight tiles leave the center truly transparent. */
 @Component
 export struct CanvasFrame {
   @Prop square:boolean=false;
   @Prop style:string='auto';
-  private body():ResourceColor{return this.style==='light'?'#FFFAFAF8':this.style==='dark'?'#FF42464B':$r('app.color.transparent_frame_surface');}
+  @Prop widthVp:number=0;
+  @Prop heightVp:number=0;
+  @State measuredWidth:number=0;
+  @State measuredHeight:number=0;
+  private frameWidth():number{return this.widthVp>0?this.widthVp:this.measuredWidth;}
+  private frameHeight():number{return this.heightVp>0?this.heightVp:this.measuredHeight;}
+  private edge():number{return this.frameWidth()*48/600;}
+  private tiles():Resource[]{
+    if(this.style==='light'&&!this.square)return [$r('app.media.frame_stone_light_round_tl'),$r('app.media.frame_stone_light_round_top'),$r('app.media.frame_stone_light_round_tr'),$r('app.media.frame_stone_light_round_left'),$r('app.media.frame_stone_light_round_right'),$r('app.media.frame_stone_light_round_bl'),$r('app.media.frame_stone_light_round_bottom'),$r('app.media.frame_stone_light_round_br')];
+    if(this.style==='light'&&this.square)return [$r('app.media.frame_stone_light_square_tl'),$r('app.media.frame_stone_light_square_top'),$r('app.media.frame_stone_light_square_tr'),$r('app.media.frame_stone_light_square_left'),$r('app.media.frame_stone_light_square_right'),$r('app.media.frame_stone_light_square_bl'),$r('app.media.frame_stone_light_square_bottom'),$r('app.media.frame_stone_light_square_br')];
+    if(this.style==='dark'&&!this.square)return [$r('app.media.frame_stone_dark_round_tl'),$r('app.media.frame_stone_dark_round_top'),$r('app.media.frame_stone_dark_round_tr'),$r('app.media.frame_stone_dark_round_left'),$r('app.media.frame_stone_dark_round_right'),$r('app.media.frame_stone_dark_round_bl'),$r('app.media.frame_stone_dark_round_bottom'),$r('app.media.frame_stone_dark_round_br')];
+    if(this.style==='dark'&&this.square)return [$r('app.media.frame_stone_dark_square_tl'),$r('app.media.frame_stone_dark_square_top'),$r('app.media.frame_stone_dark_square_tr'),$r('app.media.frame_stone_dark_square_left'),$r('app.media.frame_stone_dark_square_right'),$r('app.media.frame_stone_dark_square_bl'),$r('app.media.frame_stone_dark_square_bottom'),$r('app.media.frame_stone_dark_square_br')];
+    if(this.style==='auto'&&!this.square)return [$r('app.media.frame_stone_auto_round_tl'),$r('app.media.frame_stone_auto_round_top'),$r('app.media.frame_stone_auto_round_tr'),$r('app.media.frame_stone_auto_round_left'),$r('app.media.frame_stone_auto_round_right'),$r('app.media.frame_stone_auto_round_bl'),$r('app.media.frame_stone_auto_round_bottom'),$r('app.media.frame_stone_auto_round_br')];
+    if(this.style==='auto'&&this.square)return [$r('app.media.frame_stone_auto_square_tl'),$r('app.media.frame_stone_auto_square_top'),$r('app.media.frame_stone_auto_square_tr'),$r('app.media.frame_stone_auto_square_left'),$r('app.media.frame_stone_auto_square_right'),$r('app.media.frame_stone_auto_square_bl'),$r('app.media.frame_stone_auto_square_bottom'),$r('app.media.frame_stone_auto_square_br')];
+    return [];
+  }
+  @Builder
+  tile(index:number,w:Length,h:Length,x:Length,y:Length){
+    Image(this.tiles()[index]).width(w).height(h).objectFit(ImageFit.Fill).draggable(false).position({x:x,y:y}).hitTestBehavior(HitTestMode.None)
+  }
   build(){
     Stack(){
-      if(this.style!=='none'){
-        // Outer cut face, broad translucent body, recessed inner cut face.
-        Column().width('100%').height('100%').borderRadius(this.square?0:24)
-          .border({width:12,color:this.body()})
-        Column().width('100%').height('100%').borderRadius(this.square?0:24)
-          .border({width:1.8,color:{top:'#FFFFFFFF',left:'#FFFDFDFC',right:'#FFC3C5C7',bottom:'#FFB8BBBE'}})
-        Column().width('calc(100% - 8vp)').height('calc(100% - 8vp)').borderRadius(this.square?0:20)
-          .border({width:3,color:{top:'#FFFFFFFF',left:'#FFF5F5F2',right:'#FFE0E1E0',bottom:'#FFD5D7D8'}})
-        Column().width('calc(100% - 24vp)').height('calc(100% - 24vp)').borderRadius(this.square?0:12)
-          .border({width:1.6,color:{top:'#FFA8ADB1',left:'#FFBDC1C4',right:'#FFFFFFFF',bottom:'#FFFFFFFF'}})
+      if(this.style!=='none'&&this.edge()>0&&this.frameHeight()>0){
+        this.tile(0,this.edge(),this.edge(),0,0)
+        this.tile(1,this.frameWidth()-this.edge()*2,this.edge(),this.edge(),0)
+        this.tile(2,this.edge(),this.edge(),this.frameWidth()-this.edge(),0)
+        this.tile(3,this.edge(),this.frameHeight()-this.edge()*2,0,this.edge())
+        this.tile(4,this.edge(),this.frameHeight()-this.edge()*2,this.frameWidth()-this.edge(),this.edge())
+        this.tile(5,this.edge(),this.edge(),0,this.frameHeight()-this.edge())
+        this.tile(6,this.frameWidth()-this.edge()*2,this.edge(),this.edge(),this.frameHeight()-this.edge())
+        this.tile(7,this.edge(),this.edge(),this.frameWidth()-this.edge(),this.frameHeight()-this.edge())
       }
     }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
+      .onAreaChange((_old:Area,size:Area)=>{const width=Number(size.width);if(width>0&&Math.abs(width-this.measuredWidth)>.1)this.measuredWidth=width;const height=Number(size.height);if(height>0&&Math.abs(height-this.measuredHeight)>.1)this.measuredHeight=height;})
   }
 }

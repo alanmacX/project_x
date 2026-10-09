@@ -11,10 +11,19 @@ for(const radius of [1.6,9,13]){
 vm.runInThisContext(fs.readFileSync('previewer/shared-materials.js','utf8'));vm.runInThisContext(fs.readFileSync('previewer/capabilities.js','utf8'));vm.runInThisContext(fs.readFileSync('previewer/renderer.js','utf8'));
 const state=new schema.FridgeState();state.background=schema.normalizeBackground({mode:'transparent',transparentFrame:'dark'});
 const result=FridgeWeb.renderPackage({state,assets:[]},400,0);
-assert(!result.layers.background.includes('<rect'),'transparent canvas never regains an opaque browser background');assert(result.layers.frame.includes('66,70,75'));assert(result.layers.frame.includes('fill="none"'));
-state.background.transparentFrame='none';assert.equal(FridgeWeb.renderPackage({state,assets:[]},400,0).layers.frame,'');
+assert(!result.layers.background.includes('<rect'),'transparent canvas never regains an opaque browser background');assert.equal((result.layers.frame.match(/<image /g)||[]).length,8);assert(!result.layers.frame.includes('<rect'));
+state.background.frameStyle='none';assert.equal(FridgeWeb.renderPackage({state,assets:[]},400,0).layers.frame,'');
 console.log('PASS hollow frame normalization and transparent renderer; Gaussian contour relief alpha conservation.');
 
 const nativeFrame=fs.readFileSync('entry/src/main/ets/views/CanvasFrame.ets','utf8'),index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
-assert(nativeFrame.includes("'#FFFAFAF8'"));assert(nativeFrame.includes('this.square?0:24'));
+assert(nativeFrame.includes('48/600'));assert.equal((nativeFrame.match(/this.tile\(/g)||[]).length,8);assert(!nativeFrame.includes('.blur('));
 const share=index.slice(index.indexOf('  shareScene() {'),index.indexOf('  private templateError'));assert(share.includes('showFrame:false'));assert(share.includes('square:true'));assert(share.indexOf('square:true')>share.indexOf('ForEach(this.shareCards'),'share frame overlays cards with straight corners');
+
+for(const mode of ['solid','smart','blend','photo','preset','transparent']){
+ const bg=schema.normalizeBackground({mode,frameStyle:'light'});assert.equal(bg.frameStyle,'light');state.background=bg;
+ assert.equal((FridgeWeb.renderPackage({state,assets:[]},400,0).layers.frame.match(/<image /g)||[]).length,8);
+}
+assert.equal(schema.normalizeBackground({mode:'solid'}).frameStyle,'none');
+assert.equal(schema.normalizeBackground({mode:'transparent',transparentFrame:'dark'}).frameStyle,'dark');
+assert.equal(schema.normalizeBackground({mode:'transparent',frameStyle:'none',transparentFrame:'dark'}).frameStyle,'none');
+assert(fs.readFileSync('entry/src/main/ets/model/BackgroundWorker.ets','utf8').includes('bg.frameStyle=state.background.frameStyle'));

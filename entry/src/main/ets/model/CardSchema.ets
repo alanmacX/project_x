@@ -147,13 +147,15 @@ export class DoorState { reveal: string = '07:30'; open: boolean = false; }
 export class BackgroundAnchor { x: number = .5; y: number = .5; color: string = '#E9E5DF'; weight: number = 1; }
 export class CanvasBackground {
   mode: string = 'solid'; color: string = '#FFFFFF'; src: string = ''; photo: string = '';
-  transparentFrame: string = 'auto';
+  transparentFrame: string = 'auto'; // Legacy transparent-only setting.
+  frameStyle: string = 'none';
   palette: string[] = []; anchors: BackgroundAnchor[] = []; signature: string = '';
 }
 export function normalizeBackground(raw: CanvasBackground | undefined): CanvasBackground {
   const bg = new CanvasBackground(); if (raw === undefined || raw === null) return bg;
   bg.mode = ['solid', 'smart', 'blend', 'photo', 'preset', 'transparent'].includes(raw.mode) ? raw.mode : 'solid';
   bg.transparentFrame = ['auto','light','dark','none'].includes(raw.transparentFrame) ? raw.transparentFrame : 'auto';
+  bg.frameStyle = ['auto','light','dark','none'].includes(raw.frameStyle) ? raw.frameStyle : bg.mode === 'transparent' ? bg.transparentFrame : 'none';
   bg.color = /^#[0-9a-fA-F]{6}$/.test(raw.color ?? '') ? raw.color : '#FFFFFF';
   bg.src = (raw.src ?? '').startsWith('file://') || (raw.src ?? '').startsWith('memory://') ? raw.src : '';
   bg.photo = (raw.photo ?? '').startsWith('file://') ? raw.photo : '';

@@ -3,7 +3,7 @@
  * This is an experimental shading model, not a measured PBR stone or Three.js port. */
 (() => {
 'use strict';
-const defaults={material:'stone',wall:'dark',ratio:1.15,width:28,depth:8,grain:30,bevel:28,square:false,content:true};
+const defaults={material:'stone',wall:'dark',ratio:1.8,width:18,depth:16,grain:20,bevel:33,square:false,content:true};
 let state={...defaults},scheduled=0;
 const canvas=document.querySelector('#frame'),board=document.querySelector('#board'),ctx=canvas.getContext('2d');
 const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)),mix=(a,b,t)=>a+(b-a)*t;
@@ -71,7 +71,9 @@ function render(){
  roundPath(ctx,w,h,Math.max(0,R-B*.36),B*.36);ctx.stroke();ctx.restore();
  const surface=document.createElement('canvas');surface.width=W;surface.height=H;surface.getContext('2d').putImageData(image,0,0);ctx.drawImage(surface,0,0);
  document.querySelector('#status').textContent=`${W} × ${H} · 本次绘制 ${Math.round(performance.now()-start)} ms · 空闲零重绘`;
- window.FrameStudy={state:()=>({...state}),render,canvas};
+ window.FrameStudy={state:()=>({...state}),render,canvas,bake:(dark=false)=>{
+  const previous=palette.stone;palette.stone=dark?[70,73,74]:[245,244,239];render();palette.stone=previous;return canvas.toDataURL('image/png');
+ }};
 }
 function schedule(){if(!scheduled)scheduled=requestAnimationFrame(render);}
 function update(){

@@ -26,10 +26,10 @@
     "htmlTemplateVersion": 1
   },
   "identity": {
-    "models": "540a5c359264d6b0a37a6cc9a59890fbdf80afb2a0578147c4a5db4aac99be00",
-    "materials": "868838622c193570cd7922a284d3cc26ddd73789614693be4ebd6dffd5ada39d",
-    "browserAdapter": "75a182b916951bc5ff8805106077c3b029928dc58597102190576475d4c0a47d",
-    "nativeViews": "d250f6e229dad5a2c8e591ef83062d786b258f24aa25a51a59473bbd3fcde606"
+    "models": "852b723104669e39ecc614f56f1002926e896d9bad19130faa3c6f1684099831",
+    "materials": "a9f1a510af0e5084c5350b1605bbcbd067a96ba260589a5c584536cdd8fdf89f",
+    "browserAdapter": "434bfa213863962ea4dc0718815f488c0a8300a7454153df02398ed8488a3e9a",
+    "nativeViews": "17d7bb650ae7dfad0e26355379d13c26c372ed9b4e9cc0c22f21562860e854ec"
   },
   "coordinates": {
     "boardWidth": 344,
@@ -60,8 +60,9 @@
       "preset",
       "transparent"
     ],
-    "transparentFrame": {
-      "default": "auto",
+    "canvasFrame": {
+      "default": "none",
+      "legacyField": "transparentFrame",
       "options": [
         "auto",
         "light",
@@ -69,8 +70,14 @@
         "none"
       ],
       "hollow": true,
-      "width": 12,
-      "material": "sculpted-marble",
+      "width": 18,
+      "studyWidth": 600,
+      "depth": 16,
+      "grain": 20,
+      "bevel": 33,
+      "material": "sculptural-stone",
+      "allBackgroundModes": true,
+      "field": "frameStyle",
       "socialCorners": "square"
     },
     "relief": {

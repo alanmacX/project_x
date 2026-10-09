@@ -119,12 +119,13 @@
    body+='</g></g></g>';
    cards.push({id:c.id,groupId:c.groupId,z:c.z,x,y,width:c.w*scale,height:c.h*scale,rotation:c.rot,pivot:{x:x+c.w*scale/2,y:y+c.h*scale/2},markup:body.slice(start)});
   });
-  let frame='';if(scene.background.mode==='transparent'&&scene.background.transparentFrame!=='none'){
-   const theme=scene.background.transparentFrame==='dark'||scene.background.transparentFrame==='auto'&&options.dark;
-   const rim=theme?'rgba(66,70,75,1)':'rgba(250,250,248,1)';
-   frame=`<g data-canvas-frame="${scene.background.transparentFrame}"><rect x="6" y="6" width="${Math.max(0,width-12)}" height="${Math.max(0,height-12)}" rx="18" fill="none" stroke="${rim}" stroke-width="12"/><rect x=".9" y=".9" width="${Math.max(0,width-1.8)}" height="${Math.max(0,height-1.8)}" rx="23.1" fill="none" stroke="#FFFFFFAA" stroke-width="1.8"/><rect x="5.5" y="5.5" width="${Math.max(0,width-11)}" height="${Math.max(0,height-11)}" rx="18.5" fill="none" stroke="#E2E7EB8C" stroke-width="3"/><rect x="12.8" y="12.8" width="${Math.max(0,width-25.6)}" height="${Math.max(0,height-25.6)}" rx="11.2" fill="none" stroke="#DFF4FA88" stroke-width="1.6"/></g>`;
+  let frame='';if(scene.background.frameStyle!=='none'){
+   const theme=scene.background.frameStyle==='dark'||scene.background.frameStyle==='auto'&&options.dark;
+   const geometry=options.squareFrame?'square':'round',edge=width*48/600;
+   const tiles=[['tl',0,0,edge,edge],['top',edge,0,width-2*edge,edge],['tr',width-edge,0,edge,edge],['left',0,edge,edge,height-2*edge],['right',width-edge,edge,edge,height-2*edge],['bl',0,height-edge,edge,edge],['bottom',edge,height-edge,width-2*edge,edge],['br',width-edge,height-edge,edge,edge]];
+   frame=`<g data-canvas-frame="${scene.background.frameStyle}">`+tiles.map(([part,x,y,w,h])=>`<image href="${global.FridgeMaterials['frame_stone_'+(theme?'dark':'light')+'_'+geometry+'_'+part]}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"/>`).join('')+'</g>';
   }
-  return {svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="system-ui,sans-serif"><defs>${defs}<clipPath id="${namespace}board"><rect width="${width}" height="${height}" rx="20"/></clipPath></defs><g clip-path="url(#${namespace}board)">${body}${frame}</g></svg>`,issues:diagnostics,width,height,layers:{version:1,namespace,defs,background,cards,frame}};
+  return {svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="system-ui,sans-serif"><defs>${defs}<clipPath id="${namespace}board"><rect width="${width}" height="${height}" rx="${options.squareFrame?0:20}"/></clipPath></defs><g clip-path="url(#${namespace}board)">${body}${frame}</g></svg>`,issues:diagnostics,width,height,layers:{version:1,namespace,defs,background,cards,frame}};
  }
  // Same render pass, no second appearance implementation and no timeline in the app.
  function renderLayers(pack,width,tick,options={}){const result=renderPackage(pack,width,tick,options);return {width:result.width,height:result.height,issues:result.issues,...result.layers};}

@@ -1,0 +1,11 @@
+// Approved 600 px study: width 18, depth 16, grain 20, bevel 33.
+// Eight hollow tiles keep GPU cost independent of the material shader.
+const {chromium}=require('playwright'),sharp=require('sharp'),fs=require('fs'),path=require('path'),http=require('http');
+(async()=>{const server=http.createServer((req,res)=>{const file=path.join(path.resolve('previewer'),decodeURIComponent(req.url.split('?')[0]));try{const bytes=fs.readFileSync(file);res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':'text/html');res.end(bytes);}catch{res.statusCode=404;res.end();}});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});const page=await browser.newPage({viewport:{width:1400,height:1100},deviceScaleFactor:2});await page.goto(`http://127.0.0.1:${server.address().port}/frame-study.html`);
+await page.evaluate(()=>{const board=document.querySelector('.board');board.style.width='600px';board.style.height='600px';});
+const media=path.resolve('entry/src/main/resources/base/media'),darkMedia=path.resolve('entry/src/main/resources/dark/media');fs.mkdirSync(darkMedia,{recursive:true});
+const tiles={tl:[0,0,96,96],top:[96,0,1008,96],tr:[1104,0,96,96],left:[0,96,96,1008],right:[1104,96,96,1008],bl:[0,1104,96,96],bottom:[96,1104,1008,96],br:[1104,1104,96,96]};
+for(const square of [false,true]){await page.locator('#square').setChecked(square);for(const dark of [false,true]){const data=await page.evaluate(d=>window.FrameStudy.bake(d),dark);const bytes=Buffer.from(data.split(',')[1],'base64');const meta=await sharp(bytes).metadata();if(meta.width!==1200||meta.height!==1200)throw Error(JSON.stringify(meta));
+for(const [part,[left,top,width,height]] of Object.entries(tiles)){const png=await sharp(bytes).extract({left,top,width,height}).png().toBuffer();const geometry=square?'square':'round';fs.writeFileSync(path.join(media,`frame_stone_${dark?'dark':'light'}_${geometry}_${part}.png`),png);fs.writeFileSync(path.join(dark?darkMedia:media,`frame_stone_auto_${geometry}_${part}.png`),png);}
+}}
+await browser.close();server.close();console.log('Baked approved hollow stone frame tiles.');})().catch(error=>{console.error(error);process.exit(1);});

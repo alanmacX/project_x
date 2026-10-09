@@ -1288,7 +1288,7 @@ struct Index {
           }.width('100%').height('100%').opacity(this.editorOpacity).hitTestBehavior(HitTestMode.None)
         }
         this.editingScene()
-        if(!this.editing&&!this.viewing&&this.canvasBackground.mode==='transparent'){CanvasFrame({style:this.canvasBackground.transparentFrame}).width(BOARD_W*this.boardScale).height(this.boardHeight).position({x:this.boardLeft,y:this.boardTop}).opacity(this.boardOpacity).zIndex(100003).hitTestBehavior(HitTestMode.None)}
+        if(!this.editing&&!this.viewing&&this.canvasBackground.frameStyle!=='none'){CanvasFrame({style:this.canvasBackground.frameStyle,widthVp:BOARD_W*this.boardScale,heightVp:this.boardHeight}).width(BOARD_W*this.boardScale).height(this.boardHeight).position({x:this.boardLeft,y:this.boardTop}).opacity(this.boardOpacity).zIndex(100003).hitTestBehavior(HitTestMode.None)}
         if(this.scheduledFocusId && !this.editing) {
           ForEach(this.cards.filter((card:FridgeCard)=>card.id===this.scheduledFocusId),(card:FridgeCard)=>{
             Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {}
@@ -1601,13 +1601,13 @@ struct Index {
   }
   private chooseBackgroundMode(mode: string): void {
     if (mode === 'photo') { if (this.canvasBackground.photo.length > 0) { this.openBackgroundCrop(this.canvasBackground.photo); } else this.pickBackgroundPhoto(); return; }
-    const bg = new CanvasBackground(); bg.mode = mode; bg.color = this.canvasBackground.color; bg.photo = this.canvasBackground.photo;
+    const bg = new CanvasBackground(); bg.frameStyle = this.canvasBackground.frameStyle; bg.mode = mode; bg.color = this.canvasBackground.color; bg.photo = this.canvasBackground.photo;
     this.applyBackground(bg); if (mode === 'smart' || mode === 'blend') this.refreshBackground(true);
   }
   private backgroundColorKey(): string { return 'canvas:' + this.store.state.canvasId; }
   private setBackgroundColor(color: string, key: string): void {
     if (!this.alive || key !== this.backgroundColorKey() || this.canvasBackground.mode !== 'solid') return;
-    const bg = new CanvasBackground(); bg.color = color || '#FFFFFF'; bg.photo = this.canvasBackground.photo; this.applyBackground(bg);
+    const bg = new CanvasBackground(); bg.frameStyle = this.canvasBackground.frameStyle; bg.color = color || '#FFFFFF'; bg.photo = this.canvasBackground.photo; this.applyBackground(bg);
   }
   private chooseBackgroundColor(): void {
     const key = this.backgroundColorKey();
@@ -1637,13 +1637,13 @@ struct Index {
     try {
       const result = await taskpool.execute(new taskpool.Task(cropBackgroundPhoto, src, this.context.filesDir, this.canvasAspect, zoom, x, y)) as string;
       if (!this.alive || generation !== this.backgroundGeneration) return;
-      const bg = new CanvasBackground(); bg.mode = 'photo'; bg.src = result; bg.photo = src; this.applyBackground(bg);
+      const bg = new CanvasBackground(); bg.frameStyle = this.canvasBackground.frameStyle; bg.mode = 'photo'; bg.src = result; bg.photo = src; this.applyBackground(bg);
     } catch (_) { if (this.alive) this.getUIContext().getPromptAction().showToast({ message: '照片调整失败，请重试' }); }
     finally { if (generation === this.backgroundGeneration) this.backgroundBusy = false; }
   }
   private setBackgroundPreset(index: number): void {
     const palettes: string[][] = [['#C5B6A3','#83949A','#D5B6A9'],['#9EAF96','#B6B0C5','#D9C9A5'],['#859EB5','#B8C7C2','#C5B7AD']];
-    const bg = new CanvasBackground(); bg.mode = 'blend'; bg.color = palettes[index][0];
+    const bg = new CanvasBackground(); bg.frameStyle = this.canvasBackground.frameStyle; bg.mode = 'blend'; bg.color = palettes[index][0];
     // Presets are generated locally by the same blend renderer; no remote photos.
     const state = new FridgeState(); state.canvasAspect = this.canvasAspect; state.background = bg;
     state.cards = palettes[index].map((color: string, i: number) => { const card = new FridgeCard(); card.id = 'preset'+i; card.paper = color; card.x = i === 1 ? 170 : 20; card.y = i === 2 ? 270 : 20; return card; });
@@ -1702,7 +1702,7 @@ struct Index {
       Column({ space: 20 }) {
         Text('画布背景').fontSize(22).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
         Stack({ alignContent: Alignment.TopStart }) {
-          CanvasBackdrop({ sceneBackground: this.canvasBackground }).width('100%').height('100%')
+          CanvasBackdrop({ sceneBackground: this.canvasBackground,showFrame:false }).width('100%').height('100%')
           Stack({alignContent:Alignment.TopStart}) {
           ForEach(this.cards.slice(0,this.backgroundPreviewCount), (card: FridgeCard) => {
             CardFace({ card: card, scaleFactor: 240 / BOARD_W, tick: capabilityRenderTick(card.capability,this.tick) })
@@ -1711,6 +1711,7 @@ struct Index {
               .rotate({ angle: card.rot, centerX: 0, centerY: '100%' }).zIndex(card.z)
           }, (card: FridgeCard) => card.id)
           }.width('100%').height('100%').opacity(this.backgroundPreviewReady?1:0)
+          CanvasFrame({style:this.canvasBackground.frameStyle,widthVp:240,heightVp:240/this.canvasAspect}).width('100%').height('100%').zIndex(100000)
         }.width(240).height(240 / this.canvasAspect).borderRadius(20).clip(true)
         Column({ space: 16 }) {
           if(this.backgroundSettingsStage>=1){
@@ -1720,8 +1721,9 @@ struct Index {
           if(this.backgroundSettingsStage>=2){
           ForEach([this.canvasBackground.mode],(_mode:string)=>{
           Column({space:16}) {
+          Text('画框').fontSize(13).fontColor(this.appMuted()).width('100%')
+          SettingsSegmented({labels:['无框','白岩','深岩','跟随系统'],selectedIndex:Math.max(0,['none','light','dark','auto'].indexOf(this.canvasBackground.frameStyle)),appDark:this.appDark,onSelect:(index:number)=>{const bg=normalizeBackground(this.canvasBackground);bg.frameStyle=['none','light','dark','auto'][index];this.applyBackground(bg);}})
           if(this.canvasBackground.mode==='transparent'){
-            SettingsSegmented({labels:['跟随系统','白框','深色框','无框'],selectedIndex:Math.max(0,['auto','light','dark','none'].indexOf(this.canvasBackground.transparentFrame)),appDark:this.appDark,onSelect:(index:number)=>{const bg=normalizeBackground(this.canvasBackground);bg.transparentFrame=['auto','light','dark','none'][index];this.applyBackground(bg);}})
             Text('只显示卡片，桌面壁纸透过空白处；卡片仍限制在小组件范围内。空画布会显示可见的添加提示。').fontSize(13).fontColor(this.appMuted()).width('100%')}
           if (this.canvasBackground.mode === 'solid') {
             ColorSetting({label:'背景颜色',color:this.canvasBackground.color,canReset:false,sourceKey:this.backgroundColorKey(),appDark:this.appDark,
@@ -1730,7 +1732,7 @@ struct Index {
               ForEach(['#FFFFFF','#F1EEE6','#E9E5DF','#E2E8E2','#E3E9EF','#292B2B'], (color: string) => {
                 Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).width(44).height(44).backgroundColor(color).margin({ right: 8, bottom: 8 })
                   .border({ width: this.canvasBackground.color === color ? 2 : .5, color: this.appMuted() }).accessibilityText('背景色 '+color)
-                  .onClick(() => { const bg = new CanvasBackground(); bg.color = color; bg.photo = this.canvasBackground.photo; this.applyBackground(bg); })
+                  .onClick(() => { const bg = new CanvasBackground(); bg.frameStyle = this.canvasBackground.frameStyle; bg.color = color; bg.photo = this.canvasBackground.photo; this.applyBackground(bg); })
               }, (color: string) => color)
             }.width('100%')
           }
@@ -1782,7 +1784,7 @@ struct Index {
             .position({ x: this.shareSingle ? this.shareX : card.x, y: this.shareSingle ? this.shareY : card.y * this.shareCanvasHeight / BOARD_H })
             .rotate({ angle: card.rot, centerX: 0, centerY: '100%' }).zIndex(card.z)
         }, (card: FridgeCard) => card.id)
-        if(!this.shareSingle&&this.shareBackground.mode==='transparent'){CanvasFrame({style:this.shareBackground.transparentFrame,square:true}).width('100%').height('100%').zIndex(100000)}
+        if(!this.shareSingle&&this.shareBackground.frameStyle!=='none'){CanvasFrame({style:this.shareBackground.frameStyle,square:true,widthVp:this.shareWidth,heightVp:this.shareCanvasHeight}).width('100%').height('100%').zIndex(100000)}
       }.width(this.shareWidth).height(this.shareCanvasHeight).backgroundColor(this.shareOpaque ? Color.White : Color.Transparent).clip(true)
       if (!this.shareSingle) {
         Row({space:2}) {
