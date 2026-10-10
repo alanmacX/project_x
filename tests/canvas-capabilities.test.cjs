@@ -224,7 +224,20 @@ function load(name) {
  assert.throws(()=>sceneStore.addCard(new FridgeCard()),/一张/);assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).timed,mainId);
  await sceneStore.openCanvas(mainId);await assert.rejects(sceneStore.copyCardTo(sourceCard,sceneId),/已有/);await sceneStore.copyCardTo(sourceCard,sceneId,true);assert.equal((await sceneStore.canvasSnapshot(sceneId)).cards.length,1);
  const Rule=load('SceneScheduleSchema').SceneRule,job=new Rule();Object.assign(job,{id:'owned-scene',kind:'focus',centralOnly:true,targetId:sceneId,createdAt:0,start:(new Date().getHours()*60+new Date().getMinutes()+1439)%1440,timeoutMinutes:120,enabled:true});sceneStore.catalog.sceneRules=[job];await sceneStore.save(true);const beforeRuleEdit=updates.length;job.timeoutMinutes=1;await sceneStore.save(true);assert(updates.length>beforeRuleEdit,'rule-only edit invalidates desktop publisher cache');
+ const mainBeforeDelete=disk.get(canvasKey(mainId));await sceneStore.deleteTimedScene(mainId);assert.equal(disk.get(canvasKey(mainId)),mainBeforeDelete,'wrong scene delete identifier cannot erase a normal canvas');
  await sceneStore.openCanvas(sceneId);await sceneStore.deleteTimedScene(sceneId);assert.equal(sceneStore.state.canvasId,mainId,'deleting the edited scene restores the normal document');assert(!disk.has(canvasKey(sceneId)));await sceneStore.save(false);assert(!disk.has(canvasKey(sceneId)),'later save cannot resurrect the deleted scene');assert.equal(sceneStore.catalog.sceneRules.length,0);assert.equal(sceneStore.catalog.activeId,mainId);
+ {
+ // Legacy migration runs while the user moves to another document. It must
+ // never switch to an intermediate scene or restore the old editor afterward.
+ await sceneStore.openCanvas(mainId);sceneStore.catalog.scenePolicyVersion=1;
+ const legacyRule=new Rule();Object.assign(legacyRule,{id:'legacy-focus',kind:'focus',targetId:sceneStore.state.cards[0].id,name:'旧提醒'});sceneStore.state.sceneRules=[legacyRule];await sceneStore.save(false);
+ const migratedOther=sceneStore.createCanvas('另一个画布');await sceneStore.save(false);await sceneStore.openCanvas(mainId);
+ const originalSnapshot=sceneStore.canvasSnapshot.bind(sceneStore);let releaseMigration,enteredMigration;
+ const migrationGate=new Promise(resolve=>releaseMigration=resolve),entered=new Promise(resolve=>enteredMigration=resolve);
+ sceneStore.canvasSnapshot=async id=>{const snapshot=await originalSnapshot(id);if(id===mainId){enteredMigration();await migrationGate;}return snapshot;};
+ const migration=sceneStore.upgradeTimedScenes(),sameMigration=sceneStore.upgradeTimedScenes();await entered;await sceneStore.openCanvas(migratedOther);releaseMigration();await Promise.all([migration,sameMigration]);
+ assert.equal(sceneStore.state.canvasId,migratedOther,'migration cannot restore an old active document');assert.equal(sceneStore.catalog.activeId,migratedOther);assert.equal(sceneStore.catalog.scenes.length,1,'overlapping migration requests do not duplicate scenes');assert.equal(sceneStore.catalog.sceneRules.length,1);assert(disk.has(canvasKey(sceneStore.catalog.scenes[0].id)),'migrated scene is durably stored');sceneStore.canvasSnapshot=originalSnapshot;
+ }
  console.log('PASS independent central-card storage, fallback isolation, one-card capacity, cross-scene replacement, bound desktop ownership and policy-only publishing.');
  console.log('PASS timed delivery: atomic packet, bound-source ownership, target fanout, original geometry during battery updates, persisted acknowledgement and foreground merge, refresh minimum/quota, imported schedule remapping and opt-in.');
  console.log('PASS: legacy migration, lazy multi-canvas storage, independent duplication, widget bindings/deletion and removed-form cleanup, preserved corruption, movement-stable palette, offline refresh guard, live battery/Form refresh, conservative pickup OCR, course week/parity/boundaries, bounded ICS/JSON imports with recurrence exceptions and calendar ACL gate.');

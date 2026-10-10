@@ -32,6 +32,7 @@ export class FridgeStore {
   catalog: CanvasCatalog = new CanvasCatalog();
   documents: CanvasDocument[] = [];
   private lastCatalog: string = '';
+  private sceneUpgrade:Promise<void>|null=null;
   private selectionMigrationPending:boolean=false;
   private selectionMigration:Promise<void>|null=null;
   private savedScenes: Record<string,string> = {};
@@ -103,25 +104,35 @@ export class FridgeStore {
     if(!stored||!Array.isArray(stored.sceneRules))return;
     for(const rule of this.state.sceneRules){const other=stored.sceneRules.find(r=>r!==null&&r.id===rule.id);if(other&&typeof other.dismissed==='string'&&other.dismissed.length<=200&&other.createdAt===rule.createdAt&&other.start===rule.start&&other.end===rule.end&&other.kind===rule.kind&&other.targetId===rule.targetId)rule.dismissed=other.dismissed;}
   }
-  async upgradeTimedScenes():Promise<void> {
-    if(this.catalog.scenePolicyVersion===2)return;
-    const originalId=this.state.canvasId;
+  upgradeTimedScenes():Promise<void> {
+    if(this.sceneUpgrade!==null)return this.sceneUpgrade;
+    if(this.catalog.scenePolicyVersion===2)return Promise.resolve();
+    const pending=this.migrateTimedScenes();this.sceneUpgrade=pending;
+    return pending.finally(()=>{this.sceneUpgrade=null;});
+  }
+  private async migrateTimedScenes():Promise<void> {
     for(const entry of this.catalog.canvases.slice()){
       let source:FridgeState;try{source=await this.canvasSnapshot(entry.id);}catch(_){hilog.warn(0,'Scene','retaining unreadable legacy canvas during schedule migration');continue;}
       for(const old of source.sceneRules){
         if(old.kind!=='focus'||this.catalog.scenes.length>=12||this.catalog.sceneRules.some(r=>r.migrationKey===entry.id+':'+old.id))continue;const card=source.cards.find(c=>c.id===old.targetId);if(!card)continue;
-        const id=this.createTimedScene(old.name,card),rule=JSON.parse(JSON.stringify(old)) as SceneRule;
-        rule.id=this.newId();rule.migrationKey=entry.id+':'+old.id;rule.targetId=id;rule.centralOnly=true;rule.untilDismissed=false;rule.timeoutMinutes=Math.max(1,Math.min(120,(old.end-old.start+1440)%1440||15));this.catalog.sceneRules.push(rule);await this.save(false);
+        // Migrate a detached document: background maintenance cannot temporarily
+        // switch the active editor, or restore a canvas the user has since left.
+        const doc=this.timedSceneDocument(old.name,card,source),json=storageSnapshot(doc.state);
+        await this.saveQueue.catch(()=>{});if(this.prefs===null)throw new Error('本地存储尚未就绪');await this.prefs.put(canvasKey(doc.id),json);await this.prefs.flush();
+        this.documents.push(doc);this.savedScenes[doc.id]=json;this.catalog.scenes.push({id:doc.id,name:doc.name});
+        const rule=JSON.parse(JSON.stringify(old)) as SceneRule;rule.id=this.newId();rule.migrationKey=entry.id+':'+old.id;rule.targetId=doc.id;rule.centralOnly=true;rule.untilDismissed=false;rule.timeoutMinutes=Math.max(1,Math.min(120,(old.end-old.start+1440)%1440||15));this.catalog.sceneRules.push(rule);await this.save(false);
       }
     }
-    this.catalog.scenePolicyVersion=2;await this.openCanvas(originalId);await this.save(true);
+    this.catalog.scenePolicyVersion=2;await this.save(true);
+  }
+  private timedSceneDocument(name:string,source:FridgeCard|undefined,base:FridgeState):CanvasDocument {
+    const doc=new CanvasDocument();doc.id='scene_'+Date.now()+'_'+(++this.sequence);doc.name=name.trim().slice(0,30)||'定时场景 '+(this.catalog.scenes.length+1);
+    doc.state=new FridgeState();doc.state.canvasId=doc.id;doc.state.canvasAspect=base.canvasAspect;doc.state.canvasDimension=base.canvasDimension;
+    doc.state.background=normalizeState(JSON.parse(storageSnapshot(base)) as FridgeState).background;doc.state.cards=source?[this.copyCard(source)]:[];return doc;
   }
   createTimedScene(name:string,source?:FridgeCard):string {
     if(this.catalog.scenes.length>=12)throw new Error('最多保存 12 个定时场景');
-    const id='scene_'+Date.now()+'_'+(++this.sequence),doc=new CanvasDocument();doc.id=id;doc.name=name.trim().slice(0,30)||'定时场景 '+(this.catalog.scenes.length+1);
-    doc.state=new FridgeState();doc.state.canvasId=id;doc.state.canvasAspect=this.state.canvasAspect;doc.state.canvasDimension=this.state.canvasDimension;
-    doc.state.background=normalizeState(JSON.parse(storageSnapshot(this.state)) as FridgeState).background;doc.state.cards=source?[this.copyCard(source)]:[];
-    this.catalog.scenes.push({id,name:doc.name});this.documents.push(doc);this.switchCanvas(id);return id;
+    const doc=this.timedSceneDocument(name,source,this.state);this.catalog.scenes.push({id:doc.id,name:doc.name});this.documents.push(doc);this.switchCanvas(doc.id);return doc.id;
   }
   copyCard(source:FridgeCard):FridgeCard {
     const card=JSON.parse(JSON.stringify(source)) as FridgeCard;card.id=this.newId();card.groupId='';
@@ -137,9 +148,17 @@ export class FridgeStore {
     const queue=this.queueFor(id);await queue.waitForIdle();queue.invalidate();await queue.submit(storageSnapshot(target));
   }
   async deleteTimedScene(id:string):Promise<void> {
-    if(this.state.canvasId===id)await this.openCanvas(this.catalog.activeId);
+    // A stale callback or wrong identifier must never delete a normal canvas.
+    if(!this.catalog.scenes.some(scene=>scene.id===id))return;
+    await this.saveQueue.catch(()=>{});
+    await Promise.all(Object.values(this.widgetQueues).map(queue=>queue.waitForIdle().catch(()=>{})));
+    if(this.state.canvasId===id&&!await this.openCanvas(this.catalog.activeId))throw new Error('无法恢复主画布，已保留场景');
     this.catalog.scenes=this.catalog.scenes.filter(c=>c.id!==id);this.catalog.sceneRules=this.catalog.sceneRules.filter(r=>r.targetId!==id);
-    this.documents=this.documents.filter(c=>c.id!==id);await this.save(false);if(this.prefs){await this.prefs.delete(canvasKey(id));await this.prefs.flush();}await this.save(true);
+    this.documents=this.documents.filter(c=>c.id!==id);await this.save(false);
+    if(this.prefs){await this.prefs.delete(canvasKey(id));await this.prefs.delete('fridge_render_contours_v1_'+id);await this.prefs.flush();}
+    const saved:Record<string,string>={},contours:Record<string,string>={};for(const key of Object.keys(this.savedScenes))if(key!==id)saved[key]=this.savedScenes[key];for(const key of Object.keys(this.contourCache))if(key!==id)contours[key]=this.contourCache[key];this.savedScenes=saved;this.contourCache=contours;
+    const retained:Record<string,LatestWidgetQueue>={};for(const key of Object.keys(this.widgetQueues))if(key!==id)retained[key]=this.widgetQueues[key];this.widgetQueues=retained;
+    for(const queue of Object.values(this.widgetQueues))queue.invalidate();await this.save(true);
   }
   adoptCanvas(state:FridgeState):void {
     const entry=this.catalog.canvases.find(c=>c.id===state.canvasId);if(!entry)return;
