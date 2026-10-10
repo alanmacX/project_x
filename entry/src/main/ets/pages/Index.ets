@@ -1620,7 +1620,7 @@ struct Index {
         }.width('100%').hitTestBehavior(HitTestMode.None)
       }.height(48).layoutWeight(1).padding({left:12,right:12}).attributeModifier(immersiveChrome(this.appDark))
         .accessibilityText('展开画布工具 '+this.canvasName).onClick(()=>{this.refreshCanvasList();this.scheduleOpen=false;this.backgroundOpen=false;this.homeToolsOpen=!this.homeToolsOpen;})
-        .bindPopup(this.homeToolsOpen,{builder:this.phoneTools,placement:Placement.Top,width:this.screenWidth-32,radius:24,transition:canvasToolsTransition(),popupColor:Color.Transparent,backgroundBlurStyle:BlurStyle.NONE,enableArrow:false,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible)this.homeToolsOpen=false;}})
+        .bindPopup(this.homeToolsOpen,{builder:this.phoneTools,placement:Placement.Top,width:this.screenWidth-32,radius:24,transition:canvasToolsTransition(),systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:false,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible)this.homeToolsOpen=false;}})
       this.timingButton(48)
       this.homeBackgroundButton(48)
       Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
@@ -1751,8 +1751,7 @@ struct Index {
       .combine(TransitionEffect.translate({y:-16})).animation(canvasToolsMotion(true));
   }
   @Builder
-  homeLayers(floating:boolean=false) {
-      Column({ space: 12 }) {
+  homeToolIslands(floating:boolean=false) {
         Row({space:floating?8:6}) {
 
           Button({type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
@@ -1769,22 +1768,27 @@ struct Index {
           } else {
             Button('导入',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).id('importTemplate').height(44).fontSize(13).padding({left:12,right:12}).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).enabled(!this.sharing&&!this.backgroundBusy).onClick(()=>this.pickTemplate())
           }
-        }.width('100%')
-        if (!this.scheduleOpen&&!this.backgroundOpen&&this.cards.length >= CANVAS_CARD_TARGET) {
-          Row({space:8}) {
-            Text(this.cards.length + ' / ' + CANVAS_CARD_LIMIT).fontSize(12).fontColor(this.appMuted())
-              .accessibilityText('当前画布 '+this.cards.length+' 张卡片，最多 '+CANVAS_CARD_LIMIT+' 张')
-            Text(canvasCapacityHint(this.cards.length)).fontSize(12).fontColor(this.appMuted()).layoutWeight(1).maxLines(2)
-          }.width('100%')
-        }
+        }.width('100%').height(44).zIndex(10)
+  }
+  @Builder
+  homeLayers(floating:boolean=false) {
+      Stack({alignContent:Alignment.TopStart}) {
         Stack({ alignContent: Alignment.Bottom }) {
         if(!floating&&this.scheduleOpen) {
-          Column(){this.scheduleEditor()}.width('100%').height('100%').transition(this.homePanelTransition(true))
+          Column(){this.scheduleEditor()}.width('100%').height('100%').padding({top:56}).transition(this.homePanelTransition(true))
         } else if(!floating&&this.backgroundOpen) {
-          Column(){this.backgroundEditor()}.width('100%').height('100%').transition(this.homePanelTransition(true))
+          Column(){this.backgroundEditor()}.width('100%').height('100%').padding({top:56}).transition(this.homePanelTransition(true))
         } else {
         Stack({alignContent:Alignment.Bottom}){
         List({space:8}) {
+        if (this.cards.length >= CANVAS_CARD_TARGET) {
+          ListItem() {Row({space:8}) {
+            Text(this.cards.length + ' / ' + CANVAS_CARD_LIMIT).fontSize(12).fontColor(this.appMuted())
+              .accessibilityText('当前画布 '+this.cards.length+' 张卡片，最多 '+CANVAS_CARD_LIMIT+' 张')
+            Text(canvasCapacityHint(this.cards.length)).fontSize(12).fontColor(this.appMuted()).layoutWeight(1).maxLines(2)
+          }.width('100%').padding({bottom:12})}
+        }
+
           ForEach(layerSections(this.orderedCards()), (section: LayerSection) => {
             ForEach(section.ids,(id:string,index:number)=>{
               ListItem() {
@@ -1795,7 +1799,7 @@ struct Index {
               }
             },(id:string)=>id)
           }, (section:LayerSection)=>section.id+':'+section.title+':'+section.ids.join(','))
-        }.width('100%').height('100%').contentEndOffset(this.homeActionHeight()+8).cachedCount(1).scrollBar(BarState.Off)
+        }.width('100%').height('100%').contentStartOffset(56).contentEndOffset(this.homeActionHeight()+8).cachedCount(1).scrollBar(BarState.Off)
         if (this.homeActionHeight() > 0) {
         Column({ space: 12 }) {
         if (this.groupSelecting) {
@@ -1820,8 +1824,9 @@ struct Index {
         }
         }.width('100%').height('100%').transition(this.homePanelTransition(false))
         }
-        }.width('100%').layoutWeight(1).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
-      }.width(floating?this.screenWidth-32:this.panelWidth).height(floating?this.homeToolsHeight():this.panelHeight).padding(12).backgroundColor(Color.Transparent).borderRadius(AppDesign.sectionRadius).clip(true)
+        }.width('100%').height('100%')
+        this.homeToolIslands(floating)
+      }.width(floating?this.screenWidth-32:this.panelWidth).height(floating?this.homeToolsHeight():this.panelHeight).padding(12).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
         .position({x:floating?0:this.panelLeft,y:floating?0:this.panelTop})
   }
   private homeActionHeight():number {return this.groupSelecting?60:this.selectedId.length===0?0:60;}
