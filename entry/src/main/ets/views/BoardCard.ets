@@ -77,6 +77,7 @@ export struct BoardCard {
   @Prop boardTop: number = 100;
   @Prop tick: number = 0;
   onSelect: (id: string) => void = () => {};
+  onHold: (id:string)=>void=()=>{};
   onDelete: (id: string) => void = () => {};
   onEdit: (id: string) => void = () => {};
   getAlignmentAnchor:(card:FridgeCard)=>ShapePoint=(card:FridgeCard)=>{const box=groupBox([card],this.controlViewportHeight/this.scaleFactor);return {x:box.x+box.w/2,y:box.y+box.h/2};};
@@ -309,7 +310,8 @@ export struct BoardCard {
         .gesture(GestureGroup(GestureMode.Parallel,
           PanGesture({ distance: 4 }).onActionStart((e: GestureEvent) => { this.beginFinger(e); this.startMove(); this.move(e); }).onActionUpdate((e: GestureEvent) => this.move(e))
             .onActionEnd((e: GestureEvent) => { this.move(e); this.finishMove(); }).onActionCancel(() => this.cancelMove()),
-          TapGesture().onAction(() => { if (!this.moving) this.onSelect(this.card.id); })))
+          TapGesture().onAction(() => { if (!this.moving) this.onSelect(this.card.id); }),
+          LongPressGesture({duration:450,repeat:false}).onAction(()=>{if(!this.moving&&!this.editingSurface)this.onHold(this.card.id); })))
       }
       // Mount material controls and contour-aware handles only on selection.
       // Keep them alive through their dismissal animation.

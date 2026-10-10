@@ -28,6 +28,6 @@ for(const k of ['countdown','anniversary','worldclock','agenda','timetable']){f.
 f.preview.capability={k:'album'};assert.equal(f.editorTools()[1],'封面与资料');
 const scene={key:'base',normalState:{canvasId:'home'},state:{canvasId:'home',background:{}},ruleId:'',focusId:''};f.applyScheduledScene(scene);assert.equal(f.selectedId,'a','same-scene refresh preserves selection');assert.equal(f.groupSelection.length,2);f.applyScheduledScene({...scene,key:'scene:alert',ruleId:'alert'});assert.equal(f.selectedId,'','actual scene change clears selection');assert.equal(f.widgetRefreshes,1,'time projection triggers widget IPC even without scene-data edits');
 const commit=method(index,'  private commitGeometry(','  private async pickImage(');
-assert.ok(!commit.includes('bringToFront'),'controls must not permanently change card stacking');
+assert.match(commit,/else if\(dx!==0\|\|dy!==0\)this.raiseBoardStack\(card.id\)/,'only translation restores historical stacking; resize/rotation do not');
 assert.match(board,/aboutToDisappear\(\): void \{ this.alive = false; this.clearControlPose\(\)/);
 console.log('PASS control portal: shared resize/rotation, cancellation ownership, editable-data availability and stable stacking');

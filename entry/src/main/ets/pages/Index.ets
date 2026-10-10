@@ -892,6 +892,20 @@ struct Index {
     } }, () => { this.setHeroPose(this.boardRect()); this.setTransitionClip(true); this.editorOpacity = 0; this.boardOpacity = 1; this.scatter = 0; }); });
   }
   private orderedCards(): FridgeCard[] { return this.cards.slice().sort((a: FridgeCard, b: FridgeCard) => b.z - a.z); }
+  private raiseBoardStack(id:string):boolean {
+    if(this.editing||this.viewing||this.groupSelecting||this.scheduledName||this.scheduleTransition)return false;
+    const card=this.store.findCard(id);if(card===null||card.hidden)return false;
+    const members=groupMembers(this.store.state.cards,card).slice().sort((a:FridgeCard,b:FridgeCard)=>a.z-b.z);
+    const ids=members.map((member:FridgeCard)=>member.id);
+    const others=this.store.state.cards.filter((item:FridgeCard)=>!ids.includes(item.id));
+    if(others.every((item:FridgeCard)=>item.z<members[0].z))return false;
+    members.forEach((member:FridgeCard)=>this.store.bringToFront(member));return true;
+  }
+  private holdBoardCard(id:string):void {
+    if(this.editing||this.viewing||this.groupSelecting||this.scheduledName||this.scheduleTransition)return;
+    this.selectedId=id;
+    if(this.raiseBoardStack(id)){this.renderBoard();this.persist(true);}
+  }
   private moveCardLayer(id: string, upward: boolean): void {
     const sorted = this.store.state.cards.slice().sort((a: FridgeCard, b: FridgeCard) => a.z - b.z);
     const index = sorted.findIndex((card: FridgeCard) => card.id === id), other = index + (upward ? 1 : -1);
@@ -1243,6 +1257,7 @@ struct Index {
     this.boardMotion.offset = { x: 0, y: 0 };
     card.x = updated.x; card.y = updated.y; card.w = updated.w; card.h = updated.h; card.rot = updated.rot;
     if(!translating)this.clamp(card);
+    else if(dx!==0||dy!==0)this.raiseBoardStack(card.id);
     // Geometry handoff only updates the visible board; hydrate inspector on entry.
     if (this.editing || this.viewing) this.render(); else this.renderBoard();
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer);
@@ -1485,7 +1500,7 @@ struct Index {
               getAlignmentAnchor:(card:FridgeCard)=>{const box=groupBox(groupMembers(this.store.state.cards,card),this.boardHeight/this.boardScale);return {x:box.x+box.w/2,y:box.y+box.h/2};},
               getMoveBounds: (card: FridgeCard) => groupDragBounds(this.store.state.cards, card, this.boardHeight/this.boardScale),
               onMove: (x: number, y: number) => { if (this.movingGroupIds.length > 0) { this.boardMotion.offset = { x: x, y: y }; } },
-              onSelect: (id: string) => this.selectLayerCard(id), onDelete: (id: string) => this.deleteCard(id),
+              onSelect: (id: string) => this.selectLayerCard(id), onHold:(id:string)=>this.holdBoardCard(id), onDelete: (id: string) => this.deleteCard(id),
               onEdit: (id: string) => this.openEditor(id), onInteraction: (active: boolean) => this.boardInteraction(id, active), onCommit: (updated: FridgeCard) => this.commitGeometry(updated) })
           }.width(this.sceneCard(id).w * this.boardScale + 48).height(this.sceneCard(id).h * this.boardScale + 48)
             .scale({ x: this.sceneScale(id)*this.groupScale(id), y: this.sceneScale(id)*this.groupScale(id), centerX: this.groupPivotX(id), centerY: this.groupPivotY(id) })
