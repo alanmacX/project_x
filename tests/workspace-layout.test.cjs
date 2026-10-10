@@ -47,3 +47,12 @@ for(const [w,h] of foldWindows) for(const [top,bottom] of [[0,24],[36,24],[48,32
  assert.ok(l.previewW>=300&&l.inspectorW>=300);
 }
 console.log('PASS Pura X Max / Mate X7: both screens, both orientations, three safe-area configurations, five ratios');
+
+for(const [w,h] of [[300,260],[320,240],[480,300],[600,300],[640,300]]) {
+ const l=workspaceLayout(w,h,38,24,1);
+ assert.ok(l.boardX>=0&&l.boardX+l.boardW<=w);
+ assert.ok(l.boardY+l.boardH<=h-24);
+ assert.ok(l.panelX>=0&&l.panelX+l.panelW<=w);
+ assert.ok(l.panelY+l.panelH<=h-24);
+}
+console.log("PASS small floating windows retain canvas and dock within safe bounds");
