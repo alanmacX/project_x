@@ -45,7 +45,7 @@ export async function pushWidgets(context: Context, json: string): Promise<void>
   const catalog = readCatalog(catalogJson);
   const bindings = JSON.parse(await prefs.get('fridge_form_bindings_json','{}') as string) as Record<string,string>;
   const canvasId = (JSON.parse(json) as FridgeState).canvasId ?? 'canvas_main';
-  // Migrate old forms once; subsequent app selection never rebinds them.
+  // Retain the registry for compatibility; rendering follows the durable catalog selection.
   let changed = false;
   for (const id of Object.keys(dims)) { if (!bindings[id]) { bindings[id] = catalog.activeId; changed = true; } }
   if (changed) { await prefs.put('fridge_form_bindings_json',JSON.stringify(bindings)); await prefs.flush(); }

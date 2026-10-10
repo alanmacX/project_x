@@ -9,7 +9,7 @@ const fixture=`class Fixture {
  alive=true;ready=true;pageVisible=true;appWindowFocused=true;appBackgrounded=false;foregroundGeneration=0;foregroundRefreshTimer=-1;
  saveTimer=-1;previewTimer=-1;gestureGroup='';deletionId='';arriving=false;heroActive=false;activeBoardId='';layerDrag='';
  tick=Math.floor(Date.now()/60000)*60000;saves=0;flushes=0;refreshes=0;scenes=0;
- store={reloadSceneAcknowledgements:()=>asyncRead};
+ store={reloadSceneAcknowledgements:()=>asyncRead,repairDesktopSelection:()=>Promise.resolve()};
  persist(){this.saves++;this.saveTimer=-1;}flushPreview(){this.flushes++;this.previewTimer=-1;this.gestureGroup='';this.saveTimer=2;}
  scheduleMaintenance(){}syncSchedules(){}refreshCapabilities(){this.refreshes++;}updateScheduledScene(){this.scenes++;}
  ${method('  private flushPendingEdits(', "\n  @StorageLink('appWindowFocused')")}

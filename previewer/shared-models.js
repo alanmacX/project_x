@@ -4085,7 +4085,7 @@ class CanvasEntry {
 exports.CanvasEntry = CanvasEntry;
 class CanvasCatalog {
     constructor() {
-        this.desktopFollowsSelection = false;
+        this.desktopFollowsSelection = true;
         this.scenes = [];
         this.sceneRules = [];
         this.rotation = new CanvasRotation_1.CanvasRotation();
@@ -4122,16 +4122,15 @@ function readCatalog(json) {
     out.sceneRules = (0, SceneScheduleSchema_1.normalizeSceneRules)(source.sceneRules).filter(r => r.centralOnly && out.scenes.some(c => c.id === r.targetId));
     out.rotation = (0, CanvasRotation_1.normalizeCanvasRotation)(source.rotation, out.canvases.map(c => c.id));
     out.scenePolicyVersion = source.scenePolicyVersion === 2 ? 2 : 1;
-    out.desktopFollowsSelection = source.desktopFollowsSelection === true;
+    out.desktopFollowsSelection = true; // Migrate obsolete per-form bindings, including explicitly false legacy catalogs.
     out.activeId = out.canvases.some((c) => c.id === source.activeId) ? source.activeId : out.canvases[0].id;
     return out;
 }
 exports.readCatalog = readCatalog;
 function boundCanvas(bindings, formId, catalog) {
-    if (catalog.desktopFollowsSelection)
-        return catalog.activeId;
-    const id = bindings[formId];
-    return catalog.canvases.some((c) => c.id === id) ? id : catalog.activeId;
+    // Selection is catalog-owned. Old form IDs may point at valid but empty canvases;
+    // retaining those bindings silently disagrees with the visible App canvas.
+    return catalog.activeId;
 }
 exports.boundCanvas = boundCanvas;
 function cloneCanvas(state, id) {
@@ -4172,4 +4171,4 @@ function scenePolicyShell(base) {
 }
 exports.scenePolicyShell = scenePolicyShell;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"ac172af927dd7bbab337209d34a93ec0ae7524ae068f3fc8021507dbef32077d"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"18ea81511f0eb7a554b956cd6b0e34eaef22a3fb46b4f24695ba6a713f4b2c23"};})(globalThis);

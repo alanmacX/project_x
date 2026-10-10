@@ -32,6 +32,8 @@ export class FridgeStore {
   catalog: CanvasCatalog = new CanvasCatalog();
   documents: CanvasDocument[] = [];
   private lastCatalog: string = '';
+  private selectionMigrationPending:boolean=false;
+  private selectionMigration:Promise<void>|null=null;
   private savedScenes: Record<string,string> = {};
   private contourSnapshot:string='';
   get activeName(): string { return this.catalog.canvases.concat(this.catalog.scenes).find((c) => c.id === this.state.canvasId)?.name ?? '画布'; }
@@ -65,6 +67,14 @@ export class FridgeStore {
     await this.prefs.put('fridge_form_bindings_json',JSON.stringify(bindings));await this.prefs.flush();
     for(const queue of Object.values(this.widgetQueues))queue.invalidate();
     await this.save(true);return true;
+  }
+  /** One upgrade repair, deferred until startup is idle or the app leaves foreground. */
+  repairDesktopSelection():Promise<void> {
+    if(this.selectionMigration!==null)return this.selectionMigration;
+    if(!this.selectionMigrationPending)return Promise.resolve();
+    const pending=this.refreshWidgets().then(()=>{this.selectionMigrationPending=false;});
+    this.selectionMigration=pending;
+    return pending.finally(()=>{this.selectionMigration=null;});
   }
   /** Time changes the projection even when editable scene bytes are identical. */
   async refreshWidgets():Promise<void> {
@@ -181,7 +191,7 @@ export class FridgeStore {
     try { this.canvasSpecs = JSON.parse(await this.prefs.get('fridge_canvas_specs_json', '{}') as string) as Record<string, number>; } catch (_) { this.canvasSpecs = {}; }
     try {
       const catalogJson = await this.prefs.get('fridge_canvases_json', '') as string;
-      this.catalog = readCatalog(catalogJson); this.lastCatalog = catalogJson; this.documents = []; this.savedScenes = {};
+      this.catalog = readCatalog(catalogJson);this.selectionMigrationPending=!catalogJson||(JSON.parse(catalogJson) as CanvasCatalog).desktopFollowsSelection!==true; this.lastCatalog = catalogJson; this.documents = []; this.savedScenes = {};
       for (const entry of this.catalog.canvases.filter((c)=>c.id===this.catalog.activeId)) {
         let json = await this.prefs.get(canvasKey(entry.id), '') as string;
         if (!catalogJson) json = await this.prefs.get('fridge_state_json', '') as string;

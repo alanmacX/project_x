@@ -66,13 +66,13 @@ function load(name) {
  const data=load('CapabilityData'),{readCapability,systemAgenda}=load('CapabilityService'),{refreshMinutes}=load('WidgetRefreshPolicy');
  const original=defaultState(),card=new FridgeCard();card.id='original';card.capability={k:'clock'};original.cards=[card];
  disk.set('fridge_state_json',JSON.stringify(original));disk.set('fridge_form_dims_json',JSON.stringify({home:'4*4'}));
- const store=new FridgeStore();await store.init({});await store.save();
+ const store=new FridgeStore();await store.init({});await store.repairDesktopSelection();const afterMigration=updates.length;await store.repairDesktopSelection();assert.equal(updates.length,afterMigration,'upgrade repair publishes once, not on every foreground/background');await store.save();
  assert.equal(store.state.cards[0].id,'original','legacy artwork is migrated intact');
  assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).home,'canvas_main');
  const old=store.state,second=store.createCanvas('第二张');await store.save();
  const other=new FridgeCard();other.id='other';other.capability={k:'battery'};store.addCard(other);await store.save();
  assert.equal(JSON.parse(disk.get(canvasKey('canvas_main'))).cards[0].id,'original','new canvas never overwrites original');
- assert.equal(updates.at(-1).data.canvasId,'canvas_main','switching app does not replace original desktop form');
+ assert.equal(updates.at(-1).data.canvasId,second,'all forms follow the durable active canvas, including newly created canvases');
  const inactive=await store.canvasSnapshot('canvas_main');assert.equal(inactive.cards[0].id,'original');assert.equal(store.state.canvasId,second,'sharing inactive canvas never activates it');inactive.cards[0].x=999;assert.notEqual(JSON.parse(disk.get(canvasKey('canvas_main'))).cards[0].x,999);
  const active=await store.canvasSnapshot(second);active.cards[0].paper='#000000';assert.notEqual(store.state.cards[0].paper,'#000000','sharing snapshot is detached from live editor');
  disk.set('fridge_form_dims_json',JSON.stringify({home:'4*4',second:'4*4'}));disk.set('fridge_form_bindings_json',JSON.stringify({home:'canvas_main',second}));
@@ -137,7 +137,7 @@ function load(name) {
  const ordinarySchedules=schedules.length;await pushWidgets(ctx,JSON.stringify(b));assert.equal(schedules.length,ordinarySchedules,'ordinary saves never re-request an acknowledged content boundary');schedules.length=0;
  // Use midday: a real run near midnight has a nearer calendar refresh boundary.
  const actualNow=Date.now;Date.now=()=>new Date('2026-10-04T12:00:00').getTime();
- try { const event=new FridgeCard(),now=Date.now();event.capability={k:'agenda',agendaSource:'imported',events:[{id:'e',title:'即将开始',start:now+10*60000,end:now+70*60000,location:'',allDay:false}]};a.cards.push(event);disk.set(canvasKey(a.canvasId),JSON.stringify(a));form.onUpdateForm('fa');await form.actionQueue;assert.equal(schedules.length,1);assert.equal(schedules[0].id,'fa');assert.equal(schedules[0].minutes,10,'a nearer calendar boundary uses one system scheduling request');
+ try { const event=new FridgeCard(),now=Date.now();event.capability={k:'agenda',agendaSource:'imported',events:[{id:'e',title:'即将开始',start:now+10*60000,end:now+70*60000,location:'',allDay:false}]};a.cards.push(event);disk.set(canvasKey(a.canvasId),JSON.stringify(a));const selectedCatalog=JSON.parse(disk.get('fridge_canvases_json'));selectedCatalog.activeId=a.canvasId;disk.set('fridge_canvases_json',JSON.stringify(selectedCatalog));form.onUpdateForm('fa');await form.actionQueue;assert.equal(schedules.length,1);assert.equal(schedules[0].id,'fa');assert.equal(schedules[0].minutes,10,'a nearer calendar boundary uses one system scheduling request');
  } finally {Date.now=actualNow;}
  const recurring=ics.replace('SUMMARY:','RRULE:FREQ=WEEKLY;COUNT=4\r\nEXDATE:20261011T100000Z\r\nSUMMARY:');const exceptions=importAgenda(recurring,new Date('2026-10-03').getTime());assert.equal(exceptions.length,3);assert.ok(!exceptions.some(e=>e.start===Date.UTC(2026,9,11,10)),'excluded occurrence never appears in the widget agenda');
  const {parseWakeUp,resolveWakeUp,mondayDate}=load('WakeUpImport'),wp=[{node:1,startTime:'8:00',endTime:'08:45'},{node:2,startTime:'08:50',endTime:'09:35'}],wb=[{id:7,courseName:'高等数学'}],wd=[{id:7,day:2,startNode:1,step:2,startWeek:2,endWeek:16,type:2,room:'A101'}];
@@ -192,8 +192,8 @@ function load(name) {
  // Corrupt artwork bound to another form does not interrupt delivery of this canvas.
  source.sceneRules=[];disk.set(canvasKey(source.canvasId),JSON.stringify(source));disk.set(canvasKey(destination.canvasId),'{broken');disk.set('fridge_form_dims_json',JSON.stringify({scene:'4*4',brokenForm:'4*4'}));disk.set('fridge_form_bindings_json',JSON.stringify({scene:source.canvasId,brokenForm:destination.canvasId}));const beforeIsolated=updates.length;
  await pushWidgets(ctx,JSON.stringify(source));assert(updates.length>beforeIsolated,'healthy bound canvas still delivers');assert.equal(disk.get(canvasKey(destination.canvasId)),'{broken');
- assert(updates.slice(beforeIsolated).every(u=>u.id==='scene'),'corrupt form retains its last artwork rather than receiving a blank fallback');
- disk.set(canvasKey(destination.canvasId),JSON.stringify({cards:null}));const beforeMalformed=updates.length;await pushWidgets(ctx,JSON.stringify(source));assert(updates.slice(beforeMalformed).every(u=>u.id==='scene'));
+ assert(updates.slice(beforeIsolated).every(u=>u.data.canvasId===source.canvasId),'obsolete bindings to a corrupt inactive canvas do not hide the healthy active canvas');
+ const isolatedCatalog=JSON.parse(disk.get('fridge_canvases_json'));isolatedCatalog.activeId=destination.canvasId;disk.set('fridge_canvases_json',JSON.stringify(isolatedCatalog));const beforeMalformed=updates.length;await pushWidgets(ctx,JSON.stringify(source));assert.equal(updates.length,beforeMalformed,'corrupt active document retains the last artwork');disk.set(canvasKey(destination.canvasId),JSON.stringify({cards:null}));await pushWidgets(ctx,JSON.stringify(source));assert.equal(updates.length,beforeMalformed);
  // Reusable timetable migration must tolerate one damaged inactive canvas and
  // never overwrite a newer edit while an asynchronous legacy scan is pending.
  disk.clear();
@@ -229,3 +229,14 @@ function load(name) {
  console.log('PASS timed delivery: atomic packet, bound-source ownership, target fanout, original geometry during battery updates, persisted acknowledgement and foreground merge, refresh minimum/quota, imported schedule remapping and opt-in.');
  console.log('PASS: legacy migration, lazy multi-canvas storage, independent duplication, widget bindings/deletion and removed-form cleanup, preserved corruption, movement-stable palette, offline refresh guard, live battery/Form refresh, conservative pickup OCR, course week/parity/boundaries, bounded ICS/JSON imports with recurrence exceptions and calendar ACL gate.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
+
+const library=load('CanvasLibrary');
+for(const legacyFlag of [undefined,false,true]){
+ const old={version:1,activeId:'populated',canvases:[{id:'empty',name:'空画布'},{id:'populated',name:'当前画布'}]};
+ if(legacyFlag!==undefined)old.desktopFollowsSelection=legacyFlag;
+ const migrated=library.readCatalog(JSON.stringify(old));
+ assert.equal(migrated.desktopFollowsSelection,true);
+ assert.equal(library.boundCanvas({oldForm:'empty'},'oldForm',migrated),'populated','every legacy binding follows the durable active canvas without another manual selection');
+ assert.deepEqual(migrated.canvases,old.canvases,'migration never deletes other canvases');
+}
+console.log('PASS legacy canvas binding migration: missing/false/true policy, existing empty target retained and active document consistently selected');

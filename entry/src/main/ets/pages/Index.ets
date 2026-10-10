@@ -298,6 +298,7 @@ struct Index {
     // Changes already publish at their commit. A pure window roundtrip has no
     // edits to serialize or deliver, and page-hide/background must not duplicate it.
     if(this.saveTimer>=0)this.persist(true);
+    this.store.repairDesktopSelection().catch((e:Error):void=>{console.warn('Desktop binding migration: '+e.message);});
   }
   @StorageLink('appWindowFocused') @Watch('windowFocusChanged') appWindowFocused:boolean=true;
   private windowFocusChanged():void {if(!this.appWindowFocused)this.cancelForegroundRefresh();else if(this.ready)this.scheduleForegroundRefresh();}
@@ -364,6 +365,7 @@ struct Index {
       }
       // Opening an unchanged canvas is not an edit: do not reserialize it or
       // trigger a desktop delivery immediately after the entrance.
+      this.store.repairDesktopSelection().catch((e:Error):void=>{console.warn('Desktop binding migration: '+e.message);});
       this.syncSchedules(); this.updateScheduledScene(true);
       this.repairStoredSubjects(); this.refreshCapabilities();
     }, 1200);
