@@ -37,6 +37,10 @@ Images must be explicitly supplied or lawfully generated/obtained and embedded. 
 
 Use explicit unique card/element IDs, preserve group relations, and order z values intentionally. Whole-card transforms are separate from card-internal element positions. Do not normalize x/y/w/h all using the same scale; read the coordinate contract.
 
+## Scene artwork
+
+A timed scene is authored as one ordinary card, not a new package kind. Local schedules, target canvas IDs and acknowledgement history do not travel with artwork. Supply separate files for alternate canvases; the user sets rotation and trigger times in App. Manual canvas selection pauses rotation while retaining its settings. See the scheduling boundary in [current-format.md](references/current-format.md). Never promise precise background alarms from a desktop Form.
+
 ## Data and privacy
 
 Do not scrape private data to fill a template. Timetable and agenda use empty/unbound placeholders unless the user deliberately provides the data; do not invent their schedule. Battery starts unknown. No weather/parcel/fetch/online music capability. No arbitrary file, clipboard, account, health or network bridge. A shared binding does not authorize access to the recipient's data.

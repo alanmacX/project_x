@@ -11,6 +11,12 @@ HTML belongs to the `.fridge` framework, not a parallel website. Card geometry, 
 - At most one normal native capability; place it with capBox and leave its region blank in HTML. Time/date/calendar/battery/progress/local events/timetable use existing host data and permission semantics. No arbitrary script data bridge. Album retains its own exclusive appearance.
 - Native editing works on normal layers, card geometry and capability. App does **not** currently have an HTML source editor or rerenderer. Agent edits source externally and rebuilds its cache. Clearly disclose this.
 
+## Data boundary
+
+HTML describes static decoration; the native capability describes a recipient-side binding. Export/import sanitize that capability through the production `SharedCapability` allowlist. Do not serialize private timetable or agenda records, battery snapshots, reminder targets, or authorization into HTML text, data images or the cache: the host cannot erase private information already painted into artwork. Use synthetic fixtures only in QA, outside the shared file.
+
+The authoring helper uses 32–320 vp width and 32–420 vp height; the reader permits logical viewports up to 1024×1024 for compatibility. Larger reader limits are not a recommendation for oversized cards. PNG pixel resolution is separate from logical viewport size; the standard cache is 2×. Preserve all original sources and regenerate source/cache together before packaging, then check in the actual reader. Host-only material/layout updates do not require executing HTML again.
+
 ## Authoring workflow
 
 1. Read the current generated design contract, colors/radii and capability metrics. Source must use system fonts, fit its fixed viewport, avoid app controls and leave native text slots readable. Use host-style cream colors, subtle depth and restrained accents; creativity may use static HTML/CSS gradients and typography. Do not rasterize native dynamic content into the cache.
@@ -21,3 +27,8 @@ HTML belongs to the `.fridge` framework, not a parallel website. Card geometry, 
 6. For a whole canvas, combine these ordinary cards and merge/rekey their assets, keeping html.previewElementId linked to its layer. Exporting from App handles this automatically.
 
 No user JS, event handlers, iframe/object/embed, form controls, remote resources/fonts, CSS/SVG animation, fetch, filesystem bridge or account access. Static SVG gradients may refer to local IDs via url(#id). Source contains only static local appearance; images must be embedded data URIs. The authoring CSP also blocks any unknown resource paths. Unknown template/design versions are rejected, not silently stripped. Runtime never executes source. Keep source/version/cache separate so later renderer/design updates can rebuild from the original source with user approval and visual QA.
+
+
+## Other agent platforms
+
+This skill’s scripts require an authoring environment with Node and, for automatic caching, Chromium. A platform accepting a Skill description does not establish those tools are available. Port the workflow through the platform’s supported local tools; feed the same production reader, privacy allowlist and preview contract. Do not claim small-artifact text generation proves PNG rendering, image access, editable import, or desktop parity. No cloud renderer is implied.
