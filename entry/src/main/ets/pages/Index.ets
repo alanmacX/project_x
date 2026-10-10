@@ -1904,7 +1904,7 @@ struct Index {
           onMaterial:(material:string)=>{const bg=normalizeBackground(this.canvasBackground);bg.frameMaterial=material;this.applyBackground(bg);}})
           .width('100%')
       }.width('100%').constraintSize({maxWidth:640}).padding({top:8,left:4,right:4,bottom:12})
-    }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
+    }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring).fadingEdge(true,{fadingEdgeLength:LengthMetrics.vp(12)})
   }
   private shareCards: FridgeCard[] = [];
   private shareSingle: boolean = false;
@@ -2168,7 +2168,7 @@ struct Index {
   @Builder
   editorLayers() {
     Scroll() {Column({space:8}) {this.layerEntries()}.width('100%').padding({top:8,bottom:8,right:4})}
-      .id('editorLayerStrip').width(this.editorWorkspace().layersW).height(this.previewPaneHeight()+(this.editorLandscape()?0:64)).scrollable(ScrollDirection.Vertical).align(Alignment.Top).scrollBar(BarState.Off)
+      .id('editorLayerStrip').width(this.editorWorkspace().layersW).height(this.previewPaneHeight()+(this.editorLandscape()?0:64)).scrollable(ScrollDirection.Vertical).align(Alignment.Top).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring).fadingEdge(true,{fadingEdgeLength:LengthMetrics.vp(10)})
   }
   private capabilityHasEditableData():boolean {return ['countdown','anniversary','worldclock','agenda','timetable','album'].includes(this.preview.capability?.k??'');}
   private editorTools():string[] {

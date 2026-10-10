@@ -5,6 +5,8 @@ import { immersiveChrome } from '../model/ChromeMaterial';
 import { AppDesign } from '../model/AppDesign';
 import { SettingsSegmented } from './SettingsSegmented';
 import { settingsExpansionMotion, settingsContentSwap } from '../model/SettingsMotion';
+import { LengthMetrics } from '@kit.ArkUI';
+import { SettingsCounter } from './SettingsCounter';
 import { SettingsSelect } from './SettingsSelect';
 @Component
 export struct SceneSchedulePanel {
@@ -88,7 +90,7 @@ export struct SceneSchedulePanel {
       if(this.draftRepeat==='once'){Button(this.draftDate,{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(40).fontSize(13).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.pickDate())}
       else {Row({space:4}){ForEach([1,2,3,4,5,6,0],(d:number)=>{Button(['日','一','二','三','四','五','六'][d],{type:ButtonType.Circle}).height(40).layoutWeight(1).fontColor(AppDesign.choiceText(this.appDark,this.draftWeekdays.includes(d))).backgroundColor(AppDesign.choice(this.appDark,this.draftWeekdays.includes(d))).onClick(()=>this.draftWeekdays=this.draftWeekdays.includes(d)?this.draftWeekdays.filter(n=>n!==d):this.draftWeekdays.concat(d))},(d:number)=>String(d))}.width('100%')}
       Row(){Text('到点出现').fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Button(sceneClock(this.draftStart),{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(40).fontSize(13).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.pickTime())}.width('100%')
-      Row({space:12}){Text('最多显示').fontColor(AppDesign.text(this.appDark)).layoutWeight(1);this.action('−',()=>this.draftTimeout=Math.max(1,this.draftTimeout-1));Text(this.draftTimeout+' 分钟').fontSize(14).fontColor(AppDesign.text(this.appDark));this.action('+',()=>this.draftTimeout=Math.min(120,this.draftTimeout+1))}.width('100%')
+      SettingsCounter({label:'显示时长（分钟）',value:this.draftTimeout,minimum:1,maximum:120,step:1,onChange:(value:number)=>{this.draftTimeout=value;}})
 
       Button('保存',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.EMPHASIZED}).height(44).width('100%').backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).enabled(this.draftName.trim().length>0&&(this.draftRepeat==='once'||this.draftWeekdays.length>0)).onClick(()=>{this.onSave(this.draftRule());this.setEditingRule(false);})
     }.width('100%').padding(12).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
@@ -145,10 +147,10 @@ export struct SceneSchedulePanel {
         TabContent() {
           Scroll(this.contentScroller) {
             Stack({alignContent:Alignment.TopStart}) {ForEach([this.editingRule],(editing:boolean)=>{Column() {if(editing){this.timing()}else{this.sceneList()}}.width('100%').alignItems(HorizontalAlign.Start).transition(settingsContentSwap())},(editing:boolean)=>String(editing))}.width('100%')
-          }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
+          }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring).fadingEdge(true,{fadingEdgeLength:LengthMetrics.vp(12)})
         }
         TabContent() {
-          Scroll() {this.rotationEditor()}.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
+          Scroll() {this.rotationEditor()}.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring).fadingEdge(true,{fadingEdgeLength:LengthMetrics.vp(12)})
         }
       }.width('100%').layoutWeight(1).barHeight(0).scrollable(false).animationDuration(180).onChange((index:number)=>{this.tab=index;this.onTabChange(index);})
     }.width('100%').height('100%').padding({top:8,left:8,right:8,bottom:8})

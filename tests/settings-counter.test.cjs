@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
+const source=fs.readFileSync('entry/src/main/ets/views/SettingsCounter.ets','utf8');
+const body=source.slice(source.indexOf('  @Prop'),source.indexOf('  build()')).replace(/@(Prop|State)(?:\s+@Watch\('[^']+'\))?/g,'');
+const context={exports:{},CounterType:{LIST:0}};
+vm.runInNewContext(ts.transpileModule('export class Fixture {'+body+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,context);
+const counter=new context.exports.Fixture();counter.label='显示时长（分钟）';counter.minimum=1;counter.maximum=120;counter.step=1;counter.value=15;counter.aboutToAppear();
+const changes=[];counter.onChange=value=>changes.push(value);
+const first=counter.options(counter.instance).numberOptions;
+assert.equal(first.min,1);assert.equal(first.max,120);assert.equal(first.step,1);assert.equal(first.label,'显示时长（分钟）');
+first.onChange(16);counter.value=16;counter.valueChanged();assert.equal(counter.instance,0,'native taps and parent echo preserve the instance and held-button repeat');
+first.onChange(16);first.onChange(NaN);first.onChange(121);assert.deepEqual(changes,[16]);
+counter.value=42;counter.valueChanged();assert.equal(counter.instance,1,'external draft restore resets native initial value');
+first.onChange(17);assert.deepEqual(changes,[16],'retired control cannot change a newly restored scene draft');
+const restored=counter.options(counter.instance).numberOptions;assert.equal(restored.value,42);restored.onChange(43);assert.deepEqual(changes,[16,43]);
+counter.label='字号';counter.minimum=10;counter.maximum=64;counter.step=2;counter.configurationChanged();restored.onChange(44);assert.deepEqual(changes,[16,43],'changed control configuration invalidates previous callbacks');
+console.log('PASS native counter: arbitrary bounds, repeat-safe parent echo, external restore and stale-instance rejection');

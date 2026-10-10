@@ -24,6 +24,7 @@ export struct SettingsSelect {
       .font({size:14}).fontColor(AppDesign.text(this.appDark))
       .optionFont({size:14}).optionFontColor(AppDesign.text(this.appDark)).optionBgColor(Color.Transparent)
       .selectedOptionFontColor(AppDesign.onSelected(this.appDark)).selectedOptionBgColor(AppDesign.selected(this.appDark))
+      .optionWidth(OptionWidthMode.FIT_TRIGGER).menuAlign(MenuAlignType.START)
       .menuBackgroundColor(AppDesign.surface(this.appDark)).menuBackgroundBlurStyle(BlurStyle.NONE)
       .backgroundColor(AppDesign.control(this.appDark)).controlSize(ControlSize.NORMAL)
       .width('100%').height(AppDesign.controlHeight).borderRadius(AppDesign.controlHeight / 2).clip(true)
