@@ -51,7 +51,7 @@ for(const style of ['classic','portrait','row'])for(const [w,h] of [[208,208],[2
 console.log('PASS: album metadata candidates preserve square artwork and bounded metadata regions.');
 // Approved geometry and mode survive local storage / portable package normalization.
 const classic=albumInfoGeometry(180,180,'classic'),row=albumInfoGeometry(300,150,'row');
-assert.equal(classic.coverSize,97.5);assert.equal(classic.textY,119);assert.equal(classic.titleLines,2);assert.equal(classic.artistLines,1);assert.equal(classic.artistGap,3);
+assert.equal(classic.coverSize,97.5);assert.equal(classic.textY,119);assert.equal(classic.titleLines,2);assert.equal(classic.artistLines,1);assert.ok(classic.artistGap<=3);assert.ok(classic.textY+(classic.titleSize*classic.titleLines+classic.artistSize*classic.artistLines)*1.15+classic.artistGap<=180-13.5+1e-8,'all metadata lines fit the inner card');
 assert.equal(row.coverSize,123);assert.equal(row.textX,151.5);assert.equal(row.textY,75);assert.equal(row.centerText,true);assert.equal(row.artistLines,2);
 assert.equal(normalizeCapability({k:'album',albumPresentation:'row'}).albumPresentation,'row');
 assert.equal(normalizeCapability({k:'album',albumPresentation:'classic'}).albumPresentation,'classic');

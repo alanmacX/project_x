@@ -1,17 +1,18 @@
 import { capabilityRenderTick } from '../../model/CapabilityClock';
 import { cardRenderSnapshot } from '../../model/CardViewSnapshot';
 import { FridgeCard, CanvasBackground, normalizeBackground, BOARD_W } from '../../model/CardSchema';
-import { scenePercent } from '../../model/SceneLayout';
+import { scenePercent, canvasViewport, SceneRect } from '../../model/SceneLayout';
 import { CanvasFrame } from '../../views/CanvasFrame';
 import { CardFace } from '../../views/CardFace';
 
 function initialFormBackground():CanvasBackground {const bg=new CanvasBackground();bg.mode='transparent';return bg;}
-interface WidgetScenePacket {cards:string;background:string;canvasId:string;context:string;rev:number;}
+interface WidgetScenePacket {cards:string;background:string;canvasId:string;context:string;aspect?:number;rev:number;}
 interface WidgetSceneContext {ruleId:string;occurrence:string;baseId:string;focusId:string;}
 @Entry
 @Component
 struct FridgeWidgetCard {
   @LocalStorageProp('scenePacket') @Watch('syncPacket') packetJson:string='';
+  @State authoredAspect:number=1;
   @State scenePhase:number=0;
   @State sceneReady:boolean=false;
   @State focusId:string='';
@@ -55,13 +56,14 @@ struct FridgeWidgetCard {
     let packet:WidgetScenePacket;
     try{packet=JSON.parse(this.packetJson) as WidgetScenePacket;if(typeof packet.cards!=='string'||typeof packet.background!=='string')return;}catch(_){return;}
     // Visibility/time refreshes still update rev, but identical artwork needs no rebuild.
-    if(!this.sceneAnimating && this.appliedPacket && this.displayCanvasId===packet.canvasId && this.appliedCards===packet.cards && this.appliedBackground===packet.background && this.appliedContext===packet.context) {this.appliedPacket=this.packetJson;return;}
+    if(!this.sceneAnimating && this.appliedPacket && this.displayCanvasId===packet.canvasId && this.appliedCards===packet.cards && this.appliedBackground===packet.background && this.appliedContext===packet.context && this.authoredAspect===(packet.aspect??1)) {this.appliedPacket=this.packetJson;return;}
     const cards=this.parse(packet.cards).sort((a,b)=>a.z-b.z);
     const backgroundChanged=this.appliedBackground!==packet.background;
     const first=this.appliedPacket.length===0,differentCanvas=!first&&this.displayCanvasId!==packet.canvasId;
     const generation=++this.sceneGeneration;
     this.appliedPacket=this.packetJson;
     const apply=():void=>{
+      const aspect=packet.aspect??1;this.authoredAspect=Number.isFinite(aspect)&&aspect>=.3&&aspect<=3?aspect:1;
       this.displayCanvasId=packet.canvasId;this.appliedCards=packet.cards;this.appliedBackground=packet.background;this.appliedContext=packet.context;
       try{this.context=packet.context?JSON.parse(packet.context) as WidgetSceneContext:null;}catch(_){this.context=null;}
       this.focusId=this.context?.focusId??'';
@@ -101,6 +103,7 @@ struct FridgeWidgetCard {
   @State measuredHeight: number = 0;
   private widthValue(): number { return this.measuredWidth > 0 ? this.measuredWidth : this.canvasWidth; }
   private heightValue(): number { return this.measuredHeight > 0 ? this.measuredHeight : this.canvasHeight; }
+  private viewport():SceneRect {return canvasViewport(this.widthValue(),this.heightValue(),this.authoredAspect);}
   private parse(json: string): FridgeCard[] {
     try { return JSON.parse(json) as FridgeCard[]; } catch (_) { return []; }
   }
@@ -117,10 +120,11 @@ struct FridgeWidgetCard {
   }
   private open(): void {
     postCardAction(this, { action: 'router', abilityName: 'EntryAbility',
-      params: { canvasId: this.displayCanvasId||this.canvasId, viewCardId: '', canvasDimension: this.dim, canvasAspect: String(this.widthValue() / this.heightValue()) } });
+      params: { canvasId: this.displayCanvasId||this.canvasId, viewCardId: '', canvasDimension: this.dim, canvasAspect: String(this.authoredAspect) } });
   }
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
+      Stack({alignContent:Alignment.TopStart}) {
       Stack() {
         if(this.displayed.mode!=='transparent'){
         Stack(){
@@ -151,16 +155,18 @@ struct FridgeWidgetCard {
       }
       ForEach(this.cardIds, (id: string) => {
         Stack({alignContent:Alignment.TopStart}) {
-          CardFace({card:this.cardMap[id],scaleFactor:this.widthValue()/BOARD_W,tick:capabilityRenderTick(this.cardMap[id].capability,this.renderTick),widget:true})
+          CardFace({card:this.cardMap[id],scaleFactor:this.viewport().w/BOARD_W,tick:capabilityRenderTick(this.cardMap[id].capability,this.renderTick),widget:true})
             .width('100%').height('100%').hitTestBehavior(HitTestMode.None)
-        }.width(scenePercent(this.cardMap[id],this.widthValue()/this.heightValue()).w+'%')
-          .height(scenePercent(this.cardMap[id],this.widthValue()/this.heightValue()).h+'%')
-          .position({x:scenePercent(this.cardMap[id],this.widthValue()/this.heightValue()).x+'%',y:scenePercent(this.cardMap[id],this.widthValue()/this.heightValue()).y+'%'})
+        }.width(scenePercent(this.cardMap[id],this.authoredAspect).w+'%')
+          .height(scenePercent(this.cardMap[id],this.authoredAspect).h+'%')
+          .position({x:scenePercent(this.cardMap[id],this.authoredAspect).x+'%',y:scenePercent(this.cardMap[id],this.authoredAspect).y+'%'})
           .rotate({angle:this.cardMap[id].rot,centerX:0,centerY:'100%'})
           .zIndex(this.cardMap[id].z).hitTestBehavior(HitTestMode.None)
       }, (id: string) => id)
+      }.width(this.viewport().w/this.widthValue()*100+'%').height(this.viewport().h/this.heightValue()*100+'%')
+        .position({x:this.viewport().x/this.widthValue()*100+'%',y:this.viewport().y/this.heightValue()*100+'%'}).clip(true)
       if(this.canvasBackground.frameStyle!=='none'){CanvasFrame({material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle}).width('100%').height('100%').zIndex(100000).hitTestBehavior(HitTestMode.None)}
-    }.width('100%').height('100%').backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:Color.White).borderRadius(this.canvasBackground.frameStyle==='none'?24:this.widthValue()*31/600).clip(true)
+    }.width('100%').height('100%').backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:this.canvasBackground.color).borderRadius(this.canvasBackground.frameStyle==='none'?24:this.widthValue()*31/600).clip(true)
       // Cache the complete clipped form, including shadow fringes, while its
       // host scales it during launch/return. Crossfades render live until settled.
       .renderGroup(this.incoming===null)

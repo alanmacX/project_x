@@ -50,7 +50,7 @@ import { CanvasEntry, withScenePolicy, sceneDocumentExists } from '../model/Canv
 import lazy { GroupSelection } from '../views/GroupSelection';
 import { GroupBox, groupBox, groupMinimumScale, transformGroup } from '../model/GroupGeometry';
 import { BoardMotion, GroupPose } from '../model/BoardMotion';
-import { clampCanvasGroups, layerSections, LayerSection, combineCards, ungroupCards, groupMembers, groupDragBounds, cleanGroups } from '../model/CardGroups';
+import { layerSections, LayerSection, combineCards, ungroupCards, groupMembers, groupDragBounds, cleanGroups } from '../model/CardGroups';
 import lazy { PhotoCrop } from '../views/PhotoCrop';
 import lazy { prepareSceneRelief } from '../model/SceneRelief';
 import { CanvasFrame } from '../views/CanvasFrame';
@@ -334,9 +334,8 @@ struct Index {
       for (const card of this.store.state.cards) {
         if (!ensureCapabilitySize(card)) this.error = '部分卡片内部空间不足，请放大、更换形状或移除能力';
       }
-      this.canvasDimension = this.widgetDimension || '4*4';
-      this.canvasAspect = this.widgetAspect > 0 ? this.widgetAspect : (this.store.canvasSpecs[this.canvasDimension] ?? (this.canvasDimension === '6*4' ? 2 / 3 : (this.canvasDimension === '2*4' ? 2 : 1)));
-      clampCanvasGroups(this.store.state.cards,BOARD_W/this.canvasAspect);
+      this.canvasDimension=this.store.state.canvasDimension;
+      this.canvasAspect=this.store.state.canvasAspect; // Authored ratio is independent of launcher orientation.
       // The launcher already animates the form into this window. A second cold
       // scatter/prepare sequence underneath it fights quick gesture cancellation.
       const widgetLaunch=AppStorage.get<boolean>('launchFromWidget')===true;
@@ -428,7 +427,7 @@ struct Index {
   private applyScheduledScene(next:ScheduledScene):void {
     const previous=this.timedScene?.key??'base',differentCanvas=(this.timedScene?.state.canvasId??this.store.state.canvasId)!==next.state.canvasId;
     if(previous!==next.key){this.backgroundGeneration++;if(this.backgroundTimer>=0)clearTimeout(this.backgroundTimer);this.backgroundTimer=-1;this.backgroundBusy=false;}
-    const apply=():void=>{if(next.normalState.canvasId!==this.store.state.canvasId){this.store.adoptCanvas(next.normalState);this.refreshCanvasList();this.persist(false);}this.timedScene=next.ruleId?next:null;this.scheduledFocusId=next.focusId;this.scheduledName=next.ruleId?next.name||'定时场景':'';if(previous!==next.key||differentCanvas){this.selectedId='';this.groupSelecting=false;this.groupSelection=[];}this.canvasBackground=next.state.background;this.renderBoard();if(previous!==next.key||differentCanvas)this.store.refreshWidgets().catch((e:Error)=>this.templateError('桌面刷新未完成',e));if(!next.ruleId&&previous!=='base')this.scheduleBackground();};
+    const apply=():void=>{if(next.normalState.canvasId!==this.store.state.canvasId){this.store.adoptCanvas(next.normalState);this.canvasAspect=this.store.state.canvasAspect;this.canvasDimension=this.store.state.canvasDimension;this.layoutBoard();this.refreshCanvasList();this.persist(false);}this.timedScene=next.ruleId?next:null;this.scheduledFocusId=next.focusId;this.scheduledName=next.ruleId?next.name||'定时场景':'';if(previous!==next.key||differentCanvas){this.selectedId='';this.groupSelecting=false;this.groupSelection=[];}this.canvasBackground=next.state.background;this.renderBoard();if(previous!==next.key||differentCanvas)this.store.refreshWidgets().catch((e:Error)=>this.templateError('桌面刷新未完成',e));if(!next.ruleId&&previous!=='base')this.scheduleBackground();};
     if(previous===next.key&&!differentCanvas){apply();return;}
     const transitionGeneration=++this.scheduleVisualGeneration;this.scheduleTransition=true;
     if(differentCanvas||next.focusId.length>0||(this.timedScene?.focusId??'').length>0) {
@@ -470,7 +469,7 @@ struct Index {
     this.sceneReturnId=this.store.catalog.activeId;await this.store.save(false);
     if(create){id=this.store.createTimedScene('定时场景 '+(this.store.catalog.scenes.length+1),source??undefined);const rule=new SceneRule();rule.id=this.store.newId();rule.kind='focus';rule.centralOnly=true;rule.untilDismissed=false;rule.targetId=id;rule.name=this.store.activeName;rule.start=(new Date().getHours()*60+new Date().getMinutes()+5)%1440;rule.enabled=true;rule.createdAt=Date.now();this.store.catalog.sceneRules.push(rule);await this.store.save(false);}
     else if(!await this.store.openCanvas(id))return;
-    this.sceneEditing=true;this.selectedId='';this.groupSelecting=false;this.groupSelection=[];this.canvasBackground=this.store.state.background;this.refreshCanvasList();this.syncSchedules();this.render();
+    this.canvasAspect=this.store.state.canvasAspect;this.canvasDimension=this.store.state.canvasDimension;this.layoutBoard();this.sceneEditing=true;this.selectedId='';this.groupSelecting=false;this.groupSelection=[];this.canvasBackground=this.store.state.background;this.refreshCanvasList();this.syncSchedules();this.render();
     if(this.store.state.cards.length===0)this.addCard();
     }catch(e){this.templateError('场景编辑未完成',e as Error);}finally{this.sceneNavigationBusy=false;}
   }
@@ -506,6 +505,7 @@ struct Index {
       if(manual){if(!await this.store.selectCanvas(id))return;}else{await this.store.save(false);if(!await this.store.openCanvas(id))return;await this.store.save(false);}
       this.scheduleGeneration++;this.timedScene=null;this.scheduleOverride=null;this.scheduledName='';this.scheduledFocusId='';this.syncSchedules();
       this.selectedId = ''; this.activeBoardId = ''; this.groupSelection = []; this.groupSelecting = false;
+      this.canvasAspect=this.store.state.canvasAspect;this.canvasDimension=this.store.state.canvasDimension;this.layoutBoard();
       this.canvasBackground = this.store.state.background; this.refreshCanvasList();
       await primeRenderContours(this.store.state.cards,storageSnapshot(this.store.state));
       this.render(); this.persist(true); this.scheduleBackground(); this.canvasPickerOpen = false;
@@ -702,7 +702,7 @@ struct Index {
     return false;
   }
   private widgetFrameChanged(): void {
-    if (this.widgetAspect > 0) { this.canvasDimension = this.widgetDimension || this.canvasDimension; this.canvasAspect = this.widgetAspect; this.layoutBoard(); }
+    if(this.ready){this.canvasAspect=this.store.state.canvasAspect;this.canvasDimension=this.store.state.canvasDimension;this.layoutBoard();}
   }
   private homeToolsChanged():void {
     if(!this.ready||this.editing||this.heroActive){this.homeToolsMotionGeneration++;this.homeToolsMoving=false;return;}
@@ -885,7 +885,7 @@ struct Index {
       await this.store.init(this.context);if(canvas)await this.store.openCanvas(canvas);
       await primeRenderContours(this.store.state.cards,storageSnapshot(this.store.state));
       if(!this.alive)return;
-      this.refreshCanvasList();this.canvasBackground=this.store.state.background;
+      this.refreshCanvasList();this.canvasAspect=this.store.state.canvasAspect;this.canvasDimension=this.store.state.canvasDimension;this.canvasBackground=this.store.state.background;
       this.retireChrome();this.editing=false;this.heroActive=false;this.viewing=false;this.selectedId='';this.activeBoardId='';this.boardOpacity=1;this.render();this.layoutBoard();
       AppStorage.setOrCreate('viewCardId','');
       if(this.routeCanvasId===canvas)AppStorage.setOrCreate('routeCanvasId','');

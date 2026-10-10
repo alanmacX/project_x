@@ -73,3 +73,8 @@ export function weekLessons(cap: CapBlock, week: number): WeekLesson[] {
   return out;
 }
 export function minuteOf(time: number): number { const d = new Date(time); return d.getHours() * 60 + d.getMinutes(); }
+
+/** Only whole lesson tiles enter the visible grid; source courses remain untouched. */
+export function visibleLessonCount(height:number,count:number,columns:number):number {
+  return Math.min(Math.max(0,count),Math.max(0,Math.floor((height-BRIEF_HEADER_HEIGHT)/LESSON_CELL_HEIGHT))*Math.max(1,columns));
+}

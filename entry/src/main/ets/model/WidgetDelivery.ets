@@ -16,11 +16,11 @@ export async function deliverWidget(formId: string, json: string, dim: string, s
   const payload = await prepareWidgetPayload(json,contourCache,previousManifest,await prepareSceneRelief(JSON.stringify((JSON.parse(json) as FridgeState).cards)));
   const prepared=Date.now();
   try {
-    const canvasId=(JSON.parse(json) as FridgeState).canvasId;
+    const state=JSON.parse(json) as FridgeState,canvasId=state.canvasId;
     const revision=Date.now();
     const data: Record<string, Object> = {
       // One atomic scene, rather than four copies of all outlines and image references.
-      'scenePacket':JSON.stringify({cards:payload.cards,background:payload.background,canvasId:canvasId??'canvas_main',context:sceneContext,rev:revision}),
+      'scenePacket':JSON.stringify({cards:payload.cards,background:payload.background,canvasId:canvasId??'canvas_main',context:sceneContext,aspect:state.canvasAspect,rev:revision}),
       'canvasId':canvasId??'canvas_main',
       'canvasWidth': canvasWidth, 'canvasHeight': canvasHeight, 'rev': revision, 'dim': dim, 'formId': formId
     };

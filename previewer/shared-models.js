@@ -1103,7 +1103,8 @@ exports.isSquareAlbumCover = isSquareAlbumCover;
 function albumInfoGeometry(width, height, style) {
     const w = Math.max(0, width), h = Math.max(0, height), row = style === 'row', s = Math.min(w / (row ? 300 : 180), h / (row ? 150 : 180)), pad = 13.5 * s, gap = (row ? 15 : 8) * s;
     const cover = row ? Math.max(0, Math.min(h - 2 * pad, w - 2 * pad - gap - 60 * s)) : 97.5 * s;
-    return { coverX: pad, coverY: pad, coverSize: cover, textX: row ? pad + cover + gap : pad, textY: row ? h / 2 : pad + cover + gap, textWidth: Math.max(0, row ? w - 2 * pad - cover - gap : w - 2 * pad), titleSize: (row ? 17 : 15.3) * s, artistSize: (row ? 14 : 12.24) * s, artistGap: (row ? 6 : 3) * s, titleLines: 2, artistLines: row ? 2 : 1, centerText: row };
+    const textHeight = row ? h - 2 * pad : Math.max(0, h - pad - (pad + cover + gap)), typeScale = Math.min(1, textHeight / Math.max(.001, (((row ? 17 : 15.3) * 2 + (row ? 14 : 12.24) * (row ? 2 : 1)) * 1.15 + (row ? 6 : 3)) * s));
+    return { coverX: pad, coverY: pad, coverSize: cover, textX: row ? pad + cover + gap : pad, textY: row ? h / 2 : pad + cover + gap, textWidth: Math.max(0, row ? w - 2 * pad - cover - gap : w - 2 * pad), titleSize: (row ? 17 : 15.3) * s * typeScale, artistSize: (row ? 14 : 12.24) * s * typeScale, artistGap: (row ? 6 : 3) * s * typeScale, titleLines: 2, artistLines: row ? 2 : 1, centerText: row };
 }
 exports.albumInfoGeometry = albumInfoGeometry;
 
@@ -2044,7 +2045,7 @@ exports.attachedPath = attachedPath;
 "CapabilityMetrics":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.boundedReadoutFont = exports.capabilityContentScale = exports.capabilityReadableMinimum = exports.MIN_CAPABILITY_SCALE = exports.capabilityFits = exports.compactCapability = exports.capabilityMinimum = exports.CapabilitySize = void 0;
+exports.capabilityVisualHeight = exports.boundedReadoutFont = exports.capabilityContentScale = exports.capabilityReadableMinimum = exports.MIN_CAPABILITY_SCALE = exports.capabilityFits = exports.compactCapability = exports.capabilityMinimum = exports.CapabilitySize = void 0;
 const TimetableLayout_1 = require("./TimetableLayout");
 class CapabilitySize {
     constructor() {
@@ -2062,7 +2063,7 @@ function capabilityMinimum(cap, compact = false, availableWidth = 0) {
         return size;
     }
     if (cap.k === 'timetable') {
-        const count = cap.timetableMode === 'day' ? (0, TimetableLayout_1.timetableCapacity)(cap) : 1, columns = (0, TimetableLayout_1.briefColumns)(availableWidth);
+        const count = cap.timetableMode === 'day' && !compact ? (0, TimetableLayout_1.timetableCapacity)(cap) : 1, columns = (0, TimetableLayout_1.briefColumns)(availableWidth);
         size.w = cap.timetableMode === 'day' ? columns * TimetableLayout_1.LESSON_MIN_WIDTH : compact ? 80 : TimetableLayout_1.LESSON_MIN_WIDTH;
         size.h = cap.timetableMode === 'day' ? (0, TimetableLayout_1.briefHeight)(count, columns) : (0, TimetableLayout_1.briefHeight)(1, 1);
         return size;
@@ -2175,12 +2176,33 @@ function boundedReadoutFont(nominal, width, emWidth) {
     return Math.max(0, Math.min(nominal, width / Math.max(1, emWidth)));
 }
 exports.boundedReadoutFont = boundedReadoutFont;
+/** Conservative native line/graphic budgets. Never clip a readout to its nominal minimum. */
+function capabilityVisualHeight(cap, compact) {
+    if (cap.k === 'clock')
+        return compact ? 34 : 58;
+    if (cap.k === 'worldclock')
+        return compact ? 88 : 124;
+    if (cap.k === 'lunar')
+        return compact ? 70 : 84;
+    if (cap.k === 'date')
+        return compact ? 56 : 98;
+    if (cap.k === 'calendar')
+        return compact ? ((cap.calendarOffset ?? 0) === 0 ? 70 : 80) : 216;
+    if (cap.k === 'countdown' || cap.k === 'anniversary')
+        return compact ? 56 : 120;
+    if (cap.k === 'dayprogress' || cap.k === 'yearprogress')
+        return compact ? 64 : 84;
+    if (cap.k === 'battery')
+        return compact ? 56 : 80;
+    return 0;
+}
+exports.capabilityVisualHeight = capabilityVisualHeight;
 
 },
 "TimetableLayout":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.minuteOf = exports.weekLessons = exports.weekStart = exports.WeekLesson = exports.briefHeight = exports.lessonContext = exports.lessonRowHeight = exports.briefColumns = exports.timetableCapacity = exports.BRIEF_HEADER_HEIGHT = exports.LESSON_CELL_HEIGHT = exports.LESSON_MIN_WIDTH = void 0;
+exports.visibleLessonCount = exports.minuteOf = exports.weekLessons = exports.weekStart = exports.WeekLesson = exports.briefHeight = exports.lessonContext = exports.lessonRowHeight = exports.briefColumns = exports.timetableCapacity = exports.BRIEF_HEADER_HEIGHT = exports.LESSON_CELL_HEIGHT = exports.LESSON_MIN_WIDTH = void 0;
 const CapabilityData_1 = require("./CapabilityData");
 exports.LESSON_MIN_WIDTH = 104;
 exports.LESSON_CELL_HEIGHT = 32;
@@ -2307,6 +2329,11 @@ function weekLessons(cap, week) {
 exports.weekLessons = weekLessons;
 function minuteOf(time) { const d = new Date(time); return d.getHours() * 60 + d.getMinutes(); }
 exports.minuteOf = minuteOf;
+/** Only whole lesson tiles enter the visible grid; source courses remain untouched. */
+function visibleLessonCount(height, count, columns) {
+    return Math.min(Math.max(0, count), Math.max(0, Math.floor((height - exports.BRIEF_HEADER_HEIGHT) / exports.LESSON_CELL_HEIGHT)) * Math.max(1, columns));
+}
+exports.visibleLessonCount = visibleLessonCount;
 
 },
 "CapabilityData":function(require,module,exports){
@@ -4145,4 +4172,4 @@ function scenePolicyShell(base) {
 }
 exports.scenePolicyShell = scenePolicyShell;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"564e2598a1048ec75f79b8f112bff2aa3775993d4a17e7d5e07770ed013ece0e"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"ac172af927dd7bbab337209d34a93ec0ae7524ae068f3fc8021507dbef32077d"};})(globalThis);

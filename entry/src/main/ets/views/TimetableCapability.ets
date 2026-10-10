@@ -8,7 +8,7 @@ import { holidayKnown, dateKey } from '../model/HolidayCalendar';
 import { readingHalo } from '../model/CapabilityPresentation';
 import { CapBlock, AgendaItem } from '../model/CardSchema';
 import { timetableDisplay, TimetableDisplay, timeText } from '../model/CapabilityData';
-import { briefColumns, LESSON_CELL_HEIGHT, BRIEF_HEADER_HEIGHT, lessonRowHeight, lessonContext } from '../model/TimetableLayout';
+import { briefColumns, LESSON_CELL_HEIGHT, BRIEF_HEADER_HEIGHT, lessonRowHeight, lessonContext, visibleLessonCount } from '../model/TimetableLayout';
 import { capabilityFits, capabilityContentScale, compactCapability } from '../model/CapabilityMetrics';
 @Component
 export struct TimetableCapability {
@@ -42,12 +42,13 @@ export struct TimetableCapability {
     let width=measure(this.calendarPending()?'假期待确认':this.display.heading,10*s)+measure(this.dateLabel(),8.5*s)+18*s;
     if(!this.display.lessons.length)width=Math.max(width,measure(this.display.empty,11.5*s));
     else {
-      let cell=0;for(const lesson of this.display.lessons)cell=Math.max(cell,measure(lesson.title,11.5*s),measure(lesson.location||'地点待定',8.5*s));
+      let cell=0;for(const lesson of this.shownLessons())cell=Math.max(cell,measure(lesson.title,11.5*s),measure(lesson.location||'地点待定',8.5*s));
       width=Math.max(width,(cell+44*s)*(this.cap.timetableMode==='day'?this.columns():1));
     }
     return Math.min((this.contentWidth+2*compositionPadding(this.cap.readingBlend??''))*this.scaleFactor,Math.ceil(width)+2*compositionPadding(this.cap.readingBlend??'')*s);
   }
-  private rowHeight():number {return lessonRowHeight(this.contentHeight/Math.max(.001,this.contentScale()),this.cap.timetableMode==='day'?this.display.lessons.length:1,this.cap.timetableMode==='day'?this.columns():1);}
+  private shownLessons():AgendaItem[] {const count=this.cap.timetableMode==='day'?visibleLessonCount(this.contentHeight/Math.max(.001,this.contentScale()),this.display.lessons.length,this.columns()):1;return this.display.lessons.slice(0,count);}
+  private rowHeight():number {return lessonRowHeight(this.contentHeight/Math.max(.001,this.contentScale()),this.cap.timetableMode==='day'?this.shownLessons().length:1,this.cap.timetableMode==='day'?this.columns():1);}
   private dayCellHeight():number {return this.rowHeight()*this.s();}
   private titleLines():number {return this.rowHeight()>=48?2:1;}
   private roomLines():number {return this.rowHeight()>=60?2:1;}
@@ -57,21 +58,22 @@ export struct TimetableCapability {
   @Builder
   heading() {
     Row({space:3*this.s()}) {
-      Text(this.calendarPending()?'假期待确认':this.display.heading).fontSize(10*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
-      Text(this.dateLabel()).fontSize(8.5*this.s()).fontColor(this.ink).opacity(.6).maxLines(1)
-      SymbolGlyph($r('sys.symbol.calendar')).fontSize(10*this.s()).fontColor([this.ink]).accessibilityLevel('no')
+      Text(this.calendarPending()?'假期待确认':this.display.heading).fontSize(10*this.s()).fontWeight(FontWeight.Medium).minFontScale(1).maxFontScale(1).fontColor(this.ink).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
+      if(this.display.lessons.length>this.shownLessons().length){Text('+'+(this.display.lessons.length-this.shownLessons().length)).fontSize(8.5*this.s()).minFontScale(1).maxFontScale(1).fontColor(this.ink).maxLines(1)}
+      if(this.contentWidth/Math.max(.001,this.contentScale())>=104){Text(this.dateLabel()).fontSize(8.5*this.s()).minFontScale(1).maxFontScale(1).fontColor(this.ink).opacity(.6).maxLines(1)}
+      if(this.contentWidth/Math.max(.001,this.contentScale())>=120){SymbolGlyph($r('sys.symbol.calendar')).fontSize(10*this.s()).fontColor([this.ink]).accessibilityLevel('no')}
     }.width('100%').height(BRIEF_HEADER_HEIGHT*this.s())
   }
   /** Both modes share the same course tile, typography and complete two-line time. */
   @Builder private lessonRow(e:AgendaItem) {
     Row({space:4*this.s()}) {
       Column({space:0}) {
-        Text(timeText(e.start)).fontSize(9.5*this.s()).minFontSize(8.5*this.s()).maxFontSize(9.5*this.s()).heightAdaptivePolicy(TextHeightAdaptivePolicy.MIN_FONT_SIZE_FIRST).fontWeight(FontWeight.Medium).fontColor(this.ink).height(12*this.s()).width('100%').maxLines(1)
-        Text(timeText(e.end)).fontSize(8.5*this.s()).minFontSize(7.5*this.s()).maxFontSize(8.5*this.s()).heightAdaptivePolicy(TextHeightAdaptivePolicy.MIN_FONT_SIZE_FIRST).fontColor(this.ink).opacity(.6).height(11*this.s()).width('100%').maxLines(1)
+        Text(timeText(e.start)).fontSize(9.5*this.s()).minFontSize(8.5*this.s()).maxFontSize(9.5*this.s()).heightAdaptivePolicy(TextHeightAdaptivePolicy.MIN_FONT_SIZE_FIRST).fontWeight(FontWeight.Medium).minFontScale(1).maxFontScale(1).fontColor(this.ink).height(12*this.s()).width('100%').maxLines(1)
+        Text(timeText(e.end)).fontSize(8.5*this.s()).minFontSize(7.5*this.s()).maxFontSize(8.5*this.s()).heightAdaptivePolicy(TextHeightAdaptivePolicy.MIN_FONT_SIZE_FIRST).minFontScale(1).maxFontScale(1).fontColor(this.ink).opacity(.6).height(11*this.s()).width('100%').maxLines(1)
       }.width(30*this.s()).alignItems(HorizontalAlign.Start)
       Column({space:1*this.s()}) {
-        Text(e.title).lineHeight(14*this.s()).fontSize(11.5*this.s()).minFontSize(10.5*this.s()).maxFontSize(11.5*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).maxLines(this.titleLines()).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
-        if(e.location){Text(e.location).lineHeight(10*this.s()).fontSize(8.5*this.s()).fontColor(this.ink).opacity(.6).maxLines(this.roomLines()).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')}
+        Text(e.title).lineHeight(14*this.s()).fontSize(11.5*this.s()).minFontSize(10.5*this.s()).maxFontSize(11.5*this.s()).fontWeight(FontWeight.Medium).minFontScale(1).maxFontScale(1).fontColor(this.ink).maxLines(this.titleLines()).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
+        if(e.location){Text(e.location).lineHeight(10*this.s()).fontSize(8.5*this.s()).minFontScale(1).maxFontScale(1).fontColor(this.ink).opacity(.6).maxLines(this.roomLines()).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')}
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
     }.width('100%').height(this.dayCellHeight()-3*this.s()).padding({left:5*this.s(),right:5*this.s()}).backgroundColor(this.highlighted(e)?'#45F5C94B':'#16A69A7C').borderRadius(7*this.s())
   }
@@ -85,26 +87,26 @@ export struct TimetableCapability {
     Column() {
       this.heading()
       if (!this.fits()) {
-        Text('放大卡片以显示课程').fontSize(12*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled,this.cap.readingBlend)).layoutWeight(this.contentBackingEnabled?0:1).width('100%').maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis})
+        Text('空间不足').fontSize(Math.min(12*this.s(),this.contentWidth*this.scaleFactor/4.2)).minFontScale(1).maxFontScale(1).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled,this.cap.readingBlend)).layoutWeight(this.contentBackingEnabled?0:1).width('100%').height(16*this.s()).maxLines(1)
       } else if (!this.display.lessons.length) {
         Column({space:3*this.s()}) {
-          Text(this.display.empty).fontSize(11.5*this.s()).fontWeight(FontWeight.Medium).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled,this.cap.readingBlend)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
-          if(this.contentHeight>=70){Text((this.cap.courses??[]).length?(this.cap.timetableMode==='day'?'查看周课表安排':'开课前一晚显示下一课'):'导入或添加你的课程').fontSize(11*this.s()).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.55).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')}
+          Text(this.display.empty).fontSize(11.5*this.s()).fontWeight(FontWeight.Medium).minFontScale(1).maxFontScale(1).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled,this.cap.readingBlend)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
+          if(this.contentHeight>=70){Text((this.cap.courses??[]).length?(this.cap.timetableMode==='day'?'查看周课表安排':'开课前一晚显示下一课'):'导入或添加你的课程').fontSize(11*this.s()).minFontScale(1).maxFontScale(1).fontColor(this.ink).textShadow(readingHalo(this.ink, this.scaleFactor, this.readingHaloEnabled,this.cap.readingBlend)).opacity(this.readingHaloEnabled?1:.55).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')}
         }.layoutWeight(this.contentBackingEnabled?0:1).width('100%').alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Center)
       } else if (this.cap.timetableMode === 'day') {
         Grid() {
-          ForEach(this.display.lessons,(e:AgendaItem)=>{
+          ForEach(this.shownLessons(),(e:AgendaItem)=>{
             GridItem() {
               this.lessonRow(e)
             }
           },(e:AgendaItem)=>e.id)
         }.columnsTemplate(this.columns()===3?'1fr 1fr 1fr':this.columns()===2?'1fr 1fr':'1fr').width('100%')
-          .height(Math.ceil(this.display.lessons.length/this.columns())*this.dayCellHeight()).scrollBar(BarState.Off)
+          .height(Math.ceil(this.shownLessons().length/this.columns())*this.dayCellHeight()).scrollBar(BarState.Off)
       } else {
         Column(){this.lessonRow(this.display.lessons[0])}.width('100%').height(this.dayCellHeight())
-        if(this.contentHeight/Math.max(.001,this.contentScale())>=110&&this.contextLabel()){Text(this.contextLabel()).fontSize(8.5*this.s()).fontColor(this.ink).opacity(.6).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').margin({top:5*this.s()})}
+        if(this.contentHeight/Math.max(.001,this.contentScale())>=110&&this.contextLabel()){Text(this.contextLabel()).fontSize(8.5*this.s()).minFontScale(1).maxFontScale(1).fontColor(this.ink).opacity(.6).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%').margin({top:5*this.s()})}
       }
-    }.width(this.contentBackingEnabled?Math.max(1,this.backingWidth()-2*compositionPadding(this.cap.readingBlend??'')*this.s()-this.backingGutter*this.scaleFactor):'100%').constraintSize({maxHeight:this.contentBackingEnabled?Math.max(1,this.contentHeight*this.scaleFactor):undefined}).clip(this.contentBackingEnabled)
+    }.width(this.contentBackingEnabled?Math.max(1,this.backingWidth()-2*compositionPadding(this.cap.readingBlend??'')*this.s()-this.backingGutter*this.scaleFactor):'100%')
     }.width(this.contentBackingEnabled?this.backingWidth():'100%').height(this.backingProfile.length?'100%':this.contentBackingEnabled?undefined:'100%').padding({left:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s()+(this.backingLeft?this.backingGutter*this.scaleFactor:0):0,right:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s()+(!this.backingLeft?this.backingGutter*this.scaleFactor:0):0,bottom:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s():0,top:this.contentBackingEnabled?compositionPadding(this.cap.readingBlend??'')*this.s()+hookReserve(this.cap.readingBlend??'')*this.s():0})
       .onSizeChange((_:SizeOptions,size:SizeOptions)=>{const h=Number(size.height);if(h>0&&Math.abs(h-this.backingHeight)>.01)this.backingHeight=h;}).alignItems(HorizontalAlign.Start)
       if(this.contentBackingEnabled&&['tag','dock'].includes(this.cap.readingBlend??'')){Column(){this.readingHook()}.width(this.backingWidth()).height(this.backingHeight).position({x:0,y:0}).hitTestBehavior(HitTestMode.None)}

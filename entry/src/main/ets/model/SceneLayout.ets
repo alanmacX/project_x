@@ -17,3 +17,10 @@ export function layerLabel(card: FridgeCard): string {
   const text = card.elements.filter(el => el.kind === 'text').map(el => el.text.trim()).filter(value => value.length > 0).join(' ');
   return text.length > 0 ? text : (card.capability?.title || (card.capability !== null ? typeLabel(card.capability.k) : (card.shape === 'subject' ? '主体卡片' : '自定义卡片')));
 }
+
+/** Host orientation never changes authored coordinates. Fit the complete canvas uniformly. */
+export function canvasViewport(width:number,height:number,aspect:number):SceneRect {
+  const rect=new SceneRect(),a=Number.isFinite(aspect)&&aspect>=.3&&aspect<=3?aspect:1;
+  rect.w=Math.max(0,Math.min(width,height*a));rect.h=rect.w/a;
+  rect.x=(width-rect.w)/2;rect.y=(height-rect.h)/2;return rect;
+}

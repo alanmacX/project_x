@@ -63,7 +63,7 @@ export struct BatteryCapability {
         }.width(this.diameter()).height(this.diameter()).hitTestBehavior(HitTestMode.None)
         ForEach([0,1,2],(index:number)=>{
           if(index<this.label().length) {
-          Text(this.label().charAt(index)).fontSize(this.labelFont()).fontWeight(FontWeight.Medium).fontColor(this.ink)
+          Text(this.label().charAt(index)).fontSize(this.labelFont()).fontWeight(FontWeight.Medium).minFontScale(1).maxFontScale(1).fontColor(this.ink)
             .textShadow(readingHalo(this.ink,this.unit,this.readingHaloEnabled,this.cap.readingBlend)).maxLines(1)
             .width(this.labelFont()*1.1).height(this.labelFont()*1.25).textAlign(TextAlign.Center)
             .rotate({angle:this.glyph(index).angle}).position({x:this.glyph(index).x-this.labelFont()*.55,y:this.glyph(index).y-this.labelFont()*.625})

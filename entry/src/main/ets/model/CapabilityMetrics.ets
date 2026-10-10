@@ -6,7 +6,7 @@ export function capabilityMinimum(cap: CapBlock | null, compact: boolean = false
   const size = new CapabilitySize();
   if (cap === null) { size.w = 0; size.h = 0; return size; }
   if (cap.k === 'timetable') {
-    const count=cap.timetableMode==='day'?timetableCapacity(cap):1, columns=briefColumns(availableWidth);
+    const count=cap.timetableMode==='day'&&!compact?timetableCapacity(cap):1, columns=briefColumns(availableWidth);
     size.w = cap.timetableMode === 'day' ? columns*LESSON_MIN_WIDTH : compact ? 80 : LESSON_MIN_WIDTH;
     size.h = cap.timetableMode === 'day' ? briefHeight(count, columns) : briefHeight(1,1);
     return size;
@@ -59,4 +59,17 @@ export function capabilityContentScale(cap: CapBlock, width: number, height: num
 /** Fit a fixed-format readout before native layout; TextClock has no single-line adaptive sizing. */
 export function boundedReadoutFont(nominal: number, width: number, emWidth: number): number {
   return Math.max(0, Math.min(nominal, width / Math.max(1, emWidth)));
+}
+
+/** Conservative native line/graphic budgets. Never clip a readout to its nominal minimum. */
+export function capabilityVisualHeight(cap:CapBlock,compact:boolean):number {
+  if(cap.k==='clock')return compact?34:58;
+  if(cap.k==='worldclock')return compact?88:124;
+  if(cap.k==='lunar')return compact?70:84;
+  if(cap.k==='date')return compact?56:98;
+  if(cap.k==='calendar')return compact?((cap.calendarOffset??0)===0?70:80):216;
+  if(cap.k==='countdown'||cap.k==='anniversary')return compact?56:120;
+  if(cap.k==='dayprogress'||cap.k==='yearprogress')return compact?64:84;
+  if(cap.k==='battery')return compact?56:80;
+  return 0;
 }

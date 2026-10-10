@@ -14,3 +14,5 @@ assert.ok(jobs.every(job=>!job.onFinish));scene.aboutToDisappear();assert.equal(
 const count=jobs.length;scene.packetJson=packet('canvas99','card99','color99',101);scene.syncPacket();assert.equal(jobs.length,count,'identical artwork does not animate again');
 assert.ok(source.includes(".position({x:scenePercent"));assert.ok(!source.includes('.translate({x:scenePercent'),'normal positions use host percentages, not animation-sensitive measured absolute translation');
 console.log('PASS Form packet controller: 100 interrupted switches, dropped animation callbacks, atomic latest artwork, resumed host and density-independent percent placement.');
+
+const before=jobs.length;scene.packetJson=JSON.stringify({...JSON.parse(scene.packetJson),aspect:1.8});scene.syncPacket();assert.equal(scene.authoredAspect,1.8);assert.equal(jobs.length,before+1,'aspect-only document changes are not discarded');scene.packetJson=JSON.stringify({...JSON.parse(scene.packetJson),aspect:0});scene.syncPacket();assert.equal(scene.authoredAspect,1,'malformed aspect uses a safe square');

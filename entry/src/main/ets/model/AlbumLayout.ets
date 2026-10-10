@@ -16,5 +16,6 @@ export interface AlbumInfoGeometry {coverX:number;coverY:number;coverSize:number
 export function albumInfoGeometry(width:number,height:number,style:string):AlbumInfoGeometry {
   const w=Math.max(0,width),h=Math.max(0,height),row=style==='row',s=Math.min(w/(row?300:180),h/(row?150:180)),pad=13.5*s,gap=(row?15:8)*s;
   const cover=row?Math.max(0,Math.min(h-2*pad,w-2*pad-gap-60*s)):97.5*s;
-  return {coverX:pad,coverY:pad,coverSize:cover,textX:row?pad+cover+gap:pad,textY:row?h/2:pad+cover+gap,textWidth:Math.max(0,row?w-2*pad-cover-gap:w-2*pad),titleSize:(row?17:15.3)*s,artistSize:(row?14:12.24)*s,artistGap:(row?6:3)*s,titleLines:2,artistLines:row?2:1,centerText:row};
+  const textHeight=row?h-2*pad:Math.max(0,h-pad-(pad+cover+gap)),typeScale=Math.min(1,textHeight/Math.max(.001,(((row?17:15.3)*2+(row?14:12.24)*(row?2:1))*1.15+(row?6:3))*s));
+  return {coverX:pad,coverY:pad,coverSize:cover,textX:row?pad+cover+gap:pad,textY:row?h/2:pad+cover+gap,textWidth:Math.max(0,row?w-2*pad-cover-gap:w-2*pad),titleSize:(row?17:15.3)*s*typeScale,artistSize:(row?14:12.24)*s*typeScale,artistGap:(row?6:3)*s*typeScale,titleLines:2,artistLines:row?2:1,centerText:row};
 }

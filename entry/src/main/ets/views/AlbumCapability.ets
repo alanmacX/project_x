@@ -54,8 +54,8 @@ export struct AlbumCapability {
           .shadow({radius:10*this.scaleFactor,color:'#28000000',offsetY:4*this.scaleFactor})
           .onComplete(()=>{if(incoming)this.ready(album.cover,false)}).onError(()=>{if(incoming)this.ready(album.cover,false)})
         Column({space:albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).artistGap*this.scaleFactor}) {
-          if(album.title){Text(album.title).fontSize(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).titleSize*this.scaleFactor).fontWeight(FontWeight.Medium).lineHeight(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).titleSize*1.15*this.scaleFactor).fontColor('#FFFFFF').maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')}
-          if(album.artist) {Text(album.artist).fontSize(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).artistSize*this.scaleFactor).lineHeight(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).artistSize*1.15*this.scaleFactor).fontColor('#DDFFFFFF').maxLines(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).artistLines).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')}
+          if(album.title){Text(album.title).fontSize(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).titleSize*this.scaleFactor).fontWeight(FontWeight.Medium).lineHeight(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).titleSize*1.15*this.scaleFactor).minFontScale(1).maxFontScale(1).fontColor('#FFFFFF').maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')}
+          if(album.artist) {Text(album.artist).fontSize(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).artistSize*this.scaleFactor).lineHeight(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).artistSize*1.15*this.scaleFactor).minFontScale(1).maxFontScale(1).fontColor('#DDFFFFFF').maxLines(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).artistLines).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')}
         }.alignItems(HorizontalAlign.Start)
           .width(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).textWidth*this.scaleFactor)
           .position({x:albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).textX*this.scaleFactor,y:albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).textY*this.scaleFactor})
@@ -68,7 +68,7 @@ export struct AlbumCapability {
       Column().width('100%').height('100%').backgroundColor('#D9D4CD')
       if(this.previous.cover) {this.artwork(this.previous,false)}
       if(this.current.cover) {Column(){this.artwork(this.current,true)}.width('100%').height('100%').opacity(this.opacityValue)}
-      else {Text('选择一张专辑').fontSize(14*this.scaleFactor).fontColor('#494640')}
+      else {Text('选择专辑').fontSize(Math.min(14,this.cardWidth/4.5,this.cardHeight/1.5)*this.scaleFactor).maxLines(1).minFontScale(1).maxFontScale(1).fontColor('#494640')}
     }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
   }
 }
