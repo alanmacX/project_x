@@ -1633,8 +1633,8 @@ struct Index {
     transformGroup(members,groupBox(members,height),height,scale,angle);
     this.cancelGroupTransform();this.renderBoard();this.scheduleBackground();this.persist(true);
   }
-  private toggleCardVisibility():void {
-    const card=this.current();if(card===null||this.scheduledName||this.scheduleTransition)return;
+  private toggleCardVisibility(id:string):void {
+    const card=this.store.findCard(id);if(card===null||this.scheduledName||this.scheduleTransition)return;
     card.hidden=!card.hidden;
     this.cancelGroupTransform();this.renderBoard();this.scheduleBackground();this.persist(true);
   }
@@ -1669,6 +1669,9 @@ struct Index {
                 }.layoutWeight(1).height(48).padding(0).backgroundColor(Color.Transparent)
                   .accessibilityText('选择卡片 '+layerLabel(this.cardMap[id])).onClick(()=>this.selectLayerCard(id))
                 if (!this.groupSelecting) {
+                  Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
+                    SymbolGlyph(this.cardMap[id].hidden?$r('sys.symbol.eye_slash'):$r('sys.symbol.eye')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
+                  }.width(44).height(44).padding(0).backgroundColor(this.appControl()).accessibilityText(this.cardMap[id].hidden?'显示卡片':'隐藏卡片').enabled(!this.scheduledName&&!this.scheduleTransition).onClick(()=>this.toggleCardVisibility(id))
                   Button('编辑',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(AppDesign.controlHeight).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.groupSelecting&&!this.scheduledName).onClick(()=>this.openEditor(id))
                   Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL,role:ButtonRole.ERROR}) {
                     SymbolGlyph($r('sys.symbol.trash')).fontSize(18).fontColor(['#C43A35']).hitTestBehavior(HitTestMode.None)
@@ -1738,9 +1741,6 @@ struct Index {
         }
         if (!this.groupSelecting && this.selectedId.length > 0) {
           Row({space:8}) {
-            Button(this.cardMap[this.selectedId]?.hidden?'显示':'隐藏',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL})
-              .width(44).height(44).padding(0).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).attributeModifier(immersiveChrome(this.appDark))
-              .accessibilityText(this.cardMap[this.selectedId]?.hidden?'显示卡片':'隐藏卡片').enabled(!this.scheduledName&&!this.scheduleTransition).onClick(()=>this.toggleCardVisibility())
             Button('上移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).padding({left:6,right:6}).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(() => this.moveCardLayer(this.selectedId, true))
             Button('下移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).padding({left:6,right:6}).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(() => this.moveCardLayer(this.selectedId, false))
             Button('复制',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL})
@@ -2249,6 +2249,12 @@ struct Index {
     EditorVisualChoices({card:this.preview,selected:this.preview.capability?.readingBlend??'',appDark:this.appDark,onChoose:(key:string)=>this.chooseReadingComposition(key)})
     Text('表面材质').fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
     EditorVisualChoices({card:this.preview,mode:'material',selected:this.preview.capability?.readingMaterial??'paper',appDark:this.appDark,onChoose:(key:string)=>{const cap=this.current()?.capability;if(cap){cap.readingMaterial=key;this.change();}}})
+    Row({space:12}) {
+      Text('材质透明度').fontSize(14).fontColor(this.appText())
+      Slider({value:(1-(this.preview.capability?.readingOpacity??1))*100,min:0,max:100,step:1}).layoutWeight(1).selectedColor(AppDesign.selected(this.appDark))
+        .onChange((value:number,mode:SliderChangeMode)=>{const cap=this.current()?.capability;if(cap){cap.readingOpacity=1-value/100;this.continuousChange(mode);}})
+      Text(Math.round((1-(this.preview.capability?.readingOpacity??1))*100)+'%').fontSize(13).fontColor(this.appMuted()).width(40).textAlign(TextAlign.End)
+    }.width('100%')
     if(this.preview.capability?.readingBlend==='sticker') {
       Text('贴合方式').fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
       SettingsSegmented({labels:['左侧','右侧'],selectedIndex:this.preview.capability.readingEdge==='right'?1:0,appDark:this.appDark,onSelect:(i:number)=>this.setCapabilityAttachment(i===0?'left':'right',this.preview.capability?.readingOutside===true)})

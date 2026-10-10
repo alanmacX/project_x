@@ -23,7 +23,7 @@ export function editorVisualChoices(source:FridgeCard,mode:string):EditorVisualC
   // capability fields and replace their placement box, never nested payloads.
   const detached=cardViewSnapshot(source);
   const courses=detached.capability?.courses;
-  if(detached.capability)detached.capability.courses=[];
+  if(detached.capability){detached.capability.courses=[];detached.capability.readingOpacity=1;} // Stable canonical thumbnails while the live surface fades.
   const capabilityJSON=JSON.stringify(detached.capability);
   return keys.map((key:string):EditorVisualChoice=>{
     const choice=new EditorVisualChoice(),card=cardStorageShell(detached);if(detached.capability){card.capability=JSON.parse(capabilityJSON) as CapBlock;card.capability.courses=courses;}choice.key=key;card.rot=0;

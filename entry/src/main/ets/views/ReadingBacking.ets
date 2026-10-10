@@ -9,6 +9,7 @@ import { PaperBacking } from './PaperBacking';
 /** Shared native material paths; translating a card never clears a bitmap surface. */
 @Component
 export struct ReadingBacking {
+ @Prop surfaceOpacity:number=1;
  @Prop blend:string='paper';
  @Prop study:number=5;
  @Prop ink:string='#262824';
@@ -130,6 +131,6 @@ export struct ReadingBacking {
     }
    } else if(this.blend==='paper'){PaperBacking({radius:this.radius,scaleFactor:this.scaleFactor})}
    else if(this.blend!=='halo'){Image(this.texture()).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)}
-  }.width('100%').height('100%').onSizeChange((_:SizeOptions,size:SizeOptions)=>{const w=Number(size.width),h=Number(size.height);if(w>0&&h>0&&(Math.abs(w-this.actualWidth)>.01||Math.abs(h-this.actualHeight)>.01)){this.actualWidth=w;this.actualHeight=h;}}).hitTestBehavior(HitTestMode.None)
+  }.width('100%').height('100%').opacity(this.surfaceOpacity).onSizeChange((_:SizeOptions,size:SizeOptions)=>{const w=Number(size.width),h=Number(size.height);if(w>0&&h>0&&(Math.abs(w-this.actualWidth)>.01||Math.abs(h-this.actualHeight)>.01)){this.actualWidth=w;this.actualHeight=h;}}).hitTestBehavior(HitTestMode.None)
  }
 }

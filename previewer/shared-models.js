@@ -167,7 +167,7 @@ exports.sharedCapability = void 0;
 function sharedCapability(cap) {
     const next = { k: cap.k, readingBlend: cap.readingBlend, readingEdge: cap.readingEdge,
         readingOutside: cap.readingOutside, readingHook: cap.readingHook, readingTint: cap.readingTint,
-        readingMaterial: cap.readingMaterial, readingStyle: cap.readingStyle };
+        readingMaterial: cap.readingMaterial, readingOpacity: cap.readingOpacity, readingStyle: cap.readingStyle };
     if (cap.k === 'worldclock') {
         next.zone = cap.zone;
         next.city = cap.city;
@@ -666,6 +666,7 @@ function normalizeCapability(raw) {
     }
     if (raw.k === 'worldclock')
         cap.zone = (0, TimeCapabilities_1.clockZone)(typeof raw.zone === 'string' ? raw.zone : '');
+    cap.readingOpacity = bounded(raw.readingOpacity ?? 1, 0, 1, 1);
     cap.readingMaterialStudy = undefined;
     cap.readingMaterial = raw.readingMaterial === 'matte' ? 'matte' : 'paper';
     cap.readingStyle = ['plain', 'surface'].includes(raw.readingStyle ?? '') ? raw.readingStyle : 'auto';
@@ -3541,8 +3542,10 @@ function editorVisualChoices(source, mode) {
     // capability fields and replace their placement box, never nested payloads.
     const detached = (0, CardViewSnapshot_1.cardViewSnapshot)(source);
     const courses = detached.capability?.courses;
-    if (detached.capability)
+    if (detached.capability) {
         detached.capability.courses = [];
+        detached.capability.readingOpacity = 1;
+    } // Stable canonical thumbnails while the live surface fades.
     const capabilityJSON = JSON.stringify(detached.capability);
     return keys.map((key) => {
         const choice = new EditorVisualChoice(), card = (0, CardViewSnapshot_1.cardStorageShell)(detached);
@@ -4180,4 +4183,4 @@ function scenePolicyShell(base) {
 }
 exports.scenePolicyShell = scenePolicyShell;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"78dcaa7880802f4b4243b24f066ca8e3def66b1acda4ac57036741fa74c616a2"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"ba2febe1b209085c747f8cd5a8b64fea6666c5c4b8e727cd96323208132dcef4"};})(globalThis);

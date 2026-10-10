@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const ctx=vm.createContext({});vm.runInContext(fs.readFileSync('previewer/shared-models.js','utf8'),ctx);
+const s=ctx.FridgeCore.load('CardSchema'),snap=ctx.FridgeCore.load('CardViewSnapshot'),pack=ctx.FridgeCore.load('TemplatePackage');
+for(const [value,expected] of [[undefined,1],[0,0],[.37,.37],[1,1],[-1,0],[2,1],[NaN,1],[Infinity,1]])assert.equal(s.normalizeCapability({k:'clock',readingOpacity:value}).readingOpacity,expected);
+const state=new s.FridgeState(),card=new s.FridgeCard();card.id='surface';card.capability={k:'clock',readingStyle:'surface',readingBlend:'tag',readingOpacity:.37};state.cards=[card];
+const previous=snap.cardRenderSnapshot(card);card.capability.readingOpacity=0;const next=snap.cardRenderSnapshot(card);assert.notEqual(previous,next);assert.equal(previous.capability.readingOpacity,.37);assert.equal(next.capBox.opacity,1,'foreground alpha stays independent');
+const restored=s.normalizeState(JSON.parse(JSON.stringify(state)));assert.equal(restored.cards[0].capability.readingOpacity,0);
+const imported=pack.readPackage(JSON.stringify(pack.packageScene(JSON.stringify(state),'')));assert.equal(imported.state.cards[0].capability.readingOpacity,0,'zero alpha survives portable package');
+ctx.FridgeMaterials={};vm.runInContext(fs.readFileSync('previewer/capabilities.js','utf8'),ctx);
+const surface=ctx.FridgeReadouts.backing(100,60,'tag',1,'#262824','#eed58b',card.capability,{profile:[],left:true},'sample');assert.ok(surface.startsWith('<g opacity="0">'));assert.ok(surface.includes('<path'),'surface is retained while transparent');
+card.capability.readingOpacity=.37;const rendered=ctx.FridgeReadouts.capability(card,Date.now(),'sample');assert.ok(rendered.includes('<g opacity="0.37">'));assert.ok(rendered.includes('<text'),'readout survives surface fading');assert.equal(card.capBox.opacity,1);
+console.log('PASS material opacity: bounds/legacy, cache invalidation, independent foreground, persistence, package and preview surface');

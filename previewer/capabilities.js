@@ -17,6 +17,9 @@
  }
  function hook(x,s){const d=`M ${x-3*s} ${0} L ${x-3*s} ${-7*s} C ${x-3*s} ${-15*s} ${x+6*s} ${-15*s} ${x+6*s} ${-7*s} L ${x+6*s} ${5*s} C ${x+6*s} ${11*s} ${x} ${13*s} ${x} ${10*s}`;return [ ['rgba(29,35,42,.16)',3.4],['#90979E',2.6],['#E4E8EC',1.3] ].map(([color,width])=>`<path d="${d}" fill="none" stroke="${color}" stroke-width="${width*s}" stroke-linecap="round"/>`).join('');}
  function backing(w,h,blend,s,ink,tint,cap,contact,id){
+  return `<g opacity="${schema.normalizeCapability(cap).readingOpacity}">${backingSurface(w,h,blend,s,ink,tint,cap,contact,id)}</g>`;
+ }
+ function backingSurface(w,h,blend,s,ink,tint,cap,contact,id){
   const study=material.readingMaterialVariant(cap.readingMaterialStudy,cap.readingMaterial);
   let p=contact.profile.length?edge.attachedPath(w,h,contact.profile,contact.left,6*s):mica.micaPath(blend,w,h,s,cap.readingEdge||'');
   const reserve=mica.hookReserve(blend),hx=mica.hookCenter(cap.readingHook??.2,w,s);

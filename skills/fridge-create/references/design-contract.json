@@ -26,10 +26,10 @@
     "htmlTemplateVersion": 1
   },
   "identity": {
-    "models": "78dcaa7880802f4b4243b24f066ca8e3def66b1acda4ac57036741fa74c616a2",
+    "models": "ba2febe1b209085c747f8cd5a8b64fea6666c5c4b8e727cd96323208132dcef4",
     "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
-    "browserAdapter": "4bcd12e620a8e9e358f175fcbfeaed70b21fed70268f2432a35f420edf4f88db",
-    "nativeViews": "528cc5d8af6820b51dc1c04c2c73f234306132eb38fbdd2efd32c866985c2d41"
+    "browserAdapter": "da31deb5c7f6eb08473665ee27cf62b8112d499707407162b20cf58ae4038767",
+    "nativeViews": "7ff36b15ec554ca382c48de6f84ffe6efe0aba3b57f266fc206d2a38c3dc8fc1"
   },
   "coordinates": {
     "boardWidth": 344,
@@ -43,6 +43,13 @@
   },
   "design": {
     "readingMaterials": {
+      "opacityField": "readingOpacity",
+      "opacityDefault": 1,
+      "opacityRange": [
+        0,
+        1
+      ],
+      "foregroundUnaffected": true,
       "default": "paper",
       "options": [
         "paper",
@@ -314,6 +321,7 @@
       "readingEdge",
       "readingOutside",
       "readingHook",
+      "readingOpacity",
       "readingMaterial",
       "readingMaterialStudy",
       "readingTintKey",
