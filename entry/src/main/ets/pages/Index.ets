@@ -32,6 +32,7 @@ import { SymbolGlyphModifier, FrameCallback, LengthMetrics } from '@kit.ArkUI';
 import { chromeMaterial, popupMaterial, immersiveChrome, prepareChromeMaterial } from '../model/ChromeMaterial';
 import lazy { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
 import lazy { SettingsSelect } from '../views/SettingsSelect';
+import lazy { BackgroundFrameSettings } from '../views/BackgroundFrameSettings';
 import lazy { SettingsSegmented } from '../views/SettingsSegmented';
 import lazy { SettingsCounter } from '../views/SettingsCounter';
 import { canvasToolsMotion, canvasToolsTransition, settingsContentSwap, settingsReveal, settingsDialogOpen, settingsDialogClose } from '../model/SettingsMotion';
@@ -1549,7 +1550,7 @@ struct Index {
   }
   private backgroundToolsHeight():number {
     const extra=this.canvasBackground.mode==='solid'?160:this.canvasBackground.mode==='photo'?140:this.canvasBackground.mode==='transparent'?72:92;
-    return Math.min(this.homeToolsHeight(),320+extra+(this.canvasBackground.frameStyle==='none'?0:56));
+    return Math.min(this.homeToolsHeight(),376+extra);
   }
   @Builder
   phoneBackgroundTools() {
@@ -1898,25 +1899,10 @@ struct Index {
             },(mode:string)=>mode)
           }.width('100%')
         }.width('100%').padding(14).borderRadius(AppDesign.sectionRadius).backgroundColor(this.appControl())
-        Column({space:12}) {
-          Row() {
-            Text('画框').fontSize(15).fontWeight(FontWeight.Medium).fontColor(this.appText()).layoutWeight(1)
-            Toggle({type:ToggleType.Switch,isOn:this.canvasBackground.frameStyle!=='none'}).selectedColor(AppDesign.selected(this.appDark))
-              .accessibilityText('显示画框').onChange((on:boolean)=>{if(on===(this.canvasBackground.frameStyle!=='none'))return;const bg=normalizeBackground(this.canvasBackground);bg.frameStyle=on?'auto':'none';this.applyBackground(bg);})
-          }.width('100%').constraintSize({minHeight:40})
-          if(this.canvasBackground.frameStyle!=='none') {
-            Row({space:12}) {
-              Text('材质').fontSize(13).fontColor(this.appMuted()).width(40)
-              SettingsSegmented({labels:['白岩','胡桃木','浅橡木'],selectedIndex:Math.max(0,['stone','walnut','oak'].indexOf(this.canvasBackground.frameMaterial)),appDark:this.appDark,
-                onSelect:(index:number)=>{const bg=normalizeBackground(this.canvasBackground);bg.frameMaterial=['stone','walnut','oak'][index];this.applyBackground(bg);}}).layoutWeight(1)
-            }.width('100%')
-            Row({space:12}) {
-              Text('色调').fontSize(13).fontColor(this.appMuted()).width(40)
-              SettingsSegmented({labels:['浅色','深色','自动'],selectedIndex:Math.max(0,['light','dark','auto'].indexOf(this.canvasBackground.frameStyle)),appDark:this.appDark,
-                onSelect:(index:number)=>{const bg=normalizeBackground(this.canvasBackground);bg.frameStyle=['light','dark','auto'][index];this.applyBackground(bg);}}).layoutWeight(1)
-            }.width('100%')
-          }
-        }.width('100%').padding(14).borderRadius(AppDesign.sectionRadius).backgroundColor(this.appControl())
+        BackgroundFrameSettings({style:this.canvasBackground.frameStyle,material:this.canvasBackground.frameMaterial,appDark:this.appDark,
+          onStyle:(style:string)=>{const bg=normalizeBackground(this.canvasBackground);bg.frameStyle=style;this.applyBackground(bg);},
+          onMaterial:(material:string)=>{const bg=normalizeBackground(this.canvasBackground);bg.frameMaterial=material;this.applyBackground(bg);}})
+          .width('100%')
       }.width('100%').constraintSize({maxWidth:640}).padding({top:8,left:4,right:4,bottom:12})
     }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
   }
