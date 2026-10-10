@@ -8,6 +8,7 @@ export function cardStorageShell(source: FridgeCard): FridgeCard { return snapsh
 function snapshotCard(source: FridgeCard, detached: boolean): FridgeCard {
   const copy = new FridgeCard();
   copy.reliefSrc=detached?source.reliefSrc:'';
+  copy.subjectDepth=source.subjectDepth;copy.depthCapabilityFront=source.depthCapabilityFront;copy.depthGroup=source.depthGroup;copy.depthPass=detached?source.depthPass:'';copy.depthOwnerId=detached?source.depthOwnerId:'';
   copy.id = source.id; copy.hidden = source.hidden === true; copy.groupId = source.groupId;
   copy.x = source.x;
   copy.y = source.y;
@@ -45,7 +46,7 @@ export function cardRenderSnapshot(source: FridgeCard, prepared: boolean = false
   // Compare mutable values before cloning. Reopening/committing one card should
   // not deep-copy every unchanged capability, course list and background layer.
   const signature = JSON.stringify([source.id, source.hidden, source.groupId, source.x, source.y, source.w, source.h, source.rot, source.z,
-    source.shape, source.frame, source.material, source.paper, source.ink, source.subjectPhoto, source.subjectAspect,
+    source.subjectDepth,source.depthCapabilityFront,source.depthGroup,source.depthPass,source.depthOwnerId,source.shape, source.frame, source.material, source.paper, source.ink, source.subjectPhoto, source.subjectAspect,
     source.subjectInk, source.subjectVersion, source.cutout,source.reliefSrc, source.inDoor, contourKey, source.capability, source.capBox, source.capFree, source.elements]);
   const previous = renderSnapshots.get(source.id);
   if (previous !== undefined && renderSignatures.get(source.id) === signature) return previous;

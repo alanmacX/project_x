@@ -1,3 +1,4 @@
+import { depthRenderCards } from '../../model/DepthComposition';
 import { capabilityRenderTick } from '../../model/CapabilityClock';
 import { cardRenderSnapshot } from '../../model/CardViewSnapshot';
 import { FridgeCard, CanvasBackground, normalizeBackground, BOARD_W } from '../../model/CardSchema';
@@ -57,7 +58,7 @@ struct FridgeWidgetCard {
     try{packet=JSON.parse(this.packetJson) as WidgetScenePacket;if(typeof packet.cards!=='string'||typeof packet.background!=='string')return;}catch(_){return;}
     // Visibility/time refreshes still update rev, but identical artwork needs no rebuild.
     if(!this.sceneAnimating && this.appliedPacket && this.displayCanvasId===packet.canvasId && this.appliedCards===packet.cards && this.appliedBackground===packet.background && this.appliedContext===packet.context && this.authoredAspect===(packet.aspect??1)) {this.appliedPacket=this.packetJson;return;}
-    const cards=this.parse(packet.cards).sort((a,b)=>a.z-b.z);
+    const cards=depthRenderCards(this.parse(packet.cards)).sort((a,b)=>a.z-b.z);
     const backgroundChanged=this.appliedBackground!==packet.background;
     const first=this.appliedPacket.length===0,differentCanvas=!first&&this.displayCanvasId!==packet.canvasId;
     const generation=++this.sceneGeneration;
@@ -112,7 +113,7 @@ struct FridgeWidgetCard {
   private syncLegacyCards(): void { if (this.cardsJson.length === 0) this.syncCards(); }
   private syncCards(): void {
     if(this.packetJson)return;
-    const cards = (this.cardsJson.length > 0 ? this.parse(this.cardsJson) : this.parse(this.faceCardsJson).concat(this.parse(this.doorCardsJson)))
+    const cards = depthRenderCards(this.cardsJson.length > 0 ? this.parse(this.cardsJson) : this.parse(this.faceCardsJson).concat(this.parse(this.doorCardsJson)))
       .sort((a: FridgeCard, b: FridgeCard) => a.z - b.z);
     const map: Record<string, FridgeCard> = {};
     cards.forEach((card: FridgeCard) => { map[card.id] = cardRenderSnapshot(card); });

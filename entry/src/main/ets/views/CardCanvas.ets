@@ -1,3 +1,5 @@
+import { depthElement, internalDepth } from '../model/DepthComposition';
+import { DepthForeground } from './DepthForeground';
 import { settingsReveal } from '../model/SettingsMotion';
 import { isReadingComposition } from '../model/ReadingComposition';
 import { edgeAttachment, EdgeAttachment } from '../model/EdgeAttachment';
@@ -102,10 +104,15 @@ export struct CardCanvas {
   @Prop movingLayerId: string = '';
   @Prop moveX: number = 0;
   @Prop moveY: number = 0;
-  private photoOnly():boolean{return this.card.shape==='subject'&&this.card.subjectPhoto&&this.card.cutout.length>0&&this.card.elements.length===0&&(this.card.capability===null||this.freeCapability()||this.hideContent);}
+  private photoOnly():boolean{return this.card.depthPass!=='base'&& this.card.shape==='subject'&&this.card.subjectPhoto&&this.card.cutout.length>0&&this.card.elements.length===0&&(this.card.capability===null||this.freeCapability()||this.hideContent);}
   private freeCapability():boolean {return this.card.capFree || isReadingComposition(this.card.capability?.readingBlend??'') || this.layerMotion.id==='capability';}
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
+      if(this.card.depthPass==='foreground'){
+        this.foregroundContents()
+      }else if(internalDepth(this.card)&&this.card.depthPass!=='base'){
+        this.depthContents()
+      }else {
       if(this.photoOnly()){
         Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
       }else{
@@ -114,13 +121,13 @@ export struct CardCanvas {
         AlbumCapability({tick:this.tick,widget:this.widget,cap:this.card.capability!,cardWidth:this.card.w,cardHeight:this.card.h,scaleFactor:this.scaleFactor})
       } else {
       Column().width('100%').height('100%').backgroundColor(materialColors(this.card.material, this.card.paper, this.card.ink)[0])
-      if (this.card.shape === 'subject' && this.card.subjectPhoto && this.card.cutout.length > 0) {
+      if (this.card.depthPass!=='base' && this.card.shape === 'subject' && this.card.subjectPhoto && this.card.cutout.length > 0) {
         Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
       }
       this.canvasElements(true)
-      if (!this.freeCapability() && !this.hideContent && this.card.capability !== null && !capabilityObstructed(this.card)) { CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}).transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY) }
+      if (!(this.card.depthPass==='base'&&this.card.depthCapabilityFront) && !this.freeCapability() && !this.hideContent && this.card.capability !== null && !capabilityObstructed(this.card)) { CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}).transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY) }
       if (!this.hideContent) {Stack({alignContent:Alignment.TopStart}){this.canvasElements(false)}.width('100%').height('100%').transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY)}
-      if (!this.freeCapability() && !this.hideContent && this.card.capability !== null && capabilityObstructed(this.card)) { CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}).transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY) }
+      if (!(this.card.depthPass==='base'&&this.card.depthCapabilityFront) && !this.freeCapability() && !this.hideContent && this.card.capability !== null && capabilityObstructed(this.card)) { CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}).transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY) }
       if (this.card.shape === 'subject' && this.card.cutout.length > 0) {
         Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
           .blendMode(BlendMode.DST_IN, BlendApplyType.OFFSCREEN)
@@ -129,15 +136,45 @@ export struct CardCanvas {
     }.width('100%').height('100%').borderRadius(cardCornerRadius(this.card,this.scaleFactor)).clip(true)
       .blendMode(BlendMode.SRC_OVER, this.card.shape === 'subject' ? BlendApplyType.OFFSCREEN : BlendApplyType.FAST)
       }
-      if(this.freeCapability() && !this.hideContent && this.card.capability!==null && this.card.capability.k!=='album') {
+      if(!(this.card.depthPass==='base'&&this.card.depthCapabilityFront) && this.freeCapability() && !this.hideContent && this.card.capability!==null && this.card.capability.k!=='album') {
         CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}).transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY)
       }
+      }
     }.width('100%').height('100%')
+  }
+  @Builder
+  foregroundContents(){
+    DepthForeground({card:this.card,motion:this.layerMotion})
+    this.depthElements(true,true)
+    this.depthElements(true,false)
+    if(!this.hideContent&&this.card.capability!==null&&this.card.depthCapabilityFront){CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick})}
+  }
+  @Builder
+  depthContents(){
+    Stack({alignContent:Alignment.TopStart}){
+      if(this.card.shape==='subject'){
+        Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
+      }else {Column().width('100%').height('100%').backgroundColor(materialColors(this.card.material,this.card.paper,this.card.ink)[0])}
+      if(depthElement(this.card)!==undefined){CanvasElementLayer({motion:this.layerMotion,element:depthElement(this.card)!,ink:materialColors(this.card.material,this.card.paper,this.card.ink)[1],scaleFactor:this.scaleFactor,widget:this.widget})}
+      this.depthElements(false,true)
+      if(!this.hideContent&&this.card.capability!==null&&!this.card.depthCapabilityFront){CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick})}
+      this.depthElements(false,false)
+      DepthForeground({card:this.card,motion:this.layerMotion})
+      this.depthElements(true,true)
+      this.depthElements(true,false)
+      if(!this.hideContent&&this.card.capability!==null&&this.card.depthCapabilityFront){CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick})}
+    }.width('100%').height('100%').borderRadius(cardCornerRadius(this.card,this.scaleFactor)).clip(this.card.shape!=='subject')
+  }
+  @Builder
+  depthElements(front:boolean,behind:boolean){
+    ForEach(this.card.elements.filter(el=>el.id!==depthElement(this.card)?.id&&el.depthFront===front&&el.behindCapability===behind&&(behind||!this.hideContent)).map(el=>el.id),(id:string)=>{
+      CanvasElementLayer({motion:this.layerMotion,element:this.elementFor(id),ink:materialColors(this.card.material,this.card.paper,this.card.ink)[1],scaleFactor:this.scaleFactor,widget:this.widget})
+    },(id:string)=>id)
   }
   private elementFor(id: string): CanvasElement { return this.card.elements.find((el: CanvasElement) => el.id === id) ?? new CanvasElement(); }
   @Builder
   canvasElements(behind: boolean) {
-    ForEach(this.card.elements.filter((el: CanvasElement) => el.behindCapability === behind).map((el: CanvasElement) => el.id), (id: string) => {
+    ForEach(this.card.elements.filter((el: CanvasElement) => el.behindCapability === behind && (this.card.depthPass!=='base'||!el.depthFront)).map((el: CanvasElement) => el.id), (id: string) => {
         CanvasElementLayer({motion:this.layerMotion,element:this.elementFor(id),ink:materialColors(this.card.material,this.card.paper,this.card.ink)[1],scaleFactor:this.scaleFactor,widget:this.widget})
       }, (id: string) => id)
   }

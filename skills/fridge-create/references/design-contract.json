@@ -26,10 +26,10 @@
     "htmlTemplateVersion": 1
   },
   "identity": {
-    "models": "ba2febe1b209085c747f8cd5a8b64fea6666c5c4b8e727cd96323208132dcef4",
+    "models": "114cfb22cf59db267b652ac10fdcd069c90f64bb768a527d31c0a9b3df578888",
     "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
-    "browserAdapter": "da31deb5c7f6eb08473665ee27cf62b8112d499707407162b20cf58ae4038767",
-    "nativeViews": "7ff36b15ec554ca382c48de6f84ffe6efe0aba3b57f266fc206d2a38c3dc8fc1"
+    "browserAdapter": "ef2c9d937abecae9e23169f0ef4be0b261856cf985a73c255d28ba29e72f2370",
+    "nativeViews": "20391366522e87cd7634895a77eedf00cf5df0845a7fc1dc8c8384af4dd86b36"
   },
   "coordinates": {
     "boardWidth": 344,
@@ -42,6 +42,20 @@
     "canvasCards": 16
   },
   "design": {
+    "depthComposition": {
+      "groupSourceField": "depthGroup",
+      "subjectField": "subjectDepth",
+      "capabilityFrontField": "depthCapabilityFront",
+      "elementFields": [
+        "depthEnabled",
+        "depthForeground",
+        "depthCrop",
+        "depthSourceAspect",
+        "depthFront"
+      ],
+      "staticOnly": true,
+      "foregroundAssetRequired": true
+    },
     "readingMaterials": {
       "opacityField": "readingOpacity",
       "opacityDefault": 1,
@@ -275,7 +289,9 @@
       "cards"
     ],
     "card": [
-      "reliefSrc",
+      "subjectDepth",
+      "depthCapabilityFront",
+      "depthGroup",
       "html",
       "groupId",
       "hidden",
@@ -302,7 +318,6 @@
       "subjectVersion",
       "cutout",
       "outline",
-      "renderContourKey",
       "inDoor",
       "caps"
     ],
@@ -382,6 +397,11 @@
       "bold",
       "align",
       "behindCapability",
+      "depthEnabled",
+      "depthForeground",
+      "depthCrop",
+      "depthSourceAspect",
+      "depthFront",
       "primitive"
     ]
   },

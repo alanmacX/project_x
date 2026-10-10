@@ -22,6 +22,7 @@ export async function prepareWidgetPayload(json: string, contourCache: string = 
     if(card.reliefSrc.startsWith('file://'))keys.push(widgetImageKey(card.id+'_relief',card.reliefSrc));
     if(card.cutout.startsWith('file://'))keys.push(widgetImageKey(card.id+'_subject',card.cutout));
     for(const element of card.elements)if(element.kind==='image'&&element.src.startsWith('file://'))keys.push(widgetImageKey(card.id+'_'+element.id,element.src));
+    for(const element of card.elements)if(element.depthEnabled&&element.depthForeground.startsWith('file://'))keys.push(widgetImageKey(card.id+'_'+element.id+'_depth',element.depthForeground));
     if(card.capability?.k==='album') {
       const album=activeAlbum(card.capability,frameTime);
       if(album.cover.startsWith('file://'))keys.push(widgetImageKey(card.id+'_albumCover',album.cover));
@@ -66,6 +67,10 @@ export async function prepareWidgetPayload(json: string, contourCache: string = 
         } catch (_) { payload.manifest=''; card.cutout = ''; card.shape = 'rect'; }
       }
       for (const element of card.elements) {
+        if(element.depthEnabled&&element.depthForeground.startsWith('file://')){
+          const key=widgetImageKey(card.id+'_'+element.id+'_depth',element.depthForeground);
+          try{if(!reuse){const file=await fileIo.open(element.depthForeground.slice(7),fileIo.OpenMode.READ_ONLY);payload.descriptors.push(file.fd);payload.images[key]=file.fd;}element.depthForeground='memory://'+key;}catch(_){payload.manifest='';element.depthForeground='';element.depthEnabled=false;}
+        }else if(!element.depthEnabled)element.depthForeground='';
         if (element.kind === 'image' && element.src.startsWith('file://')) {
           const key = widgetImageKey(card.id + '_' + element.id, element.src);
           try {

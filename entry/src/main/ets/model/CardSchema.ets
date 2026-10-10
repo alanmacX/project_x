@@ -100,6 +100,9 @@ export class ElementBox {
   rot: number = 0;
   opacity: number = 1;
 }
+export class PhotoDepthCrop extends ElementBox {
+  x:number=0;y:number=0;w:number=1;h:number=1;
+}
 export class CanvasElement extends ElementBox {
   id: string = '';
   kind: string = 'text'; // text | image | shape
@@ -111,10 +114,20 @@ export class CanvasElement extends ElementBox {
   bold: boolean = false;
   align: string = 'left';
   behindCapability: boolean = false;
+  depthEnabled: boolean = false;
+  depthForeground: string = '';
+  depthCrop: ElementBox = new PhotoDepthCrop();
+  depthSourceAspect: number = 1;
+  depthFront: boolean = false;
   primitive: string = 'rect'; // rect | circle | line
 }
 export interface ShapePoint { x: number; y: number; }
 export class FridgeCard {
+  subjectDepth:boolean=false;
+  depthCapabilityFront:boolean=false;
+  depthGroup:boolean=false;
+  depthOwnerId:string=''; // Render projection owner, never imported or stored.
+  depthPass:string=''; // Derived render pass; never imported or stored.
   reliefSrc:string=''; // Host-derived only; ignored by import and omitted from editable storage.
   html?: HtmlCardTemplate;
   groupId: string = '';
@@ -236,6 +249,14 @@ export function normalizeElement(raw: CanvasElement, clippedSubject: boolean = f
   el.text = raw.text ?? ''; el.src = localImageSource(raw.src); el.animated = raw.animated === true;
   el.fs = bounded(raw.fs, 10, 64, 18); el.color = raw.color ?? '';
   el.behindCapability = raw.behindCapability ?? false;
+  el.depthFront=raw.depthFront===true;
+  el.depthForeground=localImageSource(raw.depthForeground);
+  el.depthEnabled=el.kind==='image'&&!el.animated&&raw.depthEnabled===true&&el.depthForeground.length>0;
+  if(el.depthEnabled)el.depthFront=false;
+  el.depthSourceAspect=bounded(raw.depthSourceAspect,.01,100,1);
+  const crop=raw.depthCrop;
+  el.depthCrop.x=bounded(crop?.x,0,.999,0);el.depthCrop.y=bounded(crop?.y,0,.999,0);
+  el.depthCrop.w=bounded(crop?.w,.001,1-el.depthCrop.x,1-el.depthCrop.x);el.depthCrop.h=bounded(crop?.h,.001,1-el.depthCrop.y,1-el.depthCrop.y);
   el.bold = raw.bold ?? false; el.align = raw.align ?? 'left'; el.primitive = raw.primitive ?? 'rect';
   return el;
 }
@@ -273,6 +294,7 @@ export function normalizeState(raw: FridgeState): FridgeState {
     card.shape = source.shape ?? 'rect'; card.frame = source.frame ?? false;
     card.material = source.material ?? 'white'; card.paper = source.paper ?? ''; card.ink = source.ink ?? '';
     card.inDoor = source.inDoor ?? false;
+    card.subjectDepth=source.subjectDepth===true;card.depthCapabilityFront=source.depthCapabilityFront===true;card.depthGroup=source.depthGroup===true;
     card.cutout = (source.cutout ?? '').startsWith('file://') || (source.cutout ?? '').startsWith('memory://') ? source.cutout : '';
     card.subjectBorder = true; card.subjectPhoto = source.subjectPhoto ?? false; card.subjectVersion = source.subjectVersion ?? 0; card.subjectInk = source.subjectInk ?? '#262824'; card.subjectAspect = source.subjectAspect ?? 1;
     card.outline = Array.isArray(source.outline) ? source.outline : [];

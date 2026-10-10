@@ -42,6 +42,9 @@ export struct CardFace {
 
   build() {
     Stack() {
+      if(this.card.depthPass==='foreground'){
+        CardCanvas({card:this.card,layerMotion:this.layerMotion,scaleFactor:this.scaleFactor,tick:this.tick,widget:this.widget,hideContent:this.hideContent}).width(subjectSurfaceFactor(this.card)*100+'%').height(subjectSurfaceFactor(this.card)*100+'%')
+      }else {
       // Soft cast shadow + tight contact shadow + a solid, slightly warm sidewall.
       // The cached face owns these layers; pan/rotation only transform its texture.
       if(this.card.shape==='subject'&&(this.card.reliefSrc.length>0||this.commands().length>0)){
@@ -69,6 +72,7 @@ export struct CardFace {
         Column().width('100%').height('100%').borderRadius(cardCornerRadius(this.card,this.scaleFactor))
           .border({width:.6,color:{top:'#88FFFFFF',left:'#48FFFFFF',right:'#14000000',bottom:'#20000000'}})
           .hitTestBehavior(HitTestMode.None)
+      }
       }
     // BoardCard caches the face together with its shadow fringe. A cache at
     // the face's own bounds truncates the native shadow at rounded corners.

@@ -10,6 +10,7 @@ export { traceMask } from './SubjectGeometry';
 export class SubjectShapeResult {
   src: string = '';
   outline: ShapePoint[][] = [];
+  sourceAspect:number=1;
   aspect: number = 1;
   ink: string = '#262824';
   crop: ElementBox = new ElementBox();
@@ -47,7 +48,7 @@ export async function extractSubject(src: string, filesDir: string): Promise<Sub
     output = await fileIo.open(path, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
     packer = image.createImagePacker();
     await packer.packToFile(processed, output.fd, { format: 'image/png', quality: 100 });
-    const value = new SubjectShapeResult(); value.src = 'file://' + path; value.outline = pixels.outline; value.aspect = pixels.width / pixels.height; value.crop = pixels.crop; value.ink = pixels.ink;
+    const value = new SubjectShapeResult(); value.sourceAspect=info.size.width/info.size.height; value.src = 'file://' + path; value.outline = pixels.outline; value.aspect = pixels.width / pixels.height; value.crop = pixels.crop; value.ink = pixels.ink;
     return value;
   } catch (e) {
     if (path.length > 0) { try { await fileIo.unlink(path); } catch (_) {} }

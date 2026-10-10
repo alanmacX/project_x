@@ -2,6 +2,7 @@
 (function(global){
  'use strict';
  const schema=FridgeCore.load('CardSchema'),layout=FridgeCore.load('AlbumLayout'),rotation=FridgeCore.load('AlbumRotation'),depth=FridgeCore.load('CardDepth'),canvas=FridgeCore.load('CanvasLayout');
+ const composition=FridgeCore.load('DepthComposition');
  let dimensions=new Map();
  const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const color=c=>/^#[\da-f]{6}$/i.test(c)?c:'#30322D';
@@ -76,6 +77,12 @@
   }
   return `<g data-element="${escape(el.id)}" transform="translate(${x} ${y}) rotate(${el.rot} ${ew/2} ${eh/2})" opacity="${el.opacity}">${body}</g>`;
  }
+ function depthForeground(c,media,id){
+  const f=canvas.subjectSurfaceFactor(c),w=c.w*f,h=c.h*f,ox=(c.w-w)/2,oy=(c.h-h)/2;
+  const el=composition.depthElement(c);if(!el)return c.shape==='subject'&&c.subjectPhoto&&c.cutout?image(media(c.cutout),ox,oy,w,h,0,id+'subject','none'):'';
+  const ew=el.w*w,eh=el.h*h,box=composition.depthPhotoBox(el,el.w*c.w,el.h*c.h);
+  return `<defs><clipPath id="${id}depthclip"><rect width="${ew}" height="${eh}"/></clipPath></defs><g transform="translate(${ox+el.x*w} ${oy+el.y*h}) rotate(${el.rot} ${ew/2} ${eh/2})" opacity="${el.opacity}" clip-path="url(#${id}depthclip)">`+image(media(el.depthForeground),box.x*ew,box.y*eh,box.w*ew,box.h*eh,0,id+'depthphoto','none')+'</g>';
+ }
  function renderPackage(pack,width,tick,options={}){
   const namespace=options.namespace||'fridge';if(!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(namespace))throw Error('Invalid SVG namespace');
   if(!Number.isFinite(width)||width<=0||!Number.isFinite(tick))throw Error('Invalid render dimensions/time');
@@ -91,12 +98,20 @@
   let defs=assetDefs,body=scene.background.mode==='transparent'?'':`<rect width="${width}" height="${height}" fill="${color(scene.background.color)}"/>`;
   if(scene.background.mode!=='transparent'&&scene.background.src&&scene.background.mode!=='solid'&&scene.background.mode!=='smart')body+=image(media(scene.background.src),0,0,width,height,0,namespace+'backdrop','xMidYMid slice');
   const background=body,cards=[];
-  scene.cards.filter(c=>!c.hidden).sort((a,b)=>a.z-b.z).forEach((c,i)=>{
+  composition.depthRenderCards(scene.cards).filter(c=>!c.hidden).sort((a,b)=>a.z-b.z).forEach((c,i)=>{
    const start=body.length,id=namespace+'c'+i,r=schema.cardCornerRadius(c),[paper,ink]=schema.materialColors(c.material,c.paper,c.ink),edge=depth.cardEdgeColor(paper,c.shape==='subject'&&c.subjectPhoto),f=canvas.subjectSurfaceFactor(c);
    const content=c.capability?.k==='album'?rotation.activeAlbum(c.capability,tick):null;
    defs+=shadow(id)+shadow(id+'cast',depth.CARD_CAST_RADIUS,depth.CARD_CAST_Y,41/255)+shadow(id+'contact',depth.CARD_CONTACT_RADIUS,depth.CARD_CONTACT_Y,50/255)+`<clipPath id="${id}clip"><rect width="${c.w}" height="${c.h}" rx="${r}"/></clipPath>`;
    const x=c.x*scale,y=c.y*height/schema.BOARD_H;
    body+=`<g data-fridge-card="${escape(c.id)}"><g transform="translate(${x} ${y}) scale(${scale})"><g transform="rotate(${c.rot} ${c.w/2} ${c.h/2})">`;
+   if(c.depthPass==='foreground'){
+    body+=depthForeground(c,media,id);
+    const fw=c.w*f,fh=c.h*f,fx=(c.w-fw)/2,fy=(c.h-fh)/2;
+    body+=(c.elements||[]).filter(el=>el.depthFront&&!el.depthEnabled).map((el,j)=>element(el,fw,fh,fx,fy,ink,media,id+'front'+j)).join('');
+    if(c.depthCapabilityFront&&c.capability)body+=FridgeReadouts.capability(c,tick,id+'cap');
+    body+='</g></g></g>';
+    cards.push({id:c.id,groupId:c.groupId,z:c.z,x,y,width:c.w*scale,height:c.h*scale,rotation:c.rot,pivot:{x:x+c.w*scale/2,y:y+c.h*scale/2},markup:body.slice(start)});return;
+   }
    if(c.shape==='subject'&&c.outline.length){
     const commands=FridgeCore.load('ContourPath').contourPath(c.outline,c.w,c.h,f),border=c.subjectBorder?6:0;
     for(const kind of ['cast','contact'])body+=`<path d="${commands}" transform="translate(0 ${depth.CARD_SIDE})" fill="${edge}" stroke="${edge}" stroke-width="${border}" stroke-linejoin="round" filter="url(#${id+kind}shadow)"/>`;
@@ -104,16 +119,21 @@
    }else body+=`<rect y="${depth.CARD_SIDE}" width="${c.w}" height="${c.h}" rx="${r}" fill="${edge}" filter="url(#${id}castshadow)"/><rect y="${depth.CARD_SIDE}" width="${c.w}" height="${c.h}" rx="${r}" fill="${edge}" filter="url(#${id}contactshadow)"/><rect y="${depth.CARD_SIDE}" width="${c.w}" height="${c.h}" rx="${r}" fill="${edge}"/>`;
    const innerW=c.w*f,innerH=c.h*f,offsetX=(c.w-innerW)/2,offsetY=(c.h-innerH)/2;
    if(c.shape==='subject'&&c.cutout){defs+=`<mask id="${id}alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="${c.w}" height="${c.h}" style="mask-type:alpha"><use href="${media(c.cutout)}" transform="translate(${offsetX} ${offsetY}) scale(${innerW} ${innerH})"/></mask>`;}
-   const isFree=c.capFree||FridgeCore.load('ReadingComposition').isReadingComposition(c.capability?.readingBlend||''),readout=c.capability&&!content?FridgeReadouts.capability(c,tick,id+'cap'):'';
-   body+=`<g ${c.shape==='subject'&&c.cutout?`mask="url(#${id}alpha)"`:`clip-path="url(#${id}clip)"`}>`;
+   const isFree=c.capFree||FridgeCore.load('ReadingComposition').isReadingComposition(c.capability?.readingBlend||''),readout=c.capability&&!content&&!(c.depthPass==='base'&&c.depthCapabilityFront)?FridgeReadouts.capability(c,tick,id+'cap'):'';
+   const useDepth=composition.internalDepth(c)&&c.depthPass!=='base';
+   body+=`<g ${!useDepth&&c.shape==='subject'&&c.cutout?`mask="url(#${id}alpha)"`:useDepth&&c.shape==='subject'?'':`clip-path="url(#${id}clip)"`}>`;
    if(content)body+=albumBody({...content,cover:media(content.cover),background:media(content.background)},c.w,c.h,c.capability.albumPresentation||'cover',id);
    else{
     body+=`<rect width="${c.w}" height="${c.h}" fill="${color(paper)}"/>`;
-    if(c.shape==='subject'&&c.subjectPhoto&&c.cutout)body+=image(media(c.cutout),offsetX,offsetY,innerW,innerH,0,id+'photo','none');
-    const layers=behind=>(c.elements||[]).filter(el=>el.behindCapability===behind).map((el,j)=>element(el,innerW,innerH,offsetX,offsetY,ink,media,id+(behind?'back':'front')+j)).join('');
-    body+=layers(true);if(!isFree&&!canvas.capabilityObstructed(c))body+=readout;body+=layers(false);if(!isFree&&canvas.capabilityObstructed(c))body+=readout;
+    if(c.depthPass!=='base'&&c.shape==='subject'&&c.subjectPhoto&&c.cutout)body+=image(media(c.cutout),offsetX,offsetY,innerW,innerH,0,id+'photo','none');
+    const layers=behind=>(c.elements||[]).filter(el=>el.behindCapability===behind&&(c.depthPass!=='base'||!el.depthFront)).map((el,j)=>element(el,innerW,innerH,offsetX,offsetY,ink,media,id+(behind?'back':'front')+j)).join('');
+    if(useDepth){
+     const source=composition.depthElement(c);if(source)body+=element(source,innerW,innerH,offsetX,offsetY,ink,media,id+'original');
+     const separated=(front,behind)=>(c.elements||[]).filter(el=>el.id!==source?.id&&!!el.depthFront===front&&el.behindCapability===behind).map((el,j)=>element(el,innerW,innerH,offsetX,offsetY,ink,media,id+'d'+front+behind+j)).join('');
+     body+=separated(false,true);if(!c.depthCapabilityFront)body+=readout;body+=separated(false,false);body+=depthForeground(c,media,id);body+=separated(true,true)+separated(true,false);if(c.depthCapabilityFront)body+=readout;
+    }else{body+=layers(true);if(!isFree&&!canvas.capabilityObstructed(c))body+=readout;body+=layers(false);if(!isFree&&canvas.capabilityObstructed(c))body+=readout;}
    }
-   body+='</g>';if(isFree)body+=readout;
+   body+='</g>';if(isFree&&!useDepth)body+=readout;
    if(c.frame&&c.shape!=='subject')body+=`<rect x="1.5" y="1.5" width="${Math.max(0,c.w-3)}" height="${Math.max(0,c.h-3)}" rx="${Math.max(0,r-1.5)}" fill="none" stroke="white" stroke-width="3"/>`;
    if(c.shape!=='subject'){defs+=`<linearGradient id="${id}lip" x2="0" y2="1"><stop stop-color="#FFFFFF88"/><stop offset="1" stop-color="#00000020"/></linearGradient>`;body+=`<rect width="${c.w}" height="${c.h}" rx="${r}" fill="none" stroke="url(#${id}lip)" stroke-width=".6"/>`;}
    body+='</g></g></g>';

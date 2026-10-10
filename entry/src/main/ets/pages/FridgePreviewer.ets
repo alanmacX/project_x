@@ -1,3 +1,4 @@
+import { depthRenderCards } from '../model/DepthComposition';
 import { bundleManager, common } from '@kit.AbilityKit';
 import { picker, fileIo } from '@kit.CoreFileKit';
 import { taskpool } from '@kit.ArkTS';
@@ -57,7 +58,7 @@ struct FridgePreviewer {
    if(!this.alive||token!==this.generation){taskpool.execute(new taskpool.Task(clearPreviewPackage,this.ctx().cacheDir,revision));return;}
    this.completed.push(revision);
    const result=JSON.parse(json) as PreviewPackageResult;this.packageVersion=result.version;const scene=JSON.parse(result.json) as FridgeState;scene.cards.sort((a,b)=>a.z-b.z);
-   await primeRenderContours(scene.cards,json);
+   await primeRenderContours(scene.cards,result.json);
    await prepareSubjectDepth(scene.cards,this.boardScale(),this.ctx().cacheDir,this.getUIContext().vp2px(1));
    if(!this.alive||token!==this.generation)return;
    this.scene=scene;this.loaded=true;this.status='已读取 '+scene.cards.length+' 张卡 · schema '+scene.schemaVersion+' · 原生渲染';
@@ -84,10 +85,10 @@ struct FridgePreviewer {
  @Builder artwork() {
   Stack({alignContent:Alignment.TopStart}) {
    if(!this.transparentDemo){CanvasBackdrop({sceneBackground:this.scene.background})}
-   ForEach(this.scene.cards.filter((c:FridgeCard)=>!c.hidden),(c:FridgeCard)=>{
+   ForEach(depthRenderCards(this.scene.cards).sort((a,b)=>a.z-b.z).filter((c:FridgeCard)=>!c.hidden),(c:FridgeCard)=>{
     CardFace({card:c,scaleFactor:this.boardScale(),tick:this.tick})
      .width(c.w*this.boardScale()).height(c.h*this.boardScale())
-     .rotate({angle:c.rot}).position({x:c.x*this.boardScale(),y:c.y*this.boardHeight()/BOARD_H})
+     .rotate({angle:c.rot}).position({x:c.x*this.boardScale(),y:c.y*this.boardHeight()/BOARD_H}).zIndex(c.z)
    },(c:FridgeCard)=>c.id)
   }.width(this.boardWidth()).height(this.boardHeight()).borderRadius(20).clip(true).id('fridgePreviewArtwork')
  }

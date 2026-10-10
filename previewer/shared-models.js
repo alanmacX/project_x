@@ -14,6 +14,7 @@ function packageScene(json, cardId) {
         if (state.cards.length !== 1)
             throw new Error('卡片不存在');
         state.cards[0].groupId = '';
+        state.cards[0].depthGroup = false;
         state.sceneLayouts = [];
         state.sceneRules = [];
         state.sceneBaseLayoutId = '';
@@ -61,8 +62,9 @@ function readPackage(json) {
         refs.push(c.cutout ?? '', c.capability?.albumCover ?? '', c.capability?.albumBackground ?? '');
         for (const a of c.capability?.albumItems ?? [])
             refs.push(a.cover, a.background);
-        for (const el of c.elements ?? [])
-            refs.push(el.src ?? '');
+        for (const el of c.elements ?? []) {
+            refs.push(el.src ?? '', el.depthForeground ?? '');
+        }
     }
     if (refs.some((src) => src.length > 0 && !keys.includes(src)))
         throw new Error('作品图片引用不完整');
@@ -91,9 +93,12 @@ function readPackage(json) {
                         a.background = to;
                 }
             }
-            for (const el of c.elements ?? [])
+            for (const el of c.elements ?? []) {
                 if (el.src === from)
                     el.src = to;
+                if (el.depthForeground === from)
+                    el.depthForeground = to;
+            }
         }
     };
     for (const c of raw.state.cards) {
@@ -242,7 +247,7 @@ exports.normalizeHtmlCard = normalizeHtmlCard;
 "CardSchema":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.normalizeCapability = exports.contrastingInk = exports.serializeDoorCards = exports.serializeFaceCards = exports.normalizeState = exports.normalizeElement = exports.localImageSource = exports.normalizeBox = exports.bounded = exports.defaultState = exports.cardCornerRadius = exports.shapeRadius = exports.materialColors = exports.typeLabel = exports.FridgeState = exports.normalizeBackground = exports.CanvasBackground = exports.BackgroundAnchor = exports.DoorState = exports.FridgeCard = exports.CanvasElement = exports.ElementBox = exports.CAPABILITIES = exports.CapType = exports.MIN_SUBJECT_EDGE = exports.ALBUM_CARD_CORNER_RADIUS = exports.ALBUM_CORNER_RADIUS = exports.ALBUM_INSET = exports.RECT_CORNER_RADIUS = exports.MIN_CARD_EDGE = exports.BOARD_H = exports.BOARD_W = void 0;
+exports.normalizeCapability = exports.contrastingInk = exports.serializeDoorCards = exports.serializeFaceCards = exports.normalizeState = exports.normalizeElement = exports.localImageSource = exports.normalizeBox = exports.bounded = exports.defaultState = exports.cardCornerRadius = exports.shapeRadius = exports.materialColors = exports.typeLabel = exports.FridgeState = exports.normalizeBackground = exports.CanvasBackground = exports.BackgroundAnchor = exports.DoorState = exports.FridgeCard = exports.CanvasElement = exports.PhotoDepthCrop = exports.ElementBox = exports.CAPABILITIES = exports.CapType = exports.MIN_SUBJECT_EDGE = exports.ALBUM_CARD_CORNER_RADIUS = exports.ALBUM_CORNER_RADIUS = exports.ALBUM_INSET = exports.RECT_CORNER_RADIUS = exports.MIN_CARD_EDGE = exports.BOARD_H = exports.BOARD_W = void 0;
 const HtmlCardTemplate_1 = require("./HtmlCardTemplate");
 const ReadingStylePolicy_1 = require("./ReadingStylePolicy");
 const SceneScheduleSchema_1 = require("./SceneScheduleSchema");
@@ -280,6 +285,16 @@ class ElementBox {
     }
 }
 exports.ElementBox = ElementBox;
+class PhotoDepthCrop extends ElementBox {
+    constructor() {
+        super(...arguments);
+        this.x = 0;
+        this.y = 0;
+        this.w = 1;
+        this.h = 1;
+    }
+}
+exports.PhotoDepthCrop = PhotoDepthCrop;
 class CanvasElement extends ElementBox {
     constructor() {
         super(...arguments);
@@ -293,12 +308,22 @@ class CanvasElement extends ElementBox {
         this.bold = false;
         this.align = 'left';
         this.behindCapability = false;
+        this.depthEnabled = false;
+        this.depthForeground = '';
+        this.depthCrop = new PhotoDepthCrop();
+        this.depthSourceAspect = 1;
+        this.depthFront = false;
         this.primitive = 'rect'; // rect | circle | line
     }
 }
 exports.CanvasElement = CanvasElement;
 class FridgeCard {
     constructor() {
+        this.subjectDepth = false;
+        this.depthCapabilityFront = false;
+        this.depthGroup = false;
+        this.depthOwnerId = ''; // Render projection owner, never imported or stored.
+        this.depthPass = ''; // Derived render pass; never imported or stored.
         this.reliefSrc = ''; // Host-derived only; ignored by import and omitted from editable storage.
         this.groupId = '';
         this.hidden = false;
@@ -475,6 +500,17 @@ function normalizeElement(raw, clippedSubject = false) {
     el.fs = bounded(raw.fs, 10, 64, 18);
     el.color = raw.color ?? '';
     el.behindCapability = raw.behindCapability ?? false;
+    el.depthFront = raw.depthFront === true;
+    el.depthForeground = localImageSource(raw.depthForeground);
+    el.depthEnabled = el.kind === 'image' && !el.animated && raw.depthEnabled === true && el.depthForeground.length > 0;
+    if (el.depthEnabled)
+        el.depthFront = false;
+    el.depthSourceAspect = bounded(raw.depthSourceAspect, .01, 100, 1);
+    const crop = raw.depthCrop;
+    el.depthCrop.x = bounded(crop?.x, 0, .999, 0);
+    el.depthCrop.y = bounded(crop?.y, 0, .999, 0);
+    el.depthCrop.w = bounded(crop?.w, .001, 1 - el.depthCrop.x, 1 - el.depthCrop.x);
+    el.depthCrop.h = bounded(crop?.h, .001, 1 - el.depthCrop.y, 1 - el.depthCrop.y);
     el.bold = raw.bold ?? false;
     el.align = raw.align ?? 'left';
     el.primitive = raw.primitive ?? 'rect';
@@ -540,6 +576,9 @@ function normalizeState(raw) {
         card.paper = source.paper ?? '';
         card.ink = source.ink ?? '';
         card.inDoor = source.inDoor ?? false;
+        card.subjectDepth = source.subjectDepth === true;
+        card.depthCapabilityFront = source.depthCapabilityFront === true;
+        card.depthGroup = source.depthGroup === true;
         card.cutout = (source.cutout ?? '').startsWith('file://') || (source.cutout ?? '').startsWith('memory://') ? source.cutout : '';
         card.subjectBorder = true;
         card.subjectPhoto = source.subjectPhoto ?? false;
@@ -3614,6 +3653,11 @@ exports.cardStorageShell = cardStorageShell;
 function snapshotCard(source, detached) {
     const copy = new CardSchema_1.FridgeCard();
     copy.reliefSrc = detached ? source.reliefSrc : '';
+    copy.subjectDepth = source.subjectDepth;
+    copy.depthCapabilityFront = source.depthCapabilityFront;
+    copy.depthGroup = source.depthGroup;
+    copy.depthPass = detached ? source.depthPass : '';
+    copy.depthOwnerId = detached ? source.depthOwnerId : '';
     copy.id = source.id;
     copy.hidden = source.hidden === true;
     copy.groupId = source.groupId;
@@ -3651,7 +3695,7 @@ function cardRenderSnapshot(source, prepared = false) {
     // Compare mutable values before cloning. Reopening/committing one card should
     // not deep-copy every unchanged capability, course list and background layer.
     const signature = JSON.stringify([source.id, source.hidden, source.groupId, source.x, source.y, source.w, source.h, source.rot, source.z,
-        source.shape, source.frame, source.material, source.paper, source.ink, source.subjectPhoto, source.subjectAspect,
+        source.subjectDepth, source.depthCapabilityFront, source.depthGroup, source.depthPass, source.depthOwnerId, source.shape, source.frame, source.material, source.paper, source.ink, source.subjectPhoto, source.subjectAspect,
         source.subjectInk, source.subjectVersion, source.cutout, source.reliefSrc, source.inDoor, contourKey, source.capability, source.capBox, source.capFree, source.elements]);
     const previous = renderSnapshots.get(source.id);
     if (previous !== undefined && renderSignatures.get(source.id) === signature)
@@ -4183,4 +4227,89 @@ function scenePolicyShell(base) {
 }
 exports.scenePolicyShell = scenePolicyShell;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"ba2febe1b209085c747f8cd5a8b64fea6666c5c4b8e727cd96323208132dcef4"};})(globalThis);
+},
+"DepthComposition":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.depthRenderCards = exports.depthOwner = exports.depthPhotoBox = exports.internalDepth = exports.hasDepthSubject = exports.depthElement = void 0;
+const CardSchema_1 = require("./CardSchema");
+const CardViewSnapshot_1 = require("./CardViewSnapshot");
+/** One subject source per composition. The foreground is an offline, reusable alpha image. */
+function depthElement(card) {
+    return (card.elements ?? []).find(el => el.kind === 'image' && !el.animated && el.depthEnabled && (el.depthForeground ?? '').length > 0 && (el.src ?? '').length > 0);
+}
+exports.depthElement = depthElement;
+function hasDepthSubject(card) {
+    return (card.shape === 'subject' && card.subjectPhoto && card.cutout.length > 0) || depthElement(card) !== undefined;
+}
+exports.hasDepthSubject = hasDepthSubject;
+function internalDepth(card) {
+    return (card.subjectDepth && card.shape === 'subject' && card.subjectPhoto && card.cutout.length > 0) || depthElement(card) !== undefined;
+}
+exports.internalDepth = internalDepth;
+/** Exact ImageFit.Cover transform, including source crop. Coordinates are fractions of the photo layer. */
+function depthPhotoBox(element, width, height) {
+    const result = new CardSchema_1.ElementBox(), aspect = Math.max(.001, width) / Math.max(.001, height), source = Math.max(.001, element.depthSourceAspect || 1);
+    const w = Math.max(1, source / aspect), h = Math.max(1, aspect / source), crop = element.depthCrop;
+    result.x = (1 - w) / 2 + crop.x * w;
+    result.y = (1 - h) / 2 + crop.y * h;
+    result.w = crop.w * w;
+    result.h = crop.h * h;
+    return result;
+}
+exports.depthPhotoBox = depthPhotoBox;
+function depthOwner(card) { return card.depthPass === 'foreground' ? card.depthOwnerId : card.id; }
+exports.depthOwner = depthOwner;
+class Projection {
+    constructor() {
+        this.source = new CardSchema_1.FridgeCard();
+        this.z = 0;
+        this.pass = '';
+        this.card = new CardSchema_1.FridgeCard();
+    }
+}
+const cache = new Map();
+function project(source, pass, z, id = source.id) {
+    const key = source.id + ':' + pass, old = cache.get(key);
+    if (old && old.source === source && old.z === z && old.card.id === id)
+        return old.card;
+    const copy = (0, CardViewSnapshot_1.cardViewSnapshot)(source);
+    copy.depthPass = pass;
+    copy.z = z;
+    copy.id = id;
+    if (pass === 'foreground')
+        copy.depthOwnerId = source.id;
+    const entry = new Projection();
+    entry.source = source;
+    entry.z = z;
+    entry.pass = pass;
+    entry.card = copy;
+    if (!cache.has(key) && cache.size >= 128)
+        cache.delete(cache.keys().next().value);
+    cache.set(key, entry);
+    return copy;
+}
+/** Render projection only: editable cards, groups, geometry and resource ownership remain unchanged. */
+function depthRenderCards(cards) {
+    const output = [], sources = cards.filter(c => !c.hidden && (c.groupId ?? '').length > 0 && c.depthGroup && hasDepthSubject(c));
+    const used = [], occupied = cards.map(c => c.id);
+    for (const card of cards) {
+        const source = sources.find(c => c.id === card.id && !used.includes(c.groupId));
+        const members = source ? cards.filter(c => !c.hidden && c.groupId === source.groupId) : [];
+        if (source && members.length > 1) {
+            used.push(source.groupId);
+            output.push(project(source, 'base', Math.min(...members.map(c => c.z)) - .25));
+            let foregroundId = source.id + '::depth';
+            while (occupied.includes(foregroundId))
+                foregroundId += ':';
+            occupied.push(foregroundId);
+            output.push(project(source, 'foreground', Math.max(...members.map(c => c.z)) + .25, foregroundId));
+        }
+        else
+            output.push(card);
+    }
+    return used.length > 0 ? output.sort((a, b) => a.z - b.z) : output;
+}
+exports.depthRenderCards = depthRenderCards;
+
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"114cfb22cf59db267b652ac10fdcd069c90f64bb768a527d31c0a9b3df578888"};})(globalThis);

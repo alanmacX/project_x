@@ -4,10 +4,10 @@ export function groupMembers(cards: FridgeCard[], card: FridgeCard): FridgeCard[
 export function combineCards(cards: FridgeCard[], ids: string[], groupId: string): void {
   const groups = cards.filter((c: FridgeCard) => ids.includes(c.id) && c.groupId.length > 0).map((c: FridgeCard) => c.groupId);
   const members = cards.filter((c: FridgeCard) => ids.includes(c.id) || groups.includes(c.groupId));
-  if (members.length < 2) return; members.forEach((c: FridgeCard) => { c.groupId = groupId; });
+  if (members.length < 2) return; members.forEach((c: FridgeCard) => { c.groupId = groupId; c.depthGroup=false; });
 }
-export function ungroupCards(cards: FridgeCard[], groupId: string): void { if (groupId.length > 0) cards.forEach((c: FridgeCard) => { if (c.groupId === groupId) c.groupId = ''; }); }
-export function cleanGroups(cards: FridgeCard[]): void { cards.forEach((c: FridgeCard) => { if (c.groupId.length > 0 && cards.filter((p: FridgeCard) => p.groupId === c.groupId).length < 2) c.groupId = ''; }); }
+export function ungroupCards(cards: FridgeCard[], groupId: string): void { if (groupId.length > 0) cards.forEach((c: FridgeCard) => { if (c.groupId === groupId) {c.groupId = '';c.depthGroup=false;} }); }
+export function cleanGroups(cards: FridgeCard[]): void { cards.forEach((c: FridgeCard) => { if (c.groupId.length > 0 && cards.filter((p: FridgeCard) => p.groupId === c.groupId).length < 2) {c.groupId = '';c.depthGroup=false;} }); }
 /** Intersect every member's recoverable limits; one common delta preserves overlaps and spacing. */
 export function groupDragBounds(cards: FridgeCard[], card: FridgeCard, renderedHeight?: number): DragBounds {
   const result = dragBounds(card,renderedHeight);
@@ -38,7 +38,7 @@ export function layerSections(cards: FridgeCard[]): LayerSection[] {
   for (const card of ordered) {
     const key = card.groupId ? 'group:'+card.groupId : 'card:'+card.id;
     let section = sections.find((item: LayerSection)=>item.id===key);
-    if (section === undefined) { section = new LayerSection(); section.id=key; section.title=card.groupId?'组合 '+(++number):''; sections.push(section); }
+    if (section === undefined) { section = new LayerSection(); section.id=key; section.title=card.groupId?(cards.some(c=>c.groupId===card.groupId&&c.depthGroup)?'景深组合 ':'组合 ')+(++number):''; sections.push(section); }
     section.ids.push(card.id);
   }
   return sections;

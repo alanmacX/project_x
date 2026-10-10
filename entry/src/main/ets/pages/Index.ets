@@ -1,3 +1,4 @@
+import { depthElement, hasDepthSubject, internalDepth, depthOwner, depthRenderCards } from '../model/DepthComposition';
 import { canvasRotationEnabled } from '../model/CanvasRotation';
 import { prepareReadingTints, ReadingTintRequest, ReadingTintResult } from '../model/ReadingMaterialWorker';
 import { cardSource, hash } from '../model/BackgroundInputs';
@@ -205,6 +206,8 @@ struct Index {
   @State error: string = '';
   @State cards: FridgeCard[] = [];
   @State cardIds: string[] = [];
+  @State depthSceneIds:string[]=[];
+  @State depthSceneMap:Record<string,FridgeCard>={};
   @State cardMap: Record<string, FridgeCard> = {};
   @State revision: number = 0;
   @State selectedId: string = '';
@@ -956,6 +959,11 @@ struct Index {
   private renderBoard(): void {
     const next = (this.timedScene?.state??this.store.state).cards.map((card: FridgeCard) => cardRenderSnapshot(card));
     if (next.length === this.cards.length && next.every((card: FridgeCard, index: number) => card === this.cards[index])) return;
+    const projected=depthRenderCards(next),ids=projected.map(c=>c.id);
+    if(ids.length!==this.depthSceneIds.length||ids.some((id,i)=>id!==this.depthSceneIds[i]))this.depthSceneIds=ids;
+    const projectedMap:Record<string,FridgeCard>={};projected.forEach(c=>projectedMap[c.id]=c);
+    if(Object.keys(this.depthSceneMap).length!==ids.length||ids.some(id=>this.depthSceneMap[id]===undefined))this.depthSceneMap=projectedMap;
+    else projected.forEach(c=>{if(this.depthSceneMap[c.id]!==c)this.depthSceneMap[c.id]=c;});
     // Geometry edits keep the board and layer collections alive. Replacing both
     // containers forces every card/layer builder through the release frame.
     if(next.length===this.cards.length&&next.every((c:FridgeCard,i:number)=>c.id===this.cards[i].id)){
@@ -1238,7 +1246,7 @@ struct Index {
     if(bitmap)setTimeout(()=>bitmap.release(),80);
   }
   private boardInteraction(id: string, active: boolean): void {
-    if (active) { this.scheduleGeneration++;this.selectedId=id; const card = this.store.findCard(id); this.movingGroupIds = card === null ? [] : groupMembers(this.store.state.cards, card).filter((c: FridgeCard) => c.id !== id).map((c: FridgeCard) => c.id); this.boardMotion.ids = this.movingGroupIds.length > 0 ? [id, ...this.movingGroupIds] : []; }
+    if (active) { this.scheduleGeneration++;this.selectedId=id; const card = this.store.findCard(id); this.movingGroupIds = card === null ? [] : groupMembers(this.store.state.cards, card).filter((c: FridgeCard) => c.id !== id).map((c: FridgeCard) => c.id); const foregrounds=this.depthSceneIds.filter(key=>this.depthSceneMap[key].depthPass==='foreground'&&[id,...this.movingGroupIds].includes(depthOwner(this.depthSceneMap[key])));this.boardMotion.ids = this.movingGroupIds.length>0||foregrounds.length>0?[id,...this.movingGroupIds,...foregrounds]:[]; }
     else {this.boardMotion.guideVertical=false;this.boardMotion.guideHorizontal=false; this.boardMotion.offset = { x: 0, y: 0 }; this.boardMotion.ids = []; this.movingGroupIds = []; }
     this.activeBoardId = active ? id : '';
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer); this.saveTimer = -1;
@@ -1287,7 +1295,7 @@ struct Index {
         const header = new ArrayBuffer(6); fileIo.readSync(output.fd, header, { offset: 0, length: 6 });
         const bytes = new Uint8Array(header); const gif = bytes[0] === 71 && bytes[1] === 73 && bytes[2] === 70 && bytes[3] === 56 && (bytes[4] === 55 || bytes[4] === 57) && bytes[5] === 97;
         if (this.store.findCard(id) !== card || !card.elements.includes(element)) { await fileIo.unlink(path); return; }
-        element.src = 'file://' + path; element.animated = gif; this.change(group);
+        element.src = 'file://' + path; element.animated = gif; element.depthEnabled=false;element.depthForeground=''; this.change(group);
       }
     } catch (e) {
       if (path.length > 0) { try { await fileIo.unlink(path); } catch (_) {} }
@@ -1472,7 +1480,7 @@ struct Index {
         if (width > 0 && height > 0 && (width!==this.screenWidth || height!==this.screenHeight)) { this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height);if(this.editing&&!this.heroActive)this.editorSheetOpen=!this.editorLandscape(); this.layoutBoard(); }
       })
   }
-  private sceneCard(id: string): FridgeCard { return this.editing && id === this.selectedId ? this.preview : this.cardMap[id]; }
+  private sceneCard(id: string): FridgeCard { return this.editing && id === this.selectedId ? this.preview : this.depthSceneMap[id]??this.cardMap[id]; }
   private sceneScale(id: string): number { return this.editing && id === this.selectedId ? this.surfaceScale() : 1; }
   private sceneX(id: string): number { return this.editing && id === this.selectedId ? this.surfaceX() : this.transitionCardRect(id).x; }
   private sceneY(id: string): number { return this.editing && id === this.selectedId ? this.surfaceY() : this.transitionCardRect(id).y; }
@@ -1482,40 +1490,44 @@ struct Index {
   private creationClipX(id: string): number { return this.creationClip(id) ? this.transitionClipX : 0; }
   private creationClipY(id: string): number { return this.creationClip(id) ? this.transitionClipY : 0; }
   @Builder
-  editingScene() {
-    // Stable IDs keep the actual board surfaces (including decoded photos) alive.
-    // Cache each unrotated face; transforms remain outside its padded texture.
-    Stack({ alignContent: Alignment.TopStart }) {
-      Stack({ alignContent: Alignment.TopStart }) {
-        ForEach((this.startupCardCount>=0?this.cardIds.slice(0,this.startupCardCount):this.cardIds).filter((id:string)=>!this.cardMap[id].hidden), (id: string) => {
+  depthSceneLayer(id:string,renderId:string){
           Stack({ alignContent: Alignment.TopStart }) {
             Stack({ alignContent: Alignment.TopStart }) {
-            BoardCard({ showControls:false,layerMotion:this.layerMotion, controlViewportWidth: BOARD_W * this.boardScale, controlViewportHeight: this.boardHeight, motion: this.boardMotion, card: this.sceneCard(id), localCoordinates: true, scatterAngle: 0, editingSurface: this.editing,
+            BoardCard({ showControls:false,layerMotion:this.layerMotion, controlViewportWidth: BOARD_W * this.boardScale, controlViewportHeight: this.boardHeight, motion: this.boardMotion, card: this.sceneCard(renderId), localCoordinates: true, scatterAngle: 0, editingSurface: this.editing,
               displayAngle: id === this.selectedId ? this.surfaceAngle() : this.cardMap[id].rot + this.scatter * (this.cardMap[id].z % 2 === 0 ? 9 : -9),
               selected: this.selectedId === id && !this.editing && !this.groupSelecting && this.selectedGroup().length < 2, scaleFactor: this.boardScale, yScaleFactor: this.boardHeight / BOARD_H,
               animateContent:this.editing&&!this.heroActive&&id===this.selectedId,
               hideContent: this.editing && id === this.selectedId && (this.heroActive ? this.heroHideContent : this.settingsTab === 0),
               movingLayerId: id === this.selectedId ? this.layerDrag : '',
-              moveX: id === this.selectedId && this.editing ? this.layerDX * this.boardScale / this.editorScale() : 0, moveY: id === this.selectedId && this.editing ? this.layerDY * this.boardScale / this.editorScale() : 0, tick: capabilityRenderTick(this.sceneCard(id).capability,this.tick),
+              moveX: id === this.selectedId && this.editing ? this.layerDX * this.boardScale / this.editorScale() : 0, moveY: id === this.selectedId && this.editing ? this.layerDY * this.boardScale / this.editorScale() : 0, tick: capabilityRenderTick(this.sceneCard(renderId).capability,this.tick),
               getAlignmentAnchor:(card:FridgeCard)=>{const box=groupBox(groupMembers(this.store.state.cards,card),this.boardHeight/this.boardScale);return {x:box.x+box.w/2,y:box.y+box.h/2};},
               getMoveBounds: (card: FridgeCard) => groupDragBounds(this.store.state.cards, card, this.boardHeight/this.boardScale),
-              onMove: (x: number, y: number) => { if (this.movingGroupIds.length > 0) { this.boardMotion.offset = { x: x, y: y }; } },
+              onMove: (x: number, y: number) => { if (this.boardMotion.ids.length > 0) { this.boardMotion.offset = { x: x, y: y }; } },
               onSelect: (id: string) => this.selectLayerCard(id), onHold:(id:string)=>this.holdBoardCard(id), onDelete: (id: string) => this.deleteCard(id),
               onEdit: (id: string) => this.openEditor(id), onInteraction: (active: boolean) => this.boardInteraction(id, active), onCommit: (updated: FridgeCard) => this.commitGeometry(updated) })
-          }.width(this.sceneCard(id).w * this.boardScale + 48).height(this.sceneCard(id).h * this.boardScale + 48)
+          }.width(this.sceneCard(renderId).w * this.boardScale + 48).height(this.sceneCard(renderId).h * this.boardScale + 48)
             .scale({ x: this.sceneScale(id)*this.groupScale(id), y: this.sceneScale(id)*this.groupScale(id), centerX: this.groupPivotX(id), centerY: this.groupPivotY(id) })
             .rotate({angle:this.boardMotion.transformIds.includes(id)?this.boardMotion.pose.angle:0,centerX:this.groupPivotX(id),centerY:this.groupPivotY(id)})
             .position({ x: 0, y: 0 })
             .translate({ x: this.sceneX(id) - 24 - this.creationClipX(id) + this.arrivalX(id) + this.scheduleOffset(id,true),
               y: this.sceneY(id) - 24 - this.creationClipY(id) + this.arrivalY(id) + this.scheduleOffset(id,false) })
-            .hitTestBehavior(this.editing || this.arriving || this.homeToolsMoving || this.scheduledName.length>0 || this.scheduleTransition ? HitTestMode.None : HitTestMode.Transparent)
+            .hitTestBehavior(renderId!==id || this.editing || this.arriving || this.homeToolsMoving || this.scheduledName.length>0 || this.scheduleTransition ? HitTestMode.None : HitTestMode.Transparent)
           }.width(this.creationClip(id) ? this.transitionClipW : this.screenWidth)
             .height(this.creationClip(id) ? this.transitionClipH : this.screenHeight)
             .position({ x: this.creationClipX(id), y: this.creationClipY(id) })
             .borderRadius(this.creationClip(id) ? this.transitionClipRadius : 0).clip(this.creationClip(id))
             .opacity(this.deletionBitmap!==undefined&&this.deletionId===id?0:this.editing && id === this.selectedId ? 1 : this.boardOpacity)
-            .zIndex(this.activeBoardId === id || this.boardMotion.ids.includes(id) ? 100000 + this.cardMap[id].z / (1 + this.cardMap[id].z) : this.cardMap[id].z)
-            .hitTestBehavior(this.editing || this.arriving || this.homeToolsMoving || this.scheduledName.length>0 || this.scheduleTransition ? HitTestMode.None : HitTestMode.Transparent)
+            .zIndex(this.activeBoardId === id || this.boardMotion.ids.includes(id) ? 100000 + this.sceneCard(renderId).z / (1 + this.sceneCard(renderId).z) : this.sceneCard(renderId).z)
+            .hitTestBehavior(renderId!==id || this.editing || this.arriving || this.homeToolsMoving || this.scheduledName.length>0 || this.scheduleTransition ? HitTestMode.None : HitTestMode.Transparent)
+  }
+  @Builder
+  editingScene() {
+    // Stable IDs keep the actual board surfaces (including decoded photos) alive.
+    // Cache each unrotated face; transforms remain outside its padded texture.
+    Stack({ alignContent: Alignment.TopStart }) {
+      Stack({ alignContent: Alignment.TopStart }) {
+        ForEach(this.depthSceneIds.filter((id:string)=>!this.sceneCard(id).hidden&&(!this.editing||id===depthOwner(this.depthSceneMap[id])||depthOwner(this.depthSceneMap[id])!==this.selectedId)&&(this.startupCardCount<0||this.cardIds.slice(0,this.startupCardCount).includes(depthOwner(this.depthSceneMap[id])))), (id: string) => {
+          this.depthSceneLayer(depthOwner(this.depthSceneMap[id]),id)
         }, (id: string) => id)
         CenterGuides({motion:this.boardMotion}).width(BOARD_W*this.boardScale).height(this.boardHeight).position({x:this.boardLeft,y:this.boardTop}).zIndex(200001).hitTestBehavior(HitTestMode.None)
       }.width(this.screenWidth).height(this.screenHeight)
@@ -1620,6 +1632,46 @@ struct Index {
     if(this.scheduledName||this.scheduleTransition){this.getUIContext().getPromptAction().showToast({message:'请先恢复原始画布再编辑'});return;}
     if (!this.groupSelecting) { if(this.selectedId===id)this.selectedId='';else this.select(id); return; }
     this.groupSelection = this.groupSelection.includes(id) ? this.groupSelection.filter((value: string) => value !== id) : this.groupSelection.concat([id]);
+  }
+  private async preparePhotoDepth(card:FridgeCard,element:CanvasElement,canApply:()=>boolean=()=>true):Promise<boolean>{
+    if(!this.context||element.animated||!element.src||!canApply())return false;
+    if(element.depthForeground){card.elements.forEach(el=>el.depthEnabled=false);element.depthEnabled=true;return true;}
+    const canvas=this.store.state.canvasId,src=element.src;
+    const result=await extractSubject(src,this.context.filesDir);
+    if(!this.alive||!canApply()||this.store.state.canvasId!==canvas||this.store.findCard(card.id)!==card||!card.elements.includes(element)||element.src!==src){await fileIo.unlink(result.src.slice(7));return false;}
+    card.elements.forEach(el=>el.depthEnabled=false);
+    element.depthForeground=result.src;element.depthCrop=result.crop;element.depthSourceAspect=result.sourceAspect;element.depthEnabled=true;return true;
+  }
+  private async setElementDepth(enabled:boolean):Promise<void>{
+    const card=this.current(),element=this.currentElement();if(!card||!element||this.busy)return;
+    if(!enabled){element.depthEnabled=false;this.change();return;}
+    this.busy=true;
+    try{if(await this.preparePhotoDepth(card,element,()=>this.editing&&this.selectedId===card.id))this.change();}
+    catch(e){this.getUIContext().getPromptAction().showToast({message:(e as Error).message});}
+    finally{this.busy=false;}
+  }
+  private existingDepthMenu(id:string):MenuElement[]{
+    const card=this.store.findCard(id);if(!card)return [];
+    const members=groupMembers(this.store.state.cards,card);
+    const result:MenuElement[]=[{value:'普通组合',action:()=>{members.forEach(c=>c.depthGroup=false);this.renderBoard();this.persist(true);}}];
+    for(const source of members.filter(c=>hasDepthSubject(c)||c.elements.some(el=>el.kind==='image'&&!el.animated&&el.src.length>0)))result.push({value:'主体：'+layerLabel(source),action:()=>{this.groupSelection=members.map(c=>c.id);this.confirmDepthGroup(source.id);}});
+    return result;
+  }
+  private depthGroupMenu():MenuElement[]{
+    const selected=this.store.state.cards.filter(c=>this.groupSelection.includes(c.id));
+    const groups=selected.map(c=>c.groupId).filter(id=>id.length>0);
+    return this.store.state.cards.filter(c=>this.groupSelection.includes(c.id)||groups.includes(c.groupId)).filter(c=>hasDepthSubject(c)||c.elements.some(el=>el.kind==='image'&&!el.animated&&el.src.length>0)).map((c:FridgeCard):MenuElement=>({value:'主体：'+layerLabel(c),action:()=>this.confirmDepthGroup(c.id)}));
+  }
+  private async confirmDepthGroup(id:string):Promise<void>{
+    if(this.busy||this.groupSelection.length<2)return;
+    const card=this.store.findCard(id),ids=this.groupSelection.slice(),canvas=this.store.state.canvasId;if(!card)return;
+    this.busy=true;
+    try{
+      if(!hasDepthSubject(card)){const photo=card.elements.find(el=>el.kind==='image'&&!el.animated&&el.src.length>0);if(!photo||!await this.preparePhotoDepth(card,photo,()=>ids.length===this.groupSelection.length&&ids.every(key=>this.groupSelection.includes(key))))return;}
+      if(this.store.state.canvasId!==canvas||this.store.findCard(id)!==card)return;
+      combineCards(this.store.state.cards,ids,this.store.newId());card.depthGroup=true;
+      this.groupSelecting=false;this.groupSelection=[];this.selectedId=card.id;this.renderBoard();this.persist(true);
+    }catch(e){this.getUIContext().getPromptAction().showToast({message:(e as Error).message});}finally{this.busy=false;}
   }
   private confirmGroup(): void {
     if (this.groupSelection.length < 2) return;
@@ -1737,7 +1789,7 @@ struct Index {
             ForEach(section.ids,(id:string,index:number)=>{
               ListItem() {
                 Column({space:4}) {
-                  if(index===0&&section.title.length>0) { Text(section.title).fontSize(12).fontWeight(FontWeight.Medium).fontColor(this.appMuted()).width('100%').padding({left:8,top:8,bottom:4}) }
+                  if(index===0&&section.title.length>0) {Row(){Text(section.title).fontSize(12).fontWeight(FontWeight.Medium).fontColor(this.appMuted());Blank();Button('景深',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(32).padding({left:12,right:12}).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.busy&&!this.scheduledName).bindMenu(this.existingDepthMenu(id),{systemMaterial:chromeMaterial(this.appDark),backgroundColor:AppDesign.popup(this.appDark)})}.width('100%').padding({left:8,top:8,bottom:4}) }
                   this.homeLayerRow(id)
                 }.width('100%')
               }
@@ -1751,7 +1803,7 @@ struct Index {
             Button('组合 ' + this.groupSelection.length + ' 张卡片', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.EMPHASIZED, role:ButtonRole.NORMAL })
               .height(44).fontSize(14).padding({left:20,right:20}).backgroundColor(this.groupSelection.length>1?AppDesign.selected(this.appDark):this.appControl()).fontColor(this.groupSelection.length>1?AppDesign.onSelected(this.appDark):this.appMuted()).opacity(1).attributeModifier(immersiveChrome(this.appDark,this.groupSelection.length>1))
               .accessibilityText('组合选中的 '+this.groupSelection.length+' 张卡片').accessibilityDescription(this.groupSelection.length<2?'至少选择两张卡片才能组合':'组合所选卡片').onClick(() => this.confirmGroup())
-            Blank()
+            Button('景深组合',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).padding({left:16,right:16}).fontSize(14).fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.busy&&this.groupSelection.length>1&&this.depthGroupMenu().length>0).bindMenu(this.depthGroupMenu(),{systemMaterial:chromeMaterial(this.appDark),backgroundColor:AppDesign.popup(this.appDark)})
           }.width('100%')
         }
         if (!this.groupSelecting && this.selectedId.length > 0) {
@@ -1944,7 +1996,7 @@ struct Index {
     Column() {
       Stack({ alignContent: Alignment.TopStart }) {
         if (!this.shareSingle) { CanvasBackdrop({ sceneBackground: this.shareBackground,showFrame:false }).width('100%').height('100%') }
-        ForEach(this.shareCards.filter((card:FridgeCard)=>this.shareSingle||!card.hidden), (card: FridgeCard) => {
+        ForEach(depthRenderCards(this.shareCards).filter((card:FridgeCard)=>this.shareSingle||!card.hidden), (card: FridgeCard) => {
           CardFace({ card: card, scaleFactor: 1, tick: this.shareTick, widget: true })
             .width(card.w).height(card.h)
             .position({ x: this.shareSingle ? this.shareX : card.x, y: this.shareSingle ? this.shareY : card.y * this.shareCanvasHeight / BOARD_H })
@@ -2537,6 +2589,9 @@ struct Index {
           }.width('100%').height(AppDesign.controlHeight)
         } else if (this.elementPreview.kind === 'image') {
           Button(this.busy ? '正在读取' : '选择图片或 GIF', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(14).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.busy).onClick(() => this.pickImage())
+          if(!this.elementPreview.animated&&this.elementPreview.src.length>0){
+            Row(){Text('主体景深').fontSize(14).fontColor(this.appText());Blank();Toggle({type:ToggleType.Switch,isOn:this.elementPreview.depthEnabled}).enabled(!this.busy).onChange((v:boolean)=>this.setElementDepth(v))}.width('100%').height(44)
+          }
         } else {
           SettingsSegmented({labels:['矩形','圆形','线条'],selectedIndex:Math.max(0,['rect','circle','line'].indexOf(this.elementPreview.primitive)),appDark:this.appDark,
             onSelect:(index:number)=>{const el=this.currentElement();if(el!==null){el.primitive=['rect','circle','line'][index];this.change();}}})
@@ -2559,6 +2614,9 @@ struct Index {
   @Builder
   layerLayoutContents() {
     Column({space:12}) {
+        if(internalDepth(this.preview)&&this.layerId.length>0&&this.currentElement()?.depthEnabled!==true){
+          SettingsSegmented({labels:['主体后','主体前'],selectedIndex:this.layerId==='capability'?(this.preview.depthCapabilityFront?1:0):(this.elementPreview.depthFront?1:0),appDark:this.appDark,onSelect:(index:number)=>{const card=this.current(),el=this.currentElement();if(card){if(this.layerId==='capability')card.depthCapabilityFront=index===1;else if(el)el.depthFront=index===1;this.change();}}})
+        }
         if (this.layerId !== 'capability') {
           if (this.settingsTab === 0) {
             Button('铺满底板', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).width('100%').height(AppDesign.controlHeight).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText())
@@ -2672,6 +2730,7 @@ struct Index {
   baseColorPanel() {
     Column({space:12}) {
       if(this.preview.cutout.length>0) {
+        if(this.preview.shape==='subject'&&this.preview.subjectPhoto){Row(){Text('主体景深').fontSize(14).fontColor(this.appText());Blank();Toggle({type:ToggleType.Switch,isOn:this.preview.subjectDepth}).onChange((v:boolean)=>{const card=this.current();if(card){card.subjectDepth=v;if(v)card.elements.forEach(el=>el.depthEnabled=false);this.change();}})}.width('100%').height(44)}
         Text('主体外观').fontSize(14).fontColor(this.appText()).width('100%')
         SettingsSegmented({labels:['只用形状','主体照片作底图'],selectedIndex:this.preview.subjectPhoto?1:0,appDark:this.appDark,
           onSelect:(index:number)=>{const card=this.current();if(card){card.subjectPhoto=index===1;this.change();}}})

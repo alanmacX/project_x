@@ -4,7 +4,8 @@ const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/n
 const source=fs.readFileSync('entry/src/main/ets/widget/pages/FridgeWidgetCard.ets','utf8');
 const controller=source.slice(source.indexOf('  private syncPacket()'),source.indexOf('  private sceneOffset('));
 const disappear=source.match(/  aboutToDisappear\(\):void \{[^\n]+/)[0];
-const jobs=[],env={exports:{},Curve:{EaseOut:0},cardRenderSnapshot:c=>c,normalizeBackground:b=>b,animateTo:(o,update)=>{update();jobs.push(o);}};
+const core=vm.createContext({});vm.runInContext(fs.readFileSync('previewer/shared-models.js','utf8'),core);
+const jobs=[],env={exports:{},Curve:{EaseOut:0},depthRenderCards:core.FridgeCore.load('DepthComposition').depthRenderCards,cardRenderSnapshot:c=>c,normalizeBackground:b=>b,animateTo:(o,update)=>{update();jobs.push(o);}};
 vm.runInNewContext(ts.transpileModule('export class Harness {refresh(){}parse(json:string){return JSON.parse(json);}'+controller+disappear+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,env);
 const scene=new env.exports.Harness();Object.assign(scene,{alive:true,sceneGeneration:0,appliedPacket:'',sceneAnimating:false,scenePhase:0});
 const packet=(canvasId,id,color,rev)=>JSON.stringify({canvasId,cards:JSON.stringify([{id,z:1}]),background:JSON.stringify({color}),context:'',rev});
