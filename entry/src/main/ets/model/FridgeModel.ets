@@ -1,3 +1,4 @@
+import { normalizeCanvasRotation } from './CanvasRotation';
 import { SceneRule } from './SceneScheduleSchema';
 import { TimetableLibrary, TimetableData } from './TimetableLibrary';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -188,6 +189,7 @@ export class FridgeStore {
     await Promise.all(Object.values(this.widgetQueues).map((queue)=>queue.waitForIdle().catch(()=>{})));
     if (this.catalog.activeId === id) await this.openCanvas(this.catalog.canvases.find((c)=>c.id!==id)!.id);
     this.catalog.canvases = this.catalog.canvases.filter((c) => c.id !== id); this.documents = this.documents.filter((c) => c.id !== id);
+    this.catalog.rotation=normalizeCanvasRotation(this.catalog.rotation,this.catalog.canvases.map(c=>c.id));
     if (this.prefs !== null) {
       const bindings = JSON.parse(await this.prefs.get('fridge_form_bindings_json','{}') as string) as Record<string,string>;
       for (const key of Object.keys(bindings)) if (bindings[key] === id) bindings[key] = this.catalog.activeId;

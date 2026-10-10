@@ -1,9 +1,9 @@
 /** One complete local day. Starts are boundaries, so gaps and overlaps cannot exist. */
 export class CanvasTimeSlot { start:number=0; canvasId:string=''; }
-export class CanvasRotation { enabled:boolean=true; mode:string='off'; lightId:string=''; darkId:string=''; slots:CanvasTimeSlot[]=[]; }
+export class CanvasRotation { enabled:boolean=false; mode:string='off'; lightId:string=''; darkId:string=''; slots:CanvasTimeSlot[]=[]; }
 export function normalizeCanvasRotation(raw:CanvasRotation|undefined,ids:string[]):CanvasRotation {
   const out=new CanvasRotation();if(!raw)return out;
-  out.enabled=raw.enabled!==false;out.mode=['time','theme'].includes(raw.mode)?raw.mode:'off';
+  out.mode=['time','theme'].includes(raw.mode)?raw.mode:'off';out.enabled=out.mode!=='off'&&raw.enabled!==false;
   out.lightId=ids.includes(raw.lightId)?raw.lightId:ids[0]??'';out.darkId=ids.includes(raw.darkId)?raw.darkId:out.lightId;
   const slots=(Array.isArray(raw.slots)?raw.slots:[]).filter(s=>s&&Number.isInteger(s.start)&&s.start>=0&&s.start<1440&&ids.includes(s.canvasId)).slice(0,12).sort((a,b)=>a.start-b.start);
   for(const slot of slots)if(!out.slots.some(s=>s.start===slot.start))out.slots.push({start:slot.start,canvasId:slot.canvasId});

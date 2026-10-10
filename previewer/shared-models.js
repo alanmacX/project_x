@@ -3679,7 +3679,7 @@ class CanvasTimeSlot {
 exports.CanvasTimeSlot = CanvasTimeSlot;
 class CanvasRotation {
     constructor() {
-        this.enabled = true;
+        this.enabled = false;
         this.mode = 'off';
         this.lightId = '';
         this.darkId = '';
@@ -3691,8 +3691,8 @@ function normalizeCanvasRotation(raw, ids) {
     const out = new CanvasRotation();
     if (!raw)
         return out;
-    out.enabled = raw.enabled !== false;
     out.mode = ['time', 'theme'].includes(raw.mode) ? raw.mode : 'off';
+    out.enabled = out.mode !== 'off' && raw.enabled !== false;
     out.lightId = ids.includes(raw.lightId) ? raw.lightId : ids[0] ?? '';
     out.darkId = ids.includes(raw.darkId) ? raw.darkId : out.lightId;
     const slots = (Array.isArray(raw.slots) ? raw.slots : []).filter(s => s && Number.isInteger(s.start) && s.start >= 0 && s.start < 1440 && ids.includes(s.canvasId)).slice(0, 12).sort((a, b) => a.start - b.start);
@@ -3783,7 +3783,7 @@ function occurrence(rule, day) {
     result.end = rule.centralOnly ? result.start + rule.timeoutMinutes * 60000 : end.getTime();
     return result;
 }
-/** Recent starts win. A focus occurrence remains latched until the user acknowledges it. */
+/** Recent starts win; acknowledgement and timeout never reveal a superseded occurrence. */
 function activeSceneRule(state, now) {
     if (state.scenePolicyV2) {
         let latest = null;
@@ -4040,9 +4040,16 @@ function dismissScene(state, ruleId, token, now) {
 }
 exports.dismissScene = dismissScene;
 async function resolveScheduledScene(base, now, loadTarget) {
+    // A missing/corrupt optional document must not strand the last timed projection.
+    const load = async (id) => { try {
+        return await loadTarget(id);
+    }
+    catch (_) {
+        return null;
+    } };
     const rules = (0, SceneScheduleSchema_1.normalizeSceneRules)(base.sceneRules);
     const id = (0, CanvasRotation_1.rotatedCanvas)(base.canvasRotation, now, base.systemDark === true, base.canvasId);
-    const normal = id === base.canvasId ? base : await loadTarget(id) ?? base;
+    const normal = id === base.canvasId ? base : await load(id) ?? base;
     const policy = new CardSchema_1.FridgeState();
     policy.canvasId = normal.canvasId;
     policy.cards = normal.cards;
@@ -4056,7 +4063,7 @@ async function resolveScheduledScene(base, now, loadTarget) {
     policy.scenePolicyV2 = base.scenePolicyV2;
     policy.systemDark = base.systemDark;
     const current = activeSceneRule(policy, now);
-    const target = current && (current.rule.kind === 'canvas' || current.rule.centralOnly) ? await loadTarget(current.rule.targetId) : null;
+    const target = current && (current.rule.kind === 'canvas' || current.rule.centralOnly) ? await load(current.rule.targetId) : null;
     const out = projectScheduledScene(policy, current, target);
     out.normalState = normal;
     return out;
@@ -4170,4 +4177,4 @@ function scenePolicyShell(base) {
 }
 exports.scenePolicyShell = scenePolicyShell;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"8762009aec0ae89ab768f7560ca30c181ff92e811f1aeb07ed0028126db1be93"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"c443e5e384eaa9bf6d805a4809634dd0c589ea88e9e61d9db703d7d388bbc111"};})(globalThis);

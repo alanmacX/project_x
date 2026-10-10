@@ -11,7 +11,7 @@ function occurrence(rule:SceneRule,day:Date):SceneOccurrence {
   const end=new Date(day.getFullYear(),day.getMonth(),day.getDate()+(rule.end<=rule.start?1:0),Math.floor(rule.end/60),rule.end%60);
   result.start=start.getTime();result.end=rule.centralOnly?result.start+rule.timeoutMinutes*60000:end.getTime();return result;
 }
-/** Recent starts win. A focus occurrence remains latched until the user acknowledges it. */
+/** Recent starts win; acknowledgement and timeout never reveal a superseded occurrence. */
 export function activeSceneRule(state:FridgeState,now:number):SceneOccurrence|null {
   if(state.scenePolicyV2){
     let latest:SceneOccurrence|null=null;
@@ -122,12 +122,14 @@ export function dismissScene(state:FridgeState,ruleId:string,token:string,now:nu
   return true;
 }
 export async function resolveScheduledScene(base:FridgeState,now:number,loadTarget:(id:string)=>Promise<FridgeState|null>):Promise<ScheduledScene> {
+  // A missing/corrupt optional document must not strand the last timed projection.
+  const load=async(id:string):Promise<FridgeState|null>=>{try{return await loadTarget(id);}catch(_){return null;}};
   const rules=normalizeSceneRules(base.sceneRules);
   const id=rotatedCanvas(base.canvasRotation,now,base.systemDark===true,base.canvasId);
-  const normal=id===base.canvasId?base:await loadTarget(id)??base;
+  const normal=id===base.canvasId?base:await load(id)??base;
   const policy=new FridgeState();policy.canvasId=normal.canvasId;policy.cards=normal.cards;policy.background=normal.background;policy.canvasAspect=normal.canvasAspect;policy.canvasDimension=normal.canvasDimension;policy.maxZ=normal.maxZ;policy.sceneLayouts=normal.sceneLayouts;policy.sceneRules=rules;policy.canvasRotation=base.canvasRotation;policy.scenePolicyV2=base.scenePolicyV2;policy.systemDark=base.systemDark;
   const current=activeSceneRule(policy,now);
-  const target=current&&(current.rule.kind==='canvas'||current.rule.centralOnly)?await loadTarget(current.rule.targetId):null;
+  const target=current&&(current.rule.kind==='canvas'||current.rule.centralOnly)?await load(current.rule.targetId):null;
   const out=projectScheduledScene(policy,current,target);out.normalState=normal;return out;
 }
 export function sceneWidgetContext(scene:ScheduledScene):string {

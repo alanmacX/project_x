@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
+const source=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
+const method=source.slice(source.indexOf('  private dismissCompactTools('),source.indexOf('  private floatingHome():'));
+let pending;const moduleFixture={exports:{}};
+vm.runInNewContext(ts.transpileModule(`class Fixture {alive=true;screenWidth=400;screenHeight=800;compact=true;scheduleOpen=true;backgroundOpen=true;updates=0;floatingHome(){return this.compact;}updateScheduledScene(){this.updates++;}closeBackgroundEditor(){this.backgroundOpen=false;}${method}}module.exports=Fixture;`,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,{module:moduleFixture,setTimeout:fn=>pending=fn});
+const f=new moduleFixture.exports();f.dismissCompactTools('timing');f.screenWidth=800;f.compact=false;pending();assert.equal(f.scheduleOpen,true,'popup teardown cannot close the new wide panel');
+f.compact=true;f.dismissCompactTools('timing');pending();assert.equal(f.scheduleOpen,false);assert.equal(f.updates,1,'ordinary dismissal still resumes scheduling');
+f.dismissCompactTools('background');f.screenHeight=900;pending();assert.equal(f.backgroundOpen,true,'background editing also survives geometry migration');
+f.dismissCompactTools('background');pending();assert.equal(f.backgroundOpen,false);f.scheduleOpen=true;f.dismissCompactTools('timing');f.alive=false;pending();assert.equal(f.scheduleOpen,true);
+console.log('PASS compact popup migration, ordinary dismissal, background migration and destroyed-page safety');

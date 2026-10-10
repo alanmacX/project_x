@@ -38,9 +38,14 @@ class ChromeModifier implements AttributeModifier<ButtonAttribute> {
   applyNormalAttribute(instance:ButtonAttribute):void {
     // Native system material is scoped to navigation/tab bars and popup hosts.
     // Floating canvas tools still need a native blur/tint fallback in ordinary content.
-    if(!this.emphasized)instance.backgroundColor(this.dark?'#D925231F':'#D9F6F2E9').backgroundBlurStyle(BlurStyle.COMPONENT_THIN);
-    instance.border({width:0}).shadow({radius:10,color:'#18000000',offsetY:3});
-    if(deviceInfo.sdkApiVersion>=26)instance.systemMaterial(chromeMaterial());
+    if(!this.emphasized)instance.backgroundColor(this.dark?'#D925231F':'#D9F6F2E9');
+    instance.border({width:0});
+    const material=deviceInfo.sdkApiVersion>=26?chromeMaterial():undefined;
+    if(material!==undefined) {instance.systemMaterial(material);}
+    else {
+      if(!this.emphasized)instance.backgroundBlurStyle(BlurStyle.COMPONENT_THIN);
+      instance.shadow({radius:10,color:'#18000000',offsetY:3});
+    }
   }
 }
 class ReadingModifier implements AttributeModifier<ColumnAttribute> {

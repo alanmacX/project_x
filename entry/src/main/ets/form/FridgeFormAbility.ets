@@ -1,3 +1,4 @@
+import { canvasRotationEnabled } from '../model/CanvasRotation';
 import { systemIsDark } from '../model/SystemAppearance';
 import { resolveScheduledScene, sceneWidgetContext, dismissScene, ScheduledScene } from '../model/SceneSchedule';
 import { pushWidgets } from '../model/WidgetSync';
@@ -24,7 +25,7 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     if(config.colorMode===undefined)return;this.appearanceDark=config.colorMode===0;
     this.actionQueue=this.actionQueue.catch(()=>{}).then(async()=>{
       const prefs=await preferences.getPreferences(this.context,STORE_NAME),catalog=readCatalog(await prefs.get('fridge_canvases_json','') as string);
-      if(catalog.rotation.mode!=='theme')return;
+      if(!canvasRotationEnabled(catalog.rotation)||catalog.rotation.mode!=='theme')return;
       for(const id of Object.keys(await this.loadDims())){await this.pushForm(id);await this.scheduleForm(id);}
     }).catch((e:Error)=>hilog.warn(0,'FridgeForm','theme refresh %{public}s',e.message));
   }
