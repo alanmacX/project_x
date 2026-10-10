@@ -1442,7 +1442,7 @@ struct Index {
         }
         if (this.viewing) { this.detail() }
         Column().width(1).height(1).position({x:this.navMenuX,y:this.navMenuY}).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
-          .bindMenu(this.navMenuOpen,this.navMenuItems,{placement:Placement.BottomRight,systemMaterial:chromeMaterial(),backgroundColor:AppDesign.popup(this.appDark),onDisappear:()=>this.finishNavMenu(this.navMenuResult)})
+          .bindMenu(this.navMenuOpen,this.navMenuItems,{placement:Placement.BottomRight,systemMaterial:chromeMaterial(this.appDark),backgroundColor:AppDesign.popup(this.appDark),onDisappear:()=>this.finishNavMenu(this.navMenuResult)})
         if(this.deletionId){
           Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.Block).zIndex(200000)
           if(this.deletionBitmap!==undefined){CardDeletionFlight({bitmap:this.deletionBitmap,faceWidth:this.deletionW,faceHeight:this.deletionH,originX:this.deletionX,originY:this.deletionY,angle:this.deletionAngle,viewportWidth:this.screenWidth,viewportHeight:this.screenHeight,onDone:()=>this.finishCardDeletion()}).zIndex(200001)}
@@ -1735,7 +1735,7 @@ struct Index {
             Button('上移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).padding({left:6,right:6}).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(() => this.moveCardLayer(this.selectedId, true))
             Button('下移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).padding({left:6,right:6}).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(() => this.moveCardLayer(this.selectedId, false))
             Button('复制',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL})
-              .layoutWeight(1).padding({left:6,right:6}).height(44).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).attributeModifier(immersiveChrome(this.appDark)).accessibilityText('复制卡片').bindMenu([{value:'复制',action:()=>this.duplicate()},{value:'复制到别的场景',action:()=>this.copyTargetOpen=true}],{systemMaterial:chromeMaterial(),backgroundColor:AppDesign.popup(this.appDark)})
+              .layoutWeight(1).padding({left:6,right:6}).height(44).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).attributeModifier(immersiveChrome(this.appDark)).accessibilityText('复制卡片').bindMenu([{value:'复制',action:()=>this.duplicate()},{value:'复制到别的场景',action:()=>this.copyTargetOpen=true}],{systemMaterial:chromeMaterial(this.appDark),backgroundColor:AppDesign.popup(this.appDark)})
               .bindSheet($$this.copyTargetOpen,this.copyTargets,{height:this.taskSheetHeight(),showClose:true,backgroundColor:this.appBackground()})
             if((this.cardMap[this.selectedId]?.groupId??'').length>0) { Button('取消组合',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).layoutWeight(1).padding({left:6,right:6}).height(44).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(()=>this.releaseGroup()) }
           }.width('100%')
@@ -1840,49 +1840,84 @@ struct Index {
   @Builder
   backgroundEditor() {
     Scroll() {
-      Column({ space: 12 }) {
-        Text('画布背景').fontSize(17).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
-        Column({ space: 12 }) {
+      Column({space:16}) {
+        Column({space:12}) {
+          Text('背景').fontSize(15).fontWeight(FontWeight.Medium).fontColor(this.appText()).width('100%')
           SettingsSegmented({labels:['纯色','取色','多色','照片','透明'],selectedIndex:this.canvasBackground.mode==='preset'?2:Math.max(0,['solid','smart','blend','photo','transparent'].indexOf(this.canvasBackground.mode)),appDark:this.appDark,
             onSelect:(index:number)=>{if(!this.backgroundBusy)this.chooseBackgroundMode(['solid','smart','blend','photo','transparent'][index]);}}).enabled(!this.backgroundBusy)
-          Stack({alignContent:Alignment.TopStart}) {ForEach([this.canvasBackground.mode],(_mode:string)=>{
-          Column({space:12}) {
-          Text('画框').fontSize(13).fontColor(this.appMuted()).width('100%')
-          SettingsSegmented({labels:['无框','浅色','深色','跟随系统'],selectedIndex:Math.max(0,['none','light','dark','auto'].indexOf(this.canvasBackground.frameStyle)),appDark:this.appDark,onSelect:(index:number)=>{const bg=normalizeBackground(this.canvasBackground);bg.frameStyle=['none','light','dark','auto'][index];this.applyBackground(bg);}})
-          if(this.canvasBackground.frameStyle!=='none'){SettingsSegmented({labels:['白岩','胡桃木','浅橡木'],selectedIndex:Math.max(0,['stone','walnut','oak'].indexOf(this.canvasBackground.frameMaterial)),appDark:this.appDark,onSelect:(index:number)=>{const bg=normalizeBackground(this.canvasBackground);bg.frameMaterial=['stone','walnut','oak'][index];this.applyBackground(bg);}})}
-          if (this.canvasBackground.mode === 'solid') {
-            ColorSetting({label:'背景颜色',color:this.canvasBackground.color,canReset:false,sourceKey:this.backgroundColorKey(),appDark:this.appDark,
-              onPick:(color:string,key:string)=>this.setBackgroundColor(color,key),onFallback:()=>this.chooseBackgroundColor()})
-            Flex({ wrap: FlexWrap.Wrap }) {
-              ForEach(['#FFFFFF','#F1EEE6','#E9E5DF','#E2E8E2','#E3E9EF','#292B2B'], (color: string) => {
-                Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).width(44).height(44).backgroundColor(color).margin({ right: 8, bottom: 8 })
-                  .border({ width: this.canvasBackground.color === color ? 2 : .5, color: this.appMuted() }).accessibilityText('背景色 '+color)
-                  .onClick(() => { const bg = new CanvasBackground(); bg.frameStyle = this.canvasBackground.frameStyle; bg.frameMaterial = this.canvasBackground.frameMaterial; bg.color = color; bg.photo = this.canvasBackground.photo; this.applyBackground(bg); })
-              }, (color: string) => color)
+          Stack({alignContent:Alignment.TopStart}) {
+            ForEach([this.canvasBackground.mode],(_mode:string)=>{
+              Column({space:12}) {
+                if(this.canvasBackground.mode==='solid') {
+                  Row({space:8}) {
+                    Scroll() {
+                      Row({space:8}) {
+                        ForEach(['#FFFFFF','#F1EEE6','#E9E5DF','#E2E8E2','#E3E9EF','#292B2B'],(color:string)=>{
+                          Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}).width(40).height(40).backgroundColor(color)
+                            .border({width:this.canvasBackground.color.toUpperCase()===color?2:.5,color:this.canvasBackground.color.toUpperCase()===color?this.appText():AppDesign.border(this.appDark)})
+                            .accessibilityText('背景色 '+color).onClick(()=>this.setBackgroundColor(color,this.backgroundColorKey()))
+                        },(color:string)=>color)
+                      }.padding(2)
+                    }.layoutWeight(1).scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
+                    ColorSetting({label:'背景颜色',compact:true,color:this.canvasBackground.color,canReset:false,sourceKey:this.backgroundColorKey(),appDark:this.appDark,
+                      onPick:(color:string,key:string)=>this.setBackgroundColor(color,key),onFallback:()=>this.chooseBackgroundColor()}).width(52)
+                  }.width('100%')
+                }
+                if(this.canvasBackground.mode==='smart'||this.canvasBackground.mode==='blend'||this.canvasBackground.mode==='preset') {
+                  if(this.canvasBackground.mode!=='preset') {
+                    Button(this.backgroundBusy?'正在取色':'重新取色',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL})
+                      .height(44).width('100%').fontColor(this.appText()).backgroundColor(this.appSurface()).enabled(!this.backgroundBusy).onClick(()=>this.refreshBackground(true))
+                  }
+                  if(this.canvasBackground.mode!=='smart') {
+                    Text('柔色预设').fontSize(13).fontColor(this.appMuted()).width('100%')
+                    Row({space:8}) {
+                      ForEach(['雾沙','庭院','海盐'],(name:string,index:number)=>{
+                        Button(name,{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).layoutWeight(1).height(44).fontSize(13)
+                          .fontColor(this.appText()).backgroundColor(this.appSurface()).enabled(!this.backgroundBusy).onClick(()=>this.setBackgroundPreset(index))
+                      },(name:string)=>name)
+                    }.width('100%')
+                  }
+                }
+                if(this.canvasBackground.mode==='photo') {
+                  Button(this.backgroundBusy?'正在导入':'更换照片',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL})
+                    .height(44).width('100%').fontColor(this.appText()).backgroundColor(this.appSurface()).enabled(!this.backgroundBusy).onClick(()=>this.pickBackgroundPhoto())
+                  if(this.canvasBackground.photo.length>0||this.canvasBackground.src.length>0) {
+                    Row({space:8}) {
+                      if(this.canvasBackground.photo.length>0) {
+                        Button('裁剪与位置',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).layoutWeight(1).height(44).fontSize(13)
+                          .fontColor(this.appText()).backgroundColor(this.appSurface()).enabled(!this.backgroundBusy).onClick(()=>this.openBackgroundCrop(this.canvasBackground.photo))
+                      }
+                      if(this.canvasBackground.src.length>0) {
+                        Button(this.enhancingBackground?'正在处理':'提升清晰度',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).layoutWeight(1).height(44).fontSize(13)
+                          .fontColor(this.appText()).backgroundColor(this.appSurface()).enabled(!this.backgroundBusy&&!this.enhancingBackground&&!this.enhancingSubject).onClick(()=>this.enhancePhoto(false))
+                      }
+                    }.width('100%')
+                  }
+                }
+              }.width('100%').transition(settingsContentSwap())
+            },(mode:string)=>mode)
+          }.width('100%')
+        }.width('100%').padding(14).borderRadius(AppDesign.sectionRadius).backgroundColor(this.appControl())
+        Column({space:12}) {
+          Row() {
+            Text('画框').fontSize(15).fontWeight(FontWeight.Medium).fontColor(this.appText()).layoutWeight(1)
+            Toggle({type:ToggleType.Switch,isOn:this.canvasBackground.frameStyle!=='none'}).selectedColor(AppDesign.selected(this.appDark))
+              .accessibilityText('显示画框').onChange((on:boolean)=>{if(on===(this.canvasBackground.frameStyle!=='none'))return;const bg=normalizeBackground(this.canvasBackground);bg.frameStyle=on?'auto':'none';this.applyBackground(bg);})
+          }.width('100%').constraintSize({minHeight:40})
+          if(this.canvasBackground.frameStyle!=='none') {
+            Row({space:12}) {
+              Text('材质').fontSize(13).fontColor(this.appMuted()).width(40)
+              SettingsSegmented({labels:['白岩','胡桃木','浅橡木'],selectedIndex:Math.max(0,['stone','walnut','oak'].indexOf(this.canvasBackground.frameMaterial)),appDark:this.appDark,
+                onSelect:(index:number)=>{const bg=normalizeBackground(this.canvasBackground);bg.frameMaterial=['stone','walnut','oak'][index];this.applyBackground(bg);}}).layoutWeight(1)
+            }.width('100%')
+            Row({space:12}) {
+              Text('色调').fontSize(13).fontColor(this.appMuted()).width(40)
+              SettingsSegmented({labels:['浅色','深色','自动'],selectedIndex:Math.max(0,['light','dark','auto'].indexOf(this.canvasBackground.frameStyle)),appDark:this.appDark,
+                onSelect:(index:number)=>{const bg=normalizeBackground(this.canvasBackground);bg.frameStyle=['light','dark','auto'][index];this.applyBackground(bg);}}).layoutWeight(1)
             }.width('100%')
           }
-          if (this.canvasBackground.mode === 'smart' || this.canvasBackground.mode === 'blend') {
-            if(this.backgroundBusy){Text('正在从本地卡片提取颜色').fontSize(13).fontColor(this.appMuted()).width('100%')}
-            Button('重新取色', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.backgroundBusy).onClick(() => this.refreshBackground(true))
-          }
-          if (this.canvasBackground.mode === 'photo') {
-            if (this.canvasBackground.photo.length > 0) { Button('调整照片', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.backgroundBusy).onClick(() => this.openBackgroundCrop(this.canvasBackground.photo)) }
-            if(this.canvasBackground.src.length>0){Button(this.enhancingBackground?'正在提升清晰度':'提升清晰度',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.backgroundBusy&&!this.enhancingBackground&&!this.enhancingSubject).onClick(()=>this.enhancePhoto(false))}
-            Button('选择本地照片', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).width('100%').fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.backgroundBusy).onClick(() => this.pickBackgroundPhoto())
-
-          }
-          }.width('100%').transition(settingsContentSwap())
-          },(mode:string)=>mode)}.width('100%')
-        }.width('100%').padding(12).borderRadius(20).backgroundColor(this.appSurface()).border({ width: 1, color: AppDesign.border(this.appDark) })
-        Column({ space: 12 }) {
-          Text('柔色预设').fontSize(16).fontColor(this.appText()).width('100%')
-          Flex({ wrap: FlexWrap.Wrap }) {
-            ForEach(['雾沙','庭院','海盐'], (name: string, index: number) => {
-              Button(name, { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).margin({ right: 8 }).enabled(!this.backgroundBusy).onClick(() => this.setBackgroundPreset(index))
-            }, (name: string) => name)
-          }.width('100%')
-        }.width('100%').padding(12).borderRadius(20).backgroundColor(this.appSurface()).border({ width: 1, color: AppDesign.border(this.appDark) })
-      }.width('100%').constraintSize({ maxWidth: 640 }).padding({ top: 16, left: 16, right: 16, bottom: 16 })
+        }.width('100%').padding(14).borderRadius(AppDesign.sectionRadius).backgroundColor(this.appControl())
+      }.width('100%').constraintSize({maxWidth:640}).padding({top:8,left:4,right:4,bottom:12})
     }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
   }
   private shareCards: FridgeCard[] = [];
