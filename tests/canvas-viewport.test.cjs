@@ -27,3 +27,20 @@ for(const kind of ['clock','worldclock','lunar','date','calendar','countdown','a
 }
 for(const width of [16,24,48,80,120])assert.ok(boundedReadoutFont(42,width,3.2)*3.2<=width+1e-8);
 console.log('PASS fixed authored aspect across five host shapes; non-mutating uniform fit; full album text/graphic budgets and bounded clock numbers');
+
+// Active Form policy restores pre-3a98384 full-host placement, not fixed-aspect fit.
+for(const [w,h] of [[300,500],[500,300],[940,330],[330,940]]){
+ const r=sceneRect(card,w,h);
+ assert.ok(Math.abs(r.x/w-card.x/load('CardSchema').BOARD_W)<1e-8);
+ assert.ok(Math.abs(r.y/h-card.y/load('CardSchema').BOARD_H)<1e-8);
+ assert.ok(Math.abs(r.w/r.h-card.w/card.h)<1e-8, 'host adaptation does not stretch cards');
+}
+const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
+const method=index.slice(index.indexOf('  private syncHostCanvasGeometry()'),index.indexOf('  private widgetFrameChanged()'));
+const env={exports:{}};vm.runInNewContext(ts.transpileModule('export class Harness {'+method+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,env);
+const view=new env.exports.Harness();view.store={state:{canvasDimension:'4*4',canvasAspect:1},canvasSpecs:{'4*4':1.2}};view.widgetDimension='4*4';view.widgetAspect=1.6;
+view.syncHostCanvasGeometry();assert.equal(view.canvasAspect,1.6);
+view.widgetAspect=0;view.syncHostCanvasGeometry();assert.equal(view.canvasAspect,1.2);
+view.store.canvasSpecs={};view.syncHostCanvasGeometry();assert.equal(view.canvasAspect,1);
+assert.equal(view.store.state.canvasAspect,1,'reading a live host ratio does not modify persisted composition');
+console.log('PASS original normalized full-host placement and App live-host/cached/fallback ratio policy.');

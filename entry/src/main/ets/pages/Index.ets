@@ -337,8 +337,7 @@ struct Index {
       for (const card of this.store.state.cards) {
         if (!ensureCapabilitySize(card)) this.error = '部分卡片内部空间不足，请放大、更换形状或移除能力';
       }
-      this.canvasDimension=this.store.state.canvasDimension;
-      this.canvasAspect=this.store.state.canvasAspect; // Authored ratio is independent of launcher orientation.
+      this.syncHostCanvasGeometry();
       // The launcher already animates the form into this window. A second cold
       // scatter/prepare sequence underneath it fights quick gesture cancellation.
       const widgetLaunch=AppStorage.get<boolean>('launchFromWidget')===true;
@@ -435,7 +434,7 @@ struct Index {
   private applyScheduledScene(next:ScheduledScene):void {
     const previous=this.timedScene?.key??'base',differentCanvas=(this.timedScene?.state.canvasId??this.store.state.canvasId)!==next.state.canvasId;
     if(previous!==next.key){this.backgroundGeneration++;if(this.backgroundTimer>=0)clearTimeout(this.backgroundTimer);this.backgroundTimer=-1;this.backgroundBusy=false;}
-    const apply=():void=>{if(next.normalState.canvasId!==this.store.state.canvasId){this.store.adoptCanvas(next.normalState);this.canvasAspect=this.store.state.canvasAspect;this.canvasDimension=this.store.state.canvasDimension;this.layoutBoard();this.refreshCanvasList();this.persist(false);}this.timedScene=next.ruleId?next:null;this.scheduledFocusId=next.focusId;this.scheduledName=next.ruleId?next.name||'定时场景':'';if(previous!==next.key||differentCanvas){this.selectedId='';this.groupSelecting=false;this.groupSelection=[];}this.canvasBackground=next.state.background;this.renderBoard();if(previous!==next.key||differentCanvas)this.store.refreshWidgets().catch((e:Error)=>this.templateError('桌面刷新未完成',e));if(!next.ruleId&&previous!=='base')this.scheduleBackground();};
+    const apply=():void=>{if(next.normalState.canvasId!==this.store.state.canvasId){this.store.adoptCanvas(next.normalState);this.syncHostCanvasGeometry();this.layoutBoard();this.refreshCanvasList();this.persist(false);}this.timedScene=next.ruleId?next:null;this.scheduledFocusId=next.focusId;this.scheduledName=next.ruleId?next.name||'定时场景':'';if(previous!==next.key||differentCanvas){this.selectedId='';this.groupSelecting=false;this.groupSelection=[];}this.canvasBackground=next.state.background;this.renderBoard();if(previous!==next.key||differentCanvas)this.store.refreshWidgets().catch((e:Error)=>this.templateError('桌面刷新未完成',e));if(!next.ruleId&&previous!=='base')this.scheduleBackground();};
     if(previous===next.key&&!differentCanvas){apply();return;}
     const transitionGeneration=++this.scheduleVisualGeneration;this.scheduleTransition=true;
     if(differentCanvas||next.focusId.length>0||(this.timedScene?.focusId??'').length>0) {
@@ -478,7 +477,7 @@ struct Index {
     else if(!await this.store.openCanvas(id))throw new Error('定时场景不存在');
     await primeRenderContours(this.store.state.cards,storageSnapshot(this.store.state));
     this.copyTargetOpen=false;this.canvasPickerOpen=false;this.scheduleOpen=false;this.scheduleOverride=null;this.timedScene=null;this.scheduledName='';this.scheduledFocusId='';
-    this.canvasAspect=this.store.state.canvasAspect;this.canvasDimension=this.store.state.canvasDimension;this.layoutBoard();this.sceneEditing=true;this.selectedId='';this.groupSelecting=false;this.groupSelection=[];this.canvasBackground=this.store.state.background;this.refreshCanvasList();this.syncSchedules();this.render();
+    this.syncHostCanvasGeometry();this.layoutBoard();this.sceneEditing=true;this.selectedId='';this.groupSelecting=false;this.groupSelection=[];this.canvasBackground=this.store.state.background;this.refreshCanvasList();this.syncSchedules();this.render();
     if(this.store.state.cards.length===0)this.addCard();
     }catch(e){this.templateError('场景编辑未完成',e as Error);}finally{this.sceneNavigationBusy=false;}
   }
@@ -515,7 +514,7 @@ struct Index {
     try {
       const current=this.store.state.canvasId===id;
       await this.store.deleteTimedScene(id);
-      if(current){this.sceneEditing=false;this.backgroundOpen=false;this.canvasAspect=this.store.state.canvasAspect;this.canvasDimension=this.store.state.canvasDimension;this.layoutBoard();this.canvasBackground=this.store.state.background;this.selectedId='';this.render();}
+      if(current){this.sceneEditing=false;this.backgroundOpen=false;this.syncHostCanvasGeometry();this.layoutBoard();this.canvasBackground=this.store.state.background;this.selectedId='';this.render();}
       this.scheduleGeneration++;this.refreshCanvasList();this.syncSchedules();this.armScheduleTimer();this.updateScheduledScene(true);
     } finally {this.sceneNavigationBusy=false;this.armScheduleTimer();this.updateScheduledScene(true);}
   }
@@ -534,7 +533,7 @@ struct Index {
       await primeRenderContours(this.store.state.cards,storageSnapshot(this.store.state));
       this.sceneEditing=this.store.catalog.scenes.some(c=>c.id===this.store.state.canvasId);this.scheduleGeneration++;this.timedScene=null;this.scheduleOverride=null;this.scheduledName='';this.scheduledFocusId='';this.syncSchedules();
       this.selectedId = ''; this.activeBoardId = ''; this.groupSelection = []; this.groupSelecting = false;
-      this.canvasAspect=this.store.state.canvasAspect;this.canvasDimension=this.store.state.canvasDimension;this.layoutBoard();
+      this.syncHostCanvasGeometry();this.layoutBoard();
       this.canvasBackground = this.store.state.background; this.refreshCanvasList();
       this.render(); this.persist(true); this.scheduleBackground(); this.canvasPickerOpen = false;
       this.refreshCapabilities();this.updateScheduledScene(true);
@@ -731,8 +730,14 @@ struct Index {
     if (this.selectedId.length > 0) { this.selectedId = ''; return true; }
     return false;
   }
+  // Use the live launcher ratio when available, as in the original full-host renderer.
+  // This updates layout only; opening or rotating never clamps saved card positions.
+  private syncHostCanvasGeometry():void {
+    this.canvasDimension=this.widgetDimension||this.store.state.canvasDimension;
+    this.canvasAspect=this.widgetAspect>0?this.widgetAspect:(this.store.canvasSpecs[this.canvasDimension]??this.store.state.canvasAspect);
+  }
   private widgetFrameChanged(): void {
-    if(this.ready){this.canvasAspect=this.store.state.canvasAspect;this.canvasDimension=this.store.state.canvasDimension;this.layoutBoard();}
+    if(this.ready){this.syncHostCanvasGeometry();this.layoutBoard();}
   }
   private homeToolsChanged():void {
     if(!this.ready||this.editing||this.heroActive){this.homeToolsMotionGeneration++;this.homeToolsMoving=false;return;}
@@ -915,7 +920,7 @@ struct Index {
       await this.store.init(this.context);if(canvas)await this.store.openCanvas(canvas);
       await primeRenderContours(this.store.state.cards,storageSnapshot(this.store.state));
       if(!this.alive)return;
-      this.refreshCanvasList();this.canvasAspect=this.store.state.canvasAspect;this.canvasDimension=this.store.state.canvasDimension;this.canvasBackground=this.store.state.background;
+      this.refreshCanvasList();this.syncHostCanvasGeometry();this.canvasBackground=this.store.state.background;
       this.retireChrome();this.editing=false;this.heroActive=false;this.viewing=false;this.selectedId='';this.activeBoardId='';this.boardOpacity=1;this.render();this.layoutBoard();
       AppStorage.setOrCreate('viewCardId','');
       if(this.routeCanvasId===canvas)AppStorage.setOrCreate('routeCanvasId','');

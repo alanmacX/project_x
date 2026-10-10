@@ -1,7 +1,7 @@
 import { capabilityRenderTick } from '../../model/CapabilityClock';
 import { cardRenderSnapshot } from '../../model/CardViewSnapshot';
 import { FridgeCard, CanvasBackground, normalizeBackground, BOARD_W } from '../../model/CardSchema';
-import { scenePercent, canvasViewport, SceneRect } from '../../model/SceneLayout';
+import { scenePercent } from '../../model/SceneLayout';
 import { CanvasFrame } from '../../views/CanvasFrame';
 import { CardFace } from '../../views/CardFace';
 
@@ -103,7 +103,7 @@ struct FridgeWidgetCard {
   @State measuredHeight: number = 0;
   private widthValue(): number { return this.measuredWidth > 0 ? this.measuredWidth : this.canvasWidth; }
   private heightValue(): number { return this.measuredHeight > 0 ? this.measuredHeight : this.canvasHeight; }
-  private viewport():SceneRect {return canvasViewport(this.widthValue(),this.heightValue(),this.authoredAspect);}
+  private hostAspect():number {return this.widthValue()/this.heightValue();}
   private parse(json: string): FridgeCard[] {
     try { return JSON.parse(json) as FridgeCard[]; } catch (_) { return []; }
   }
@@ -120,12 +120,12 @@ struct FridgeWidgetCard {
   }
   private open(): void {
     postCardAction(this, { action: 'router', abilityName: 'EntryAbility',
-      params: { canvasId: this.displayCanvasId||this.canvasId, viewCardId: '', canvasDimension: this.dim, canvasAspect: String(this.authoredAspect) } });
+      params: { canvasId: this.displayCanvasId||this.canvasId, viewCardId: '', canvasDimension: this.dim, canvasAspect: String(this.hostAspect()) } });
   }
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
-      // Background and frame belong to the physical host; only authored artwork
-      // uses the fitted viewport. Keeping these separate avoids orientation bands.
+      // Restore the original full-host layout: normalized centres adapt to the
+      // launcher rectangle; each card retains its width/height proportion.
       Stack() {
         if(this.displayed.mode!=='transparent'){
         Stack(){
@@ -150,23 +150,20 @@ struct FridgeWidgetCard {
           }.width('100%').height('100%').opacity(this.mix)
         }
       }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
-      Stack({alignContent:Alignment.TopStart}) {
       if(this.canvasBackground.mode==='transparent'&&this.cardIds.length===0){
         Column({space:8}){Text('冰箱贴').fontSize(18).fontWeight(FontWeight.Medium).fontColor('#302D23');Text('点击添加卡片').fontSize(13).fontColor('#696459')}
          .width('72%').height('28%').justifyContent(FlexAlign.Center).backgroundColor('#F2FAF8EF').borderRadius(20).position({x:'14%',y:'36%'}).hitTestBehavior(HitTestMode.None)
       }
       ForEach(this.cardIds, (id: string) => {
         Stack({alignContent:Alignment.TopStart}) {
-          CardFace({card:this.cardMap[id],scaleFactor:this.viewport().w/BOARD_W,tick:capabilityRenderTick(this.cardMap[id].capability,this.renderTick),widget:true})
+          CardFace({card:this.cardMap[id],scaleFactor:this.widthValue()/BOARD_W,tick:capabilityRenderTick(this.cardMap[id].capability,this.renderTick),widget:true})
             .width('100%').height('100%').hitTestBehavior(HitTestMode.None)
-        }.width(scenePercent(this.cardMap[id],this.authoredAspect).w+'%')
-          .height(scenePercent(this.cardMap[id],this.authoredAspect).h+'%')
-          .position({x:scenePercent(this.cardMap[id],this.authoredAspect).x+'%',y:scenePercent(this.cardMap[id],this.authoredAspect).y+'%'})
+        }.width(scenePercent(this.cardMap[id],this.hostAspect()).w+'%')
+          .height(scenePercent(this.cardMap[id],this.hostAspect()).h+'%')
+          .position({x:scenePercent(this.cardMap[id],this.hostAspect()).x+'%',y:scenePercent(this.cardMap[id],this.hostAspect()).y+'%'})
           .rotate({angle:this.cardMap[id].rot,centerX:0,centerY:'100%'})
           .zIndex(this.cardMap[id].z).hitTestBehavior(HitTestMode.None)
       }, (id: string) => id)
-      }.width(this.viewport().w/this.widthValue()*100+'%').height(this.viewport().h/this.heightValue()*100+'%')
-        .position({x:this.viewport().x/this.widthValue()*100+'%',y:this.viewport().y/this.heightValue()*100+'%'}).clip(true)
       if(this.canvasBackground.frameStyle!=='none'){CanvasFrame({material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle}).width('100%').height('100%').zIndex(100000).hitTestBehavior(HitTestMode.None)}
     }.width('100%').height('100%').backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:this.canvasBackground.color).borderRadius(this.canvasBackground.frameStyle==='none'?24:this.widthValue()*31/600).clip(true)
       // Cache the complete clipped form, including shadow fringes, while its

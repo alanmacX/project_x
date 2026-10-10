@@ -15,7 +15,7 @@ view.canvasBackground={mode:'photo',src:'third',color:'yellow'};view.refresh();v
 const form=fs.readFileSync('entry/src/main/ets/widget/pages/FridgeWidgetCard.ets','utf8');let routed;
 const open=form.slice(form.indexOf('  private open()'),form.indexOf('  build()'));
 const routerEnv={exports:{},postCardAction:(_,action)=>routed=action};vm.runInNewContext(ts.transpileModule('export class Router {'+open+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,routerEnv);
-const router=new routerEnv.exports.Router();Object.assign(router,{displayCanvasId:'shown',canvasId:'base',dim:'4*4',sceneAnimating:true,widthValue:()=>400,heightValue:()=>300});router.open();assert.equal(routed.params.canvasId,'shown');assert.equal(routed.params.viewCardId,'');assert.equal(routed.action,'router');assert(!form.includes('widgetHit'));assert(!form.includes('Button('));
+const router=new routerEnv.exports.Router();Object.assign(router,{displayCanvasId:'shown',canvasId:'base',dim:'4*4',sceneAnimating:true,widthValue:()=>400,heightValue:()=>300,hostAspect:()=>4/3});router.open();assert.equal(routed.params.canvasId,'shown');assert.equal(routed.params.viewCardId,'');assert.equal(routed.action,'router');assert(!form.includes('widgetHit'));assert(!form.includes('Button('));
 console.log('PASS Form backdrop: immediate cold load, decode-gated fade, repeated/interrupting packets, hidden cleanup and whole-widget routing.');
 
 assert.ok(form.trimEnd().endsWith(".accessibilityText('打开冰箱贴画布')\n      .onClick(() => this.open())\n  }\n}"), 'root Form directly owns the launch action');
@@ -30,12 +30,9 @@ assert.match(form,/tick:capabilityRenderTick\(this.cardMap\[id\]\.capability,thi
 assert.match(form,/\.renderGroup\(this.incoming===null\)/,'whole bounded Form caches native launch scaling, background fades stay live');
 console.log('PASS Form render clock: repeated revisions do not rerender unchanged artwork; minute boundaries still update.');
 
-// Both decode-gated background layers must be siblings of the authored viewport.
-// Otherwise a non-square desktop host exposes solid-colour orientation bands.
-const build=form.slice(form.indexOf('  build()'));
-const artworkStart=build.indexOf('Stack({alignContent:Alignment.TopStart})');
-const fitStart=build.indexOf('.width(this.viewport().w/this.widthValue()');
-assert.ok(artworkStart>build.lastIndexOf('Image('), 'all background image layers fill the host, outside the fitted artwork');
-assert.ok(artworkStart<build.indexOf('ForEach(this.cardIds')&&fitStart>build.indexOf('ForEach(this.cardIds'), 'card geometry still uses the unchanged authored viewport');
-assert.ok(build.indexOf('CanvasFrame({')>fitStart, 'physical frame remains outside the authored viewport');
-console.log('PASS full-host backdrop and frame with uniformly fitted authored cards; no letterbox background layer.');
+// Restore the original full-host composition without fitted/letterboxed artwork.
+assert.ok(!form.includes('this.viewport()'), 'no nested fitted canvas or empty orientation bands');
+assert.match(form,/scaleFactor:this.widthValue\(\)\/BOARD_W/);
+assert.match(form,/scenePercent\(this.cardMap\[id\],this.hostAspect\(\)\)/);
+assert.equal(routed.params.canvasAspect,String(4/3), 'App opens at the visible desktop host ratio');
+console.log('PASS original full-host composition, proportion-preserving cards and actual host ratio routing.');

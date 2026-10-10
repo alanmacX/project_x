@@ -1,3 +1,7 @@
+# Superseded by restored full-host layout
+
+The user rejected the fixed-aspect fitted composition. See `2026-10-10-restored-full-host-layout.md` for the active policy. This record describes the intermediate attempt only.
+
 # Desktop orientation background bands
 
 ## Cause
