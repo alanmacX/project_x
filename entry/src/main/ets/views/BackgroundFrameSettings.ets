@@ -1,5 +1,5 @@
 import { AppDesign } from '../model/AppDesign';
-import { motionFrameRate } from '../model/MotionPolicy';
+import { settingsExpansionMotion } from '../model/SettingsMotion';
 import { SettingsSegmented } from './SettingsSegmented';
 
 /** Keep native controls mounted while only their clipped viewport expands. */
@@ -21,7 +21,7 @@ export struct BackgroundFrameSettings {
   }
   private toggle(on:boolean):void {
     if(on===this.expanded)return;
-    this.getUIContext().animateTo({duration:240,curve:Curve.EaseOut,expectedFrameRateRange:motionFrameRate()},()=>{
+    this.getUIContext().animateTo(settingsExpansionMotion(),()=>{
       this.expanded=on;
     });
     // Persistence and artwork preparation run once, outside the animation transaction.
@@ -34,7 +34,7 @@ export struct BackgroundFrameSettings {
         Toggle({type:ToggleType.Switch,isOn:this.expanded})
           .selectedColor(AppDesign.selected(this.appDark))
           .switchPointColor(this.expanded?AppDesign.onSelected(this.appDark):AppDesign.text(this.appDark))
-          .backgroundColor(AppDesign.border(this.appDark))
+          .switchStyle({unselectedColor:AppDesign.border(this.appDark)})
           .accessibilityText('显示画框').onChange((on:boolean)=>this.toggle(on))
       }.width('100%').constraintSize({minHeight:40})
       Stack({alignContent:Alignment.TopStart}) {

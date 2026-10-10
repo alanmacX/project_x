@@ -7,6 +7,7 @@ import { importAlbumCover } from '../model/AlbumWorker';
 import { taskpool } from '@kit.ArkTS';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { AppDesign } from '../model/AppDesign';
+import { settingsExpansionMotion, settingsReveal } from '../model/SettingsMotion';
 import { SettingsAction } from './SettingsAction';
 @Component
 export struct AlbumSettings {
@@ -103,11 +104,12 @@ export struct AlbumSettings {
       }
       if(this.section==='all'||this.section==='library') {
 
-      SettingsAction({label:this.sources?'收起封面来源建议':'封面来源建议',appDark:this.appDark,fillWidth:true,onPress:()=>this.sources=!this.sources})
+      SettingsAction({label:this.sources?'收起封面来源建议':'封面来源建议',appDark:this.appDark,fillWidth:true,onPress:()=>this.getUIContext().animateTo(settingsExpansionMotion(),()=>{this.sources=!this.sources;})})
       if(this.sources) {
+        Column({space:12}) {
         SettingsAction({label:'iSearch · 中文封面搜索 ↗',appDark:this.appDark,fillWidth:true,onPress:()=>this.source('https://i.oppsu.cn/')})
         SettingsAction({label:'CoverBox · 备用搜索 ↗',appDark:this.appDark,fillWidth:true,onPress:()=>this.source('https://coverbox.henry-hu.com/')})
-
+        }.width('100%').transition(settingsReveal())
       }
       }
       if(this.message) {Text(this.message).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}

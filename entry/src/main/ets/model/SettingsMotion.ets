@@ -28,3 +28,8 @@ export function settingsContentSwap():TransitionEffect {
     TransitionEffect.OPACITY.animation({duration:80,curve:Curve.EaseIn,expectedFrameRateRange:settingsRate})
   );
 }
+
+/** Local settings layout changes share one short native animation transaction. */
+export function settingsExpansionMotion():AnimateParam {
+  return {duration:220,curve:Curve.EaseOut,expectedFrameRateRange:settingsRate};
+}

@@ -4,6 +4,7 @@ import { CanvasRotation, CanvasTimeSlot, normalizeCanvasRotation, canvasRotation
 import { immersiveChrome } from '../model/ChromeMaterial';
 import { AppDesign } from '../model/AppDesign';
 import { SettingsSegmented } from './SettingsSegmented';
+import { settingsExpansionMotion, settingsContentSwap } from '../model/SettingsMotion';
 import { SettingsSelect } from './SettingsSelect';
 @Component
 export struct SceneSchedulePanel {
@@ -44,7 +45,10 @@ export struct SceneSchedulePanel {
   private edit(rule:SceneRule):void {
     this.draft=JSON.parse(JSON.stringify(rule)) as SceneRule;
     this.draftStart=rule.start;this.draftDate=rule.date;this.draftName=rule.name;this.draftEnabled=rule.enabled;this.draftRepeat=rule.repeat;this.draftWeekdays=rule.weekdays.slice();this.draftTimeout=rule.timeoutMinutes;
-    this.contentScroller.scrollTo({xOffset:0,yOffset:0});this.editingRule=true;
+    this.contentScroller.scrollTo({xOffset:0,yOffset:0});this.setEditingRule(true);
+  }
+  private setEditingRule(value:boolean):void {
+    this.getUIContext().animateTo(settingsExpansionMotion(),()=>{this.editingRule=value;});
   }
   private draftRule():SceneRule {
     const rule=JSON.parse(JSON.stringify(this.draft)) as SceneRule;
@@ -53,6 +57,14 @@ export struct SceneSchedulePanel {
   private pickTime():void {const id=this.draft.id;const d=new Date();d.setHours(Math.floor(this.draftStart/60),this.draftStart%60,0,0);this.getUIContext().showTimePickerDialog({selected:d,useMilitaryTime:true,onAccept:(v:TimePickerResult)=>{if(!this.mounted||!this.editingRule||this.draft.id!==id)return;this.draftStart=(v.hour??0)*60+(v.minute??0);}});}
   private pickDate():void {const id=this.draft.id;const p=this.draftDate.split('-').map(Number);this.getUIContext().showDatePickerDialog({selected:p.length===3?new Date(p[0],p[1]-1,p[2]):new Date(),onAccept:(v:DatePickerResult)=>{if(!this.mounted||!this.editingRule||this.draft.id!==id)return;this.draftDate=sceneDay(new Date(v.year??new Date().getFullYear(),v.month??0,v.day??1));}});}
   private saveRotation():void {this.rotationDraft=normalizeCanvasRotation(this.rotationDraft,this.canvases.map(c=>c.id));this.rotationRevision++;this.onRotation(normalizeCanvasRotation(this.rotationDraft,this.canvases.map(c=>c.id)));}
+  private selectRotationMode(index:number):void {
+    const next=normalizeCanvasRotation(this.rotationDraft,this.canvases.map(c=>c.id));
+    next.mode=index===1?'theme':'time';
+    if(next.mode===this.rotationDraft.mode)return;
+    this.rotationRevision++;
+    this.getUIContext().animateTo(settingsExpansionMotion(),()=>{this.rotationDraft=next;});
+    this.onRotation(normalizeCanvasRotation(next,this.canvases.map(c=>c.id)));
+  }
   private slotTime(index:number):void {
     const slot=this.rotationDraft.slots[index];if(!slot||index===0)return;
     const start=slot.start,revision=this.rotationRevision,d=new Date();d.setHours(Math.floor(start/60),start%60,0,0);
@@ -69,31 +81,34 @@ export struct SceneSchedulePanel {
   @Builder
   timing() {
     Column({space:10}) {
-      Row(){Text('出现时间').fontSize(17).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark));Blank();Button('返回',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontColor(AppDesign.text(this.appDark)).attributeModifier(immersiveChrome(this.appDark)).onClick(()=>{this.contentScroller.scrollTo({xOffset:0,yOffset:0});this.editingRule=false;})}.width('100%')
+      Row(){Text('出现时间').fontSize(17).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark));Blank();Button('返回',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontColor(AppDesign.text(this.appDark)).attributeModifier(immersiveChrome(this.appDark)).onClick(()=>{this.contentScroller.scrollTo({xOffset:0,yOffset:0});this.setEditingRule(false);})}.width('100%')
       Row(){Text('启用场景').fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:this.draftEnabled}).onChange(value=>this.draftEnabled=value)}.width('100%')
       TextInput({text:this.draftName,placeholder:'场景名称'}).height(44).maxLength(30).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onChange(v=>this.draftName=v)
-      SettingsSegmented({labels:['每周重复','仅一次'],selectedIndex:this.draftRepeat==='once'?1:0,appDark:this.appDark,onSelect:i=>{this.draftRepeat=i===1?'once':'daily';if(!this.draftDate)this.draftDate=sceneDay(new Date());}})
+      SettingsSegmented({labels:['每周重复','仅一次'],selectedIndex:this.draftRepeat==='once'?1:0,appDark:this.appDark,onSelect:i=>{if(!this.draftDate)this.draftDate=sceneDay(new Date());this.getUIContext().animateTo(settingsExpansionMotion(),()=>{this.draftRepeat=i===1?'once':'daily';});}})
       if(this.draftRepeat==='once'){Button(this.draftDate,{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(40).fontSize(13).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.pickDate())}
       else {Row({space:4}){ForEach([1,2,3,4,5,6,0],(d:number)=>{Button(['日','一','二','三','四','五','六'][d],{type:ButtonType.Circle}).height(40).layoutWeight(1).fontColor(AppDesign.choiceText(this.appDark,this.draftWeekdays.includes(d))).backgroundColor(AppDesign.choice(this.appDark,this.draftWeekdays.includes(d))).onClick(()=>this.draftWeekdays=this.draftWeekdays.includes(d)?this.draftWeekdays.filter(n=>n!==d):this.draftWeekdays.concat(d))},(d:number)=>String(d))}.width('100%')}
       Row(){Text('到点出现').fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Button(sceneClock(this.draftStart),{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(40).fontSize(13).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.pickTime())}.width('100%')
       Row({space:12}){Text('最多显示').fontColor(AppDesign.text(this.appDark)).layoutWeight(1);this.action('−',()=>this.draftTimeout=Math.max(1,this.draftTimeout-1));Text(this.draftTimeout+' 分钟').fontSize(14).fontColor(AppDesign.text(this.appDark));this.action('+',()=>this.draftTimeout=Math.min(120,this.draftTimeout+1))}.width('100%')
 
-      Button('保存',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.EMPHASIZED}).height(44).width('100%').backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).enabled(this.draftName.trim().length>0&&(this.draftRepeat==='once'||this.draftWeekdays.length>0)).onClick(()=>{this.onSave(this.draftRule());this.editingRule=false;})
+      Button('保存',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.EMPHASIZED}).height(44).width('100%').backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).enabled(this.draftName.trim().length>0&&(this.draftRepeat==='once'||this.draftWeekdays.length>0)).onClick(()=>{this.onSave(this.draftRule());this.setEditingRule(false);})
     }.width('100%').padding(12).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
   }
   @Builder
   rotationEditor() {
     Column({space:10}) {
       Row(){Text('画布轮换').fontSize(16).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:canvasRotationEnabled(this.rotationDraft)}).accessibilityText('启用画布轮换').onChange(value=>{this.rotationDraft.enabled=value;if(value&&this.rotationDraft.mode==='off')this.rotationDraft.mode='time';this.saveRotation();})}.width('100%')
-      SettingsSegmented({labels:['按时间','跟随深浅'],selectedIndex:this.rotationDraft.mode==='theme'?1:0,appDark:this.appDark,onSelect:i=>{this.rotationDraft.mode=i===1?'theme':'time';this.saveRotation();}})
+      SettingsSegmented({labels:['按时间','跟随深浅'],selectedIndex:this.rotationDraft.mode==='theme'?1:0,appDark:this.appDark,onSelect:i=>this.selectRotationMode(i)})
 
-      if(this.rotationDraft.mode==='theme') {
+      Stack({alignContent:Alignment.TopStart}) {
+      ForEach([this.rotationDraft.mode],(mode:string)=>{
+      Column({space:10}) {
+      if(mode==='theme') {
         Text('浅色模式').fontColor(AppDesign.text(this.appDark)).width('100%')
         SettingsSelect({labels:this.canvases.map(c=>c.name),selectedIndex:this.canvases.findIndex(c=>c.id===this.rotationDraft.lightId),appDark:this.appDark,onSelect:i=>{this.rotationDraft.lightId=this.canvases[i].id;this.saveRotation();}})
         Text('深色模式').fontColor(AppDesign.text(this.appDark)).width('100%')
         SettingsSelect({labels:this.canvases.map(c=>c.name),selectedIndex:this.canvases.findIndex(c=>c.id===this.rotationDraft.darkId),appDark:this.appDark,onSelect:i=>{this.rotationDraft.darkId=this.canvases[i].id;this.saveRotation();}})
 
-      } else if(this.rotationDraft.mode==='time') {
+      } else if(mode==='time') {
         ForEach(this.rotationDraft.slots,(slot:CanvasTimeSlot,index:number)=>{
           Column({space:8}) {
             Row(){if(index===0){Text('00:00 – '+(this.rotationDraft.slots.length>1?sceneClock(this.rotationDraft.slots[1].start):'24:00')).height(40).fontSize(13).fontColor(AppDesign.text(this.appDark))}else{Button(sceneClock(slot.start)+' – '+(index+1<this.rotationDraft.slots.length?sceneClock(this.rotationDraft.slots[index+1].start):'24:00'),{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(40).fontSize(13).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.slotTime(index))}Blank();if(index>0){Button({type:ButtonType.Circle}){SymbolGlyph($r('sys.symbol.trash')).fontSize(18).fontColor(['#C43A35'])}.width(44).height(44).backgroundColor(Color.Transparent).accessibilityText('删除时段').onClick(()=>{this.rotationDraft.slots=this.rotationDraft.slots.filter((s,i)=>i!==index);this.saveRotation();})}}.width('100%')
@@ -103,6 +118,9 @@ export struct SceneSchedulePanel {
         Button('添加时间分界',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontSize(13).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).enabled(this.canvases.length>0&&this.rotationDraft.slots.length<12).onClick(()=>{let start=720;while(this.rotationDraft.slots.some(s=>s.start===start)&&start<1439)start++;if(start>=1440)return;this.rotationDraft.slots.push({start,canvasId:this.canvases[0]?.id??''});this.saveRotation();})
 
       }
+      }.width('100%').transition(settingsContentSwap())
+      },(mode:string)=>mode)
+      }.width('100%')
     }.width('100%').padding(12).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
   }
   @Builder
@@ -126,7 +144,7 @@ export struct SceneSchedulePanel {
       Tabs({index:this.tab}) {
         TabContent() {
           Scroll(this.contentScroller) {
-            Column() {if(this.editingRule){this.timing()}else{this.sceneList()}}.width('100%').alignItems(HorizontalAlign.Start)
+            Stack({alignContent:Alignment.TopStart}) {ForEach([this.editingRule],(editing:boolean)=>{Column() {if(editing){this.timing()}else{this.sceneList()}}.width('100%').alignItems(HorizontalAlign.Start).transition(settingsContentSwap())},(editing:boolean)=>String(editing))}.width('100%')
           }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
         }
         TabContent() {
