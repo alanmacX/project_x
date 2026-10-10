@@ -15,7 +15,7 @@ export struct TimeCapabilitySettings {
         SettingsSelect({labels:CLOCK_CITIES.map((city)=>city.value),selectedIndex:CLOCK_CITIES.findIndex((city)=>city.zone===clockZone(this.cap.zone??'')),
           valueLabel:clockCity(this.cap.zone??''),appDark:this.appDark,onSelect:(index:number)=>{if(CLOCK_CITIES[index]){const cap=JSON.parse(JSON.stringify(this.cap)) as CapBlock;cap.zone=CLOCK_CITIES[index].zone;this.onUpdate(cap);}}}).layoutWeight(1)
       }.width('100%')
-      Text('夏令时自动切换；无需联网或位置权限。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+
     }.width('100%')
   }
 }

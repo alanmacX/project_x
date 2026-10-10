@@ -103,21 +103,21 @@ export struct CapabilitySettings {
     Column({space:12}) {
       if(this.cap.k==='album') {AlbumSettings({section:this.section,showPresentation:false,tick:this.tick,cap:this.cap,cardId:this.cardId,appDark:this.appDark,onUpdate:this.onUpdate})}
       if(this.cap.k==='battery') {
-        Text('本机电量与充电状态，前台响应系统变化；桌面由系统周期刷新。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+
         SettingsAction({label:this.busy?'更新中':'更新电量',onPress:()=>this.refresh(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
       }
       if(this.cap.k==='agenda') {
         if(this.wholeCalendarAccess) {SettingsAction({label:'读取系统日历',onPress:()=>this.readSystemAgenda(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})}
         SettingsAction({label:'导入日历文件 .ics',onPress:()=>this.importSchedule(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
-        Text(this.cap.agendaSource==='system'?'系统日历' :this.cap.agendaSource==='imported'?'本地日历副本；原文件修改后需要重新导入':'显示接下来三项安排，缩小时保留下一项').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+        if(this.cap.agendaSource==='imported'){Text('本地日历副本；原文件修改后需要重新导入').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
       }
       if(this.cap.k==='timetable') {
         if(this.section==='all'||this.section==='display') {
-        Text('课表保存在本机，新建课程表卡片自动使用最近保存的课表；每张卡片的课表副本可独立编辑。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+
         Text('卡片展示').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
         SettingsSegmented({labels:['下一课','每日概览'],selectedIndex:this.cap.timetableMode==='day'?1:0,appDark:this.appDark,
           onSelect:(index:number)=>{const next=this.copy();next.timetableMode=index===1?'day':'next';this.change(next);}})
-        Text(this.cap.timetableMode==='day'?'网格展示当天全部课程和地点；最后一课结束后展示明天。卡片会为学期内最忙的一天预留空间。':'下课前 10 分钟切到下一课；只在前一晚 20:00 后预告次日，假期中不提前展示远期课程。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+
         }
         if(this.section==='all'||this.section==='courses') {
         Row() {

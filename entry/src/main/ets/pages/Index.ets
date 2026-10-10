@@ -582,7 +582,7 @@ struct Index {
       if (this.canvasCreating) {
         TextInput({text:this.canvasDraftName,placeholder:'画布名称'}).height(44).fontColor(this.appText()).placeholderColor(this.appMuted())
           .backgroundColor(AppDesign.popupChoice(this.appDark,false)).borderRadius(12).maxLength(30).onChange((value:string)=>this.canvasDraftName=value)
-        Text(this.canvasDuplicate?'保留当前布局，创建一份独立副本':'从空白开始，添加你的卡片').fontSize(12).fontColor(this.appMuted()).width('100%')
+
         Button(this.canvasChanging?'创建中':'创建画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.EMPHASIZED})
           .height(44).width('100%').backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).enabled(!this.canvasChanging && this.canvasDraftName.trim().length>0)
           .onClick(()=>this.newCanvas(this.canvasDuplicate,this.canvasDraftName))
@@ -1374,7 +1374,6 @@ struct Index {
   }
 
 
-
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       Column().width('100%').height('100%').backgroundColor(this.appBackground())
@@ -1839,8 +1838,6 @@ struct Index {
           Text('画框').fontSize(13).fontColor(this.appMuted()).width('100%')
           SettingsSegmented({labels:['无框','浅色','深色','跟随系统'],selectedIndex:Math.max(0,['none','light','dark','auto'].indexOf(this.canvasBackground.frameStyle)),appDark:this.appDark,onSelect:(index:number)=>{const bg=normalizeBackground(this.canvasBackground);bg.frameStyle=['none','light','dark','auto'][index];this.applyBackground(bg);}})
           if(this.canvasBackground.frameStyle!=='none'){SettingsSegmented({labels:['白岩','胡桃木','浅橡木'],selectedIndex:Math.max(0,['stone','walnut','oak'].indexOf(this.canvasBackground.frameMaterial)),appDark:this.appDark,onSelect:(index:number)=>{const bg=normalizeBackground(this.canvasBackground);bg.frameMaterial=['stone','walnut','oak'][index];this.applyBackground(bg);}})}
-          if(this.canvasBackground.mode==='transparent'){
-            Text('只显示卡片，桌面壁纸透过空白处；卡片仍限制在小组件范围内。空画布会显示可见的添加提示。').fontSize(13).fontColor(this.appMuted()).width('100%')}
           if (this.canvasBackground.mode === 'solid') {
             ColorSetting({label:'背景颜色',color:this.canvasBackground.color,canReset:false,sourceKey:this.backgroundColorKey(),appDark:this.appDark,
               onPick:(color:string,key:string)=>this.setBackgroundColor(color,key),onFallback:()=>this.chooseBackgroundColor()})
@@ -1853,14 +1850,14 @@ struct Index {
             }.width('100%')
           }
           if (this.canvasBackground.mode === 'smart' || this.canvasBackground.mode === 'blend') {
-            Text(this.backgroundBusy ? '正在从本地卡片提取颜色' : this.canvasBackground.mode === 'smart' ? '根据全部可见卡片取色，降低饱和度以衬托作品。' : '移动时保持当前配色；换图或改色后更新，也可手动重新取色。').fontSize(13).fontColor(this.appMuted()).width('100%')
+            if(this.backgroundBusy){Text('正在从本地卡片提取颜色').fontSize(13).fontColor(this.appMuted()).width('100%')}
             Button('重新取色', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.backgroundBusy).onClick(() => this.refreshBackground(true))
           }
           if (this.canvasBackground.mode === 'photo') {
             if (this.canvasBackground.photo.length > 0) { Button('调整照片', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.backgroundBusy).onClick(() => this.openBackgroundCrop(this.canvasBackground.photo)) }
             if(this.canvasBackground.src.length>0){Button(this.enhancingBackground?'正在提升清晰度':'提升清晰度',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.backgroundBusy&&!this.enhancingBackground&&!this.enhancingSubject).onClick(()=>this.enhancePhoto(false))}
             Button('选择本地照片', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(44).width('100%').fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.backgroundBusy).onClick(() => this.pickBackgroundPhoto())
-            Text('按桌面画布比例拖动、双指缩放后确认；原照片不修改。').fontSize(12).fontColor(this.appMuted()).width('100%')
+
           }
           }.width('100%').transition(settingsContentSwap())
           },(mode:string)=>mode)}.width('100%')
@@ -2204,7 +2201,7 @@ struct Index {
   @Builder
   albumStyleChoices() {
     EditorVisualChoices({card:this.preview,mode:'album',selected:this.preview.capability?.albumPresentation??'cover',appDark:this.appDark,onChoose:(key:string)=>{const cap=this.current()?.capability;if(cap){const next=JSON.parse(JSON.stringify(cap)) as CapBlock;next.albumPresentation=key;this.updateExtraCapability(this.preview.id,next);}}})
-    Text('封面固定为正方形；信息款显示专辑名与歌手，超出行数自动省略。').fontSize(12).fontColor(this.appMuted()).width('100%')
+
   }
   @Builder
   capabilityStyleChoices() {
@@ -2217,7 +2214,7 @@ struct Index {
       SettingsSegmented({labels:['内贴合','外贴合'],selectedIndex:this.preview.capability.readingOutside?1:0,appDark:this.appDark,onSelect:(i:number)=>this.setCapabilityAttachment(this.preview.capability?.readingEdge||'left',i===1)})
     }
     if(this.preview.capability?.readingBlend==='tag') {HookPlacement({hookLocation:this.preview.capability.readingHook??.2,appDark:this.appDark,onChoose:(p:number)=>{const cap=this.current()?.capability;if(cap){cap.readingHook=p;this.change();}}})}
-    Text('大小与位置在预览中直接调整；内容会随时间变化，衬底自动适应。').fontSize(12).fontColor(this.appMuted()).width('100%')
+
     Column() {this.capabilityPanel()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(20)
   }
   private setCapabilityAttachment(side:string,outer:boolean):void {
@@ -2478,7 +2475,6 @@ struct Index {
           }.width('100%').height(AppDesign.controlHeight)
         } else if (this.elementPreview.kind === 'image') {
           Button(this.busy ? '正在读取' : '选择图片或 GIF', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(14).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.busy).onClick(() => this.pickImage())
-          if (this.elementPreview.animated) { Text('App 内循环播放；桌面组件展示时播放一次。').fontSize(12).fontColor(this.appMuted()).width('100%') }
         } else {
           SettingsSegmented({labels:['矩形','圆形','线条'],selectedIndex:Math.max(0,['rect','circle','line'].indexOf(this.elementPreview.primitive)),appDark:this.appDark,
             onSelect:(index:number)=>{const el=this.currentElement();if(el!==null){el.primitive=['rect','circle','line'][index];this.change();}}})
@@ -2636,9 +2632,6 @@ struct Index {
       if (this.preview.cutout.length > 0) {
         Button(this.enhancingSubject?'正在提升清晰度':'提升清晰度',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontColor(this.appText()).backgroundColor(this.appControl()).enabled(!this.busy&&!this.enhancingSubject&&!this.enhancingBackground).onClick(()=>this.enhancePhoto(true))
 
-      }
-      if (this.preview.shape === 'subject') {
-        Text('抠图固定使用白边，保留柔化的主体轮廓。').fontSize(12).fontColor(this.appMuted()).width('100%')
       }
       if (this.preview.shape !== 'subject') {
       Row() {

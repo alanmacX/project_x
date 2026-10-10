@@ -6,7 +6,7 @@ import { FridgeCard, ElementBox } from './CardSchema';
 export { readingStyles } from './ReadingStylePolicy';
 export const READING_COMPOSITIONS:string[]=['cloud','bare','badge','sticker','tag'];
 export const READING_COMPOSITION_LABELS:string[]=['柔软云朵','笔触','徽章','边缘自适应','挂钩'];
-export const READING_COMPOSITION_NOTES:string[]=['圆润云瓣向内容外延展，保留原有字号和缩小下限','半透明笔触，贴近内容区域','电量专用圆形徽章','沿卡片左右边缘滑动，选择内贴合或外贴合','穿孔挂钩，上沿留出内容避让区'];
+
 export function isReadingComposition(blend:string):boolean {return READING_COMPOSITIONS.includes(blend);}
 export function compositionSuggestion(kind:string):string {return preferredReadingStyle(kind);}
 /** Smooth fixed-complexity silhouette; generated in native pixel coordinates, no outline scan. */

@@ -1,4 +1,4 @@
-import { READING_COMPOSITIONS, READING_COMPOSITION_LABELS, READING_COMPOSITION_NOTES, compositionPlacement, compositionOverflow, readingStyles } from '../model/ReadingComposition';
+import { READING_COMPOSITIONS, READING_COMPOSITION_LABELS, compositionPlacement, compositionOverflow, readingStyles } from '../model/ReadingComposition';
 import { MICA_STUDY_NOTES } from '../model/MicaMaterialStudy';
 import { sampleMicaStudyTint } from '../model/MicaStudyWorker';
 import { cardSource } from '../model/BackgroundInputs';
@@ -71,7 +71,6 @@ export struct ReadingComparison {
       Text(MICA_STUDY_NOTES[this.materialStudy]).fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
       Stack() {CardFace({card:this.sample,scaleFactor:this.sampleScale(),tick:this.tick}).width(this.sample.w*this.sampleScale()).height(this.sample.h*this.sampleScale()).translate({x:(compositionOverflow(this.sample,1).left-compositionOverflow(this.sample,1).right)*this.sampleScale()/2,y:(compositionOverflow(this.sample,1).top-compositionOverflow(this.sample,1).bottom)*this.sampleScale()/2})}
         .width('100%').height(this.previewHeight()).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
-      Text(READING_COMPOSITION_NOTES[READING_COMPOSITIONS.indexOf(this.styles()[this.selected])]).fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%').maxLines(2)
     }.width('100%').padding({left:20,right:20,top:16,bottom:24})
     }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
       .onAreaChange((_:Area,area:Area)=>{const width=Number(area.width),height=Number(area.height);if(width!==this.panelWidth||height!==this.panelHeight){this.panelWidth=width;this.panelHeight=height;this.queueDepth();}})

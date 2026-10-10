@@ -68,12 +68,12 @@ export struct WakeUpImportDialog {
     Column({space:14}) {
       Text(this.stage?'确认课程表':'导入课程表').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
       if(!this.stage) {
-        Text('导入一次即可保存在本机，之后新建课程表卡片无需重复导入。支持本地 ICS 课程日历。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
+
         SettingsAction({label:'选择课程日历 .ics',onPress:()=>this.file(),appDark:this.appDark,isEnabled:!this.busy,emphasis:true})
         Column({space:8}) {
           Text('如何从 WakeUp 导入').fontSize(15).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark))
           Text('1  在鸿蒙 WakeUp 中选学校、登录教务并核对课表，再点分享 → 导出到日历。\n2  系统日历 → 查看全部日程，长按一门课程选“多选”，勾选本学期的课程后点分享。\n3  将格式改为日历日程（.ics），另存为；回到这里选择文件，核对周课表后确认。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
-          Text('已在鸿蒙 WakeUp 6.1.90 与系统日历核对批量分享路径。仅勾选课程，避免混入私人日程或全天节日；分开导出的文件也可一次多选（最多 32 个）。离线副本不会自动同步调课，更新后请重新导入。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+
         }.padding(16).width('100%').borderRadius(AppDesign.sectionRadius).backgroundColor(AppDesign.control(this.appDark))
         SettingsAction({label:'已有 WakeUp 备份文件',onPress:()=>this.file(false),appDark:this.appDark,isEnabled:!this.busy})
         TextArea({text:this.text,placeholder:'也可以粘贴 WakeUp 导出的课表文本（不是分享口令）'}).height(160).maxLength(262144).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(16).onChange((v:string)=>this.text=v)
@@ -82,25 +82,27 @@ export struct WakeUpImportDialog {
       } else {
         Text(this.parsed.name+' · '+this.parsed.courses.length+' 条上课安排').fontSize(13).fontColor(AppDesign.muted(this.appDark)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
         SettingsAction({label:(this.calendarFile?'日历首周  ':'第一周周一  ')+(this.semester||'选择开学日期'),onPress:()=>this.date(),appDark:this.appDark,isEnabled:!this.busy&&!this.calendarFile})
-        if(this.calendarFile){Text('按导出的实际日期排课，不会猜测节次或补齐空周。日历有变更时请重新导入。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
+
         SettingsSegmented({labels:['课程',this.slots.some((s)=>!s.start||!s.end)?'作息 · 待补全':'作息'],selectedIndex:this.periods?1:0,appDark:this.appDark,onSelect:(index:number)=>this.periods=index===1})
+        if ((this.periods && this.slots.length > 0) || (!this.periods && this.previewReady)) {
         Scroll() {
           Column({space:10}) {
             if(this.periods) {
-              if(!this.slots.length){Text('所有课程已包含实际时间，无需配置节次。').fontSize(13).fontColor(AppDesign.muted(this.appDark))}
+
               ForEach(this.slots,(s:WakeSlot)=>{
                 Row({space:8}) {Text('第 '+s.node+' 节').fontSize(14).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);SettingsAction({label:this.slotTime(s.node,true),onPress:()=>this.time(s.node,true),appDark:this.appDark,isEnabled:!this.busy});SettingsAction({label:this.slotTime(s.node,false),onPress:()=>this.time(s.node,false),appDark:this.appDark,isEnabled:!this.busy})}.width('100%').padding(10).borderRadius(14).backgroundColor(AppDesign.control(this.appDark))
               },(s:WakeSlot)=>String(s.node))
             } else {
               if(this.previewReady) {WeekTimetable({cap:this.previewCap,appDark:this.appDark,initialWeek:1,heightLimit:230,editable:false})}
-              else {Text('选择开学日期并补全作息后，即可预览周课表。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')}
+
             }
           }.width('100%')
         }.width('100%').height(this.periods?230:310).scrollBar(BarState.Off).align(Alignment.Top)
+        }
         if(this.existingCount>0) {Row({space:12}) {Text(this.replace?'替换现有 '+this.existingCount+' 条课程':'追加到现有课程').fontSize(13).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:this.replace}).onChange((v:boolean)=>this.replace=v)}.width('100%')}
         if(this.existingCount>0 && this.replace) {
           Row({space:12}) {Text('保留当前课表的校历').fontSize(13).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:this.keepCalendar}).onChange((v:boolean)=>this.keepCalendar=v)}.width('100%')
-          Text('换学校或学期时建议关闭；仅更新同一课表时，可保留原停课和整天调课安排。单次课程变动会清除。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+
         }
       }
       if(this.error){Text(this.error).fontSize(12).fontColor('#B34735').width('100%').maxLines(3).textOverflow({overflow:TextOverflow.Ellipsis})}

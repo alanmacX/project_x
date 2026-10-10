@@ -35,7 +35,7 @@ export struct PhotoCrop {
   build() {
     Column({ space: 16 }) {
       Text('调整背景照片').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark))
-      Text('框内即桌面画布 · 拖动位置，双指缩放').fontSize(13).fontColor(AppDesign.muted(this.appDark))
+
       Stack({ alignContent: Alignment.TopStart }) {
         if (this.ready) { Image(this.source).width(this.frame().width).height(this.frame().height).objectFit(ImageFit.Fill).draggable(false).hitTestBehavior(HitTestMode.None).position({ x: this.frame().left, y: this.frame().top }) }
       }.width(this.frameWidth()).height(this.frameWidth() / this.aspect).borderRadius(24).clip(true).backgroundColor(AppDesign.background(this.appDark)).border({ width: 1, color: AppDesign.border(this.appDark) })

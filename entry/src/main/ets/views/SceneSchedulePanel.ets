@@ -58,7 +58,7 @@ export struct SceneSchedulePanel {
       else {Row({space:4}){ForEach([1,2,3,4,5,6,0],(d:number)=>{Button(['日','一','二','三','四','五','六'][d],{type:ButtonType.Circle}).height(40).layoutWeight(1).fontColor(AppDesign.choiceText(this.appDark,this.draftWeekdays.includes(d))).backgroundColor(AppDesign.choice(this.appDark,this.draftWeekdays.includes(d))).onClick(()=>this.draftWeekdays=this.draftWeekdays.includes(d)?this.draftWeekdays.filter(n=>n!==d):this.draftWeekdays.concat(d))},(d:number)=>String(d))}.width('100%')}
       Row(){Text('到点出现').fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Button(sceneClock(this.draftStart),{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(40).fontSize(13).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.pickTime())}.width('100%')
       Row({space:12}){Text('最多显示').fontColor(AppDesign.text(this.appDark)).layoutWeight(1);this.action('−',()=>this.draftTimeout=Math.max(1,this.draftTimeout-1));Text(this.draftTimeout+' 分钟').fontSize(14).fontColor(AppDesign.text(this.appDark));this.action('+',()=>this.draftTimeout=Math.min(120,this.draftTimeout+1))}.width('100%')
-      Text('点击中央卡片或超时，恢复当前主画布。新场景出现会结束旧场景；旧场景不会重新出现。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
+
       Button('保存',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.EMPHASIZED}).height(44).width('100%').backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).enabled(this.draftName.trim().length>0&&(this.draftRepeat==='once'||this.draftWeekdays.length>0)).onClick(()=>{this.onSave(this.draftRule());this.editingRule=false;})
     }.width('100%').padding(12).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
   }
@@ -67,14 +67,13 @@ export struct SceneSchedulePanel {
     Column({space:10}) {
       Row(){Text('画布轮换').fontSize(16).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Toggle({type:ToggleType.Switch,isOn:canvasRotationEnabled(this.rotationDraft)}).accessibilityText('启用画布轮换').onChange(value=>{this.rotationDraft.enabled=value;if(value&&this.rotationDraft.mode==='off')this.rotationDraft.mode='time';this.saveRotation();})}.width('100%')
       SettingsSegmented({labels:['按时间','跟随深浅'],selectedIndex:this.rotationDraft.mode==='theme'?1:0,appDark:this.appDark,onSelect:i=>{this.rotationDraft.mode=i===1?'theme':'time';this.saveRotation();}})
-      if(!canvasRotationEnabled(this.rotationDraft)){Text('已暂停，保留以下轮换设置。手动切换画布也会暂停轮换。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
 
       if(this.rotationDraft.mode==='theme') {
         Text('浅色模式').fontColor(AppDesign.text(this.appDark)).width('100%')
         SettingsSelect({labels:this.canvases.map(c=>c.name),selectedIndex:this.canvases.findIndex(c=>c.id===this.rotationDraft.lightId),appDark:this.appDark,onSelect:i=>{this.rotationDraft.lightId=this.canvases[i].id;this.saveRotation();}})
         Text('深色模式').fontColor(AppDesign.text(this.appDark)).width('100%')
         SettingsSelect({labels:this.canvases.map(c=>c.name),selectedIndex:this.canvases.findIndex(c=>c.id===this.rotationDraft.darkId),appDark:this.appDark,onSelect:i=>{this.rotationDraft.darkId=this.canvases[i].id;this.saveRotation();}})
-        Text('跟随系统外观切换，不叠加自定义时间。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
+
       } else if(this.rotationDraft.mode==='time') {
         ForEach(this.rotationDraft.slots,(slot:CanvasTimeSlot,index:number)=>{
           Column({space:8}) {
@@ -83,8 +82,8 @@ export struct SceneSchedulePanel {
           }.padding(12).width('100%').backgroundColor(AppDesign.control(this.appDark)).borderRadius(16)
         },(slot:CanvasTimeSlot)=>String(slot.start))
         this.action('添加时间分界',()=>{if(this.rotationDraft.slots.length>=12)return;let start=720;while(this.rotationDraft.slots.some(s=>s.start===start)&&start<1439)start++;if(start>=1440)return;this.rotationDraft.slots.push({start,canvasId:this.canvases[0]?.id??''});this.saveRotation();})
-        Text('从 00:00 到 24:00 连续覆盖；修改分界会同时调整相邻区间。').fontSize(13).fontColor(AppDesign.muted(this.appDark)).width('100%')
-      } else {Text('在“画布”里自由切换。').fontSize(14).fontColor(AppDesign.muted(this.appDark)).width('100%')}
+
+      }
     }.width('100%').padding(12).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
   }
   @Builder
@@ -98,7 +97,6 @@ export struct SceneSchedulePanel {
             }.width('100%').padding(12).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(20)
           },(rule:SceneRule)=>rule.id)
           Button('新建场景',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.EMPHASIZED}).height(40).width('100%').fontColor(AppDesign.onSelected(this.appDark)).backgroundColor(AppDesign.selected(this.appDark)).enabled(this.scenes.length<12).onClick(this.onCreate)
-          Text('到点展示中央卡片，点击或超时恢复。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
 
     }.width('100%').padding({bottom:12})
   }

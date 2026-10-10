@@ -1,4 +1,4 @@
-import { READING_COMPOSITIONS, READING_COMPOSITION_LABELS, READING_COMPOSITION_NOTES, compositionPlacement, compositionOverflow, readingStyles } from '../model/ReadingComposition';
+import { READING_COMPOSITIONS, READING_COMPOSITION_LABELS, compositionPlacement, compositionOverflow, readingStyles } from '../model/ReadingComposition';
 import { prepareSubjectDepth } from '../model/SubjectDepthCache';
 import { common } from '@kit.AbilityKit';
 import { FridgeCard } from '../model/CardSchema';
@@ -49,7 +49,6 @@ struct ReadingDemo {
       Stack() {CardFace({card:card,scaleFactor:this.sampleScale(card),tick:this.tick}).width(card.w*this.sampleScale(card)).height(card.h*this.sampleScale(card)).translate({x:(compositionOverflow(card,1).left-compositionOverflow(card,1).right)*this.sampleScale(card)/2,y:(compositionOverflow(card,1).top-compositionOverflow(card,1).bottom)*this.sampleScale(card)/2})}
         .width('100%').height(this.previewHeight()).renderGroup(true).backgroundColor(AppDesign.background(this.dark)).borderRadius(16)
       Text(READING_COMPOSITION_LABELS[READING_COMPOSITIONS.indexOf(card.capability?.readingBlend??'')]).fontSize(17).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.dark)).width('100%')
-      Text(READING_COMPOSITION_NOTES[READING_COMPOSITIONS.indexOf(card.capability?.readingBlend??'')]).fontSize(13).fontColor(AppDesign.muted(this.dark)).width('100%')
     }.width(this.sampleWidth()).padding(16).backgroundColor(AppDesign.surface(this.dark)).borderRadius(20)
   }
   build() {

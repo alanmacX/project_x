@@ -14,7 +14,7 @@ export struct EnhancementPreview {
       SettingsSegmented({labels:['原图','增强后'],selectedIndex:this.selected,appDark:this.appDark,onSelect:(i:number)=>this.selected=i})
       Image(this.selected===0?this.original:this.enhanced).width(this.previewWidth).height(this.previewWidth).objectFit(ImageFit.Contain).draggable(false)
         .backgroundColor(AppDesign.background(this.appDark)).borderRadius(20).clip(true)
-      Text('检查线条与细节；照片可能变得更平滑。原文件不会覆盖。').fontSize(13).fontColor(AppDesign.muted(this.appDark))
+
       Row({space:12}) {
         Button('保留原图',{type:ButtonType.Capsule}).layoutWeight(1).height(44).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.controller?.close())
         Button('使用增强',{type:ButtonType.Capsule}).layoutWeight(1).height(44).onClick(()=>{this.accepted=true;this.onUse();this.controller?.close();})

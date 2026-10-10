@@ -1836,7 +1836,7 @@ exports.micaPath = micaPath;
 "ReadingComposition":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.hookPosition = exports.hookPoint = exports.snapComposition = exports.CompositionSnap = exports.brushPath = exports.compositionOverflow = exports.CompositionOverflow = exports.compositionPadding = exports.compositionPlacement = exports.compositionPath = exports.compositionSuggestion = exports.isReadingComposition = exports.READING_COMPOSITION_NOTES = exports.READING_COMPOSITION_LABELS = exports.READING_COMPOSITIONS = exports.readingStyles = void 0;
+exports.hookPosition = exports.hookPoint = exports.snapComposition = exports.CompositionSnap = exports.brushPath = exports.compositionOverflow = exports.CompositionOverflow = exports.compositionPadding = exports.compositionPlacement = exports.compositionPath = exports.compositionSuggestion = exports.isReadingComposition = exports.READING_COMPOSITION_LABELS = exports.READING_COMPOSITIONS = exports.readingStyles = void 0;
 const CloudReadingGeometry_1 = require("./CloudReadingGeometry");
 const ReadingStylePolicy_1 = require("./ReadingStylePolicy");
 const EdgeAttachment_1 = require("./EdgeAttachment");
@@ -1845,7 +1845,6 @@ var ReadingStylePolicy_2 = require("./ReadingStylePolicy");
 Object.defineProperty(exports, "readingStyles", { enumerable: true, get: function () { return ReadingStylePolicy_2.readingStyles; } });
 exports.READING_COMPOSITIONS = ['cloud', 'bare', 'badge', 'sticker', 'tag'];
 exports.READING_COMPOSITION_LABELS = ['柔软云朵', '笔触', '徽章', '边缘自适应', '挂钩'];
-exports.READING_COMPOSITION_NOTES = ['圆润云瓣向内容外延展，保留原有字号和缩小下限', '半透明笔触，贴近内容区域', '电量专用圆形徽章', '沿卡片左右边缘滑动，选择内贴合或外贴合', '穿孔挂钩，上沿留出内容避让区'];
 function isReadingComposition(blend) { return exports.READING_COMPOSITIONS.includes(blend); }
 exports.isReadingComposition = isReadingComposition;
 function compositionSuggestion(kind) { return (0, ReadingStylePolicy_1.preferredReadingStyle)(kind); }
@@ -4171,4 +4170,4 @@ function scenePolicyShell(base) {
 }
 exports.scenePolicyShell = scenePolicyShell;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"18ea81511f0eb7a554b956cd6b0e34eaef22a3fb46b4f24695ba6a713f4b2c23"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"8762009aec0ae89ab768f7560ca30c181ff92e811f1aeb07ed0028126db1be93"};})(globalThis);

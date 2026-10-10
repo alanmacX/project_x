@@ -49,7 +49,7 @@ export struct LessonExceptionEditor {
           Row({space:8}) {Button('开始 '+this.start,{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).layoutWeight(1).height(44).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.time(true));Button('结束 '+this.end,{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).layoutWeight(1).height(44).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.time(false))}.width('100%')
           TextInput({text:this.room,placeholder:'教室 / 地点'}).height(44).borderRadius(12).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).onChange((value:string)=>this.room=value)
         }
-        Text('只影响指定日期，其他周次保持原安排。明确补课可以安排在假期；整天停课规则优先。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+
       }.width('100%')}.width('100%').layoutWeight(1).scrollBar(BarState.Off)
       if(this.error){Text(this.error).fontSize(12).fontColor('#C43A35').width('100%')}
       Row({space:12}) {Button('取消',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).layoutWeight(1).height(44).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.controller.close());Button('保存',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.EMPHASIZED, role:ButtonRole.NORMAL}).layoutWeight(1).height(44).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).onClick(()=>this.save())}.width('100%')
