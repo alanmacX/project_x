@@ -301,6 +301,7 @@ class FridgeCard {
     constructor() {
         this.reliefSrc = ''; // Host-derived only; ignored by import and omitted from editable storage.
         this.groupId = '';
+        this.hidden = false;
         this.id = '';
         this.x = 24;
         this.y = 32;
@@ -519,6 +520,7 @@ function normalizeState(raw) {
         if (source.html !== undefined)
             card.html = (0, HtmlCardTemplate_1.normalizeHtmlCard)(source.html);
         card.id = source.id;
+        card.hidden = source.hidden === true;
         card.groupId = typeof source.groupId === 'string' ? source.groupId.slice(0, 96) : '';
         card.w = bounded(source.w, source.shape === 'subject' ? exports.MIN_SUBJECT_EDGE : exports.MIN_CARD_EDGE, 320, 180);
         card.h = bounded(source.h, source.shape === 'subject' ? exports.MIN_SUBJECT_EDGE : exports.MIN_CARD_EDGE, 420, 180);
@@ -632,9 +634,9 @@ function normalizeState(raw) {
     return state;
 }
 exports.normalizeState = normalizeState;
-function serializeFaceCards(state) { return JSON.stringify(state.cards.filter((c) => !c.inDoor)); }
+function serializeFaceCards(state) { return JSON.stringify(state.cards.filter((c) => !c.inDoor && !c.hidden)); }
 exports.serializeFaceCards = serializeFaceCards;
-function serializeDoorCards(state) { return JSON.stringify(state.cards.filter((c) => c.inDoor)); }
+function serializeDoorCards(state) { return JSON.stringify(state.cards.filter((c) => c.inDoor && !c.hidden)); }
 exports.serializeDoorCards = serializeDoorCards;
 function contrastingInk(color) {
     if (!/^#[0-9a-fA-F]{6}$/.test(color))
@@ -3610,6 +3612,7 @@ function snapshotCard(source, detached) {
     const copy = new CardSchema_1.FridgeCard();
     copy.reliefSrc = detached ? source.reliefSrc : '';
     copy.id = source.id;
+    copy.hidden = source.hidden === true;
     copy.groupId = source.groupId;
     copy.x = source.x;
     copy.y = source.y;
@@ -3644,7 +3647,7 @@ function cardRenderSnapshot(source, prepared = false) {
     const contourKey = (0, ContourRegistry_1.registerRenderContour)(source, prepared);
     // Compare mutable values before cloning. Reopening/committing one card should
     // not deep-copy every unchanged capability, course list and background layer.
-    const signature = JSON.stringify([source.id, source.groupId, source.x, source.y, source.w, source.h, source.rot, source.z,
+    const signature = JSON.stringify([source.id, source.hidden, source.groupId, source.x, source.y, source.w, source.h, source.rot, source.z,
         source.shape, source.frame, source.material, source.paper, source.ink, source.subjectPhoto, source.subjectAspect,
         source.subjectInk, source.subjectVersion, source.cutout, source.reliefSrc, source.inDoor, contourKey, source.capability, source.capBox, source.capFree, source.elements]);
     const previous = renderSnapshots.get(source.id);
@@ -4177,4 +4180,4 @@ function scenePolicyShell(base) {
 }
 exports.scenePolicyShell = scenePolicyShell;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"c443e5e384eaa9bf6d805a4809634dd0c589ea88e9e61d9db703d7d388bbc111"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"78dcaa7880802f4b4243b24f066ca8e3def66b1acda4ac57036741fa74c616a2"};})(globalThis);

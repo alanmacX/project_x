@@ -1429,7 +1429,7 @@ struct Index {
               onWillDismiss:(action:DismissSheetAction)=>this.dismissEditorSheet(action),onWillSpringBackWhenDismiss:(action:SpringBackAction)=>action.springBack()
             })
         if(!this.editing&&!this.viewing&&!this.arriving&&!this.groupSelecting&&this.selectedGroup().length<2&&!this.scheduledName&&!this.scheduleTransition) {
-          ForEach(this.cardIds.filter((id:string)=>id===this.selectedId),(id:string)=>{
+          ForEach(this.cardIds.filter((id:string)=>id===this.selectedId&&!this.cardMap[id].hidden),(id:string)=>{
             BoardCard({controlsOnly:true,card:this.cardMap[id],motion:this.boardMotion,selected:true,scaleFactor:this.boardScale,yScaleFactor:this.boardHeight/BOARD_H,
               boardLeft:this.boardLeft,boardTop:this.boardTop,controlViewportWidth:BOARD_W*this.boardScale,controlViewportHeight:this.boardHeight,
               onDelete:(id:string)=>this.deleteCard(id),onEdit:(id:string)=>this.openEditor(id),
@@ -1472,7 +1472,7 @@ struct Index {
     // Cache each unrotated face; transforms remain outside its padded texture.
     Stack({ alignContent: Alignment.TopStart }) {
       Stack({ alignContent: Alignment.TopStart }) {
-        ForEach(this.startupCardCount>=0?this.cardIds.slice(0,this.startupCardCount):this.cardIds, (id: string) => {
+        ForEach((this.startupCardCount>=0?this.cardIds.slice(0,this.startupCardCount):this.cardIds).filter((id:string)=>!this.cardMap[id].hidden), (id: string) => {
           Stack({ alignContent: Alignment.TopStart }) {
             Stack({ alignContent: Alignment.TopStart }) {
             BoardCard({ showControls:false,layerMotion:this.layerMotion, controlViewportWidth: BOARD_W * this.boardScale, controlViewportHeight: this.boardHeight, motion: this.boardMotion, card: this.sceneCard(id), localCoordinates: true, scatterAngle: 0, editingSurface: this.editing,
@@ -1611,7 +1611,7 @@ struct Index {
     combineCards(this.store.state.cards, this.groupSelection, this.store.newId()); this.groupSelecting = false; this.groupSelection = []; this.renderBoard(); this.persist(true);
   }
   private selectedGroup():FridgeCard[] {
-    const card=this.cardMap[this.selectedId];return card&&card.groupId?this.cards.filter((c:FridgeCard)=>c.groupId===card.groupId):[];
+    const card=this.cardMap[this.selectedId];return card&&!card.hidden&&card.groupId?this.cards.filter((c:FridgeCard)=>c.groupId===card.groupId&&!c.hidden):[];
   }
   private selectedGroupBox():GroupBox {
     const logical=groupBox(this.selectedGroup(),this.boardHeight/this.boardScale),box=new GroupBox();
@@ -1631,6 +1631,11 @@ struct Index {
     const card=this.current();if(card===null){this.cancelGroupTransform();return;}
     const members=groupMembers(this.store.state.cards,card),height=this.boardHeight/this.boardScale;
     transformGroup(members,groupBox(members,height),height,scale,angle);
+    this.cancelGroupTransform();this.renderBoard();this.scheduleBackground();this.persist(true);
+  }
+  private toggleCardVisibility():void {
+    const card=this.current();if(card===null||this.scheduledName||this.scheduleTransition)return;
+    card.hidden=!card.hidden;
     this.cancelGroupTransform();this.renderBoard();this.scheduleBackground();this.persist(true);
   }
   private releaseGroup(): void {
@@ -1658,7 +1663,7 @@ struct Index {
                     }.width(44).height(44).hitTestBehavior(HitTestMode.None)
                     Column({space:4}) {
                       Text(layerLabel(this.cardMap[id])).fontSize(14).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontColor(this.appText()).width('100%')
-                      Text((this.orderedCards()[0]?.id===id?'最上层 · ':'')+(this.cardMap[id].capability!==null?typeLabel(this.cardMap[id].capability?.k??''):'自定义')).fontSize(11).fontColor(this.appMuted()).width('100%')
+                      Text((this.cardMap[id].hidden?'已隐藏 · ':this.orderedCards()[0]?.id===id?'最上层 · ':'')+(this.cardMap[id].capability!==null?typeLabel(this.cardMap[id].capability?.k??''):'自定义')).fontSize(11).fontColor(this.appMuted()).width('100%')
                     }.layoutWeight(1).hitTestBehavior(HitTestMode.None)
                   }.width('100%')
                 }.layoutWeight(1).height(48).padding(0).backgroundColor(Color.Transparent)
@@ -1733,6 +1738,9 @@ struct Index {
         }
         if (!this.groupSelecting && this.selectedId.length > 0) {
           Row({space:8}) {
+            Button(this.cardMap[this.selectedId]?.hidden?'显示':'隐藏',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL})
+              .width(44).height(44).padding(0).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).attributeModifier(immersiveChrome(this.appDark))
+              .accessibilityText(this.cardMap[this.selectedId]?.hidden?'显示卡片':'隐藏卡片').enabled(!this.scheduledName&&!this.scheduleTransition).onClick(()=>this.toggleCardVisibility())
             Button('上移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).padding({left:6,right:6}).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(() => this.moveCardLayer(this.selectedId, true))
             Button('下移一层', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).layoutWeight(1).padding({left:6,right:6}).height(AppDesign.controlHeight).fontSize(12).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).onClick(() => this.moveCardLayer(this.selectedId, false))
             Button('复制',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL})
@@ -1921,7 +1929,7 @@ struct Index {
     Column() {
       Stack({ alignContent: Alignment.TopStart }) {
         if (!this.shareSingle) { CanvasBackdrop({ sceneBackground: this.shareBackground,showFrame:false }).width('100%').height('100%') }
-        ForEach(this.shareCards, (card: FridgeCard) => {
+        ForEach(this.shareCards.filter((card:FridgeCard)=>this.shareSingle||!card.hidden), (card: FridgeCard) => {
           CardFace({ card: card, scaleFactor: 1, tick: this.shareTick, widget: true })
             .width(card.w).height(card.h)
             .position({ x: this.shareSingle ? this.shareX : card.x, y: this.shareSingle ? this.shareY : card.y * this.shareCanvasHeight / BOARD_H })

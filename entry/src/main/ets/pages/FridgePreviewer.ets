@@ -84,7 +84,7 @@ struct FridgePreviewer {
  @Builder artwork() {
   Stack({alignContent:Alignment.TopStart}) {
    if(!this.transparentDemo){CanvasBackdrop({sceneBackground:this.scene.background})}
-   ForEach(this.scene.cards,(c:FridgeCard)=>{
+   ForEach(this.scene.cards.filter((c:FridgeCard)=>!c.hidden),(c:FridgeCard)=>{
     CardFace({card:c,scaleFactor:this.boardScale(),tick:this.tick})
      .width(c.w*this.boardScale()).height(c.h*this.boardScale())
      .rotate({angle:c.rot}).position({x:c.x*this.boardScale(),y:c.y*this.boardHeight()/BOARD_H})

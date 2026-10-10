@@ -12,6 +12,7 @@ export interface WidgetPayload {
 export async function prepareWidgetPayload(json: string, contourCache: string = '', previousManifest: string = '',reliefJson:string='{}'): Promise<WidgetPayload> {
   const frameTime=Date.now();
   const state: FridgeState = normalizeState(JSON.parse(json) as FridgeState), payload: WidgetPayload = { background: '{}', cards: '[]', images: {}, descriptors: [], manifest: '' };
+  state.cards=state.cards.filter(card=>!card.hidden);
   const relief=JSON.parse(reliefJson) as Record<string,string>;
   for(const card of state.cards)card.reliefSrc=relief[card.id]??'';
   // Prepare the complete identity set before opening anything. A partial formImages map

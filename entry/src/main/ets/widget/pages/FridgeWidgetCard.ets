@@ -154,7 +154,7 @@ struct FridgeWidgetCard {
         Column({space:8}){Text('冰箱贴').fontSize(18).fontWeight(FontWeight.Medium).fontColor('#302D23');Text('点击添加卡片').fontSize(13).fontColor('#696459')}
          .width('72%').height('28%').justifyContent(FlexAlign.Center).backgroundColor('#F2FAF8EF').borderRadius(20).position({x:'14%',y:'36%'}).hitTestBehavior(HitTestMode.None)
       }
-      ForEach(this.cardIds, (id: string) => {
+      ForEach(this.cardIds.filter((id:string)=>!this.cardMap[id].hidden), (id: string) => {
         Stack({alignContent:Alignment.TopStart}) {
           CardFace({card:this.cardMap[id],scaleFactor:this.widthValue()/BOARD_W,tick:capabilityRenderTick(this.cardMap[id].capability,this.renderTick),widget:true})
             .width('100%').height('100%').hitTestBehavior(HitTestMode.None)

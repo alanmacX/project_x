@@ -117,6 +117,7 @@ export class FridgeCard {
   reliefSrc:string=''; // Host-derived only; ignored by import and omitted from editable storage.
   html?: HtmlCardTemplate;
   groupId: string = '';
+  hidden: boolean = false;
   id: string = '';
   x: number = 24;
   y: number = 32;
@@ -258,7 +259,7 @@ export function normalizeState(raw: FridgeState): FridgeState {
   state.maxZ = bounded(raw.maxZ, 0, Number.MAX_SAFE_INTEGER, 10);
   for (const source of (Array.isArray(raw.cards) ? raw.cards : [])) {
     if (source === null || typeof source.id !== 'string') continue;
-    const card = new FridgeCard(); if(source.html!==undefined)card.html=normalizeHtmlCard(source.html); card.id = source.id; card.groupId = typeof source.groupId === 'string' ? source.groupId.slice(0, 96) : '';
+    const card = new FridgeCard(); if(source.html!==undefined)card.html=normalizeHtmlCard(source.html); card.id = source.id; card.hidden = source.hidden === true; card.groupId = typeof source.groupId === 'string' ? source.groupId.slice(0, 96) : '';
     card.w = bounded(source.w, source.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE, 320, 180); card.h = bounded(source.h, source.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE, 420, 180);
     // Validate finite coordinates here. Rotated/host-aware recovery belongs to
     // the whole canvas, where grouping and the actual aspect are available.
@@ -328,8 +329,8 @@ export function normalizeState(raw: FridgeState): FridgeState {
   }
   return state;
 }
-export function serializeFaceCards(state: FridgeState): string { return JSON.stringify(state.cards.filter((c: FridgeCard) => !c.inDoor)); }
-export function serializeDoorCards(state: FridgeState): string { return JSON.stringify(state.cards.filter((c: FridgeCard) => c.inDoor)); }
+export function serializeFaceCards(state: FridgeState): string { return JSON.stringify(state.cards.filter((c: FridgeCard) => !c.inDoor && !c.hidden)); }
+export function serializeDoorCards(state: FridgeState): string { return JSON.stringify(state.cards.filter((c: FridgeCard) => c.inDoor && !c.hidden)); }
 
 export function contrastingInk(color: string): string {
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) return '#FFFFFF';

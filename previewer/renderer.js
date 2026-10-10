@@ -91,7 +91,7 @@
   let defs=assetDefs,body=scene.background.mode==='transparent'?'':`<rect width="${width}" height="${height}" fill="${color(scene.background.color)}"/>`;
   if(scene.background.mode!=='transparent'&&scene.background.src&&scene.background.mode!=='solid'&&scene.background.mode!=='smart')body+=image(media(scene.background.src),0,0,width,height,0,namespace+'backdrop','xMidYMid slice');
   const background=body,cards=[];
-  scene.cards.slice().sort((a,b)=>a.z-b.z).forEach((c,i)=>{
+  scene.cards.filter(c=>!c.hidden).sort((a,b)=>a.z-b.z).forEach((c,i)=>{
    const start=body.length,id=namespace+'c'+i,r=schema.cardCornerRadius(c),[paper,ink]=schema.materialColors(c.material,c.paper,c.ink),edge=depth.cardEdgeColor(paper,c.shape==='subject'&&c.subjectPhoto),f=canvas.subjectSurfaceFactor(c);
    const content=c.capability?.k==='album'?rotation.activeAlbum(c.capability,tick):null;
    defs+=shadow(id)+shadow(id+'cast',depth.CARD_CAST_RADIUS,depth.CARD_CAST_Y,41/255)+shadow(id+'contact',depth.CARD_CONTACT_RADIUS,depth.CARD_CONTACT_Y,50/255)+`<clipPath id="${id}clip"><rect width="${c.w}" height="${c.h}" rx="${r}"/></clipPath>`;

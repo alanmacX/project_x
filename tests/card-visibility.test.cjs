@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const ctx=vm.createContext({});vm.runInContext(fs.readFileSync('previewer/shared-models.js','utf8'),ctx);
+const s=ctx.FridgeCore.load('CardSchema'),snap=ctx.FridgeCore.load('CardViewSnapshot'),pack=ctx.FridgeCore.load('TemplatePackage');
+const state=new s.FridgeState(),card=new s.FridgeCard();card.id='saved-design';card.hidden=true;card.x=89;card.rot=14;card.capability={k:'clock'};state.cards=[card];
+const restored=s.normalizeState(JSON.parse(JSON.stringify(state)));assert.equal(restored.cards[0].hidden,true);assert.equal(restored.cards[0].rot,14);assert.equal(restored.cards[0].capability.k,'clock');
+assert.equal(JSON.parse(s.serializeFaceCards(restored)).length,0);card.inDoor=true;assert.equal(JSON.parse(s.serializeDoorCards(state)).length,0);
+const hidden=snap.cardRenderSnapshot(card);card.hidden=false;const visible=snap.cardRenderSnapshot(card);assert.notEqual(hidden,visible,'visibility invalidates render cache without changing geometry');assert.equal(hidden.hidden,true);assert.equal(visible.hidden,false);
+card.hidden=true;assert.equal(snap.cardStorageShell(card).hidden,true);assert.equal(snap.cardViewSnapshot(card).hidden,true);
+const exported=pack.packageScene(JSON.stringify(state),'');const imported=pack.readPackage(JSON.stringify(exported));assert.equal(imported.state.cards[0].hidden,true,'editable canvas preserves visibility and retained card');
+const legacy=s.normalizeState({cards:[{id:'legacy'}]});assert.equal(legacy.cards[0].hidden,false,'old cards remain visible');
+console.log('PASS visibility: persistence, retained geometry/data, render cache invalidation, desktop serialization, package roundtrip and legacy defaults');

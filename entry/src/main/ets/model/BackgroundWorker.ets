@@ -10,7 +10,7 @@ export { backgroundSignature } from './BackgroundInputs';
 export async function createSmartBackground(json:string,filesDir:string):Promise<string> {
   const state=JSON.parse(json) as FridgeState,bg=new CanvasBackground();bg.mode=state.background.mode;bg.frameStyle=state.background.frameStyle;bg.frameMaterial=state.background.frameMaterial;bg.transparentFrame=state.background.transparentFrame;
   const colors:WeightedColor[]=[],anchors:BackgroundAnchor[]=[],cache=new Map<string,WeightedColor[]>();
-  for(const card of state.cards){
+  for(const card of state.cards.filter(card=>!card.hidden)){
     const samples:WeightedColor[]=[],paper=materialColors(card.material,card.paper)[0];
     const cutout=card.shape==='subject'&&card.subjectPhoto?card.cutout:'';
     if(cutout.startsWith('file://')){try{const palette=cache.get(cutout)??await imageSwatches(cutout);cache.set(cutout,palette);palette.forEach((p:WeightedColor)=>samples.push(p));}catch(_){}}

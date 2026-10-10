@@ -52,6 +52,14 @@ const count=opens,reused=await payload.prepareWidgetPayload(JSON.stringify(state
 assert.equal(opens,count,'unchanged relief reuses native Form cache without reopening files');assert.deepEqual(reused.images,{});
 testFiles.add('/cache/resized.png');const resized=await payload.prepareWidgetPayload(JSON.stringify(state),'',initial.manifest,JSON.stringify({[changed.id]:'file:///cache/resized.png'}));
 assert.equal(Object.keys(resized.images).length,2,'geometry changes atomically replace all Form images');
+const beforeHide=JSON.stringify(state.cards[0]);state.cards[0].hidden=true;
+const hiddenPayload=await payload.prepareWidgetPayload(JSON.stringify(state),'',initial.manifest,reliefMap);
+assert.deepEqual(JSON.parse(hiddenPayload.cards),[],'hidden artwork cannot be delivered to the desktop');
+assert.deepEqual(JSON.parse(hiddenPayload.manifest),[],'hidden artwork consumes no native image descriptors');
+assert.equal(JSON.stringify({...state.cards[0],hidden:false}),JSON.stringify({...JSON.parse(beforeHide),hidden:false}),'hide retains all card design and geometry');
+state.cards[0].hidden=false;
+const shownPayload=await payload.prepareWidgetPayload(JSON.stringify(state),'',hiddenPayload.manifest,reliefMap);
+assert.equal(JSON.parse(shownPayload.cards).length,1,'show republishes the preserved card');
 const layout=load('CanvasLayout'),photo=new s.FridgeCard();
 photo.id='layout-photo';photo.shape='subject';photo.cutout='file://layout-photo.png';photo.subjectVersion=4;photo.w=240;photo.h=300;photo.capability={k:'clock'};
 photo.outline=[Array.from({length:512},(_,i)=>({x:.5+.48*Math.cos(i*Math.PI/256),y:.5+.48*Math.sin(i*Math.PI/256)}))];
