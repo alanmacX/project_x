@@ -124,7 +124,8 @@ struct FridgeWidgetCard {
   }
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
-      Stack({alignContent:Alignment.TopStart}) {
+      // Background and frame belong to the physical host; only authored artwork
+      // uses the fitted viewport. Keeping these separate avoids orientation bands.
       Stack() {
         if(this.displayed.mode!=='transparent'){
         Stack(){
@@ -149,6 +150,7 @@ struct FridgeWidgetCard {
           }.width('100%').height('100%').opacity(this.mix)
         }
       }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
+      Stack({alignContent:Alignment.TopStart}) {
       if(this.canvasBackground.mode==='transparent'&&this.cardIds.length===0){
         Column({space:8}){Text('冰箱贴').fontSize(18).fontWeight(FontWeight.Medium).fontColor('#302D23');Text('点击添加卡片').fontSize(13).fontColor('#696459')}
          .width('72%').height('28%').justifyContent(FlexAlign.Center).backgroundColor('#F2FAF8EF').borderRadius(20).position({x:'14%',y:'36%'}).hitTestBehavior(HitTestMode.None)

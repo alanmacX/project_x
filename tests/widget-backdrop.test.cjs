@@ -29,3 +29,13 @@ clock.rev=180001;clock.syncRenderClock();assert.equal(writes,1);assert.equal(val
 assert.match(form,/tick:capabilityRenderTick\(this.cardMap\[id\]\.capability,this.renderTick\)/);
 assert.match(form,/\.renderGroup\(this.incoming===null\)/,'whole bounded Form caches native launch scaling, background fades stay live');
 console.log('PASS Form render clock: repeated revisions do not rerender unchanged artwork; minute boundaries still update.');
+
+// Both decode-gated background layers must be siblings of the authored viewport.
+// Otherwise a non-square desktop host exposes solid-colour orientation bands.
+const build=form.slice(form.indexOf('  build()'));
+const artworkStart=build.indexOf('Stack({alignContent:Alignment.TopStart})');
+const fitStart=build.indexOf('.width(this.viewport().w/this.widthValue()');
+assert.ok(artworkStart>build.lastIndexOf('Image('), 'all background image layers fill the host, outside the fitted artwork');
+assert.ok(artworkStart<build.indexOf('ForEach(this.cardIds')&&fitStart>build.indexOf('ForEach(this.cardIds'), 'card geometry still uses the unchanged authored viewport');
+assert.ok(build.indexOf('CanvasFrame({')>fitStart, 'physical frame remains outside the authored viewport');
+console.log('PASS full-host backdrop and frame with uniformly fitted authored cards; no letterbox background layer.');
