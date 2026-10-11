@@ -4,6 +4,10 @@ const path=require('node:path');
 const {validate}=require('../scripts/fridge-package-check.cjs');
 const json=fs.readFileSync(path.join(__dirname,'../skills/fridge-create/examples/native-canvas.fridge'),'utf8');
 assert.deepEqual(validate(json),{kind:'canvas',cards:3,assets:0});
+// All shipped starting points must remain usable with the current production reader.
+const examples=path.join(__dirname,'../skills/fridge-create/examples');
+function validateExamples(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,entry.name);if(entry.isDirectory())validateExamples(file);else if(entry.name.endsWith('.fridge')){assert.doesNotThrow(()=>validate(fs.readFileSync(file,'utf8')),file);}}}
+validateExamples(examples);
 const reject=(mutate,pattern)=>{const pack=JSON.parse(json);mutate(pack);assert.throws(()=>validate(JSON.stringify(pack)),pattern);};
 reject(p=>p.state.cards[0].renderer='html',/unsupported field renderer/);
 reject(p=>p.state.cards[0].capability.k='fetch',/Unsupported capability/);
