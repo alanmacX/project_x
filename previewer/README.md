@@ -69,3 +69,25 @@ const layers = FridgeWeb.renderLayers(pack, 900, fixedTick, {namespace: 'profile
 大留白先裁紧源图并重新提取，不能单改轮廓；不要对照片编造 polygon。异常碎片在建立轮廓图之前限流，1024px 长边/24MB 及当前轮廓限制用于避免准备工具卡死。真实输入和整张作品仍要目视检查。主题创作的素材搜寻、原创生成和异形组合方法见 skill 的 art-direction.md；下载来源、使用范围与加工过程放在作品旁的 `.sources.json`，不塞进 v1 包。
 
 HTML card：v2 作品包携带静态 HTML 源码和 image 图层缓存，预览器与 ArkUI/Form 使用同一个缓存，源码不执行。支持一个原生能力；网页脚本、网络和动态 DOM 不支持。源文件的重新渲染由离线创作工具完成，App 内可编辑图层、能力及整卡布局。
+
+## 演示数据与真实绑定分离
+
+工具栏的数据样例可切换未绑定、演示、空数据、长内容；也可加载本地 `.preview-data.json`。样例只注入读取完成后的独立渲染投影，使用相同生产能力布局、日期/课程计算及衬底，不修改原作品或 App 协议。重新打开作品会清空上份自定义样例。报告 `previewData.synthetic` 和 `appliedCards` 明确标注演示数据，截图本身保持作品画面干净。
+
+```js
+await FridgeHarness.loadText(fridgeJSON);
+FridgeHarness.setTick('2026-10-11T10:24:00+08:00');
+FridgeHarness.setDataProfile('demo'); // none / demo / empty / long
+// 或按真实 card ID 覆盖，仅允许 provider 数据，不允许几何/材质/能力类型
+FridgeHarness.setPreviewData({format:'fridge-preview-data',version:1,byCard:{
+  batteryCard:{percent:67,charging:true,chargeState:'charging'},
+  deadlineCard:{title:'周末出发',date:'2026-11-04'},
+  agendaCard:{events:[{id:'sample',title:'散步',start:1791705600000,
+    end:1791709200000,location:'公园',allDay:false}]}
+}});
+FridgeHarness.setPreviewData(null); // 恢复接收者未绑定的数据形态
+```
+
+允许电量、日程、课程表、倒计时/纪念日的数据样例。日期/时间/进度/农历/台历由固定 tick 计算；专辑图片与文字仍属于作品素材。不为不存在的能力增加网络数据源。自定义课程表沿用生产 CourseItem/TeachingDay 等字段，示例只用合成记录。`getCardMetrics()` 与截图使用同一数据投影，保证长内容 QA 有效。
+
+把样例及固定 tick 放到作品旁的 sidecar 和 QA 记录；**不要塞进 `.fridge`**，不要把数据画进静态图片/HTML。作品导入 App 后依旧读取接收者本机电量、已保存课表、授权日程等。样例预览不证明这些权限或真实 Form 已验收。

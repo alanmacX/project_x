@@ -2,16 +2,17 @@
 'use strict';
 const $=id=>document.getElementById(id);
 let pack=null,output=null,album={cover:'',background:'',title:'专辑名称',artist:'歌手名'};
-let report=null,loadGeneration=0;
+let report=null,loadGeneration=0,previewData=null,renderedPack=null;
 function showError(error){output=null;$('artwork').replaceChildren();$('status').textContent='无法预览：'+error.message;$('export').disabled=true;$('report').disabled=false;report={status:'error',message:error.message};}
 function render(){
  if(!pack)return;
  try{
   const tick=new Date($('tick').value).getTime();if(!Number.isFinite(tick))throw Error('数据时间无效');
-  output=FridgeWeb.renderPackage(pack,Number($('size').value),tick);$('artwork').innerHTML=output.svg;
+  const mode=$('previewData').value,fixture=mode==='none'?null:mode==='custom'?previewData:FridgePreviewData.profile(pack,tick,mode),projection=FridgePreviewData.project(pack,fixture);renderedPack=projection.pack;
+  output=FridgeWeb.renderPackage(renderedPack,Number($('size').value),tick);$('artwork').innerHTML=output.svg;
   $('issues').replaceChildren(...output.issues.map(message=>{const li=document.createElement('li');li.textContent=message;return li;}));
-  report={previewVersion:2,adapter:'browser-svg-v2',sourceFingerprint:FridgeCore.sourceFingerprint,designContract:{contractVersion:FridgeDesignContract.contractVersion,skillContractVersion:FridgeDesignContract.skillContractVersion,identity:FridgeDesignContract.identity,appVersion:FridgeDesignContract.app.versionName},packageVersion:pack.version,schemaVersion:pack.state.schemaVersion,width:output.width,height:output.height,tick,timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone,cards:pack.state.cards.length,status:output.issues.length?'unsupported':'ready-for-review',issues:output.issues,actualFormVerified:false,pixelParityVerified:false};
-  $('status').textContent=output.issues.length?'文件已读取，存在未支持能力，不能验收通过':'文件已读取，可以导出对照图';$('export').disabled=false;$('report').disabled=false;
+  report={previewVersion:2,adapter:'browser-svg-v2',sourceFingerprint:FridgeCore.sourceFingerprint,designContract:{contractVersion:FridgeDesignContract.contractVersion,skillContractVersion:FridgeDesignContract.skillContractVersion,identity:FridgeDesignContract.identity,appVersion:FridgeDesignContract.app.versionName},packageVersion:pack.version,schemaVersion:pack.state.schemaVersion,width:output.width,height:output.height,tick,timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone,cards:pack.state.cards.length,previewData:{mode,synthetic:fixture!==null,appliedCards:projection.appliedCards,portablePackageUnchanged:true},status:output.issues.length?'unsupported':'ready-for-review',issues:output.issues,actualFormVerified:false,pixelParityVerified:false};
+  $('status').textContent=output.issues.length?'文件已读取，存在未支持能力，不能验收通过':fixture?'演示数据仅用于预览，作品仍绑定接收者数据':'文件已读取，可以导出对照图';$('export').disabled=false;$('report').disabled=false;
  }catch(error){showError(error);}
 }
 function study(){
@@ -26,7 +27,7 @@ function study(){
 }
 function tab(which){$('scenePane').hidden=which!=='scene';$('albumPane').hidden=which!=='album';$('sceneTab').setAttribute('aria-pressed',which==='scene');$('albumTab').setAttribute('aria-pressed',which==='album');}
 async function loadText(json){
- const generation=++loadGeneration;pack=null;output=null;report=null;$('artwork').replaceChildren();$('issues').replaceChildren();$('export').disabled=true;$('report').disabled=true;
+ const generation=++loadGeneration;previewData=null;renderedPack=null;$('previewData').querySelector('[value=custom]').disabled=true;$('previewData').value='none';pack=null;output=null;report=null;$('artwork').replaceChildren();$('issues').replaceChildren();$('export').disabled=true;$('report').disabled=true;
  try{
  if(json.length>90*1024*1024)throw Error('作品包超过大小限制');
  // Do not silently normalize a future capability into an older one.
@@ -52,9 +53,11 @@ async function capture(){
  const url=URL.createObjectURL(new Blob([snapshot.svg],{type:'image/svg+xml'}));
  try{const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url;});const canvas=document.createElement('canvas');canvas.width=snapshot.width*2;canvas.height=snapshot.height*2;canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);return await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));}finally{URL.revokeObjectURL(url);}
 }
-window.FridgeHarness={loadText,capture,getReport:()=>structuredClone(report),getDesignContract:()=>structuredClone(FridgeDesignContract),getCardMetrics:()=>{if(!pack)throw Error('尚未读取作品');return structuredClone(pack.state.cards.map(FridgeReadouts.inspectCard));},getLayers:()=>{if(!output)throw Error('尚未读取作品');return structuredClone({width:output.width,height:output.height,issues:output.issues,...output.layers});},setSize:(size)=>{if(![180,300,420].includes(size))throw Error('Unsupported size');$('size').value=String(size);render();},showAlbums:()=>tab('album')};
+function setPreviewData(value){if(!pack)throw Error('尚未读取作品');const checked=value===null?null:FridgePreviewData.validate(value,pack);previewData=checked;$('previewData').querySelector('[value=custom]').disabled=checked===null;$('previewData').value=checked?'custom':'none';render();return structuredClone(report);}
+window.FridgeHarness={setPreviewData,setDataProfile:(mode)=>{if(!pack)throw Error('尚未读取作品');if(!['none','demo','empty','long'].includes(mode))throw Error('Unknown data profile');$('previewData').value=mode;render();return structuredClone(report);},setTick:(value)=>{const d=new Date(value);if(!Number.isFinite(d.getTime()))throw Error('Invalid preview tick');const local=new Date(d.getTime()-d.getTimezoneOffset()*60000);$('tick').value=local.toISOString().slice(0,16);render();},loadText,capture,getReport:()=>structuredClone(report),getDesignContract:()=>structuredClone(FridgeDesignContract),getCardMetrics:()=>{if(!pack)throw Error('尚未读取作品');return structuredClone((renderedPack||pack).state.cards.map(FridgeReadouts.inspectCard));},getLayers:()=>{if(!output)throw Error('尚未读取作品');return structuredClone({width:output.width,height:output.height,issues:output.issues,...output.layers});},setSize:(size)=>{if(![180,300,420].includes(size))throw Error('Unsupported size');$('size').value=String(size);render();},showAlbums:()=>tab('album')};
 $('file').onchange=async event=>{try{const file=event.target.files[0];if(!file)return;await loadText(await file.text());tab('scene');}catch(error){/* loadText owns errors and ignores stale imports. */}};
-for(const id of ['size','tick'])$(id).onchange=render;
+$('fixtureFile').onchange=async event=>{try{const file=event.target.files[0];if(file){if(file.size>256*1024)throw Error('样例数据过大');setPreviewData(JSON.parse(await file.text()));}}catch(error){$('status').textContent='样例未应用：'+error.message;}};
+for(const id of ['size','tick','previewData'])$(id).onchange=render;
 $('content').onchange=study;$('sceneTab').onclick=()=>tab('scene');$('albumTab').onclick=()=>tab('album');
 for(const name of ['cover','background'])$(name).onchange=async event=>{
  try{const file=event.target.files[0];if(!file)return;if(file.size>24*1024*1024)throw Error('图片过大');const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);});const bitmap=await createImageBitmap(file);try{if(name==='cover'&&!FridgeCore.load('AlbumLayout').isSquareAlbumCover(bitmap.width,bitmap.height))throw Error('专辑封面必须是正方形');}finally{bitmap.close();}album[name]=data;study();}catch(error){showError(error);}

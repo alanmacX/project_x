@@ -45,7 +45,7 @@ A timed scene is authored as one ordinary card, not a new package kind. Local sc
 
 ## Data and privacy
 
-Do not scrape private data to fill a template. Timetable and agenda use empty/unbound placeholders unless the user deliberately provides the data; do not invent their schedule. Battery starts unknown. No weather/parcel/fetch/online music capability. No arbitrary file, clipboard, account, health or network bridge. A shared binding does not authorize access to the recipient's data.
+Do not scrape private data to fill a template. Timetable and agenda use empty/unbound placeholders unless the user deliberately provides the data; do not invent their schedule. Battery starts unknown in portable artwork; for browser QA use synthetic host fixtures rather than limiting creation to clock-only compositions. No weather/parcel/fetch/online music capability. No arbitrary file, clipboard, account, health or network bridge. A shared binding does not authorize access to the recipient's data.
 
 Importing a file into the offline app is the intended flow. Do not add a cloud AI endpoint to the app or promise app-store “single-app” approval based on this skill.
 
@@ -58,6 +58,8 @@ If the FridgeMemo repository is available, run this Node-only checker:
 The helper runs the actual current reader and checks identifiers, supported capability types and geometry preservation. It is not a complete media decoder, visual validator or security boundary. Never claim visual acceptance based only on JSON validation.
 
 Match the installed app contract before generation; app updates may change supported capabilities and design profiles. Do not assume this reference supports newer fields. Start with the platform-independent browser previewer documented in previewer/README.md, which bundles the app's pure production models. Render the complete generated package at its target aspect ratio; inspect all cards, cutout alpha, clipping, layer order, attachment profiles, text fit and empty data. The browser supports all current native capabilities using production layout/data/contour modules and material assets. Unknown capabilities or missing resources block acceptance even when JSON parses. Static previews do not validate GIF playback, system Symbols or live device data; never mark pixel parity or actual Form verification from browser output alone. Use the native FridgePreviewer QA route in FRIDGE_PREVIEWER.md as a comparison host; compare source fingerprints and PNG/version/dimension reports. Neither browser nor native QA routes replace real Form testing.
+
+When data-bearing capabilities would serve the theme, author them even without private records. Use previewer data profiles or a separate `.preview-data.json` to demonstrate battery, agenda, timetable and deadlines; read [preview-data.md](references/preview-data.md). Always inspect both populated and unbound/empty states. Do not copy fixtures into artwork.
 
 Check target aspect, long text, overlap/z order, minimum size, empty data, missing assets and source permissions. Use the app's own renderer for preview if available. An HTML browser preview cannot prove native app/Form equality. If preview or native import has not been tested, state that plainly.
 

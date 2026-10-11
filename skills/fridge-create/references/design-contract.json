@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "skillContractVersion": 5,
+  "skillContractVersion": 6,
   "app": {
     "bundleName": "com.fridgewidget.app",
     "vendor": "fridgememo",
@@ -28,7 +28,7 @@
   "identity": {
     "models": "114cfb22cf59db267b652ac10fdcd069c90f64bb768a527d31c0a9b3df578888",
     "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
-    "browserAdapter": "ef2c9d937abecae9e23169f0ef4be0b261856cf985a73c255d28ba29e72f2370",
+    "browserAdapter": "a56fac5d5baf0f50f9761cd70534f8405138f43527d4e84adf9ac08d50eb9ea9",
     "nativeViews": "20391366522e87cd7634895a77eedf00cf5df0845a7fc1dc8c8384af4dd86b36"
   },
   "coordinates": {
@@ -435,6 +435,19 @@
       "lunar",
       "album"
     ],
+    "syntheticData": {
+      "format": "fridge-preview-data",
+      "version": 1,
+      "hostOnly": true,
+      "portable": false,
+      "profiles": [
+        "none",
+        "demo",
+        "empty",
+        "long"
+      ],
+      "customCardOverrides": true
+    },
     "staticFrame": true,
     "systemSymbols": "vector-substitutes",
     "fontParity": false,
