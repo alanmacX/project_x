@@ -525,25 +525,59 @@ struct Index {
     } finally {this.sceneNavigationBusy=false;this.armScheduleTimer();this.updateScheduledScene(true);}
   }
 
+  @State private canvasFlightY:number=0;
+  @State private canvasFlightX:number=0;
+  @State private canvasFlightAngle:number=0;
+  private canvasFlightGeneration:number=0;
+  private animateCanvasFlight(y:number,x:number,angle:number,duration:number,entering:boolean):Promise<void> {
+    return new Promise<void>((resolve)=>{
+      // The timeout settles navigation even if the window hides and ArkUI cancels onFinish.
+      let finished=false;
+      const finish=():void=>{if(finished)return;finished=true;clearTimeout(timer);resolve();};
+      const timer=setTimeout(finish,duration+160);
+      this.getUIContext().animateTo({duration:duration,curve:entering?Curve.Friction:Curve.EaseIn,expectedFrameRateRange:this.frameRate,onFinish:finish},()=>{
+        this.canvasFlightY=y;this.canvasFlightX=x;this.canvasFlightAngle=angle;
+      });
+    });
+  }
   private async chooseCanvas(id: string): Promise<void> {
     if (this.heroActive || this.activeBoardId || this.sharing || this.busy || this.canvasChanging || this.sceneNavigationBusy || this.scheduleTransition) return;
     if (this.editing) { this.getUIContext().getPromptAction().showToast({message:'请先完成当前卡片编辑'}); return; }
-    this.canvasChanging=true;
-    try {await this.loadCanvas(id,true);}catch(e){this.templateError('画布切换未完成',e as Error);}finally{this.canvasChanging=false;this.armScheduleTimer();this.updateScheduledScene(true);}
+    if(id===this.store.state.canvasId&&this.canvasBackground===this.store.state.background&&!this.scheduledName&&!this.timedScene)return;
+    this.canvasChanging=true;this.canvasPickerOpen=false;this.selectedId='';
+    const generation=++this.canvasFlightGeneration;
+    const exit=this.animateCanvasFlight(this.screenHeight+this.boardHeight,this.screenWidth*.08,8,260,false);
+    try {
+      await this.loadCanvas(id,true,async():Promise<void>=>{
+        await exit;
+        if(!this.alive||generation!==this.canvasFlightGeneration)return;
+        this.canvasFlightY=-this.screenHeight;this.canvasFlightX=-this.screenWidth*.04;this.canvasFlightAngle=-5;
+      });
+      if(this.alive&&generation===this.canvasFlightGeneration){
+        // Let the new retained surfaces render offscreen before native transforms start.
+        await new Promise<void>((resolve)=>setTimeout(resolve,32));
+        await this.animateCanvasFlight(0,0,0,460,true);
+      }
+    }catch(e){this.templateError('画布切换未完成',e as Error);}
+    finally{
+      if(generation===this.canvasFlightGeneration){this.canvasFlightY=0;this.canvasFlightX=0;this.canvasFlightAngle=0;this.canvasChanging=false;this.armScheduleTimer();this.updateScheduledScene(true);this.scheduleForegroundRefresh();}
+    }
   }
-  private async loadCanvas(id:string,manual:boolean=false):Promise<void> {
+
+  private async loadCanvas(id:string,manual:boolean=false,beforeReveal:(()=>Promise<void>)|null=null):Promise<void> {
     this.scenePanelGeneration++;this.cancelScheduledTransition();
     try {
       this.backgroundGeneration++; if(this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); this.backgroundBusy = false;
-      if(manual){if(!await this.store.selectCanvas(id))return;}else{await this.store.save(false);if(!await this.store.openCanvas(id))return;await this.store.save(false);}
+      if(manual){if(!await this.store.selectCanvas(id,false))return;}else{await this.store.save(false);if(!await this.store.openCanvas(id))return;await this.store.save(false);}
       await primeRenderContours(this.store.state.cards,storageSnapshot(this.store.state));
+      if(beforeReveal!==null){await beforeReveal();if(!this.alive)return;}
       this.sceneEditing=this.store.catalog.scenes.some(c=>c.id===this.store.state.canvasId);this.scheduleGeneration++;this.timedScene=null;this.scheduleOverride=null;this.scheduledName='';this.scheduledFocusId='';this.syncSchedules();
       this.selectedId = ''; this.activeBoardId = ''; this.groupSelection = []; this.groupSelecting = false;
       this.syncHostCanvasGeometry();this.layoutBoard();
       this.canvasBackground = this.store.state.background; this.refreshCanvasList();
-      this.render(); this.persist(true); this.scheduleBackground(); this.canvasPickerOpen = false;
+      this.render(); if(!manual)this.persist(true); this.scheduleBackground(); this.canvasPickerOpen = false;
       this.refreshCapabilities();this.updateScheduledScene(true);
-    } catch (e) { this.templateError('画布切换未完成',e as Error); }
+    } catch (e) { throw e as Error; }
   }
   private async newCanvas(duplicate: boolean, name: string = ''): Promise<void> {
     if(this.canvasChanging || this.sceneNavigationBusy || this.busy || this.sharing)return;this.canvasChanging=true;
@@ -716,7 +750,7 @@ struct Index {
       }
     } finally { this.repairingSubjects = false; }
   }
-  aboutToDisappear(): void { this.reliefGeneration++;if(this.reliefTimer>=0)clearTimeout(this.reliefTimer); this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer); if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
+  aboutToDisappear(): void { this.canvasFlightGeneration++;this.canvasFlightY=0;this.canvasFlightX=0;this.canvasFlightAngle=0;this.canvasChanging=false; this.reliefGeneration++;if(this.reliefTimer>=0)clearTimeout(this.reliefTimer); this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer); if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
     if(this.navMenuOpen){this.finishNavMenu(-1);return true;}
     if(this.deletionId)return true;
@@ -1376,7 +1410,7 @@ struct Index {
     }catch(e){if(this.alive)this.getUIContext().getPromptAction().showToast({message:(e as Error).message});}
   }
   private async refreshCapabilities():Promise<void> {
-    if(!this.ready||!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||this.arriving||this.heroActive||this.activeBoardId||this.layerDrag||this.gestureGroup.length>0||this.refreshingCapabilities||!this.context)return;
+    if(!this.ready||!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||this.canvasChanging||this.arriving||this.heroActive||this.activeBoardId||this.layerDrag||this.gestureGroup.length>0||this.refreshingCapabilities||!this.context)return;
     this.refreshingCapabilities=true;const canvasId=this.store.state.canvasId,generation=this.foregroundGeneration;
     const sources:FridgeCard[]=[],previous:CapBlock[]=[],results:CapBlock[]=[],keys:string[]=[];
     try {
@@ -1409,6 +1443,7 @@ struct Index {
           if (this.error.length > 0) { Button('重试', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).onClick(() => this.initialize()) }
         }.width('100%').height('100%').justifyContent(FlexAlign.Center)
       } else {
+        Stack({alignContent:Alignment.TopStart}) {
         this.board()
         if (this.editing && this.editorReady) {
           // Backdrop and chrome are separate from the persistent card surface.
@@ -1420,6 +1455,15 @@ struct Index {
         }
         this.editingScene()
         if(!this.viewing&&this.canvasBackground.frameStyle!=='none'){CanvasFrame({material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle}).width(BOARD_W*this.boardScale).height(this.boardHeight).position({x:this.boardLeft,y:this.boardTop}).opacity(this.boardOpacity).zIndex(100003).hitTestBehavior(HitTestMode.None)}
+        }.width('100%').height('100%')
+          .translate({x:this.canvasFlightX,y:this.canvasFlightY})
+          .rotate({angle:this.canvasFlightAngle,centerX:this.boardLeft+BOARD_W*this.boardScale/2,centerY:this.boardTop+this.boardHeight/2})
+          .hitTestBehavior(this.canvasChanging?HitTestMode.BLOCK_DESCENDANTS:HitTestMode.Transparent)
+        Stack({alignContent:Alignment.TopStart}) {
+          if(this.floatingHome()){this.homeDock()}else{this.homeLayers()}
+        }.width('100%').height('100%').opacity(this.arriving?1:this.boardOpacity)
+          .accessibilityLevel(this.editing||this.viewing?'no-hide-descendants':'auto')
+          .hitTestBehavior(this.editing||this.viewing||this.canvasChanging?HitTestMode.BLOCK_DESCENDANTS:HitTestMode.Transparent)
         if(this.scheduledFocusId && !this.editing) {
           ForEach(this.cards.filter((card:FridgeCard)=>card.id===this.scheduledFocusId),(card:FridgeCard)=>{
             Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {}
@@ -1467,6 +1511,7 @@ struct Index {
         if (this.viewing) { this.detail() }
         Column().width(1).height(1).position({x:this.navMenuX,y:this.navMenuY}).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
           .bindMenu(this.navMenuOpen,this.navMenuItems,{placement:Placement.BottomRight,systemMaterial:chromeMaterial(this.appDark),backgroundColor:AppDesign.popup(this.appDark),onDisappear:()=>this.finishNavMenu(this.navMenuResult)})
+        if(this.canvasChanging){Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.Block).zIndex(200002)}
         if(this.deletionId){
           Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.Block).zIndex(200000)
           if(this.deletionBitmap!==undefined){CardDeletionFlight({bitmap:this.deletionBitmap,faceWidth:this.deletionW,faceHeight:this.deletionH,originX:this.deletionX,originY:this.deletionY,angle:this.deletionAngle,viewportWidth:this.screenWidth,viewportHeight:this.screenHeight,onDone:()=>this.finishCardDeletion()}).zIndex(200001)}
@@ -1550,7 +1595,6 @@ struct Index {
       }.width(BOARD_W * this.boardScale).height(this.boardHeight).borderRadius(this.canvasBackground.frameStyle==='none'?24:BOARD_W*this.boardScale*31/600).clip(true).backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:Color.White)
         .border({ width: this.canvasBackground.frameStyle==='none'?.5:0, color: '#E9E9E9' }).id('homeCanvasSurface')
         .position({ x: this.boardLeft, y: this.boardTop })
-      if(this.floatingHome()){this.homeDock()}else{this.homeLayers()}
     }.width('100%').height('100%').opacity(this.arriving ? 1 : this.boardOpacity).accessibilityLevel(this.editing || this.viewing ? 'no-hide-descendants' : 'auto').hitTestBehavior(this.editing || this.viewing || this.canvasChanging ? HitTestMode.BLOCK_DESCENDANTS : HitTestMode.Default)
   }
   private dismissCompactTools(kind:string):void {

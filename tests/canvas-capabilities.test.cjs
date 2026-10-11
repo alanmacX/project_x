@@ -99,6 +99,22 @@ function load(name) {
  const unchangedUpdates=updates.length;await selectedRestart.refreshWidgets();await selectedRestart.refreshWidgets();assert.ok(updates.length>=unchangedUpdates+4,'time projection changes publish even with identical editable bytes');
  selectedRestart.catalog.rotation.mode='time';selectedRestart.catalog.rotation.enabled=true;selectedRestart.catalog.rotation.slots=[{start:0,canvasId:duplicate},{start:600,canvasId:'canvas_main'}];
  await selectedRestart.selectCanvas('canvas_main');assert.equal(selectedRestart.catalog.rotation.enabled,false,'manual choice pauses automatic rotation');assert.equal(selectedRestart.catalog.rotation.slots.length,2,'rotation settings retained');
+ // UI selection is durable and returns while previous desktop IPC is stalled.
+ const {LatestWidgetQueue}=load('LatestWidgetQueue');let releaseDesktop;
+ const stalled=new Promise(resolve=>releaseDesktop=resolve);
+ selectedRestart.widgetQueues.slow=new LatestWidgetQueue(async()=>stalled);
+ const oldDelivery=selectedRestart.widgetQueues.slow.submit('old');
+ const selection=selectedRestart.selectCanvas(duplicate,false);
+ const completed=await Promise.race([selection.then(()=>true),new Promise(resolve=>setTimeout(()=>resolve(false),150))]);
+ assert.equal(completed,true,'canvas reveal must not wait for desktop image processing or IPC');
+ assert.equal(readCatalog(disk.get('fridge_canvases_json')).activeId,duplicate,'nonblocking selection still saves active canvas first');
+ selectedRestart.state.background.color='#123456';await selectedRestart.save(false);
+ releaseDesktop();await oldDelivery;await selectedRestart.selectionSettled();
+ assert.equal(updates.at(-1).data.canvasId,duplicate,'desktop eventually receives the selected artwork');
+ assert.equal(JSON.parse(JSON.parse(updates.at(-1).data.scenePacket).background).color,'#123456','delayed delivery includes edits made after selection');
+ const hydrateCount=jobs.filter(name=>name==='hydrateCanvas').length;
+ await selectedRestart.openCanvas(duplicate);await selectedRestart.openCanvas(duplicate);
+ assert.equal(jobs.filter(name=>name==='hydrateCanvas').length,hydrateCount,'unchanged persisted canvas reuses normalized layout and contour identities');
  const corrupt=JSON.stringify({version:1,activeId:'missing',canvases:[{id:'missing',name:'Missing'}]});disk.set('fridge_canvases_json',corrupt);await assert.rejects(new FridgeStore().init({}),/已保留原始记录/);assert.equal(disk.get('fridge_canvases_json'),corrupt);disk.clear();
  // Each canvas retains its own disposable geometry cache across cold starts.
  const contours=load('RenderContours'),outline=[[{x:.1,y:.1},{x:.9,y:.1},{x:.9,y:.9},{x:.1,y:.9}]];

@@ -48,28 +48,46 @@ export class FridgeStore {
     await this.saveQueue.catch(()=>{});
     if(this.context!==null){await preferences.removePreferencesFromCache(this.context,'fridge_store');this.prefs=await preferences.getPreferences(this.context,'fridge_store');}
     const json=await this.prefs.get(canvasKey(id),'') as string;if(!json)throw new Error('画布记录缺失，已保留目录');
-    const raw=JSON.parse(json) as FridgeState;if(!Array.isArray(raw.cards))throw new Error('画布数据损坏');
-    const doc=new CanvasDocument();doc.id=id;doc.name=entry.name;doc.state=normalizeState(raw);doc.state.canvasId=id;
-    cleanGroups(doc.state.cards);clampCanvasGroups(doc.state.cards,BOARD_W/doc.state.canvasAspect);this.documents=this.documents.filter((c)=>c.id!==id);this.documents.push(doc);this.savedScenes[id]=json;await this.restoreContours(doc.state);return this.switchCanvas(id);
+    const cached=this.documents.find((c)=>c.id===id);
+    if(cached!==undefined&&this.savedScenes[id]===json)return this.switchCanvas(id);
+    const hydrated=await taskpool.execute(new taskpool.Task(hydrateCanvas,json,id)) as string;
+    const result=JSON.parse(hydrated) as CanvasLoadResult;
+    const doc=new CanvasDocument();doc.id=id;doc.name=entry.name;doc.state=result.state;restoreStartupLayouts(result.layout);
+    this.documents=this.documents.filter((c)=>c.id!==id);this.documents.push(doc);this.savedScenes[id]=json;
+    await this.restoreContours(doc.state);return this.switchCanvas(id);
   }
   /** Manual selection commits the catalog before any rendering or widget IPC.
    * All installed forms follow this explicit choice; opening/exporting documents does not rebind them. */
-  async selectCanvas(id:string):Promise<boolean> {
+  async selectCanvas(id:string,waitForWidgets:boolean=true):Promise<boolean> {
     if(!this.catalog.canvases.some(c=>c.id===id))return false;
-    await this.save(false);
+    const started=Date.now();await this.save(false);
     if(!await this.openCanvas(id))return false;
     // An explicit choice takes precedence over automatic rotation, retaining its configuration.
     this.catalog.rotation.enabled=false;this.catalog.desktopFollowsSelection=true;
     await this.save(false);
-    await Promise.all(Object.values(this.widgetQueues).map(queue=>queue.waitForIdle()));
-    if(this.prefs===null)throw new Error('本地存储尚未就绪');
-    const dims=JSON.parse(await this.prefs.get('fridge_form_dims_json','{}') as string) as Record<string,string>;
-    const bindings=JSON.parse(await this.prefs.get('fridge_form_bindings_json','{}') as string) as Record<string,string>;
-    for(const formId of Object.keys(dims))bindings[formId]=id;
-    await this.prefs.put('fridge_form_bindings_json',JSON.stringify(bindings));await this.prefs.flush();
-    for(const queue of Object.values(this.widgetQueues))queue.invalidate();
-    await this.save(true);return true;
+    hilog.info(0,'CanvasSwitch','local ready=%{public}d ms',Date.now()-started);
+    const delivery=this.selectionDelivery.catch(()=>{}).then(async()=>{
+      await Promise.all(Object.values(this.widgetQueues).map(queue=>queue.waitForIdle()));
+      // A newer explicit choice supersedes an obsolete queued binding operation.
+      if(this.catalog.activeId!==id)return;
+      if(this.prefs===null)throw new Error('本地存储尚未就绪');
+      const dims=JSON.parse(await this.prefs.get('fridge_form_dims_json','{}') as string) as Record<string,string>;
+      const bindings=JSON.parse(await this.prefs.get('fridge_form_bindings_json','{}') as string) as Record<string,string>;
+      for(const formId of Object.keys(dims))bindings[formId]=id;
+      await this.prefs.put('fridge_form_bindings_json',JSON.stringify(bindings));await this.prefs.flush();
+      if(this.catalog.activeId!==id)return;
+      for(const queue of Object.values(this.widgetQueues))queue.invalidate();
+      const doc=this.documents.find(c=>c.id===id);
+      if(doc!==undefined)await this.queueFor(id).submit(storageSnapshot(doc.state));
+    });
+    this.selectionDelivery=delivery;
+    if(waitForWidgets)await delivery;
+    else delivery.catch((e:Error)=>hilog.warn(0,'WidgetSync','selection delivery: %{public}s',e.message));
+    return true;
   }
+  private selectionDelivery:Promise<void>=Promise.resolve();
+  selectionSettled():Promise<void>{return this.selectionDelivery;}
+
   /** One upgrade repair, deferred until startup is idle or the app leaves foreground. */
   repairDesktopSelection():Promise<void> {
     if(this.selectionMigration!==null)return this.selectionMigration;
