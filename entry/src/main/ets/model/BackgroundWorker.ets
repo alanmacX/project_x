@@ -2,7 +2,7 @@ import { photoFrame } from './PhotoCropGeometry';
 import { image } from '@kit.ImageKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { BackgroundAnchor, CanvasBackground, FridgeState, FridgeCard, materialColors, BOARD_W, BOARD_H } from './CardSchema';
-import { representativeColor, smartTone, blendPixels, combineColors, WeightedColor, colorLab } from './BackgroundPalette';
+import { representativeColor, smartTone, blendPixels, combineColors, WeightedColor, colorLab, reduceBackgroundAnchors } from './BackgroundPalette';
 
 import { imageSwatches, imageColor, cardSource, backgroundSignature, hash } from './BackgroundInputs';
 export { backgroundSignature } from './BackgroundInputs';
@@ -43,7 +43,7 @@ export async function createSmartBackground(json:string,filesDir:string):Promise
     if(existing!==undefined){const total=existing.weight+candidate.weight;existing.x=(existing.x*existing.weight+candidate.x*candidate.weight)/total;existing.y=(existing.y*existing.weight+candidate.y*candidate.weight)/total;existing.weight=total;}
     else fields.push({x:candidate.x,y:candidate.y,color:candidate.color,weight:candidate.weight});
   }
-  bg.anchors=fields.sort((a:BackgroundAnchor,b:BackgroundAnchor)=>b.weight-a.weight).slice(0,6);
+  bg.anchors=reduceBackgroundAnchors(fields);
   if(bg.mode==='smart')return JSON.stringify(bg);
   const width=320,height=Math.max(160,Math.min(512,Math.round(width/state.canvasAspect))),path=filesDir+'/canvas_blend_'+hash(bg.signature+'|'+JSON.stringify(bg.anchors))+'.png';
   try{if(await fileIo.access(path)){bg.src='file://'+path;return JSON.stringify(bg);}}catch(_){}

@@ -178,7 +178,7 @@ export function normalizeBackground(raw: CanvasBackground | undefined): CanvasBa
   bg.src = (raw.src ?? '').startsWith('file://') || (raw.src ?? '').startsWith('memory://') ? raw.src : '';
   bg.photo = (raw.photo ?? '').startsWith('file://') ? raw.photo : '';
   bg.palette = (Array.isArray(raw.palette) ? raw.palette : []).filter((c: string) => /^#[0-9a-fA-F]{6}$/.test(c)).slice(0, 6);
-  bg.anchors = (Array.isArray(raw.anchors) ? raw.anchors : []).slice(0, 12).filter((a: BackgroundAnchor) => a !== null && /^#[0-9a-fA-F]{6}$/.test(a.color)).map((a: BackgroundAnchor): BackgroundAnchor => ({ x: bounded(a.x,0,1,.5), y: bounded(a.y,0,1,.5), color: a.color, weight: bounded(a.weight,.05,8,1) }));
+  bg.anchors = (Array.isArray(raw.anchors) ? raw.anchors : []).slice(0, 12).filter((a: BackgroundAnchor) => a !== null && /^#[0-9a-fA-F]{6}$/.test(a.color)).map((a: BackgroundAnchor): BackgroundAnchor => ({ x: bounded(a.x,0,1,.5), y: bounded(a.y,0,1,.5), color: a.color, weight: bounded(a.weight,.000001,8,1) }));
   bg.signature = typeof raw.signature === 'string' ? raw.signature : ''; return bg;
 }
 export class FridgeState {

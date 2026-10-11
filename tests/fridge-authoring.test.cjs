@@ -22,3 +22,12 @@ reject(p=>p.state.cards[0].cutout='asset://404',/引用不完整/);
 const grouped=JSON.parse(json);grouped.state.cards[0].groupId=grouped.state.cards[1].groupId='pair';validate(JSON.stringify(grouped));
 const single=JSON.parse(json);single.kind='card';single.state.cards=single.state.cards.slice(0,1);validate(JSON.stringify(single));
 console.log('PASS: native sample and card/group variants; invented HTML, retired network source, unsupported surface, ID collision, singleton groups, clamped geometry and missing assets rejected.');
+
+reject(p=>p.state.background.frameMaterial='marble',/unsupported frameMaterial/);
+reject(p=>p.state.background.frameWidth=30,/unsupported field frameWidth/);
+reject(p=>p.state.background.mode='fluid',/unsupported mode/);
+for(const frameMaterial of ['stone','walnut','oak'])for(const frameStyle of ['none','light','dark','auto']){
+ const pack=JSON.parse(json);Object.assign(pack.state.background,{frameMaterial,frameStyle});assert.doesNotThrow(()=>validate(JSON.stringify(pack)));
+}
+
+reject(p=>p.state.background.color='cream',/reader changed color/);

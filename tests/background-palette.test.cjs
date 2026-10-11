@@ -33,6 +33,16 @@ function pixels(main,accent,fraction){const out=new Uint8Array(48*48*4);for(let 
  const clouds=separated.anchors.filter(a=>a.color===swatches[0].color);
  assert.equal(clouds.length,2,'same-colour artwork far apart retains distinct spatial clouds');
  assert.ok(Math.abs(clouds[0].x-clouds[1].x)>.5);
+ const crowded=Array.from({length:9},(_,i)=>({x:(i%3)/3,y:Math.floor(i/3)/3,color:'#BC7C4D',weight:.09-i*.002}));
+ crowded.push({x:.8,y:.7,color:'#ADB17A',weight:.04},{x:.2,y:.8,color:'#DDD9D6',weight:.035});
+ const retained=p.reduceBackgroundAnchors(crowded);
+ assert.equal(retained.length,6);
+ assert.ok(retained.some(a=>p.colorLab(a.color).a<0),'quiet green survives repeated brown subjects');
+ assert.ok(retained.some(a=>p.colorLab(a.color).l>75),'pale subject survives the six-field budget');
+ assert.ok(Math.abs(retained.reduce((s,a)=>s+a.weight,0)-crowded.reduce((s,a)=>s+a.weight,0))<1e-9,'all source colour mass is conserved');
+ assert.deepEqual(p.reduceBackgroundAnchors(crowded),retained,'pose selection is deterministic');
+ const normalized=load('CardSchema').normalizeBackground({anchors:[{x:.5,y:.5,color:'#ADB17A',weight:.008}]});
+ assert.equal(normalized.anchors[0].weight,.008,'saving or sharing does not inflate a small field to .05');
  const signature=backgroundSignature(state);yellowCard.x+=20;yellowCard.rot=10;assert.equal(backgroundSignature(state),signature,'drag and rotation do not invoke palette extraction');const moved=JSON.parse(await createSmartBackground(JSON.stringify(state),'/cache'));assert.notEqual(moved.src,bg.src,'manual re-extraction uses a new pose bitmap instead of returning stale pixels');yellowCard.subjectVersion++;assert.notEqual(backgroundSignature(state),signature,'updated cutout invalidates cache even at the same path');
  const element=load('CardSchema').CanvasElement;yellowCard.elements=[new element()];yellowCard.elements[0].kind='shape';const sig2=backgroundSignature(state);yellowCard.elements[0].w=.5;assert.notEqual(backgroundSignature(state),sig2,'layer coverage changes invalidate extraction');
  console.log('PASS background: measured cluster proportions, transparent pixels, minority accents, Overlay hue preservation, single-hue light/shade depth, actual weighted worker output and movement-stable/versioned cache');

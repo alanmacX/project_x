@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "skillContractVersion": 6,
+  "skillContractVersion": 7,
   "app": {
     "bundleName": "com.fridgewidget.app",
     "vendor": "fridgememo",
@@ -26,7 +26,7 @@
     "htmlTemplateVersion": 1
   },
   "identity": {
-    "models": "114cfb22cf59db267b652ac10fdcd069c90f64bb768a527d31c0a9b3df578888",
+    "models": "fe69d985877acfdcc798a61d52e2dfd8b27bc3e29af349f155e7a1932630e073",
     "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
     "browserAdapter": "a56fac5d5baf0f50f9761cd70534f8405138f43527d4e84adf9ac08d50eb9ea9",
     "nativeViews": "20391366522e87cd7634895a77eedf00cf5df0845a7fc1dc8c8384af4dd86b36"
@@ -274,6 +274,18 @@
     }
   ],
   "fields": {
+    "background": [
+      "mode",
+      "color",
+      "src",
+      "photo",
+      "transparentFrame",
+      "frameStyle",
+      "frameMaterial",
+      "palette",
+      "anchors",
+      "signature"
+    ],
     "state": [
       "sceneLayouts",
       "sceneRules",

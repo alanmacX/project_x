@@ -398,7 +398,7 @@ function normalizeBackground(raw) {
     bg.src = (raw.src ?? '').startsWith('file://') || (raw.src ?? '').startsWith('memory://') ? raw.src : '';
     bg.photo = (raw.photo ?? '').startsWith('file://') ? raw.photo : '';
     bg.palette = (Array.isArray(raw.palette) ? raw.palette : []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c)).slice(0, 6);
-    bg.anchors = (Array.isArray(raw.anchors) ? raw.anchors : []).slice(0, 12).filter((a) => a !== null && /^#[0-9a-fA-F]{6}$/.test(a.color)).map((a) => ({ x: bounded(a.x, 0, 1, .5), y: bounded(a.y, 0, 1, .5), color: a.color, weight: bounded(a.weight, .05, 8, 1) }));
+    bg.anchors = (Array.isArray(raw.anchors) ? raw.anchors : []).slice(0, 12).filter((a) => a !== null && /^#[0-9a-fA-F]{6}$/.test(a.color)).map((a) => ({ x: bounded(a.x, 0, 1, .5), y: bounded(a.y, 0, 1, .5), color: a.color, weight: bounded(a.weight, .000001, 8, 1) }));
     bg.signature = typeof raw.signature === 'string' ? raw.signature : '';
     return bg;
 }
@@ -4312,4 +4312,4 @@ function depthRenderCards(cards) {
 }
 exports.depthRenderCards = depthRenderCards;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"114cfb22cf59db267b652ac10fdcd069c90f64bb768a527d31c0a9b3df578888"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"fe69d985877acfdcc798a61d52e2dfd8b27bc3e29af349f155e7a1932630e073"};})(globalThis);

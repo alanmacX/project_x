@@ -77,6 +77,36 @@ export function smartTone(colors: WeightedColor[]): string {
 export function fluidBase(colors: WeightedColor[]): string {
   return colors.slice().sort((a:WeightedColor,b:WeightedColor)=>b.weight-a.weight)[0]?.color??'#C5C1B8';
 }
+/** Bounded weighted colour/spatial quantization. A top-N cut discards quieter hues
+ * entirely when several similarly coloured subjects occupy the canvas. Preserve
+ * their colour mass instead, while distant same-colour subjects retain a fold. */
+export function reduceBackgroundAnchors(points: BackgroundAnchor[], limit: number = 6): BackgroundAnchor[] {
+  const source=points.filter((p:BackgroundAnchor)=>p.weight>0).slice().sort((a:BackgroundAnchor,b:BackgroundAnchor)=>b.weight-a.weight);
+  if(source.length<=limit)return source;
+  const labs=source.map((p:BackgroundAnchor)=>colorLab(p.color));
+  const metric=(i:number,j:number):number=>distance(labs[i],labs[j])+225*((source[i].x-source[j].x)**2+(source[i].y-source[j].y)**2);
+  const chosen:number[]=[0];
+  while(chosen.length<limit){
+    let best=-1,score=-1;
+    for(let i=0;i<source.length;i++){
+      if(chosen.includes(i))continue;
+      const value=source[i].weight*Math.min(...chosen.map((j:number)=>metric(i,j)));
+      if(value>score){best=i;score=value;}
+    }
+    if(best<0)break;chosen.push(best);
+  }
+  const result=chosen.map(()=>({x:0,y:0,color:'',weight:0} as BackgroundAnchor));
+  const sums=chosen.map(()=>({l:0,a:0,b:0} as LabColor));
+  for(let i=0;i<source.length;i++){
+    let at=0,best=Infinity;
+    for(let j=0;j<chosen.length;j++){const d=metric(i,chosen[j]);if(d<best){best=d;at=j;}}
+    const p=source[i],out=result[at],lab=labs[i];out.weight+=p.weight;out.x+=p.x*p.weight;out.y+=p.y*p.weight;
+    sums[at].l+=lab.l*p.weight;sums[at].a+=lab.a*p.weight;sums[at].b+=lab.b*p.weight;
+  }
+  return result.map((p:BackgroundAnchor,i:number):BackgroundAnchor=>({
+    x:p.x/Math.max(p.weight,1e-12),y:p.y/Math.max(p.weight,1e-12),color:labColor({l:sums[i].l/Math.max(p.weight,1e-12),a:sums[i].a/Math.max(p.weight,1e-12),b:sums[i].b/Math.max(p.weight,1e-12)}),weight:p.weight
+  })).filter((p:BackgroundAnchor)=>p.weight>0).sort((a:BackgroundAnchor,b:BackgroundAnchor)=>b.weight-a.weight);
+}
 /** FluidGradient port: solid radial cores, source-over base, Overlay light folds, final blur.
  * Adapted from Cindori/FluidGradient (MIT); see THIRD_PARTY_NOTICES.md. A deterministic pose is
  * rendered off-thread so FormKit, preview and exported artwork share identical pixels.

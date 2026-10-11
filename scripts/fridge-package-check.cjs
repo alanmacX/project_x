@@ -26,6 +26,13 @@ function validate(json) {
   const source = ''; // Field whitelist is the generated release contract.
   known(raw.state, fields(source, 'export class FridgeState {'), 'state');
   const schema = load('CardSchema');
+  if(raw.state.background){
+    const bg=raw.state.background;
+    known(bg,new Set(contract.fields.background),'background');
+    const choices={mode:contract.design.canvasBackgroundModes,frameStyle:contract.design.canvasFrame.options,frameMaterial:contract.design.canvasFrame.materials};
+    for(const [key,allowed] of Object.entries(choices))if(bg[key]!==undefined&&!allowed.includes(bg[key]))throw Error('background: unsupported '+key+' '+bg[key]);
+  }
+
   const ids = new Set();
   const groups = new Map();
   const addID = id => { if (typeof id !== 'string' || !id.length || ids.has(id)) throw Error('Missing or duplicate ID: ' + id); ids.add(id); };
@@ -55,6 +62,10 @@ function validate(json) {
   for (const [id, count] of groups) if (count < 2) throw Error('Group has only one member: ' + id);
   // App decoder checks container, capacity, asset references and schema normalization.
   const normalized = load('TemplatePackage').readPackage(json);
+  for(const key of ['mode','color','frameStyle','frameMaterial','palette','anchors']){
+    if(raw.state.background?.[key]!==undefined)assert.deepEqual(JSON.parse(JSON.stringify(normalized.state.background[key])),raw.state.background[key],'background: reader changed '+key);
+  }
+
   for (let i=0; i<raw.state.cards.length; i++) {
     const a=raw.state.cards[i], b=normalized.state.cards[i];
     for (const key of ['x','y','w','h','rot','z','shape','material','paper','ink','groupId']) {
