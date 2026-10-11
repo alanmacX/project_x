@@ -45,3 +45,9 @@ Ask in working notes: is the theme recognizable without its title; does the foca
 Check sparse data, long names, unknown battery and multiple time/date values. Preview both light/dark imagery for capability ink, contour at card scale, and transparency around all disconnected pieces. Preserve package/assets/sources/QA receipts. For commercial promotion, resolve asset permissions before publishing; for app/Form parity retain native evidence rather than asserting pixel identity. If a direction fails, change composition or asset choice, not just the shade of the same rectangular template.
 
 Treat tiny display sizes separately: structural readout fit does not prove that decorative text is readable. Test at the recipient's actual widget width; reduce secondary wording, enlarge essential text or remove low-value labels before shrinking the whole composition. Record any remaining small-size limitation instead of calling every tested size visually approved.
+
+## Asset-led collage requests
+
+When the user asks for many pets or a game-material collage with little text, prioritize diversity of recognizable subjects over labelled panels: mix poses, scales and a few props, with one quiet area for native readouts. Search for actual transparent assets; opaque photos require real segmentation before subject authoring. Do not cut rectangular portraits and call them silhouette stickers. More subjects may justify 7–12 independent cards within the 16-card limit, provided the small-size composition stays readable. Do not enforce a quota when fewer stronger assets work better.
+
+Preview the assembled file rather than a separate concept image. Keep each pet/character/prop independently editable, group only intentional clusters, and avoid baked white borders/shadows that duplicate host relief. Record acquisition failures and generated substitutions honestly. Deliver source attribution separately from the portable file.

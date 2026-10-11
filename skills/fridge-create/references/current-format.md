@@ -1,6 +1,6 @@
 # Current .fridge authoring contract
 
-Verified against FridgeMemo TemplatePackage.ets/CardSchema.ets on 2026-10-10. The generated design-contract.json is the release snapshot for fields, capabilities and design tokens. This prose explains semantics. When working in the app repo, production source files are authoritative: run previewer/build.cjs --check and update this reference if semantics changed.
+Verified against FridgeMemo TemplatePackage.ets/CardSchema.ets on 2026-10-11. The generated design-contract.json is the release snapshot for fields, capabilities and design tokens. This prose explains semantics. When working in the app repo, production source files are authoritative: run previewer/build.cjs --check and update this reference if semantics changed.
 
 ## Container
 
@@ -51,7 +51,7 @@ Prefer the example's core fields. Additional types need source review; don't inv
 - agenda: imported source and events explicitly provided by user; never pretend a package grants full system-calendar permission.
 - album: square local albumCover AND host-compatible albumBackground, artist/title; host fixes albumInset=4.9. Review albumItems schema if using a library. No search or platform credentials.
 
-Reading blends cloud/bare/tag/sticker work for ordinary capabilities. Battery additionally supports badge; no badge for other types. Album uses its own appearance. Bare means the current host brush surface, not a second handwritten CSS implementation. Current reader migrates space/dock to sticker/tag; don't author the legacy names.
+Reading blends cloud/bare/tag/sticker work for ordinary capabilities. Battery supports only badge/cloud/bare; no tag/sticker and no badge for other types. Album uses its own appearance. Bare means the current host brush surface, not a second handwritten CSS implementation. Current reader migrates space/dock to sticker/tag; don't author the legacy names.
 
 ## Assets
 
@@ -78,3 +78,10 @@ Reading material: `capability.readingMaterial` is `paper` (default, warm white f
 - `albumPresentation`: cover/classic/row. Classic uses title below the square cover; row uses a full-height inset square cover on the left, title and artist on the right. Native two-line truncation and existing album radii apply. Never bake native album labels into a decorative image.
 - Density is host-adaptive: agenda/timetable gain more rows with available height. Do not emulate this by painting multiple live event records into HTML. Test small, large, empty and long-name fixtures.
 - Timed scenes now own one central card in the **local canvas catalog**, separate from normal canvases. Main canvas rotation partitions a full day, or follows system light/dark; only one mode is active. New rotation starts disabled, disabling retains its configuration, and manual canvas selection pauses it. A scene expires after its local timeout or is superseded by a later scene; presentation never changes the portable artwork. These catalog rules, local target IDs, acknowledgement history and runtime `canvasRotation`, `scenePolicyV2`, `systemDark` fields are NOT portable artwork. Author a one-card package for a central scene; users can copy it to a scene in App. Do not invent a global schedule field in `.fridge` or copy sender schedules/data. Legacy layouts/rules are retained only for migration.
+
+## Current visibility and static depth
+
+- `card.hidden` defaults to false. Hidden artwork stays editable but is excluded from canvas/Form rendering. Do not accidentally deliver an invisible hero; use it only for intentionally stored alternatives and explain that choice.
+- `capability.readingOpacity` is 0–1 (default 1); it affects the surface, not text, symbols or hook. Readability still needs visual review on the actual underlying art.
+- Existing static depth is optional: `subjectDepth:true` on a real photo subject places the subject foreground above the internal artwork; `depthCapabilityFront:true` keeps its capability above the foreground. An image element may use `depthEnabled:true`, embedded `depthForeground`, `depthCrop` and `depthSourceAspect` for a source-aligned alpha foreground. Derive the foreground from the same source and validate alignment; never fabricate a mask. `depthFront` lets ordinary elements sit above the internal foreground.
+- Canvas depth groups use shared `groupId` and `depthGroup:true` on a subject source. The renderer projects one eligible subject into base/foreground passes around the group members. This is not arbitrary multi-level 3D or the postponed exploded layer editor. Do not author derived `depthOwnerId`/`depthPass` or duplicate the projected source as extra cards. Ordinary overlapping cards with deliberate z values are usually enough for a collage.
