@@ -1,3 +1,5 @@
+import { widgetRectangles } from '../model/WidgetGeometry';
+import { GalleryThumbnail, cachedGalleryPreview, saveGalleryPreview, removeGalleryPreview } from '../model/GalleryPreviewCache';
 import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode, TextStyleMode } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { navigationChrome } from '../model/NavigationChrome';
@@ -9,7 +11,7 @@ import { taskpool } from '@kit.ArkTS';
 import lazy { prepareSceneRelief } from '../model/SceneRelief';
 import { CanvasEntry } from '../model/CanvasLibrary';
 import { FridgeState, FridgeCard, BOARD_W, BOARD_H } from '../model/CardSchema';
-import { GalleryItem, GalleryRow, galleryColumns, galleryRows, galleryRowKey } from '../model/CanvasGallery';
+import { GalleryItem, GalleryRow, galleryRows, galleryRowKey, galleryPreviewSize } from '../model/CanvasGallery';
 import { AppDesign } from '../model/AppDesign';
 import { immersiveChrome, chromeMaterial } from '../model/ChromeMaterial';
 import { storageSnapshot } from '../model/StorageSnapshot';
@@ -19,14 +21,6 @@ import { primeRenderContours } from '../model/RenderContours';
 import { CanvasBackdrop } from './CanvasBackdrop';
 import { CanvasFrame } from './CanvasFrame';
 import { CardFace } from './CardFace';
-
-class GalleryThumbnail {
-  source: string = '';
-  path: string = '';
-}
-// Derived previews survive navigation; no live clocks or GIFs run in the library.
-const thumbnails: Map<string, GalleryThumbnail> = new Map();
-let thumbnailSequence: number = 0;
 
 @Component
 export struct CanvasGallery {
@@ -47,6 +41,7 @@ export struct CanvasGallery {
   onImport: () => void = () => {};
   onSkill: (url: string) => void = () => {};
   @State items: GalleryItem[] = [];
+  @State widgetRects:Record<string,number[]>={};
   @State toolsOpen: boolean = false;
   @State filter: string = '';
   @State creating: boolean = false;
@@ -70,18 +65,20 @@ export struct CanvasGallery {
   private async loadItems(): Promise<void> {
     const generation = ++this.generation;
     this.documents.clear();
-    for (const id of thumbnails.keys()) {
-      if (!this.entries.some((entry: CanvasEntry) => entry.id === id)) {
-        const removed = thumbnails.get(id); thumbnails.delete(id);
-        if (removed) fileIo.unlink(removed.path.slice(7)).catch(() => {});
-      }
-    }
     this.items = this.entries.map((entry: CanvasEntry): GalleryItem => {
       const item = new GalleryItem(); item.id = entry.id; item.name = entry.name; return item;
     });
+    const context=this.getUIContext().getHostContext();const cacheDir=context?.cacheDir??'';
+    if(context){try{this.widgetRects=await widgetRectangles(context);}catch(_){}}
     for (const entry of this.entries) {
       if (!this.alive || generation !== this.generation) return;
       try {
+        const cached=await cachedGalleryPreview(cacheDir,entry.id);
+        if (!this.alive || generation !== this.generation) return;
+        if(cached)this.items=this.items.map((item:GalleryItem):GalleryItem=>{
+          if(item.id!==entry.id)return item;
+          const next=new GalleryItem();next.id=item.id;next.name=item.name;next.dimension=cached.dimension;next.aspect=cached.aspect;next.preview=cached.path;return next;
+        });
         const state = await this.onLoad(entry.id);
         if (!this.alive || generation !== this.generation) return;
         this.documents.set(entry.id, state);
@@ -90,8 +87,8 @@ export struct CanvasGallery {
           const item = new GalleryItem(); item.id = source.id; item.name = source.name;
           item.dimension = state.canvasDimension; item.aspect = state.canvasAspect;
           item.loaded = true;
-          const cached = thumbnails.get(item.id);
-          if (cached?.source === storageSnapshot(state)) item.preview = cached.path;
+
+          if (cached?.source === this.previewSource(state)) item.preview = cached.path;
           return item;
         });
         if (this.visibleIds.has(entry.id)) this.requestPreview(entry.id);
@@ -114,14 +111,14 @@ export struct CanvasGallery {
         const state = this.documents.get(id);
         if (!this.alive || generation !== this.generation || !state || !this.visibleIds.has(id)) return;
         const context = this.getUIContext().getHostContext(); if (!context) return;
-        const source = storageSnapshot(state);
+        const source = this.previewSource(state);
         const relief = JSON.parse(await taskpool.execute(new taskpool.Task(prepareSceneRelief, JSON.stringify(state.cards))) as string) as Record<string, string>;
         state.cards.forEach((card: FridgeCard) => { card.reliefSrc = relief[card.id] ?? card.reliefSrc; });
-        await primeRenderContours(state.cards, source);
+        await primeRenderContours(state.cards, storageSnapshot(state));
         if (!this.alive || generation !== this.generation) return;
         const pixel = await this.getUIContext().getComponentSnapshot().createFromBuilder(() => { this.artwork(state); }, 180, true,
           { scale: 1, waitUntilRenderFinished: true });
-        const path = context.cacheDir + '/gallery_' + id + '_' + (++thumbnailSequence) + '.png';
+        const path = context.cacheDir + '/gallery_v2_' + id + '_' + Date.now() + '.png';
         const packer = image.createImagePacker(); let file: fileIo.File | null = null;
         try {
           file = await fileIo.open(path, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE);
@@ -130,9 +127,9 @@ export struct CanvasGallery {
           try { if (file) fileIo.closeSync(file.fd); }
           finally { try { await packer.release(); } finally { await pixel.release(); } }
         }
-        const previous = thumbnails.get(id);
-        const cached = new GalleryThumbnail(); cached.source = source; cached.path = 'file://' + path; thumbnails.set(id, cached);
-        if (previous && previous.path !== cached.path) { try { await fileIo.unlink(previous.path.slice(7)); } catch (_) {} }
+        const cached = new GalleryThumbnail(); cached.source = source; cached.path = 'file://' + path;
+        cached.dimension=state.canvasDimension;cached.aspect=state.canvasAspect;
+        await saveGalleryPreview(context.cacheDir,id,cached);
         if (!this.alive || generation !== this.generation) return;
         this.items = this.items.map((value: GalleryItem): GalleryItem => {
           if (value.id !== id) return value;
@@ -155,9 +152,13 @@ export struct CanvasGallery {
       const next = new GalleryItem(); next.id = value.id; next.name = value.name; next.dimension = value.dimension;
       next.aspect = value.aspect; next.loaded = value.loaded; next.failed = true; return next;
     });
-    const cached = thumbnails.get(id); thumbnails.delete(id);
-    if (cached) fileIo.unlink(cached.path.slice(7)).catch(() => {});
+    const dir=this.getUIContext().getHostContext()?.cacheDir??'';
+    removeGalleryPreview(dir,id).catch(()=>{});
   }
+  private previewAspect(state:FridgeState):number {
+    const rect=galleryPreviewSize(state.canvasDimension,state.canvasAspect,this.contentWidth(),this.widgetRects);return rect[0]/rect[1];
+  }
+  private previewSource(state:FridgeState):string {return 'v3:'+storageSnapshot(state)+':hostAspect='+this.previewAspect(state);}
   private artworkCards(state: FridgeState): FridgeCard[] {
     return depthRenderCards(state.cards.filter((card: FridgeCard) => !card.hidden).map((card: FridgeCard) => cardRenderSnapshot(card)))
       .sort((a: FridgeCard, b: FridgeCard) => a.z - b.z);
@@ -168,18 +169,18 @@ export struct CanvasGallery {
       CanvasBackdrop({ sceneBackground: state.background, showFrame: false }).width('100%').height('100%')
       ForEach(this.artworkCards(state), (card: FridgeCard) => {
         CardFace({ card: card, scaleFactor: 1, tick: this.previewTick, widget: true })
-          .width(card.w).height(card.h).position({ x: card.x, y: card.y * (BOARD_W / state.canvasAspect) / BOARD_H })
+          .width(card.w).height(card.h).position({ x: card.x, y: card.y * (BOARD_W / this.previewAspect(state)) / BOARD_H })
           .rotate({ angle: card.rot, centerX: 0, centerY: '100%' }).zIndex(card.z)
       }, (card: FridgeCard) => card.id)
       if (state.background.frameStyle !== 'none') {
         CanvasFrame({ material: state.background.frameMaterial, style: state.background.frameStyle, square: true }).width('100%').height('100%').zIndex(100000)
       }
-    }.width(BOARD_W).height(BOARD_W / state.canvasAspect).clip(true)
+    }.width(BOARD_W).height(BOARD_W / this.previewAspect(state)).clip(true)
   }
-  private columns(): number { return galleryColumns(this.viewportWidth); }
+  private columns(): number { const small=galleryPreviewSize('2*2',1,this.contentWidth(),this.widgetRects)[0];return Math.max(1,Math.min(4,Math.floor((this.contentWidth()+16)/(small+16)))); }
   private contentWidth(): number { return Math.min(1120, this.viewportWidth - (this.viewportWidth >= 720 ? 48 : 32)); }
-  private tileWidth(wide: boolean): number { return wide ? this.contentWidth() : (this.contentWidth() - (this.columns() - 1) * 16) / this.columns(); }
-  private previewHeight(item: GalleryItem, wide: boolean): number { return this.tileWidth(wide) / Math.max(.3, item.aspect); }
+  private tileWidth(item:GalleryItem):number {return galleryPreviewSize(item.dimension,item.aspect,this.contentWidth(),this.widgetRects)[0];}
+  private previewHeight(item: GalleryItem, wide: boolean): number { return galleryPreviewSize(item.dimension,item.aspect,this.contentWidth(),this.widgetRects)[1]; }
   private menu(item: GalleryItem): MenuElement[] {
     return [
       { value: '重命名', action: () => { this.renameId = item.id; this.renameName = item.name; } },
@@ -238,7 +239,7 @@ export struct CanvasGallery {
             .bindMenu(this.menu(item), { systemMaterial: chromeMaterial(this.appDark), backgroundColor: AppDesign.popup(this.appDark) })
         }.width('100%').constraintSize({ minHeight: 48 })
       }
-    }.width(this.tileWidth(wide)).alignItems(HorizontalAlign.Start)
+    }.width(this.tileWidth(item)).alignItems(HorizontalAlign.Start)
   }
   build() {
     Stack({ alignContent: Alignment.Bottom }) {

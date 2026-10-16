@@ -341,7 +341,7 @@ struct Index {
     const materialReady=prepareChromeMaterial();
     this.store.init(this.context).then(async () => {
       await materialReady; startupMark('material-ready');
-      if ((this.viewRouteId||this.routedId) && this.routeCanvasId && this.routeCanvasId!==this.store.state.canvasId) await this.store.openCanvas(this.routeCanvasId);
+      if (this.routeCanvasId && this.routeCanvasId!==this.store.state.canvasId) await this.store.openCanvas(this.routeCanvasId);
       this.refreshCanvasList();
       // Refresh host geometry for the next launch without changing the visible arrival aspect.
       // Cached host geometry is enough for first paint. System IPC must not hold the screen blank.
@@ -999,7 +999,7 @@ struct Index {
     const canvas=this.routeCanvasId,id=this.viewRouteId;
     try {
       // A desktop tap is navigation, not an instruction to rebuild the same canvas.
-      if(!id && !this.routedId){
+      if(!id && !this.routedId && (!canvas||canvas===this.store.state.canvasId)){
         AppStorage.setOrCreate('routeCanvasId','');this.scheduleForegroundRefresh();return;
       }
       this.backgroundGeneration++;
@@ -1588,7 +1588,7 @@ struct Index {
   private showCardActions(): boolean {
     return !this.galleryVisible && !this.galleryTransitioning && !this.canvasChanging && !this.editing && !this.viewing && !this.arriving &&
       !this.heroActive && !this.activeBoardId && !this.groupSelecting && this.selectedGroup().length < 2 &&
-      !this.scheduledName && !this.scheduleTransition && !this.deletionId && !this.homeToolsOpen && !this.backgroundOpen && !this.scheduleOpen &&
+      !this.scheduledName && !this.scheduleTransition && !this.deletionId &&
       !!this.cardMap[this.selectedId] && !this.cardMap[this.selectedId].hidden;
   }
   private selectedActionAnchor(): CardActionAnchor {

@@ -26,7 +26,7 @@ export function galleryRows(items: GalleryItem[], filter: string, columns: numbe
   let pending = new GalleryRow();
   for (const item of items) {
     if (filter && item.dimension !== filter) continue;
-    if (item.aspect > 1.45 && columns > 1) {
+    if (item.dimension !== '2*2' && (item.dimension || item.aspect > 1.45) && columns > 1) {
       if (pending.items.length) { rows.push(pending); pending = new GalleryRow(); }
       const row = new GalleryRow(); row.id = item.id; row.wide = true; row.items = [item]; rows.push(row);
     } else {
@@ -37,4 +37,13 @@ export function galleryRows(items: GalleryItem[], filter: string, columns: numbe
   }
   if (pending.items.length) rows.push(pending);
   return rows;
+}
+
+/** Use measured launcher rectangles; before a host exists use its usual 4-column grid. */
+export function galleryPreviewSize(dimension:string,aspect:number,available:number,rects:Record<string,number[]>):number[]{
+  const full=Math.min(available,rects['4*4']?.[0]??344),small=(full-16)/2;
+  const measured=rects[dimension];
+  const width=Math.min(available,measured?.[0]??(dimension==='2*2'?small:full));
+  const ratio=measured&&measured[1]>0?measured[0]/measured[1]:Math.max(.3,aspect);
+  return [width,width/ratio];
 }

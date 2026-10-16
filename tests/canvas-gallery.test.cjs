@@ -98,12 +98,12 @@ const { Fixture } = execute(`class Fixture {
   const loading = gallery.slice(gallery.indexOf('  private async loadItems('), gallery.indexOf('  private requestPreview('));
   const { Loader } = execute(`class Loader {
     alive=true;generation=0;items=[];entries=[{id:'a',name:'A'}];documents=new Map();visibleIds=new Set();
-    requestPreview(){}onLoad=async()=>({cards:[],canvasDimension:'4*4',canvasAspect:1});
+    getUIContext(){return {getHostContext:()=>undefined};}previewSource(state){return JSON.stringify(state);}requestPreview(){}onLoad=async()=>({cards:[],canvasDimension:'4*4',canvasAspect:1});
     ${loading}
-  }exports.Loader=Loader;`, { GalleryItem: model.GalleryItem, thumbnails: new Map(), storageSnapshot: JSON.stringify, fileIo: { unlink: async () => {} } });
+  }exports.Loader=Loader;`, { GalleryItem: model.GalleryItem,cachedGalleryPreview:async()=>null, storageSnapshot: JSON.stringify, fileIo: { unlink: async () => {} } });
   let completeOld;
   const loader = new Loader(); loader.onLoad = async () => new Promise(resolve => completeOld = resolve);
-  const old = loader.loadItems();
+  const old = loader.loadItems();await new Promise(resolve=>setImmediate(resolve));
   loader.entries = [{ id: 'b', name: 'B' }]; loader.onLoad = async () => ({ cards: [], canvasDimension: '2*4', canvasAspect: 2 });
   await loader.loadItems(); completeOld({ cards: [], canvasDimension: '4*4', canvasAspect: 1 }); await old;
   assert.deepEqual(Array.from(loader.items.map(item => item.id)), ['b'], 'stale preview metadata cannot restore removed/replaced canvases');
@@ -122,3 +122,9 @@ for(const [filter,expected] of [['2*2','2*2'],['2*4','2*4'],['','4*4']]){
  const f=new creationFixture();f.filter=filter;f.scroller={scrollEdge(){}};f.startCreating();assert.equal(f.draftDimension,expected);assert.equal(f.creating,true);
 }
 assert.match(galleryView,/onCreate\(this.draftName.trim\(\) \|\| '新画布', this.draftDimension\)/);
+
+for(const available of [288,358,700]){
+ const small=model.galleryPreviewSize('2*2',1,available,{}),large=model.galleryPreviewSize('4*4',1,available,{}),strip=model.galleryPreviewSize('2*4',2,available,{});
+ assert(large[0]>small[0]*1.9,'large and small squares cannot have identical preview sizes');assert.equal(strip[0],large[0]);assert.equal(strip[1],strip[0]/2);
+}
+const measured=model.galleryPreviewSize('2*2',1,600,{'2*2':[190,170]});assert.equal(measured[0],190);assert.equal(measured[1],170,'native vp rectangle wins over nominal square ratio');

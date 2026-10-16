@@ -36,6 +36,7 @@
       }
     ],
     "extensionAbilities": [
+      {"name":"WidgetConfigAbility","srcEntry":"./ets/form/WidgetConfigAbility.ets","type":"formEdit","exported":true},
       {
         "name": "TemplateShareAbility",
         "srcEntry": "./ets/share/TemplateShareAbility.ets",

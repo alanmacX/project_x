@@ -82,13 +82,11 @@ export default class EntryAbility extends UIAbility {
 
   private routeCard(want: Want): void {
     const canvasId = want.parameters?.['canvasId'];
-    // Ordinary widget taps open the latest durable selection, not a cached display revision.
-    const viewTarget=want.parameters?.['viewCardId'],editTarget=want.parameters?.['cardId'];
-    const targetsCard=(typeof viewTarget==='string'&&viewTarget.length>0)||(typeof editTarget==='string'&&editTarget.length>0);
-    AppStorage.setOrCreate('routeCanvasId', targetsCard&&typeof canvasId === 'string' ? canvasId : '');
+    // A widget opens its bound document without rebinding any other instance.
+    AppStorage.setOrCreate('routeCanvasId', typeof canvasId === 'string' ? canvasId : '');
     const dim = want.parameters?.['canvasDimension'];
-    AppStorage.setOrCreate('launchFromWidget',typeof canvasId==='string'&&canvasId.length>0&&typeof dim==='string'&&['2*4','4*4','6*4'].includes(dim));
-    AppStorage.setOrCreate('widgetDimension', typeof dim === 'string' && ['2*4', '4*4', '6*4'].includes(dim) ? dim : '');
+    AppStorage.setOrCreate('launchFromWidget',typeof canvasId==='string'&&canvasId.length>0&&typeof dim==='string'&&['2*2','2*4','4*4','6*4'].includes(dim));
+    AppStorage.setOrCreate('widgetDimension', typeof dim === 'string' && ['2*2', '2*4', '4*4', '6*4'].includes(dim) ? dim : '');
     const aspect = Number(want.parameters?.['canvasAspect'] ?? 0);
     AppStorage.setOrCreate('widgetAspect', Number.isFinite(aspect) && aspect >= .3 && aspect <= 3 ? aspect : 0);
     const viewId = want.parameters?.['viewCardId'];

@@ -96,7 +96,8 @@ struct FridgeWidgetCard {
     const tick=Math.floor((this.rev>0?this.rev:Date.now())/60000)*60000;
     if(tick!==this.renderTick)this.renderTick=tick;
   }
-  @LocalStorageProp('canvasId') canvasId: string = 'canvas_main';
+  @LocalStorageProp('canvasId') canvasId: string = '';
+  @LocalStorageProp('formId') formId:string='';
   @LocalStorageProp('dim') dim: string = '4*4';
   @LocalStorageProp('canvasWidth') canvasWidth: number = 344;
   @LocalStorageProp('canvasHeight') canvasHeight: number = 344;
@@ -120,6 +121,7 @@ struct FridgeWidgetCard {
     this.cardMap = map; this.cardIds = cards.map((card: FridgeCard) => card.id);
   }
   private open(): void {
+    if(!(this.displayCanvasId||this.canvasId)){postCardAction(this,{action:'message',params:{operation:'configure'}});return;}
     postCardAction(this, { action: 'router', abilityName: 'EntryAbility',
       params: { canvasId: this.displayCanvasId||this.canvasId, viewCardId: '', canvasDimension: this.dim, canvasAspect: String(this.hostAspect()) } });
   }
@@ -152,7 +154,7 @@ struct FridgeWidgetCard {
         }
       }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
       if(this.canvasBackground.mode==='transparent'&&this.cardIds.length===0){
-        Column({space:8}){Text($r('app.string.app_name')).fontSize(18).fontWeight(FontWeight.Medium).fontColor('#302D23');Text('点击添加卡片').fontSize(13).fontColor('#696459')}
+        Column({space:8}){Text($r('app.string.app_name')).fontSize(18).fontWeight(FontWeight.Medium).fontColor('#302D23');Text((this.displayCanvasId||this.canvasId)?'点击添加卡片':'点击选择绑定画布').fontSize(13).fontColor('#696459')}
          .width('72%').height('28%').justifyContent(FlexAlign.Center).backgroundColor('#F2FAF8EF').borderRadius(20).position({x:'14%',y:'36%'}).hitTestBehavior(HitTestMode.None)
       }
       ForEach(this.cardIds.filter((id:string)=>!this.cardMap[id].hidden), (id: string) => {

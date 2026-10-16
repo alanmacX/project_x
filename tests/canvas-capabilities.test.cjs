@@ -72,7 +72,7 @@ function load(name) {
  const old=store.state,second=store.createCanvas('第二张');await store.save();
  const other=new FridgeCard();other.id='other';other.capability={k:'battery'};store.addCard(other);await store.save();
  assert.equal(JSON.parse(disk.get(canvasKey('canvas_main'))).cards[0].id,'original','new canvas never overwrites original');
- assert.equal(updates.at(-1).data.canvasId,second,'all forms follow the durable active canvas, including newly created canvases');
+ assert.equal(updates.at(-1).data.canvasId,'canvas_main','creating an unbound canvas does not change existing desktop content');
  const inactive=await store.canvasSnapshot('canvas_main');assert.equal(inactive.cards[0].id,'original');assert.equal(store.state.canvasId,second,'sharing inactive canvas never activates it');inactive.cards[0].x=999;assert.notEqual(JSON.parse(disk.get(canvasKey('canvas_main'))).cards[0].x,999);
  const active=await store.canvasSnapshot(second);active.cards[0].paper='#000000';assert.notEqual(store.state.cards[0].paper,'#000000','sharing snapshot is detached from live editor');
  disk.set('fridge_form_dims_json',JSON.stringify({home:'4*4',second:'4*4'}));disk.set('fridge_form_bindings_json',JSON.stringify({home:'canvas_main',second}));
@@ -92,13 +92,13 @@ function load(name) {
  assert.equal(boundCanvas({a:'canvas_main'},'a',reloaded.catalog),'canvas_main');assert.throws(()=>readCatalog('{"version":1,"canvases":[]}'));
  await reloaded.selectCanvas(duplicate);
  assert.equal(readCatalog(disk.get('fridge_canvases_json')).activeId,duplicate,'manual selection is durable before returning');
- assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).home,duplicate);
- assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).second,duplicate,'all installed widgets follow the explicit selection');
- assert.equal(updates.at(-1).data.canvasId,duplicate,'manual selection delivers the selected canvas');assert.equal(boundCanvas({home:'canvas_main'},'home',readCatalog(disk.get('fridge_canvases_json'))),duplicate,'stale legacy bindings cannot undo the current canvas');
+ assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).home,'canvas_main');
+ assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).second,'canvas_main','editor selection never rewrites desktop bindings');
+ assert.equal(updates.at(-1).data.canvasId,'canvas_main','manual selection does not deliver an unbound canvas');assert.equal(boundCanvas({home:'canvas_main'},'home',readCatalog(disk.get('fridge_canvases_json'))),'canvas_main','binding owns desktop selection');
  const selectedRestart=new FridgeStore();await selectedRestart.init({});assert.equal(selectedRestart.state.canvasId,duplicate,'relaunch never restores old selection');
- const unchangedUpdates=updates.length;await selectedRestart.refreshWidgets();await selectedRestart.refreshWidgets();assert.ok(updates.length>=unchangedUpdates+4,'time projection changes publish even with identical editable bytes');
+ const unchangedUpdates=updates.length;await selectedRestart.refreshWidgets();await selectedRestart.refreshWidgets();assert.equal(updates.length,unchangedUpdates,'refreshing an unbound editor cannot change another widget');
  selectedRestart.catalog.rotation.mode='time';selectedRestart.catalog.rotation.enabled=true;selectedRestart.catalog.rotation.slots=[{start:0,canvasId:duplicate},{start:600,canvasId:'canvas_main'}];
- await selectedRestart.selectCanvas('canvas_main');assert.equal(selectedRestart.catalog.rotation.enabled,false,'manual choice pauses automatic rotation');assert.equal(selectedRestart.catalog.rotation.slots.length,2,'rotation settings retained');
+ await selectedRestart.selectCanvas('canvas_main');assert.equal(selectedRestart.catalog.rotation.enabled,true,'editor navigation cannot change desktop rotation policy');selectedRestart.catalog.rotation.enabled=false;assert.equal(selectedRestart.catalog.rotation.slots.length,2,'rotation settings retained');
  // UI selection is durable and returns while previous desktop IPC is stalled.
  const {LatestWidgetQueue}=load('LatestWidgetQueue');let releaseDesktop;
  const stalled=new Promise(resolve=>releaseDesktop=resolve);
@@ -110,8 +110,8 @@ function load(name) {
  assert.equal(readCatalog(disk.get('fridge_canvases_json')).activeId,duplicate,'nonblocking selection still saves active canvas first');
  selectedRestart.state.background.color='#123456';await selectedRestart.save(false);
  releaseDesktop();await oldDelivery;await selectedRestart.selectionSettled();
- assert.equal(updates.at(-1).data.canvasId,duplicate,'desktop eventually receives the selected artwork');
- assert.equal(JSON.parse(JSON.parse(updates.at(-1).data.scenePacket).background).color,'#123456','delayed delivery includes edits made after selection');
+ assert.equal(updates.at(-1).data.canvasId,'canvas_main','stalled IPC cannot turn editor selection into a binding');
+ assert.notEqual(JSON.parse(JSON.parse(updates.at(-1).data.scenePacket).background).color,'#123456','edits to an unbound canvas stay off other widgets');
  const hydrateCount=jobs.filter(name=>name==='hydrateCanvas').length;
  await selectedRestart.openCanvas(duplicate);await selectedRestart.openCanvas(duplicate);
  assert.equal(jobs.filter(name=>name==='hydrateCanvas').length,hydrateCount,'unchanged persisted canvas reuses normalized layout and contour identities');
@@ -139,16 +139,15 @@ function load(name) {
  const {importAgenda,importCourses}=load('ScheduleImport'),ics='BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nDTSTART:20261004T100000Z\r\nDTEND:20261004T110000Z\r\nSUMMARY:Discuss\\, tomorrow\r\nLOCATION:Room A\r\nEND:VEVENT\r\nEND:VCALENDAR';const events=importAgenda(ics,new Date('2026-10-03').getTime());assert.equal(events[0].start,Date.UTC(2026,9,4,10));assert.equal(events[0].title,'Discuss, tomorrow');assert.ok(importAgenda(ics.replace('SUMMARY:','RRULE:FREQ=WEEKLY;COUNT=4\r\nSUMMARY:'),new Date('2026-10-03').getTime()).length===4,'weekly recurrence expands into actual instances');assert.throws(()=>importAgenda(ics.replace('SUMMARY:','RRULE:FREQ=MONTHLY\r\nSUMMARY:')),/复杂重复/);assert.throws(()=>importAgenda(ics.replace('DTSTART:20261004T100000Z','DTSTART;TZID=Asia/Shanghai:20261004T100000')),/时区/);assert.equal(importCourses(JSON.stringify([course])).length,1);assert.throws(()=>importCourses(JSON.stringify([{...course,day:9}])));
  const modelPath=path.resolve(root,'../form/FridgeFormAbility.ets');kits['@kit.FormKit'].FormExtensionAbility=class{constructor(){this.context=ctx;}};const Form=load('../form/FridgeFormAbility').default;
  const a=defaultState(),b=defaultState();a.canvasId='canvas_main';a.cards=[card];b.canvasId='canvas_second';other.capability={k:'battery',percent:1};b.cards=[other];disk.set('fridge_canvases_json',JSON.stringify({version:1,activeId:'canvas_second',canvases:[{id:'canvas_main',name:'A'},{id:'canvas_second',name:'B'}]}));disk.set(canvasKey(a.canvasId),JSON.stringify(a));disk.set(canvasKey(b.canvasId),JSON.stringify(b));disk.set('fridge_form_dims_json',JSON.stringify({fa:'4*4',fb:'4*4'}));disk.set('fridge_form_bindings_json',JSON.stringify({fa:'canvas_main',fb:'canvas_second'}));const form=new Form();form.onUpdateForm('fb');await form.actionQueue;assert.equal(JSON.parse(disk.get(canvasKey(b.canvasId))).cards[0].capability.percent,72,'background Form refresh reads live battery');assert.equal(JSON.parse(disk.get(canvasKey(a.canvasId))).cards[0].id,'original','another canvas is untouched');assert.equal(updates.at(-1).data.canvasId,'canvas_second');
- // Slow registration/flush must never gate the first visible artwork.
+ // First delivery must resolve the durable instance binding before reading artwork.
  const added=new Form();let releaseRegistration,finishAdd,firstDelivery;
  const registration=new Promise(resolve=>releaseRegistration=resolve),completedAdd=new Promise(resolve=>finishAdd=resolve),delivered=new Promise(resolve=>firstDelivery=resolve);
  added.register=()=>registration;added.refreshDueData=async()=>{};added.scheduleForm=async()=>finishAdd();
  const originalUpdate=kits['@kit.FormKit'].formProvider.updateForm;
  kits['@kit.FormKit'].formProvider.updateForm=async(id,payload)=>{await originalUpdate(id,payload);if(id==='instant')firstDelivery();};
+ const beforeRegistration=updates.length;
  added.onAddForm({parameters:{'ohos.extra.param.key.form_identity':'instant','ohos.extra.param.key.form_dimension':4}});
- let timeout;try {await Promise.race([delivered,new Promise((_,reject)=>{timeout=setTimeout(()=>reject(Error('initial delivery waited for registration')),2000);})]);}
- finally {clearTimeout(timeout);releaseRegistration();await completedAdd;kits['@kit.FormKit'].formProvider.updateForm=originalUpdate;}
- assert.ok(updates.find(u=>u.id==='instant').data.scenePacket,'initial artwork is sent while registration is still pending');
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(updates.length,beforeRegistration,'no wrong-canvas first-frame delivery');releaseRegistration();await delivered;await completedAdd;kits['@kit.FormKit'].formProvider.updateForm=originalUpdate;
  const {pushWidgets}=load('WidgetSync');removedForm='fb';await pushWidgets(ctx,JSON.stringify(b));assert.ok(!JSON.parse(disk.get('fridge_form_dims_json')).fb,'removed form is pruned without retrying indefinitely');assert.equal(JSON.parse(disk.get('fridge_form_dims_json')).fa,'4*4','another live canvas binding is preserved');assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).fa,'canvas_main');removedForm='';
  const ordinarySchedules=schedules.length;await pushWidgets(ctx,JSON.stringify(b));assert.equal(schedules.length,ordinarySchedules,'ordinary saves never re-request an acknowledged content boundary');schedules.length=0;
  // Use midday: a real run near midnight has a nearer calendar refresh boundary.
@@ -209,7 +208,7 @@ function load(name) {
  source.sceneRules=[];disk.set(canvasKey(source.canvasId),JSON.stringify(source));disk.set(canvasKey(destination.canvasId),'{broken');disk.set('fridge_form_dims_json',JSON.stringify({scene:'4*4',brokenForm:'4*4'}));disk.set('fridge_form_bindings_json',JSON.stringify({scene:source.canvasId,brokenForm:destination.canvasId}));const beforeIsolated=updates.length;
  await pushWidgets(ctx,JSON.stringify(source));assert(updates.length>beforeIsolated,'healthy bound canvas still delivers');assert.equal(disk.get(canvasKey(destination.canvasId)),'{broken');
  assert(updates.slice(beforeIsolated).every(u=>u.data.canvasId===source.canvasId),'obsolete bindings to a corrupt inactive canvas do not hide the healthy active canvas');
- const isolatedCatalog=JSON.parse(disk.get('fridge_canvases_json'));isolatedCatalog.activeId=destination.canvasId;disk.set('fridge_canvases_json',JSON.stringify(isolatedCatalog));const beforeMalformed=updates.length;await pushWidgets(ctx,JSON.stringify(source));assert.equal(updates.length,beforeMalformed,'corrupt active document retains the last artwork');disk.set(canvasKey(destination.canvasId),JSON.stringify({cards:null}));await pushWidgets(ctx,JSON.stringify(source));assert.equal(updates.length,beforeMalformed);
+ const isolatedCatalog=JSON.parse(disk.get('fridge_canvases_json'));isolatedCatalog.activeId=destination.canvasId;disk.set('fridge_canvases_json',JSON.stringify(isolatedCatalog));const beforeMalformed=updates.length;await pushWidgets(ctx,JSON.stringify(source));assert(updates.slice(beforeMalformed).every(u=>u.id==='scene'),'foreground selection does not redirect healthy bindings to the corrupt canvas');disk.set(canvasKey(destination.canvasId),JSON.stringify({cards:null}));await pushWidgets(ctx,JSON.stringify(source));assert(updates.slice(beforeMalformed).every(u=>u.id==='scene'),'corrupt widget retains its last artwork');
  // Reusable timetable migration must tolerate one damaged inactive canvas and
  // never overwrite a newer edit while an asynchronous legacy scan is pending.
  disk.clear();
@@ -256,6 +255,21 @@ function load(name) {
  }
  // Creation, storage normalization and reopen must retain the selected size.
  const sizeStore=new FridgeStore();await sizeStore.init({});
+ const {bindWidget,widgetDimension}=load('WidgetBinding');
+ assert.equal(widgetDimension(2),'2*2');assert.equal(widgetDimension(3),'2*4');
+ const smallId=sizeStore.createCanvas('小尺寸绑定',undefined,'2*2');await sizeStore.save(false);
+ const oldPolicy=JSON.parse(disk.get('fridge_canvases_json'));oldPolicy.desktopFollowsSelection=true;disk.set('fridge_canvases_json',JSON.stringify(oldPolicy));
+ await bindWidget({},'small-form',smallId,'2*2');
+ assert.equal(JSON.parse(disk.get('fridge_canvases_json')).desktopFollowsSelection,false,'configuring from the system freezes the old policy before the app opens');
+ const afterSystemBinding=new FridgeStore();await afterSystemBinding.init({});assert.equal(JSON.parse(disk.get('fridge_form_bindings_json'))['small-form'],smallId,'later app startup cannot overwrite the system choice');
+ await assert.rejects(bindWidget({},'wrong-size',smallId,'4*4'),/相同尺寸/);
+ const beforeNavBindings=disk.get('fridge_form_bindings_json');await sizeStore.selectCanvas(mainId);
+ assert.equal(disk.get('fridge_form_bindings_json'),beforeNavBindings,'navigating after configuring an instance leaves every binding unchanged');
+ await sizeStore.openCanvas(smallId);sizeStore.catalog.sceneRules=[];sizeStore.catalog.rotation.enabled=false;sizeStore.state.background.color='#ABC123';const beforeSmall=updates.length;await sizeStore.save(true);
+ assert(updates.slice(beforeSmall).some(u=>u.id==='small-form'&&u.data.canvasId===smallId),'editing a bound small canvas refreshes its instance');
+ const newForm=new Form();await newForm.register('new-unbound','2*2');assert.equal(JSON.parse(disk.get('fridge_form_bindings_json'))['new-unbound'],'');
+ await newForm.register('preview-copy','2*2',false,0,0,'small-form');assert.equal(JSON.parse(disk.get('fridge_form_bindings_json'))['preview-copy'],smallId,'native editor preview inherits its edited instance');
+ await newForm.register('preview-copy','',true);assert.equal(JSON.parse(disk.get('fridge_form_bindings_json'))['small-form'],smallId,'temporary preview cleanup preserves the real instance');
  for(const [dimension,aspect] of [['2*2',1],['2*4',2],['4*4',1]]){
   const id=sizeStore.createCanvas('尺寸回归 '+dimension,undefined,dimension);await sizeStore.save(false);
   const reopened=new FridgeStore();await reopened.init({});await reopened.openCanvas(id);
@@ -276,8 +290,9 @@ for(const legacyFlag of [undefined,false,true]){
  const old={version:1,activeId:'populated',canvases:[{id:'empty',name:'空画布'},{id:'populated',name:'当前画布'}]};
  if(legacyFlag!==undefined)old.desktopFollowsSelection=legacyFlag;
  const migrated=library.readCatalog(JSON.stringify(old));
- assert.equal(migrated.desktopFollowsSelection,true);
- assert.equal(library.boundCanvas({oldForm:'empty'},'oldForm',migrated),'populated','every legacy binding follows the durable active canvas without another manual selection');
+ assert.equal(migrated.desktopFollowsSelection,false);
+ assert.equal(library.boundCanvas({oldForm:'empty'},'oldForm',migrated),'empty','valid per-instance binding wins over the foreground canvas');
+ assert.equal(library.boundCanvas({oldForm:''},'oldForm',migrated),'','unconfigured instance remains explicitly unbound');
  assert.deepEqual(migrated.canvases,old.canvases,'migration never deletes other canvases');
 }
-console.log('PASS legacy canvas binding migration: missing/false/true policy, existing empty target retained and active document consistently selected');
+console.log('PASS independent binding policy: missing/false/true legacy flags, explicit bindings and unconfigured instances.');

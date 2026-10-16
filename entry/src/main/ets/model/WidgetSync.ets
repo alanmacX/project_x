@@ -45,13 +45,14 @@ export async function pushWidgets(context: Context, json: string): Promise<void>
   const catalog = readCatalog(catalogJson);
   const bindings = JSON.parse(await prefs.get('fridge_form_bindings_json','{}') as string) as Record<string,string>;
   const canvasId = (JSON.parse(json) as FridgeState).canvasId ?? 'canvas_main';
-  // Retain the registry for compatibility; rendering follows the durable catalog selection.
+  // Missing legacy bindings are fixed once; explicit empty bindings await user configuration.
   let changed = false;
-  for (const id of Object.keys(dims)) { if (!bindings[id]) { bindings[id] = catalog.activeId; changed = true; } }
+  for (const id of Object.keys(dims)) { if (bindings[id] === undefined) { bindings[id] = catalog.activeId; changed = true; } }
   if (changed) { await prefs.put('fridge_form_bindings_json',JSON.stringify(bindings)); await prefs.flush(); }
   const failures: string[] = [], removed: string[] = [];
   await Promise.all(Object.keys(dims).map(async (id: string) => {
     const baseId=catalogJson?boundCanvas(bindings,id,catalog):canvasId;
+    if(!baseId)return;
     let base:FridgeState;
     try {
       const source=baseId===canvasId?json:await prefs.get(canvasKey(baseId),'') as string;
@@ -74,6 +75,8 @@ export async function pushWidgets(context: Context, json: string): Promise<void>
     const deadline=Math.min(widgetBoundary(base,now),widgetBoundary(scene.state,now));
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
+        const latestBindings=JSON.parse(await prefs.get('fridge_form_bindings_json','{}') as string) as Record<string,string>;
+        if(boundCanvas(latestBindings,id,catalog)!==baseId)return;
         await updateWidget(id, sceneJson, dims[id],sceneWidgetContext(scene),await prefs.get('fridge_render_contours_v1_'+scene.state.canvasId,'') as string);
         await scheduleWidget(prefs,id,deadline,now);
         return;
