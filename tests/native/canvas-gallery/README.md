@@ -80,3 +80,10 @@ The scroll surface now occupies the whole page beneath a sibling native HDS navi
 Physical API26 evidence: `output/header-safearea.png` shows scrolling artwork behind the status bar/title and the gradient fading into the gallery. `header-before.json` / `header-safearea.json` record matching title/menu bounds and the 1px filter/artwork rounding difference. Swiping still scrolls the content; the floating create button opens the size/name controls; Cancel returns without creating a canvas; native More opens both Skill entries. No artwork or widget bindings were changed. Signed native compilation and canvas-gallery, chrome-material and chrome-material-compatibility tests passed.
 
 Reference: [Huawei navigation dynamic blur](https://developer.huawei.com/consumer/cn/doc/HarmonyOS-Guides/ui-design-navigation-dynamic-blur); safe-area/title options were checked against the installed HDS SDK declarations.
+
+
+## Native safe-area blur coverage correction · 2026-10-17
+
+The previous gallery navigation retained 4vp of outer top padding: this shifted the blur surface below the physical top even with component safe-area handling. Removed that outer padding and its matching content spacer; HDS now owns title safe-area avoidance and extends the material from the top of the full-page surface. The gallery also leaves `maskExtraHeight` undefined, using the SDK gradient extent instead of the App's explicit 32vp override. Workbench settings are unchanged. Fixed page spacing remains a design value, separate from system status-bar coverage.
+
+The signed build was installed on the connected API26 device. `output/header-system-inset.png` shows scrolling artwork blurred through the physical top with no former unblurred top strip. Native compilation and the canvas-gallery/chrome-material/chrome-material-compatibility tests passed. Other device sizes were not physically tested; their status-bar handling is delegated to HDS component safe areas rather than a device-specific offset.

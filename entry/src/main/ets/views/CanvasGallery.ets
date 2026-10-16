@@ -297,7 +297,7 @@ export struct CanvasGallery {
               Text(this.filter ? '可以先查看全部作品' : '添加照片、文字或实用卡片，创作自己的桌面作品').fontSize(14).fontColor(AppDesign.muted(this.appDark))
             }.width('100%').padding({ top: 64, bottom: 64 })
           }
-        }.width(this.contentWidth()).padding({ top: 76 + this.safeTop + 4, bottom: this.safeBottom + 104 }).alignItems(HorizontalAlign.Start)
+        }.width(this.contentWidth()).padding({ top: 76 + this.safeTop, bottom: this.safeBottom + 104 }).alignItems(HorizontalAlign.Start)
       }.width('100%').height('100%')
         .align(Alignment.Top).clip(false).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring)
       // A sibling native title bar can blur the full scroll surface without clipping it at the safe area.
@@ -313,9 +313,9 @@ export struct CanvasGallery {
               label: '新建画布', type: IconStyleMode.NORMAL, isEnabled: !this.busy, action: () => this.startCreating() } },
             { content: { label: '更多', type: TextStyleMode.NORMAL, isEnabled: !this.busy, action: () => this.toolsOpen = true } }
           ] }
-        }, style: navigationChrome(this.appDark, 32) })
+        }, style: navigationChrome(this.appDark, true) })
         .bindToScrollable([this.scroller]).hideBackButton(true).hideToolBar(true).mode(NavigationMode.Stack)
-        .width('100%').height('100%').padding({ top: 4 }).position({ x: 0, y: 0 })
+        .width('100%').height('100%').align(Alignment.Top)
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
         .hitTestBehavior(HitTestMode.Transparent).clip(false).backgroundColor(Color.Transparent)
       Column().width(1).height(1).position({ x: this.viewportWidth - 24, y: this.safeTop + 60 }).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
