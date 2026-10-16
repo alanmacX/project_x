@@ -44,3 +44,7 @@ view.widgetAspect=0;view.syncHostCanvasGeometry();assert.equal(view.canvasAspect
 view.store.canvasSpecs={};view.syncHostCanvasGeometry();assert.equal(view.canvasAspect,1);
 assert.equal(view.store.state.canvasAspect,1,'reading a live host ratio does not modify persisted composition');
 console.log('PASS original normalized full-host placement and App live-host/cached/fallback ratio policy.');
+
+view.store.state={canvasDimension:'2*2',canvasAspect:1};view.widgetDimension='4*4';view.widgetAspect=2;
+view.syncHostCanvasGeometry();assert.equal(view.canvasDimension,'2*2');assert.equal(view.canvasAspect,1,'stale widget dimensions cannot override a new small canvas');
+view.store.state={canvasDimension:'2*4',canvasAspect:2};view.syncHostCanvasGeometry();assert.equal(view.canvasDimension,'2*4');assert.equal(view.canvasAspect,2);

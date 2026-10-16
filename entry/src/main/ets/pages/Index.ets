@@ -1,3 +1,4 @@
+import { cardActionAnchor, CardActionAnchor } from '../model/CardActionPlacement';
 import { canvasPageTransition, CANVAS_PAGE_DURATION } from '../model/CanvasPageMotion';
 import { navigationChrome } from '../model/NavigationChrome';
 import lazy { CanvasGallery } from '../views/CanvasGallery';
@@ -416,8 +417,8 @@ struct Index {
     } catch (e) { this.templateError('画布保存未完成', e as Error); }
     finally { this.canvasChanging = false; }
   }
-  private async createGalleryCanvas(name: string): Promise<void> {
-    await this.newCanvas(false, name);
+  private async createGalleryCanvas(name: string, dimension: string): Promise<void> {
+    await this.newCanvas(false, name, dimension);
   }
   private async duplicateGalleryCanvas(id: string): Promise<void> {
     if (this.canvasChanging || this.busy || this.sharing || this.sceneNavigationBusy) return;
@@ -682,12 +683,12 @@ struct Index {
       this.refreshCapabilities();this.updateScheduledScene(true);
     } catch (e) { throw e as Error; }
   }
-  private async newCanvas(duplicate: boolean, name: string = ''): Promise<void> {
+  private async newCanvas(duplicate: boolean, name: string = '', dimension: string = '4*4'): Promise<void> {
     if(this.canvasChanging || this.sceneNavigationBusy || this.busy || this.sharing)return;this.canvasChanging=true;
     try {
       await this.store.save(false);this.backgroundGeneration++;
       const source = duplicate ? this.store.state : undefined;
-      const id = this.store.createCanvas(name.trim() || (duplicate ? this.canvasName+' 副本' : '画布 '+(this.canvasEntries.length+1)),source);
+      const id = this.store.createCanvas(name.trim() || (duplicate ? this.canvasName+' 副本' : '画布 '+(this.canvasEntries.length+1)),source,dimension);
       await this.loadCanvas(id,true); if(this.alive)this.setGalleryPage(false);
     } catch(e) {this.templateError('画布未创建',e as Error);}finally{this.canvasChanging=false;this.armScheduleTimer();this.updateScheduledScene(true);}
   }
@@ -794,8 +795,8 @@ struct Index {
   // Use the live launcher ratio when available, as in the original full-host renderer.
   // This updates layout only; opening or rotating never clamps saved card positions.
   private syncHostCanvasGeometry():void {
-    this.canvasDimension=this.widgetDimension||this.store.state.canvasDimension;
-    this.canvasAspect=this.widgetAspect>0?this.widgetAspect:(this.store.canvasSpecs[this.canvasDimension]??this.store.state.canvasAspect);
+    this.canvasDimension=this.store.state.canvasDimension;
+    this.canvasAspect=this.widgetDimension===this.canvasDimension&&this.widgetAspect>0?this.widgetAspect:(this.store.canvasSpecs[this.canvasDimension]??this.store.state.canvasAspect);
   }
   private widgetFrameChanged(): void {
     if(this.ready){this.syncHostCanvasGeometry();this.layoutBoard();}
@@ -1537,12 +1538,19 @@ struct Index {
             })
         if(!this.editing&&!this.viewing&&!this.arriving&&!this.groupSelecting&&this.selectedGroup().length<2&&!this.scheduledName&&!this.scheduleTransition) {
           ForEach(this.cardIds.filter((id:string)=>id===this.selectedId&&!this.cardMap[id].hidden),(id:string)=>{
-            BoardCard({controlsOnly:true,card:this.cardMap[id],motion:this.boardMotion,selected:true,scaleFactor:this.boardScale,yScaleFactor:this.boardHeight/BOARD_H,
+            BoardCard({controlsOnly:true,appDark:this.appDark,card:this.cardMap[id],motion:this.boardMotion,selected:true,scaleFactor:this.boardScale,yScaleFactor:this.boardHeight/BOARD_H,
               boardLeft:this.boardLeft,boardTop:this.boardTop,controlViewportWidth:BOARD_W*this.boardScale,controlViewportHeight:this.boardHeight,
               onDelete:(id:string)=>this.deleteCard(id),onEdit:(id:string)=>this.openEditor(id),
               onInteraction:(active:boolean)=>this.boardInteraction(id,active),onCommit:(next:FridgeCard)=>this.commitGeometry(next)})
           },(id:string)=>id)
         }
+        Column().width(1).height(1).position({ x: this.selectedActionAnchor().x, y: this.selectedActionAnchor().y })
+          .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
+          .bindPopup(this.showCardActions(), { builder: this.cardActions, width: 176, radius: 26, targetSpace: 8,
+            placement: this.selectedActionAnchor().above ? Placement.Top : Placement.Bottom,
+            systemMaterial: chromeMaterial(this.appDark), popupColor: AppDesign.popup(this.appDark),
+            backgroundBlurStyle: chromeMaterial(this.appDark) !== undefined ? BlurStyle.NONE : BlurStyle.COMPONENT_THIN,
+            enableArrow: false, autoCancel: false, focusable: false, mask: false })
         if (this.editorMounted) { this.editor() }
         if (this.chromeSnapshot !== undefined) {
           Image(this.chromeSnapshot).width(this.screenWidth).height(this.screenHeight - this.safeTop - EDITOR_SAFE_GAP)
@@ -1555,7 +1563,7 @@ struct Index {
           CanvasGallery({ entries: this.canvasEntries, appDark: this.appDark, viewportWidth: this.screenWidth, safeTop: this.safeTop, safeBottom: this.safeBottom,
             busy: this.canvasChanging || this.galleryTransitioning || this.busy || this.sharing, revision: this.galleryRevision,
             onLoad: (id: string): Promise<FridgeState> => this.store.canvasSnapshot(id),
-            onOpen: (id: string) => this.openGalleryCanvas(id), onCreate: (name: string) => this.createGalleryCanvas(name),
+            onOpen: (id: string) => this.openGalleryCanvas(id), onCreate: (name: string, dimension: string) => this.createGalleryCanvas(name, dimension),
             onRename: (id: string, name: string) => this.renameGalleryCanvas(id, name),
             onDuplicate: (id: string) => this.duplicateGalleryCanvas(id), onShare: (id: string) => this.shareCanvasById(id),
             onDelete: (id: string) => this.deleteCanvas(id), onImport: () => this.pickTemplate(),
@@ -1576,6 +1584,33 @@ struct Index {
         const width = Number(area.width), height = Number(area.height);
         if (width > 0 && height > 0 && (width!==this.screenWidth || height!==this.screenHeight)) { this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height);if(this.editing&&!this.heroActive)this.editorSheetOpen=!this.editorLandscape(); this.layoutBoard(); }
       })
+  }
+  private showCardActions(): boolean {
+    return !this.galleryVisible && !this.galleryTransitioning && !this.canvasChanging && !this.editing && !this.viewing && !this.arriving &&
+      !this.heroActive && !this.activeBoardId && !this.groupSelecting && this.selectedGroup().length < 2 &&
+      !this.scheduledName && !this.scheduleTransition && !this.deletionId && !this.homeToolsOpen && !this.backgroundOpen && !this.scheduleOpen &&
+      !!this.cardMap[this.selectedId] && !this.cardMap[this.selectedId].hidden;
+  }
+  private selectedActionAnchor(): CardActionAnchor {
+    const card = this.cardMap[this.selectedId]; if (!card) return new CardActionAnchor();
+    const fringe = compositionOverflow(card, this.boardScale);
+    return cardActionAnchor(card, this.boardScale, this.boardHeight / BOARD_H, this.boardLeft, this.boardTop, this.boardHeight,
+      this.screenWidth, this.screenHeight, this.safeTop, this.safeBottom, [fringe.left, fringe.top, fringe.right, fringe.bottom]);
+  }
+  @Builder
+  cardActions() {
+    Row() {
+      Button({ type: ButtonType.Circle, buttonStyle: ButtonStyleMode.NORMAL, role: ButtonRole.ERROR }) {
+        SymbolGlyph($r('sys.symbol.trash')).fontSize(22).fontColor(['#D3423C']).hitTestBehavior(HitTestMode.None)
+      }.width(48).height(44).backgroundColor(Color.Transparent).accessibilityText('删除卡片').onClick(() => this.deleteCard(this.selectedId))
+      Divider().vertical(true).width(1).height(24).color(AppDesign.border(this.appDark)).margin({ left: 6, right: 6 })
+      Button({ type: ButtonType.Capsule, buttonStyle: ButtonStyleMode.NORMAL }) {
+        Row({ space: 8 }) {
+          SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(22).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
+          Text('编辑').fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.appText()).hitTestBehavior(HitTestMode.None)
+        }
+      }.width(107).height(44).padding(0).backgroundColor(Color.Transparent).accessibilityText('编辑卡片内容').onClick(() => this.openEditor(this.selectedId))
+    }.width(176).height(52).padding(4)
   }
   private sceneCard(id: string): FridgeCard { return this.editing && id === this.selectedId ? this.preview : this.depthSceneMap[id]??this.cardMap[id]; }
   private sceneScale(id: string): number { return this.editing && id === this.selectedId ? this.surfaceScale() : 1; }

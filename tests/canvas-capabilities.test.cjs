@@ -254,6 +254,18 @@ function load(name) {
  const migration=sceneStore.upgradeTimedScenes(),sameMigration=sceneStore.upgradeTimedScenes();await entered;await sceneStore.openCanvas(migratedOther);releaseMigration();await Promise.all([migration,sameMigration]);
  assert.equal(sceneStore.state.canvasId,migratedOther,'migration cannot restore an old active document');assert.equal(sceneStore.catalog.activeId,migratedOther);assert.equal(sceneStore.catalog.scenes.length,1,'overlapping migration requests do not duplicate scenes');assert.equal(sceneStore.catalog.sceneRules.length,1);assert(disk.has(canvasKey(sceneStore.catalog.scenes[0].id)),'migrated scene is durably stored');sceneStore.canvasSnapshot=originalSnapshot;
  }
+ // Creation, storage normalization and reopen must retain the selected size.
+ const sizeStore=new FridgeStore();await sizeStore.init({});
+ for(const [dimension,aspect] of [['2*2',1],['2*4',2],['4*4',1]]){
+  const id=sizeStore.createCanvas('尺寸回归 '+dimension,undefined,dimension);await sizeStore.save(false);
+  const reopened=new FridgeStore();await reopened.init({});await reopened.openCanvas(id);
+  assert.equal(reopened.state.canvasDimension,dimension);assert.equal(reopened.state.canvasAspect,aspect);
+  const copy=reopened.createCanvas('副本',reopened.state);await reopened.save(false);
+  assert.equal((await reopened.canvasSnapshot(copy)).canvasDimension,dimension,'copy retains authored dimension');
+ }
+ assert.equal(sizeStore.createCanvas('非法尺寸',undefined,'invalid').length>0,true);
+ assert.equal(sizeStore.state.canvasDimension,'4*4');
+ console.log('PASS canvas creation sizes survive persistence, reopening and copying.');
  console.log('PASS independent central-card storage, fallback isolation, one-card capacity, cross-scene replacement, bound desktop ownership and policy-only publishing.');
  console.log('PASS timed delivery: atomic packet, bound-source ownership, target fanout, original geometry during battery updates, persisted acknowledgement and foreground merge, refresh minimum/quota, imported schedule remapping and opt-in.');
  console.log('PASS: legacy migration, lazy multi-canvas storage, independent duplication, widget bindings/deletion and removed-form cleanup, preserved corruption, movement-stable palette, offline refresh guard, live battery/Form refresh, conservative pickup OCR, course week/parity/boundaries, bounded ICS/JSON imports with recurrence exceptions and calendar ACL gate.');

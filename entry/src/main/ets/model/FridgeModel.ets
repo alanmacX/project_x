@@ -1,4 +1,5 @@
 import { normalizeCanvasRotation } from './CanvasRotation';
+import { creationDimension, creationAspect } from './CanvasSize';
 import { SceneRule } from './SceneScheduleSchema';
 import { TimetableLibrary, TimetableData } from './TimetableLibrary';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -183,11 +184,12 @@ export class FridgeStore {
     const entry=this.catalog.canvases.find(c=>c.id===state.canvasId);if(!entry)return;
     const doc=new CanvasDocument();doc.id=entry.id;doc.name=entry.name;doc.state=state;this.documents=this.documents.filter(c=>c.id!==doc.id);this.documents.push(doc);this.switchCanvas(doc.id);
   }
-  createCanvas(name: string, source?: FridgeState): string {
+  createCanvas(name: string, source?: FridgeState, dimension: string = '4*4'): string {
     assertCanvasCapacity(0, source?.cards.length ?? 0);
     const id = 'canvas_' + Date.now() + '_' + (++this.sequence);
     const doc = new CanvasDocument(); doc.id = id; doc.name = name.trim().slice(0,40) || '新画布';
     doc.state = source === undefined ? defaultState() : cloneCanvas(source, id); doc.state.canvasId = id;
+    if (source === undefined) { doc.state.canvasDimension = creationDimension(dimension); doc.state.canvasAspect = creationAspect(doc.state.canvasDimension); }
     this.documents.push(doc); this.catalog.canvases.push({id:id,name:doc.name}); this.switchCanvas(id); return id;
   }
   renameCanvas(name: string, id: string = this.catalog.activeId): void {

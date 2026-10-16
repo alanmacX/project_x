@@ -17,7 +17,7 @@ const fixture=`class Fixture {
  preview={capability:{k:'calendar'}};layerId='capability';elementPreview={kind:'text'};
 } module.exports=Fixture;`;
 vm.runInNewContext(ts.transpileModule(fixture,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,{module:moduleMock,Curve:{Friction:'friction'},HitTestMode:{Default:'default',None:'none'}});
-const f=new moduleMock.exports();assert.equal(f.controlRegions().length,4);assert.equal(f.controlRegions()[1].width,44);f.card.y=10;f.publishControlPose();
+const f=new moduleMock.exports();assert.equal(f.controlRegions().length,2);assert.equal(f.controlRegions()[1].width,44);f.card.y=10;f.publishControlPose();
 assert.equal(f.motion.controlId,'a');assert.equal(f.motion.controlPose.scale,1.5);assert.equal(f.motion.controlPose.y,20);assert.equal(f.motion.controlPose.angle,12);
 f.controlsOnly=false;f.resizing=false;assert.equal(f.resizeScale(),1.5,'artwork consumes the same resize pose as the controls');
 f.controlsOnly=true;f.rotating=true;f.publishControlPose();assert.equal(f.motion.controlPose.angle,34);

@@ -113,3 +113,12 @@ const { Fixture } = execute(`class Fixture {
   await damaged.loadItems(); assert.equal(damaged.items[0].failed, true); assert.equal(damaged.items[1].loaded, true, 'one damaged preview cannot block the remaining library');
   console.log('PASS gallery: mixed-size responsive rows, filters, serialized opening, save-before-return, load/save recovery, nested/scene back, teardown and warm widget route');
 })().catch(error => { console.error(error); process.exitCode = 1; });
+
+const sizes=execute(fs.readFileSync('entry/src/main/ets/model/CanvasSize.ets','utf8'));
+const galleryView=fs.readFileSync('entry/src/main/ets/views/CanvasGallery.ets','utf8');
+const createStart=galleryView.slice(galleryView.indexOf('  private startCreating()'),galleryView.indexOf('  private startCreating()')+galleryView.slice(galleryView.indexOf('  private startCreating()')).indexOf('\n'));
+const creationFixture=execute('export class CreationFixture { '+createStart+' }',{creationDimension:sizes.creationDimension,Edge:{Top:0}}).CreationFixture;
+for(const [filter,expected] of [['2*2','2*2'],['2*4','2*4'],['','4*4']]){
+ const f=new creationFixture();f.filter=filter;f.scroller={scrollEdge(){}};f.startCreating();assert.equal(f.draftDimension,expected);assert.equal(f.creating,true);
+}
+assert.match(galleryView,/onCreate\(this.draftName.trim\(\) \|\| '新画布', this.draftDimension\)/);

@@ -1,6 +1,7 @@
 import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode, TextStyleMode } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { navigationChrome } from '../model/NavigationChrome';
+import { CREATION_DIMENSIONS, creationDimension } from '../model/CanvasSize';
 import { image } from '@kit.ImageKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { LengthMetrics } from '@kit.ArkUI';
@@ -38,7 +39,7 @@ export struct CanvasGallery {
   @Prop busy: boolean = false;
   onLoad: (id: string) => Promise<FridgeState> = async () => new FridgeState();
   onOpen: (id: string) => void = () => {};
-  onCreate: (name: string) => void = () => {};
+  onCreate: (name: string, dimension: string) => void = () => {};
   onRename: (id: string, name: string) => void = () => {};
   onDuplicate: (id: string) => void = () => {};
   onShare: (id: string) => void = () => {};
@@ -50,6 +51,7 @@ export struct CanvasGallery {
   @State filter: string = '';
   @State creating: boolean = false;
   @State draftName: string = '';
+  @State draftDimension: string = '4*4';
   @State renameId: string = '';
   @State renameName: string = '';
   private alive: boolean = false;
@@ -64,7 +66,7 @@ export struct CanvasGallery {
   aboutToAppear(): void { this.alive = true; this.loadItems(); }
   aboutToDisappear(): void { this.alive = false; this.generation++; }
   private reload(): void { if (this.alive) this.loadItems(); }
-  private startCreating(): void { this.creating = true; this.draftName = ''; this.scroller.scrollEdge(Edge.Top); }
+  private startCreating(): void { this.draftDimension = creationDimension(this.filter); this.creating = true; this.draftName = ''; this.scroller.scrollEdge(Edge.Top); }
   private async loadItems(): Promise<void> {
     const generation = ++this.generation;
     this.documents.clear();
@@ -255,13 +257,24 @@ export struct CanvasGallery {
           }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
           if (this.creating) {
             Column({ space: 12 }) {
+              Text('画布尺寸').fontSize(14).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
+              Row({ space: 8 }) {
+                ForEach(CREATION_DIMENSIONS, (dimension: string) => {
+                  Button(dimension.replace('*', '×'), { type: ButtonType.Capsule, buttonStyle: ButtonStyleMode.NORMAL })
+                    .height(44).layoutWeight(1).fontSize(14).padding({ left: 8, right: 8 })
+                    .backgroundColor(AppDesign.choice(this.appDark, this.draftDimension === dimension))
+                    .fontColor(AppDesign.choiceText(this.appDark, this.draftDimension === dimension))
+                    .accessibilityText('创建 ' + dimension.replace('*', '×') + ' 画布' + (this.draftDimension === dimension ? '，已选中' : ''))
+                    .onClick(() => this.draftDimension = dimension)
+                }, (dimension: string) => dimension)
+              }.width('100%')
               TextInput({ text: this.draftName, placeholder: '新画布名称' }).height(48).maxLength(40).fontColor(AppDesign.text(this.appDark))
                 .backgroundColor(AppDesign.control(this.appDark)).borderRadius(12).onChange((value: string) => this.draftName = value)
               Row({ space: 8 }) {
                 Text('创建后即可添加卡片').fontSize(12).fontColor(AppDesign.muted(this.appDark)).layoutWeight(1)
                 Button('取消', { type: ButtonType.Capsule, buttonStyle: ButtonStyleMode.NORMAL }).height(44).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(() => this.creating = false)
                 Button('创建画布', { type: ButtonType.Capsule }).height(44).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark))
-                  .enabled(!this.busy).onClick(() => this.onCreate(this.draftName.trim() || '新画布'))
+                  .enabled(!this.busy).onClick(() => this.onCreate(this.draftName.trim() || '新画布', this.draftDimension))
               }.width('100%')
             }.width('100%').padding(16).borderRadius(20).backgroundColor(AppDesign.surface(this.appDark))
           }

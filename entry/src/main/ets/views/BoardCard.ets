@@ -3,6 +3,7 @@ import { alignToCanvas } from '../model/AlignmentGuide';
 import { groupBox } from '../model/GroupGeometry';
 import { EditorLayerMotion } from '../model/EditorLayerMotion';
 import { immersiveChrome } from '../model/ChromeMaterial';
+import { AppDesign } from '../model/AppDesign';
 import { BoardMotion } from '../model/BoardMotion';
 import { dragBounds, DragBounds } from '../model/DragGeometry';
 import { cardOutline } from '../model/RenderContours';
@@ -56,6 +57,7 @@ export struct BoardCard {
   @Prop @Watch('invalidateGeometry') card: FridgeCard = new FridgeCard();
   @Prop @Watch('syncHandles') selected: boolean = false;
   @Prop controlsOnly:boolean=false;
+  @Prop appDark:boolean=false;
   @Prop showControls:boolean=true;
   @Prop heroHidden: boolean = false;
   @Prop localCoordinates: boolean = false;
@@ -202,7 +204,7 @@ export struct BoardCard {
   private controlPosition(right: boolean, bottom: boolean): ShapePoint {
     const p=this.handle(right,bottom),a=(this.rotating?this.liveAngle:this.card.rot)*Math.PI/180,w=this.w(),h=this.h();
     const originX=this.card.x*this.scaleFactor+this.rotationShift().x,originY=(this.resizing?this.liveY:this.card.y)*this.yScaleFactor+this.rotationShift().y;
-    // Thin cutouts still need four distinct 44vp touch targets.
+    // Thin cutouts still need distinct 44vp transform targets.
     const rowSpan=Math.abs(this.handle(true,bottom).x-this.handle(false,bottom).x)*w;
     const columnSpan=Math.abs(this.handle(right,true).y-this.handle(right,false).y)*h;
     const localX=p.x*w+(right?1:-1)*Math.max(0,60-rowSpan)/2;
@@ -270,7 +272,7 @@ export struct BoardCard {
   }
   private controlRegions():Rectangle[] {
     if(!this.controlsOnly)return [{x:0,y:0,width:'100%',height:'100%'}];
-    return [this.controlPosition(false,false),this.controlPosition(true,false),this.controlPosition(false,true),this.controlPosition(true,true)]
+    return [this.controlPosition(true,false),this.controlPosition(false,true)]
       .map((p:ShapePoint):Rectangle=>({x:p.x,y:p.y,width:44,height:44}));
   }
   private publishControlPose():void {
@@ -316,13 +318,8 @@ export struct BoardCard {
       // Mount material controls and contour-aware handles only on selection.
       // Keep them alive through their dismissal animation.
       if(this.showControls&&(this.shown() || this.controlsMounted)) {
-      Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.ERROR }) {SymbolGlyph($r('sys.symbol.xmark')).fontSize(20).fontColor(['#D3423C']).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(24).fontColor('#D3423C').backgroundColor(Color.White)
-        .attributeModifier(immersiveChrome())
-        .opacity(this.controlsOpacity).scale({ x: this.controlsScale, y: this.controlsScale })
-        .position(this.controlPosition(false, false)).hitTestBehavior(this.shown() ? HitTestMode.Block : HitTestMode.BLOCK_DESCENDANTS)
-        .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('删除卡片').onClick(() => this.onDelete(this.card.id))
-      Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right')).fontSize(22).fontColor(['#303030']).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(22).fontColor('#303030').backgroundColor(Color.White)
-        .attributeModifier(immersiveChrome())
+      Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right')).fontSize(22).fontColor([AppDesign.text(this.appDark)]).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(22).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.surface(this.appDark))
+        .attributeModifier(immersiveChrome(this.appDark))
         .opacity(this.controlsOpacity).scale({ x: this.resizeControlScale, y: this.resizeControlScale })
         .position(this.controlPosition(true, false)).hitTestBehavior(this.shown() ? HitTestMode.Block : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('调整卡片大小').onClick(() => this.getUIContext().getPromptAction().showToast({ message: '向外拖动放大，向内拖动缩小' }))
@@ -332,8 +329,8 @@ export struct BoardCard {
         Text('最小可读尺寸').fontSize(12).fontColor('#FFFFFF').padding(8).backgroundColor('#303030').borderRadius(8)
           .position({ x: 24, y: this.h() + 26 }).hitTestBehavior(HitTestMode.None)
       }
-      Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(22).fontColor(['#303030']).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(22).fontColor('#303030').backgroundColor(Color.White)
-        .attributeModifier(immersiveChrome()).opacity(this.controlsOpacity).scale({ x: this.controlsScale, y: this.controlsScale })
+      Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(22).fontColor([AppDesign.text(this.appDark)]).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(22).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.surface(this.appDark))
+        .attributeModifier(immersiveChrome(this.appDark)).opacity(this.controlsOpacity).scale({ x: this.controlsScale, y: this.controlsScale })
         .position(this.controlPosition(false, true))
         .hitTestBehavior(this.shown() ? HitTestMode.Block : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('旋转整张卡片')
@@ -342,11 +339,7 @@ export struct BoardCard {
           .onActionUpdate((e: GestureEvent) => this.updateRotation(e))
           .onActionEnd((e: GestureEvent) => { this.updateRotation(e); this.finishRotation(); })
           .onActionCancel(() => { this.rotating = false;this.clearControlPose(); this.onInteraction(false); }))
-      Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(20).fontColor(['#303030']).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(11).fontColor('#303030').backgroundColor(Color.White)
-        .attributeModifier(immersiveChrome())
-        .opacity(this.controlsOpacity).scale({ x: this.controlsScale, y: this.controlsScale })
-        .position(this.controlPosition(true, true)).hitTestBehavior(this.shown() ? HitTestMode.Block : HitTestMode.BLOCK_DESCENDANTS)
-        .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('编辑卡片内容').onClick(() => this.onEdit(this.card.id))
+
       }
     }.width(this.w()+48+this.visibleOverflow().left+this.visibleOverflow().right).height(this.h()+48+this.visibleOverflow().top+this.visibleOverflow().bottom).opacity(this.heroHidden ? 0 : 1).hitTestBehavior(this.heroHidden ? HitTestMode.BLOCK_DESCENDANTS : this.controlsOnly?HitTestMode.Default:HitTestMode.Transparent)
       .responseRegion(this.controlRegions())

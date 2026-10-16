@@ -31,3 +31,11 @@ Once connected, verify:
 7. Folded phone and expanded/landscape layouts keep header, previews and tools within the safe area; no old canvas switch popup remains.
 
 Preview PNGs are derived local cache files. Failed previews remain openable as original artwork. Device captures and build logs belong under ignored `output/`, not in this commit.
+
+## Size creation and selected-card actions · 2026-10-17
+
+Native API26 debug build/signing passed and the package was installed on the physical device. Creating from the 2×2 filter preselected 2×2; the resulting gallery entry retained 2×2 after force-stop and cold launch. Creating from the 2×4 filter preselected 2×4 and opened a visibly horizontal 2×4 workbench (`output/stripready.png`). Temporary empty canvases were created for this manual check; existing artwork was preserved.
+
+Selected an existing card without changing its content. The native HDS popup shows the red trash, divider and edit action; resize remains at top-right and rotation at bottom-left. A card extending below the board initially placed its popup over the inspector; placement now uses the board bottom and flips above (`output/pill3.png`). Tapping the popup edit button opened the correct music-album editor; Back returned without changing content.
+
+Twelve targeted tests passed: canvas-gallery, canvas-capabilities, canvas-viewport, board-controls, card-action-placement, board-hold, template, editor-motion, chrome-material, chrome-material-compatibility, home-panel-race and widget-launch-selection. New coverage exercises filter-to-form size inheritance, dimension persistence/reopening/copying, stale host size isolation and rotated popup placement within board bounds. The card delete action was not exercised on existing user artwork. Desktop widget supported sizes and independent bindings remain outside this change.
