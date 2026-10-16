@@ -1,3 +1,5 @@
+import { canvasPageTransition, CANVAS_PAGE_DURATION } from '../model/CanvasPageMotion';
+import { navigationChrome } from '../model/NavigationChrome';
 import lazy { CanvasGallery } from '../views/CanvasGallery';
 import { depthElement, hasDepthSubject, internalDepth, depthOwner, depthRenderCards } from '../model/DepthComposition';
 import { canvasRotationEnabled } from '../model/CanvasRotation';
@@ -134,6 +136,9 @@ struct Index {
   @State enhancingBackground: boolean = false;
   private photoCropDialog: CustomDialogController | null = null;
   @State galleryVisible: boolean = true;
+  @State galleryTransitioning: boolean = false;
+  private galleryTransitionGeneration: number = 0;
+  private galleryTransitionTimer: number = -1;
   @State galleryRevision: number = 0;
   @StorageLink('launchFromWidget') @Watch('widgetLaunchChanged') launchFromWidget: boolean = false;
   @State canvasChanging: boolean = false;
@@ -296,7 +301,7 @@ struct Index {
   @StorageLink('appBackgrounded') @Watch('appWentBackground') appBackgrounded: boolean = false;
   private appWentBackground(): void {
     if(this.appBackgrounded) {
-      this.cancelForegroundRefresh();this.finishCardDeletion();
+      this.cancelGalleryTransition();this.cancelForegroundRefresh();this.finishCardDeletion();
       if(!this.ready)return;
       if(this.scheduleTransition){this.scheduleVisualGeneration++;this.scheduleTransition=false;this.schedulePhase=0;this.timedScene=null;this.scheduledName='';this.scheduledFocusId='';this.renderBoard();}
       this.flushPendingEdits();
@@ -383,7 +388,7 @@ struct Index {
     this.sceneEntries=this.store.catalog.scenes.slice();this.canvasName = this.store.activeName;
   }
   private async openGalleryCanvas(id: string): Promise<void> {
-    if (!this.alive || this.canvasChanging || this.busy || this.sharing || this.sceneNavigationBusy) return;
+    if (!this.alive || this.galleryTransitioning || this.canvasChanging || this.busy || this.sharing || this.sceneNavigationBusy) return;
     this.canvasChanging = true;
     try {
       await this.loadCanvas(id, true);
@@ -391,12 +396,12 @@ struct Index {
       this.sceneEditing = false; this.selectedId = ''; this.groupSelecting = false; this.groupSelection = [];
       this.canvasFlightX = 0; this.canvasFlightY = 0; this.canvasFlightAngle = 0;
       this.boardOpacity = 1; this.scatter = 0; this.startupCardCount = -1;
-      this.galleryVisible = false;
+      this.setGalleryPage(false);
     } catch (e) { this.templateError('画布打开未完成', e as Error); }
     finally { this.canvasChanging = false; this.armScheduleTimer(); this.updateScheduledScene(true); }
   }
   private async showGallery(): Promise<void> {
-    if (this.galleryVisible || this.arriving || this.heroActive || this.editing || this.viewing || this.canvasChanging || this.busy || this.sharing || this.deletionId || this.activeBoardId || this.sceneNavigationBusy || this.scheduleTransition) return;
+    if (this.galleryVisible || this.galleryTransitioning || this.arriving || this.heroActive || this.editing || this.viewing || this.canvasChanging || this.busy || this.sharing || this.deletionId || this.activeBoardId || this.sceneNavigationBusy || this.scheduleTransition) return;
     if (this.sceneEditing) { await this.leaveTimedScene(); return; }
     this.canvasChanging = true;
     this.scenePanelGeneration++; this.cancelScheduledTransition();
@@ -405,7 +410,7 @@ struct Index {
     try {
       this.flushPendingEdits(); await this.store.save(false);
       if (!this.alive) return;
-      this.refreshCanvasList(); this.galleryRevision++; this.galleryVisible = true;
+      this.refreshCanvasList(); this.galleryRevision++; this.setGalleryPage(true);
       AppStorage.setOrCreate('launchFromWidget', false);
       if (this.scheduleTimer >= 0) { clearTimeout(this.scheduleTimer); this.scheduleTimer = -1; }
     } catch (e) { this.templateError('画布保存未完成', e as Error); }
@@ -422,7 +427,7 @@ struct Index {
       await this.store.save(false);
       const next = this.store.createCanvas(this.canvasTitle(id) + ' 副本', source);
       await this.loadCanvas(next, true);
-      if (this.alive) { this.galleryVisible = false; this.boardOpacity = 1; this.startupCardCount = -1; }
+      if (this.alive) { this.boardOpacity = 1; this.startupCardCount = -1; this.setGalleryPage(false); }
     } catch (e) { this.templateError('画布复制未完成', e as Error); }
     finally { this.canvasChanging = false; this.armScheduleTimer(); this.updateScheduledScene(true); }
   }
@@ -433,27 +438,48 @@ struct Index {
     catch (e) { this.store.renameCanvas(previous, id); this.templateError('名称保存未完成', e as Error); }
     finally { this.canvasChanging = false; this.refreshCanvasList(); this.galleryRevision++; }
   }
+  private cancelGalleryTransition(): void {
+    this.galleryTransitionGeneration++;
+    if (this.galleryTransitionTimer >= 0) clearTimeout(this.galleryTransitionTimer);
+    this.galleryTransitionTimer = -1; this.galleryTransitioning = false;
+  }
+  private setGalleryPage(library: boolean): void {
+    if (this.galleryVisible === library) return;
+    this.cancelGalleryTransition();
+    const generation = this.galleryTransitionGeneration;
+    this.galleryTransitioning = true;
+    const finish = (): void => {
+      if (!this.alive || generation !== this.galleryTransitionGeneration) return;
+      this.cancelGalleryTransition(); this.armScheduleTimer(); this.updateScheduledScene(true);
+    };
+    // Native completion can be omitted when the window is backgrounded mid-transition.
+    this.galleryTransitionTimer = setTimeout(finish, CANVAS_PAGE_DURATION + 160);
+    this.getUIContext().animateTo({ duration: CANVAS_PAGE_DURATION, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: finish },
+      () => { this.galleryVisible = library; });
+  }
   @Builder
   canvasNavigation() {
-    Row({ space: 8 }) {
-      Button({ type: ButtonType.Capsule, buttonStyle: ButtonStyleMode.NORMAL }) {
-        Row({ space: 4 }) {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
-          Text(this.sceneEditing ? '定时' : '画布').fontSize(15).fontColor(this.appText())
-        }
-      }.height(44).padding({ left: 12, right: 14 }).attributeModifier(immersiveChrome(this.appDark)).enabled(!this.canvasChanging && !this.busy && !this.sharing)
-        .accessibilityText(this.sceneEditing ? '返回定时设置' : '返回作品库').onClick(() => this.showGallery())
-      Column({ space: 3 }) {
-        Text(this.canvasName).fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.appText()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text(this.canvasDimension.replace('*', '×')).fontSize(12).fontColor(this.appMuted())
-      }.layoutWeight(1)
-      Button({ type: ButtonType.Circle, buttonStyle: ButtonStyleMode.NORMAL }) {
-        Text('⋯').fontSize(24).fontColor(this.appText()).hitTestBehavior(HitTestMode.None)
-      }.id('shareCanvas').width(44).height(44).attributeModifier(immersiveChrome(this.appDark)).enabled(!this.canvasChanging && !this.busy && !this.sharing).accessibilityText('画布更多操作')
-        .bindMenu([{ value: '分享画布', action: () => this.shareCanvasById(this.store.state.canvasId) },
-          { value: '复制画布', action: () => this.duplicateGalleryCanvas(this.store.state.canvasId) },
-          { value: '导入作品', action: () => this.pickTemplate() }], { systemMaterial: chromeMaterial(this.appDark), backgroundColor: AppDesign.popup(this.appDark) })
-    }.width(this.screenWidth - 32).height(48).position({ x: 16, y: this.safeTop + 4 }).zIndex(150000)
+    HdsNavigation() {
+      Column().width('100%').height(0).hitTestBehavior(HitTestMode.None)
+    }.titleMode(HdsNavigationTitleMode.MINI)
+      .titleBar({ content: {
+        title: { mainTitle: this.canvasName, subTitle: this.canvasDimension.replace('*', '×') },
+        backIcon: { icon: new SymbolGlyphModifier($r('sys.symbol.chevron_left')).fontSize(20).fontColor([this.appText()]),
+          label: this.sceneEditing ? '返回定时设置' : '返回作品库', type: IconStyleMode.NORMAL,
+          isEnabled: !this.canvasChanging && !this.galleryTransitioning && !this.busy && !this.sharing, action: () => this.showGallery() },
+        menu: { maxCount: 1, value: [{ content: { label: '更多', type: TextStyleMode.NORMAL, componentId: 'shareCanvas',
+          isEnabled: !this.canvasChanging && !this.galleryTransitioning && !this.busy && !this.sharing, action: () => this.canvasMoreMenu() } }] }
+      }, style: navigationChrome(this.appDark) })
+      .hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).backgroundColor(Color.Transparent)
+      .width('100%').height(56).position({ x: 0, y: this.safeTop + 4 }).zIndex(150000).hitTestBehavior(HitTestMode.Transparent)
+  }
+  private async canvasMoreMenu(): Promise<void> {
+    const id = this.store.state.canvasId;
+    const choice = await this.navChoice('画布', ['分享画布', '复制画布', '导入作品'], 'shareCanvas');
+    if (!this.alive || id !== this.store.state.canvasId || this.galleryVisible) return;
+    if (choice === 0) this.shareCanvasById(id);
+    else if (choice === 1) this.duplicateGalleryCanvas(id);
+    else if (choice === 2) this.pickTemplate();
   }
   private canvasRouteChanged(): void { if(this.ready && this.routeCanvasId) this.scheduleWidgetRoute(); }
   private widgetLaunchChanged(): void { if (this.ready && this.launchFromWidget) this.scheduleWidgetRoute(); }
@@ -479,13 +505,13 @@ struct Index {
     if(this.savedLayouts.length>0||this.store.state.sceneLayouts.length>0)this.savedLayouts=this.store.state.sceneLayouts.slice();
   }
   private armScheduleTimer():void {
-    if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer);if(this.galleryVisible||!this.alive||!this.ready||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||(!withScenePolicy(this.store.state,this.store.catalog,this.appDark).sceneRules.some(r=>r.enabled)&&!canvasRotationEnabled(this.store.catalog.rotation)))return;
+    if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer);if(this.galleryVisible||this.galleryTransitioning||!this.alive||!this.ready||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||(!withScenePolicy(this.store.state,this.store.catalog,this.appDark).sceneRules.some(r=>r.enabled)&&!canvasRotationEnabled(this.store.catalog.rotation)))return;
     const wait=Math.min(60000,Math.max(100,nextSceneBoundary(withScenePolicy(this.store.state,this.store.catalog,this.appDark),Date.now())-Date.now()));
     this.scheduleTimer=setTimeout(()=>{this.scheduleTimer=-1;this.updateScheduledScene();},wait);
   }
   private scheduleInteractionBusy():boolean {return !!(this.deletionId||this.scheduleTransition||this.arriving||this.editing||this.viewing||this.heroActive||this.activeBoardId||this.gestureGroup||this.backgroundOpen||this.templateReviewOpen||this.incomingReview||this.sharing||this.busy);}
   private async updateScheduledScene(force:boolean=false):Promise<void> {
-    if(this.galleryVisible||!this.alive||!this.ready||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||this.sceneEditing||this.sceneNavigationBusy||this.canvasChanging)return;
+    if(this.galleryVisible||this.galleryTransitioning||!this.alive||!this.ready||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||this.sceneEditing||this.sceneNavigationBusy||this.canvasChanging)return;
     if(!this.scheduleOverride && !this.timedScene && (!withScenePolicy(this.store.state,this.store.catalog,this.appDark).sceneRules.some(r=>r.enabled)&&!canvasRotationEnabled(this.store.catalog.rotation))) {
       if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer);this.scheduleTimer=-1;return;
     }
@@ -662,7 +688,7 @@ struct Index {
       await this.store.save(false);this.backgroundGeneration++;
       const source = duplicate ? this.store.state : undefined;
       const id = this.store.createCanvas(name.trim() || (duplicate ? this.canvasName+' 副本' : '画布 '+(this.canvasEntries.length+1)),source);
-      await this.loadCanvas(id,true); this.galleryVisible=false;
+      await this.loadCanvas(id,true); if(this.alive)this.setGalleryPage(false);
     } catch(e) {this.templateError('画布未创建',e as Error);}finally{this.canvasChanging=false;this.armScheduleTimer();this.updateScheduledScene(true);}
   }
   private deleteCanvas(id: string): void {
@@ -744,8 +770,9 @@ struct Index {
       }
     } finally { this.repairingSubjects = false; }
   }
-  aboutToDisappear(): void { this.canvasFlightGeneration++;this.canvasFlightY=0;this.canvasFlightX=0;this.canvasFlightAngle=0;this.canvasChanging=false; this.reliefGeneration++;if(this.reliefTimer>=0)clearTimeout(this.reliefTimer); this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer); if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
+  aboutToDisappear(): void { this.cancelGalleryTransition();this.canvasFlightGeneration++;this.canvasFlightY=0;this.canvasFlightX=0;this.canvasFlightAngle=0;this.canvasChanging=false; this.reliefGeneration++;if(this.reliefTimer>=0)clearTimeout(this.reliefTimer); this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer); if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
+    if(this.galleryTransitioning)return true;
     if(this.navMenuOpen){this.finishNavMenu(-1);return true;}
     if(this.deletionId)return true;
     if(this.scheduleOpen){this.scenePanelGeneration++;this.scheduleOpen=false;this.updateScheduledScene(true);return true;}
@@ -967,7 +994,7 @@ struct Index {
   }
   private async reloadWidgetRoute():Promise<void> {
     if(!this.context || !this.alive)return;
-    this.galleryVisible=false;
+    this.cancelGalleryTransition();this.galleryVisible=false;
     const canvas=this.routeCanvasId,id=this.viewRouteId;
     try {
       // A desktop tap is navigation, not an instruction to rebuild the same canvas.
@@ -1387,7 +1414,7 @@ struct Index {
       }
     });
   }
-  onPageHide(): void { this.scenePanelGeneration++;this.pageVisible=false;this.cancelForegroundRefresh();this.flushPendingEdits(); }
+  onPageHide(): void { this.cancelGalleryTransition();this.scenePanelGeneration++;this.pageVisible=false;this.cancelForegroundRefresh();this.flushPendingEdits(); }
   private compareReading():void {
     if(!this.current()?.capability||this.readingComparisonOpen||this.capabilityPickerOpen)return;
     this.readingComparisonOpen=true;
@@ -1456,6 +1483,7 @@ struct Index {
       } else {
         if (!this.galleryVisible) {
         Stack({alignContent:Alignment.TopStart}) {
+        Stack({alignContent:Alignment.TopStart}) {
         this.board()
         if (this.editing && this.editorReady) {
           // Backdrop and chrome are separate from the persistent card surface.
@@ -1522,19 +1550,20 @@ struct Index {
         }
         if (this.viewing) { this.detail() }
         if (!this.editing && !this.viewing && !this.arriving) { this.canvasNavigation() }
+        }.width('100%').height('100%').transition(canvasPageTransition(false))
         } else {
           CanvasGallery({ entries: this.canvasEntries, appDark: this.appDark, viewportWidth: this.screenWidth, safeTop: this.safeTop, safeBottom: this.safeBottom,
-            busy: this.canvasChanging || this.busy || this.sharing, revision: this.galleryRevision,
+            busy: this.canvasChanging || this.galleryTransitioning || this.busy || this.sharing, revision: this.galleryRevision,
             onLoad: (id: string): Promise<FridgeState> => this.store.canvasSnapshot(id),
             onOpen: (id: string) => this.openGalleryCanvas(id), onCreate: (name: string) => this.createGalleryCanvas(name),
             onRename: (id: string, name: string) => this.renameGalleryCanvas(id, name),
             onDuplicate: (id: string) => this.duplicateGalleryCanvas(id), onShare: (id: string) => this.shareCanvasById(id),
             onDelete: (id: string) => this.deleteCanvas(id), onImport: () => this.pickTemplate(),
-            onSkill: (url: string) => this.openSkillRepository(url) })
+            onSkill: (url: string) => this.openSkillRepository(url) }).transition(canvasPageTransition(true))
         }
         Column().width(1).height(1).position({x:this.navMenuX,y:this.navMenuY}).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
           .bindMenu(this.navMenuOpen,this.navMenuItems,{placement:Placement.BottomRight,systemMaterial:chromeMaterial(this.appDark),backgroundColor:AppDesign.popup(this.appDark),onDisappear:()=>this.finishNavMenu(this.navMenuResult)})
-        if(this.canvasChanging){Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.Block).zIndex(200002)}
+        if(this.canvasChanging||this.galleryTransitioning){Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.Block).zIndex(200002)}
         if(this.deletionId){
           Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.Block).zIndex(200000)
           if(this.deletionBitmap!==undefined){CardDeletionFlight({bitmap:this.deletionBitmap,faceWidth:this.deletionW,faceHeight:this.deletionH,originX:this.deletionX,originY:this.deletionY,angle:this.deletionAngle,viewportWidth:this.screenWidth,viewportHeight:this.screenHeight,onDone:()=>this.finishCardDeletion()}).zIndex(200001)}
@@ -2174,7 +2203,7 @@ struct Index {
       }
       if(kind==='card'&&cards.length===1){cards[0].x=Math.max(0,(BOARD_W-cards[0].w)/2);cards[0].y=Math.max(0,(BOARD_H-cards[0].h)/2);}
       cards.forEach((c:FridgeCard)=>this.clamp(c));this.store.addCards(cards.slice().sort((a:FridgeCard,b:FridgeCard)=>a.z-b.z));this.render();this.persist(true);this.scheduleBackground();this.refreshCapabilities();
-      if(cards.length>0){this.galleryVisible=false;this.boardOpacity=1;this.startupCardCount=-1;this.select(cards[0].id);}
+      if(cards.length>0){this.boardOpacity=1;this.startupCardCount=-1;this.setGalleryPage(false);this.select(cards[0].id);}
     }catch(e){this.templateError('导入未完成',e as Error);}finally{this.busy=false;}
   }
   private async shareArtwork(single: boolean, source: FridgeState, cardId: string): Promise<void> {

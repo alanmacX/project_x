@@ -14,7 +14,11 @@ Existing unrelated baseline issues observed before feature completion: `share.te
 
 ## Native visual verification
 
-Pending emulator connection. Emulator CLI required confirmation of updated Huawei license agreements; the user chose to open the emulator and confirm personally. No device data was reset or removed.
+Initial prototype verification waited for an emulator connection. On 2026-10-17, the subsequent motion/material iteration was compiled, installed and checked on a connected physical API26 device. No device data was reset or removed.
+
+Verified in that iteration: normal launch shows the library with native HDS import/new/more buttons; opening an existing canvas shows the HDS back/more title bar; system Back restores the library; native More menus remain clickable after the transition. Both portrait and wide window layouts were observed on the device. Transition screenshots are in ignored `output/gallery-enter-*.png`. Automated coverage includes rapid navigation blocking, stale completion isolation, timeout recovery and cancellation.
+
+The device check also exposed stale loading placeholders in retained ArkUI row builders. Row keys now include settled preview metadata, so asynchronously generated thumbnails replace their initial loading nodes. A rebuilt package was installed and the native library showed the actual preview with no loading placeholders (`output/gallery-final-home.png`).
 
 Once connected, verify:
 

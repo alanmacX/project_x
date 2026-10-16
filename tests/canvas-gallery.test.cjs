@@ -24,13 +24,18 @@ for (const width of [320, 360, 390, 600, 720, 960, 1100, 1440]) {
 }
 assert.equal(model.galleryColumns(320), 1, 'short narrow windows retain usable previews');
 assert.equal(model.galleryRows([], '', 2).length, 0);
+const pendingRow = model.galleryRows([{id:'preview', name:'A', dimension:'', aspect:1, loaded:false, failed:false, preview:''}], '', 2)[0];
+const pendingKey = model.galleryRowKey(pendingRow);
+pendingRow.items[0].loaded = true; pendingRow.items[0].preview = 'file://preview.png';
+assert.notEqual(model.galleryRowKey(pendingRow), pendingKey, 'settled async previews must replace ArkUI builders that captured a loading row');
 
 const page = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 const methods = page.slice(page.indexOf('  private async openGalleryCanvas('), page.indexOf('  @Builder\n  canvasNavigation('));
 const routeMethods = page.slice(page.indexOf('  private canvasRouteChanged('), page.indexOf('  private async foregroundSchedules('));
 const calls = [];
+const motionTimers = new Map(); let motionTimerId = 0;
 const { Fixture } = execute(`class Fixture {
- alive=true;galleryVisible=true;galleryRevision=0;canvasChanging=false;busy=false;sharing=false;sceneNavigationBusy=false;
+ alive=true;galleryVisible=true;galleryRevision=0;galleryTransitioning=false;galleryTransitionGeneration=0;galleryTransitionTimer=-1;frameRate={};canvasChanging=false;busy=false;sharing=false;sceneNavigationBusy=false;
  heroActive=false;editing=false;viewing=false;deletionId='';activeBoardId='';sceneEditing=false;selectedId='';
  homeToolsOpen=true;scheduleOpen=true;backgroundOpen=true;groupSelecting=true;groupSelection=['card'];scheduleTimer=-1;scenePanelGeneration=0;
  boardOpacity=0;scatter=1;startupCardCount=4;ready=true;launchFromWidget=false;routeCanvasId='';
@@ -41,9 +46,10 @@ const { Fixture } = execute(`class Fixture {
  templateError(prefix,error){calls.push('error:'+prefix);}
  leaveTimedScene=async()=>calls.push('leave-scene');
  scheduleWidgetRoute(){calls.push('widget-route');}
+ getUIContext(){return {animateTo:(options,update)=>{update();options.onFinish();}};}
  ${methods}
  ${routeMethods}
-}exports.Fixture=Fixture;`, { calls, clearTimeout() {}, AppStorage: { setOrCreate: (key, value) => calls.push([key, value]) } });
+}exports.Fixture=Fixture;`, { calls, CANVAS_PAGE_DURATION:320, Curve:{Friction:0}, setTimeout:fn=>{motionTimers.set(++motionTimerId,fn);return motionTimerId;}, clearTimeout:id=>motionTimers.delete(id), AppStorage: { setOrCreate: (key, value) => calls.push([key, value]) } });
 
 (async () => {
   const f = new Fixture();
@@ -76,6 +82,18 @@ const { Fixture } = execute(`class Fixture {
   assert.equal(stopped.galleryVisible, true, 'late load cannot open a destroyed page');
   const widget = new Fixture(); widget.launchFromWidget = true; calls.length = 0; widget.widgetLaunchChanged();
   assert.deepEqual(calls, ['widget-route'], 'warm widget launch bypasses the library too');
+  const motion = new Fixture(), completions = [];
+  motion.getUIContext = () => ({ animateTo: (options, update) => { update(); completions.push(options.onFinish); } });
+  motion.setGalleryPage(false);
+  assert.equal(motion.galleryTransitioning, true); assert.equal(motion.galleryVisible, false);
+  await motion.showGallery(); assert.equal(motion.galleryVisible, false, 'back cannot replace an active native transition');
+  motion.cancelGalleryTransition(); motion.setGalleryPage(true);
+  completions.shift()(); assert.equal(motion.galleryTransitioning, true, 'old animation completion cannot release a newer transition');
+  completions.shift()(); assert.equal(motion.galleryTransitioning, false); assert.equal(motionTimers.size, 0);
+  motion.setGalleryPage(false); motionTimers.values().next().value();
+  assert.equal(motion.galleryTransitioning, false, 'deadline releases the interaction guard if native completion is omitted');
+  motion.setGalleryPage(true); motion.cancelGalleryTransition(); motion.alive = false;
+  completions.forEach(finish => finish()); assert.equal(motion.galleryTransitioning, false, 'teardown remains cancelled after stale completions');
   const gallery = fs.readFileSync('entry/src/main/ets/views/CanvasGallery.ets', 'utf8');
   const loading = gallery.slice(gallery.indexOf('  private async loadItems('), gallery.indexOf('  private requestPreview('));
   const { Loader } = execute(`class Loader {

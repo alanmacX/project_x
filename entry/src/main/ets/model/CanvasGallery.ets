@@ -13,6 +13,11 @@ export class GalleryRow {
   wide: boolean = false;
   items: GalleryItem[] = [];
 }
+/** ArkUI retains keyed builder arguments; replace a row when its async preview data settles. */
+export function galleryRowKey(row: GalleryRow): string {
+  return JSON.stringify([row.id, row.wide, row.items.map((item: GalleryItem): string =>
+    JSON.stringify([item.id, item.name, item.dimension, item.aspect, item.loaded, item.failed, item.preview]))]);
+}
 export function galleryColumns(width: number): number {
   return width < 360 ? 1 : width >= 1100 ? 4 : width >= 720 ? 3 : 2;
 }

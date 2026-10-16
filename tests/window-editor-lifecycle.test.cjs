@@ -10,7 +10,7 @@ const fixture=`class Fixture {
  editorSheetOpen=true;editorBackPending=false;arriving=false;heroActive=false;activeBoardId='';layerDrag='';gestureGroup='';refreshingCapabilities=false;
  routeCanvasId='canvas_a';viewRouteId='';routedId='';closed=0;collapsed=0;refreshes=0;renders=0;
  store={state:{canvasId:'canvas_a',cards:[{id:'a',capability:{k:'battery',percent:30}},{id:'b',capability:{k:'battery',percent:40}}]},init(){throw Error('unexpected full reload');},findCard(id){return this.state.cards.find(c=>c.id===id);}};
- closeEditor(){this.closed++;}expandEditor(){this.collapsed++;}scheduleForegroundRefresh(){this.refreshes++;}
+ cancelGalleryTransition(){}closeEditor(){this.closed++;}expandEditor(){this.collapsed++;}scheduleForegroundRefresh(){this.refreshes++;}
  render(){this.renders++;}persist(){saves.push(this.store.state.cards.map(c=>c.capability.percent));}updateScheduledScene(){}
  ${method('  private dismissEditorSheet(', '  private expandEditor(')}
  ${method('  private async reloadWidgetRoute(', '  private calendarAction(')}

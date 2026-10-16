@@ -1,3 +1,6 @@
+import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode, TextStyleMode } from '@kit.UIDesignKit';
+import { SymbolGlyphModifier } from '@kit.ArkUI';
+import { navigationChrome } from '../model/NavigationChrome';
 import { image } from '@kit.ImageKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { LengthMetrics } from '@kit.ArkUI';
@@ -5,7 +8,7 @@ import { taskpool } from '@kit.ArkTS';
 import lazy { prepareSceneRelief } from '../model/SceneRelief';
 import { CanvasEntry } from '../model/CanvasLibrary';
 import { FridgeState, FridgeCard, BOARD_W, BOARD_H } from '../model/CardSchema';
-import { GalleryItem, GalleryRow, galleryColumns, galleryRows } from '../model/CanvasGallery';
+import { GalleryItem, GalleryRow, galleryColumns, galleryRows, galleryRowKey } from '../model/CanvasGallery';
 import { AppDesign } from '../model/AppDesign';
 import { immersiveChrome, chromeMaterial } from '../model/ChromeMaterial';
 import { storageSnapshot } from '../model/StorageSnapshot';
@@ -43,6 +46,7 @@ export struct CanvasGallery {
   onImport: () => void = () => {};
   onSkill: (url: string) => void = () => {};
   @State items: GalleryItem[] = [];
+  @State toolsOpen: boolean = false;
   @State filter: string = '';
   @State creating: boolean = false;
   @State draftName: string = '';
@@ -236,26 +240,9 @@ export struct CanvasGallery {
   }
   build() {
     Stack({ alignContent: Alignment.Bottom }) {
+      HdsNavigation() {
       Scroll(this.scroller) {
         Column({ space: 20 }) {
-          Row({ space: 8 }) {
-            Column({ space: 6 }) {
-              Text('我的画布').fontSize(30).fontWeight(FontWeight.Bold).fontColor(AppDesign.text(this.appDark))
-              Text(this.entries.length + ' 张画布').fontSize(14).fontColor(AppDesign.muted(this.appDark))
-            }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-            Button({ type: ButtonType.Circle, buttonStyle: ButtonStyleMode.NORMAL }) {
-              SymbolGlyph($r('sys.symbol.square_and_arrow_down')).fontSize(22).fontColor([AppDesign.text(this.appDark)]).hitTestBehavior(HitTestMode.None)
-            }.width(48).height(48).attributeModifier(immersiveChrome(this.appDark)).enabled(!this.busy).accessibilityText('导入作品').onClick(() => this.onImport())
-            Button({ type: ButtonType.Circle, buttonStyle: ButtonStyleMode.NORMAL }) {
-              SymbolGlyph($r('sys.symbol.plus')).fontSize(24).fontColor([AppDesign.text(this.appDark)]).hitTestBehavior(HitTestMode.None)
-            }.width(48).height(48).attributeModifier(immersiveChrome(this.appDark)).enabled(!this.busy).accessibilityText('新建画布').onClick(() => this.startCreating())
-            Button({ type: ButtonType.Circle, buttonStyle: ButtonStyleMode.NORMAL }) {
-              Text('⋯').fontSize(24).fontColor(AppDesign.text(this.appDark)).hitTestBehavior(HitTestMode.None)
-            }.width(44).height(44).backgroundColor(Color.Transparent).accessibilityText('更多创作工具')
-              .bindMenu([{ value: '创作 Skill · Gitee', action: () => this.onSkill('https://gitee.com/alanmac/fridge-signing-system') },
-                { value: '创作 Skill · GitHub', action: () => this.onSkill('https://github.com/alanmacX/fridge-creating-skill') }],
-                { systemMaterial: chromeMaterial(this.appDark), backgroundColor: AppDesign.popup(this.appDark) })
-          }.width('100%')
           Scroll() {
             Row({ space: 8 }) {
               ForEach(['', '4*4', '2*4', '2*2'], (dimension: string) => {
@@ -282,15 +269,32 @@ export struct CanvasGallery {
             Row({ space: 16 }) {
               ForEach(row.items, (item: GalleryItem) => { this.tile(item, row.wide) }, (item: GalleryItem) => item.id)
             }.width('100%').alignItems(VerticalAlign.Top)
-          }, (row: GalleryRow) => row.id + '_' + String(row.wide))
+          }, (row: GalleryRow) => galleryRowKey(row))
           if (!galleryRows(this.items, this.filter, this.columns()).length) {
             Column({ space: 12 }) {
               Text(this.filter ? '还没有这个尺寸的画布' : '从第一张画布开始').fontSize(18).fontColor(AppDesign.text(this.appDark))
               Text(this.filter ? '可以先查看全部作品' : '添加照片、文字或实用卡片，创作自己的桌面作品').fontSize(14).fontColor(AppDesign.muted(this.appDark))
             }.width('100%').padding({ top: 64, bottom: 64 })
           }
-        }.width(this.contentWidth()).padding({ top: this.safeTop + 24, bottom: this.safeBottom + 104 }).alignItems(HorizontalAlign.Start)
+        }.width(this.contentWidth()).padding({ top: 76, bottom: this.safeBottom + 104 }).alignItems(HorizontalAlign.Start)
       }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring).fadingEdge(true, { fadingEdgeLength: LengthMetrics.vp(12) })
+      }.titleMode(HdsNavigationTitleMode.MINI)
+        .titleBar({ content: {
+          title: { mainTitle: '我的画布', subTitle: this.entries.length + ' 张画布' },
+          menu: { maxCount: 3, value: [
+            { content: { icon: new SymbolGlyphModifier($r('sys.symbol.square_and_arrow_down')).fontSize(22).fontColor([AppDesign.text(this.appDark)]),
+              label: '导入作品', type: IconStyleMode.NORMAL, isEnabled: !this.busy, action: () => this.onImport() } },
+            { content: { icon: new SymbolGlyphModifier($r('sys.symbol.plus')).fontSize(22).fontColor([AppDesign.text(this.appDark)]),
+              label: '新建画布', type: IconStyleMode.NORMAL, isEnabled: !this.busy, action: () => this.startCreating() } },
+            { content: { label: '更多', type: TextStyleMode.NORMAL, isEnabled: !this.busy, action: () => this.toolsOpen = true } }
+          ] }
+        }, style: navigationChrome(this.appDark) })
+        .bindToScrollable([this.scroller]).hideBackButton(true).hideToolBar(true).mode(NavigationMode.Stack)
+        .width('100%').height('100%').padding({ top: this.safeTop + 4 }).backgroundColor(Color.Transparent)
+      Column().width(1).height(1).position({ x: this.viewportWidth - 24, y: this.safeTop + 60 }).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
+        .bindMenu(this.toolsOpen, [{ value: '创作 Skill · Gitee', action: () => { this.toolsOpen = false; this.onSkill('https://gitee.com/alanmac/fridge-signing-system'); } },
+          { value: '创作 Skill · GitHub', action: () => { this.toolsOpen = false; this.onSkill('https://github.com/alanmacX/fridge-creating-skill'); } }],
+          { systemMaterial: chromeMaterial(this.appDark), backgroundColor: AppDesign.popup(this.appDark), onDisappear: () => this.toolsOpen = false })
       if (!this.creating) {
         Button('+ 新建画布', { type: ButtonType.Capsule, buttonStyle: ButtonStyleMode.NORMAL }).height(48).padding({ left: 24, right: 24 }).fontSize(16)
           .backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).margin({ bottom: this.safeBottom + 16 })
