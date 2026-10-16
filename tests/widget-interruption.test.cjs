@@ -36,4 +36,4 @@ vm.runInNewContext(ts.transpileModule(fixture,{compilerOptions:{target:ts.Script
  console.log('PASS interrupted widget entrance: pending timer cancellation, stale result isolation, untouched no-op exit and pending edit durability');
 })().catch(e=>{console.error(e);process.exitCode=1;});
 assert.match(source,/const widgetLaunch=AppStorage.get<boolean>\('launchFromWidget'\)===true/,'cold widget route uses the native launcher transition instead of a second scatter entrance');
-assert.match(source,/if \(!routedLaunch && this.cardIds.length > 0\) this.startArrival\(\);/,'icon cold launch retains the designed entrance');
+assert.match(source,/this.galleryVisible = !routedLaunch;/,'icon launch opens the library while widget/card routes retain their direct editor entrance');

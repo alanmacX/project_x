@@ -1,3 +1,4 @@
+import lazy { CanvasGallery } from '../views/CanvasGallery';
 import { depthElement, hasDepthSubject, internalDepth, depthOwner, depthRenderCards } from '../model/DepthComposition';
 import { canvasRotationEnabled } from '../model/CanvasRotation';
 import { prepareReadingTints, ReadingTintRequest, ReadingTintResult } from '../model/ReadingMaterialWorker';
@@ -132,15 +133,12 @@ struct Index {
   @State enhancingSubject: boolean = false;
   @State enhancingBackground: boolean = false;
   private photoCropDialog: CustomDialogController | null = null;
-  @State canvasPickerOpen: boolean = false;
-  @State canvasCreating: boolean = false;
-  @State canvasDuplicate: boolean = false;
-  @State canvasDraftName: string = '';
+  @State galleryVisible: boolean = true;
+  @State galleryRevision: number = 0;
+  @StorageLink('launchFromWidget') @Watch('widgetLaunchChanged') launchFromWidget: boolean = false;
   @State canvasChanging: boolean = false;
   @State canvasEntries: CanvasEntry[] = [];
   @State canvasName: string = '我的画布';
-  @State renameValue: string = '';
-  @State canvasRenameId: string = '';
   @StorageLink('routeCanvasId') @Watch('canvasRouteChanged') routeCanvasId: string = '';
   @State groupSelecting: boolean = false;
   @State groupSelection: string[] = [];
@@ -351,6 +349,7 @@ struct Index {
       // scatter/prepare sequence underneath it fights quick gesture cancellation.
       const widgetLaunch=AppStorage.get<boolean>('launchFromWidget')===true;
       const routedLaunch = widgetLaunch || this.routedId.length > 0 || this.viewRouteId.length > 0;
+      this.galleryVisible = !routedLaunch;
       this.canvasBackground = this.store.state.background; this.layoutBoard();
       startupMark('geometry-ready');
       if(!this.alive)return;
@@ -359,7 +358,6 @@ struct Index {
       this.scheduleBackground(); this.routeChanged(); this.viewRouteChanged(); this.incomingTemplateChanged();
       if(!this.viewRouteId && this.routeCanvasId===this.store.state.canvasId)AppStorage.setOrCreate('routeCanvasId','');
       if(widgetLaunch && !this.editing && !this.viewing && this.cardIds.length>0)this.prepareWidgetScene();
-      else if (!routedLaunch && this.cardIds.length > 0) this.startArrival();
       else this.getUIContext().postFrameCallback(new PreparedTransition(() => { revealStartup(); }));
       this.scheduleMaintenance();
 
@@ -382,9 +380,83 @@ struct Index {
   }
   private refreshCanvasList(): void {
     this.canvasEntries = this.store.catalog.canvases.map((c: CanvasEntry): CanvasEntry => ({id:c.id,name:c.name}));
-    this.sceneEntries=this.store.catalog.scenes.slice();this.canvasName = this.store.activeName; this.renameValue = this.canvasName;
+    this.sceneEntries=this.store.catalog.scenes.slice();this.canvasName = this.store.activeName;
+  }
+  private async openGalleryCanvas(id: string): Promise<void> {
+    if (!this.alive || this.canvasChanging || this.busy || this.sharing || this.sceneNavigationBusy) return;
+    this.canvasChanging = true;
+    try {
+      await this.loadCanvas(id, true);
+      if (!this.alive) return;
+      this.sceneEditing = false; this.selectedId = ''; this.groupSelecting = false; this.groupSelection = [];
+      this.canvasFlightX = 0; this.canvasFlightY = 0; this.canvasFlightAngle = 0;
+      this.boardOpacity = 1; this.scatter = 0; this.startupCardCount = -1;
+      this.galleryVisible = false;
+    } catch (e) { this.templateError('画布打开未完成', e as Error); }
+    finally { this.canvasChanging = false; this.armScheduleTimer(); this.updateScheduledScene(true); }
+  }
+  private async showGallery(): Promise<void> {
+    if (this.galleryVisible || this.arriving || this.heroActive || this.editing || this.viewing || this.canvasChanging || this.busy || this.sharing || this.deletionId || this.activeBoardId || this.sceneNavigationBusy || this.scheduleTransition) return;
+    if (this.sceneEditing) { await this.leaveTimedScene(); return; }
+    this.canvasChanging = true;
+    this.scenePanelGeneration++; this.cancelScheduledTransition();
+    this.homeToolsOpen = false; this.scheduleOpen = false; this.backgroundOpen = false;
+    this.selectedId = ''; this.groupSelecting = false; this.groupSelection = [];
+    try {
+      this.flushPendingEdits(); await this.store.save(false);
+      if (!this.alive) return;
+      this.refreshCanvasList(); this.galleryRevision++; this.galleryVisible = true;
+      AppStorage.setOrCreate('launchFromWidget', false);
+      if (this.scheduleTimer >= 0) { clearTimeout(this.scheduleTimer); this.scheduleTimer = -1; }
+    } catch (e) { this.templateError('画布保存未完成', e as Error); }
+    finally { this.canvasChanging = false; }
+  }
+  private async createGalleryCanvas(name: string): Promise<void> {
+    await this.newCanvas(false, name);
+  }
+  private async duplicateGalleryCanvas(id: string): Promise<void> {
+    if (this.canvasChanging || this.busy || this.sharing || this.sceneNavigationBusy) return;
+    this.canvasChanging = true;
+    try {
+      const source = await this.store.canvasSnapshot(id);
+      await this.store.save(false);
+      const next = this.store.createCanvas(this.canvasTitle(id) + ' 副本', source);
+      await this.loadCanvas(next, true);
+      if (this.alive) { this.galleryVisible = false; this.boardOpacity = 1; this.startupCardCount = -1; }
+    } catch (e) { this.templateError('画布复制未完成', e as Error); }
+    finally { this.canvasChanging = false; this.armScheduleTimer(); this.updateScheduledScene(true); }
+  }
+  private async renameGalleryCanvas(id: string, name: string): Promise<void> {
+    if (this.canvasChanging || this.busy || this.sharing || !name.trim()) return;
+    const previous = this.canvasTitle(id); this.canvasChanging = true;
+    try { this.store.renameCanvas(name, id); await this.store.save(false); }
+    catch (e) { this.store.renameCanvas(previous, id); this.templateError('名称保存未完成', e as Error); }
+    finally { this.canvasChanging = false; this.refreshCanvasList(); this.galleryRevision++; }
+  }
+  @Builder
+  canvasNavigation() {
+    Row({ space: 8 }) {
+      Button({ type: ButtonType.Capsule, buttonStyle: ButtonStyleMode.NORMAL }) {
+        Row({ space: 4 }) {
+          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
+          Text(this.sceneEditing ? '定时' : '画布').fontSize(15).fontColor(this.appText())
+        }
+      }.height(44).padding({ left: 12, right: 14 }).attributeModifier(immersiveChrome(this.appDark)).enabled(!this.canvasChanging && !this.busy && !this.sharing)
+        .accessibilityText(this.sceneEditing ? '返回定时设置' : '返回作品库').onClick(() => this.showGallery())
+      Column({ space: 3 }) {
+        Text(this.canvasName).fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.appText()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(this.canvasDimension.replace('*', '×')).fontSize(12).fontColor(this.appMuted())
+      }.layoutWeight(1)
+      Button({ type: ButtonType.Circle, buttonStyle: ButtonStyleMode.NORMAL }) {
+        Text('⋯').fontSize(24).fontColor(this.appText()).hitTestBehavior(HitTestMode.None)
+      }.id('shareCanvas').width(44).height(44).attributeModifier(immersiveChrome(this.appDark)).enabled(!this.canvasChanging && !this.busy && !this.sharing).accessibilityText('画布更多操作')
+        .bindMenu([{ value: '分享画布', action: () => this.shareCanvasById(this.store.state.canvasId) },
+          { value: '复制画布', action: () => this.duplicateGalleryCanvas(this.store.state.canvasId) },
+          { value: '导入作品', action: () => this.pickTemplate() }], { systemMaterial: chromeMaterial(this.appDark), backgroundColor: AppDesign.popup(this.appDark) })
+    }.width(this.screenWidth - 32).height(48).position({ x: 16, y: this.safeTop + 4 }).zIndex(150000)
   }
   private canvasRouteChanged(): void { if(this.ready && this.routeCanvasId) this.scheduleWidgetRoute(); }
+  private widgetLaunchChanged(): void { if (this.ready && this.launchFromWidget) this.scheduleWidgetRoute(); }
   private async foregroundSchedules(generation:number):Promise<void> {
     try{await this.store.reloadSceneAcknowledgements();}catch(_){}
     if(!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||generation!==this.foregroundGeneration)return;this.syncSchedules();this.refreshCapabilities();this.updateScheduledScene();this.scheduleMaintenance();this.queueRelief();this.queueReadingTints();this.scheduleBackground();
@@ -407,13 +479,13 @@ struct Index {
     if(this.savedLayouts.length>0||this.store.state.sceneLayouts.length>0)this.savedLayouts=this.store.state.sceneLayouts.slice();
   }
   private armScheduleTimer():void {
-    if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer);if(!this.alive||!this.ready||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||(!withScenePolicy(this.store.state,this.store.catalog,this.appDark).sceneRules.some(r=>r.enabled)&&!canvasRotationEnabled(this.store.catalog.rotation)))return;
+    if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer);if(this.galleryVisible||!this.alive||!this.ready||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||(!withScenePolicy(this.store.state,this.store.catalog,this.appDark).sceneRules.some(r=>r.enabled)&&!canvasRotationEnabled(this.store.catalog.rotation)))return;
     const wait=Math.min(60000,Math.max(100,nextSceneBoundary(withScenePolicy(this.store.state,this.store.catalog,this.appDark),Date.now())-Date.now()));
     this.scheduleTimer=setTimeout(()=>{this.scheduleTimer=-1;this.updateScheduledScene();},wait);
   }
   private scheduleInteractionBusy():boolean {return !!(this.deletionId||this.scheduleTransition||this.arriving||this.editing||this.viewing||this.heroActive||this.activeBoardId||this.gestureGroup||this.backgroundOpen||this.templateReviewOpen||this.incomingReview||this.sharing||this.busy);}
   private async updateScheduledScene(force:boolean=false):Promise<void> {
-    if(!this.alive||!this.ready||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||this.sceneEditing||this.sceneNavigationBusy||this.canvasChanging)return;
+    if(this.galleryVisible||!this.alive||!this.ready||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||this.sceneEditing||this.sceneNavigationBusy||this.canvasChanging)return;
     if(!this.scheduleOverride && !this.timedScene && (!withScenePolicy(this.store.state,this.store.catalog,this.appDark).sceneRules.some(r=>r.enabled)&&!canvasRotationEnabled(this.store.catalog.rotation))) {
       if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer);this.scheduleTimer=-1;return;
     }
@@ -476,7 +548,7 @@ struct Index {
   private sceneThemeChanged():void {if(this.ready&&this.store.catalog.rotation.mode==='theme'){this.cancelScheduledTransition();this.updateScheduledScene(true);}}
   private async openScenePanel(tab:number=-1):Promise<void> {
     const request=++this.scenePanelGeneration;if(tab>=0)this.scenePanelTab=tab;
-    this.homeToolsOpen=false;this.canvasPickerOpen=false;this.backgroundOpen=false;
+    this.homeToolsOpen=false;this.backgroundOpen=false;
     try{await this.store.upgradeTimedScenes();if(!this.alive||!this.pageVisible||request!==this.scenePanelGeneration||this.sceneNavigationBusy||this.canvasChanging||this.editing)return;this.refreshCanvasList();this.syncSchedules();this.scheduleOpen=true;}catch(e){if(this.alive&&this.pageVisible&&request===this.scenePanelGeneration)this.templateError('场景读取失败',e as Error);}
   }
   private async editTimedScene(id:string='',create:boolean=false,source:FridgeCard|null=null):Promise<void> {
@@ -486,7 +558,7 @@ struct Index {
     if(create){id=this.store.createTimedScene('定时场景 '+(this.store.catalog.scenes.length+1),source??undefined);const rule=new SceneRule();rule.id=this.store.newId();rule.kind='focus';rule.centralOnly=true;rule.untilDismissed=false;rule.targetId=id;rule.name=this.store.activeName;rule.start=(new Date().getHours()*60+new Date().getMinutes()+5)%1440;rule.enabled=true;rule.createdAt=Date.now();this.store.catalog.sceneRules.push(rule);await this.store.save(false);}
     else if(!await this.store.openCanvas(id))throw new Error('定时场景不存在');
     await primeRenderContours(this.store.state.cards,storageSnapshot(this.store.state));
-    this.copyTargetOpen=false;this.canvasPickerOpen=false;this.scheduleOpen=false;this.scheduleOverride=null;this.timedScene=null;this.scheduledName='';this.scheduledFocusId='';
+    this.copyTargetOpen=false;this.scheduleOpen=false;this.scheduleOverride=null;this.timedScene=null;this.scheduledName='';this.scheduledFocusId='';
     this.syncHostCanvasGeometry();this.layoutBoard();this.sceneEditing=true;this.selectedId='';this.groupSelecting=false;this.groupSelection=[];this.canvasBackground=this.store.state.background;this.refreshCanvasList();this.syncSchedules();this.render();
     if(this.store.state.cards.length===0)this.addCard();
     }catch(e){this.templateError('场景编辑未完成',e as Error);}finally{this.sceneNavigationBusy=false;}
@@ -547,8 +619,9 @@ struct Index {
   private async chooseCanvas(id: string): Promise<void> {
     if (this.heroActive || this.activeBoardId || this.sharing || this.busy || this.canvasChanging || this.sceneNavigationBusy || this.scheduleTransition) return;
     if (this.editing) { this.getUIContext().getPromptAction().showToast({message:'请先完成当前卡片编辑'}); return; }
+    if(this.galleryVisible){await this.openGalleryCanvas(id);return;}
     if(id===this.store.state.canvasId&&this.canvasBackground===this.store.state.background&&!this.scheduledName&&!this.timedScene)return;
-    this.canvasChanging=true;this.canvasPickerOpen=false;this.selectedId='';
+    this.canvasChanging=true;this.selectedId='';
     const generation=++this.canvasFlightGeneration;
     const exit=this.animateCanvasFlight(this.screenHeight+this.boardHeight,this.screenWidth*.08,8,260,false);
     try {
@@ -579,7 +652,7 @@ struct Index {
       this.selectedId = ''; this.activeBoardId = ''; this.groupSelection = []; this.groupSelecting = false;
       this.syncHostCanvasGeometry();this.layoutBoard();
       this.canvasBackground = this.store.state.background; this.refreshCanvasList();
-      this.render(); if(!manual)this.persist(true); this.scheduleBackground(); this.canvasPickerOpen = false;
+      this.render(); if(!manual)this.persist(true); this.scheduleBackground();
       this.refreshCapabilities();this.updateScheduledScene(true);
     } catch (e) { throw e as Error; }
   }
@@ -589,106 +662,17 @@ struct Index {
       await this.store.save(false);this.backgroundGeneration++;
       const source = duplicate ? this.store.state : undefined;
       const id = this.store.createCanvas(name.trim() || (duplicate ? this.canvasName+' 副本' : '画布 '+(this.canvasEntries.length+1)),source);
-      await this.loadCanvas(id,true);
+      await this.loadCanvas(id,true); this.galleryVisible=false;
     } catch(e) {this.templateError('画布未创建',e as Error);}finally{this.canvasChanging=false;this.armScheduleTimer();this.updateScheduledScene(true);}
   }
   private deleteCanvas(id: string): void {
     if(this.canvasEntries.length <= 1 || this.canvasChanging||this.sceneNavigationBusy) return;
     this.getUIContext().showAlertDialog({title:'删除“'+this.canvasTitle(id)+'”？',message:'卡片和背景会一起删除。删除当前画布后，将切换到剩余画布。',primaryButton:{value:'取消',action:()=>{}},secondaryButton:{value:'删除',fontColor:'#C43A35',action:()=>{
       if(this.canvasChanging||this.sceneNavigationBusy)return;const active=this.store.state.canvasId===id;this.canvasChanging=true;this.cancelScheduledTransition();
-      this.store.deleteCanvas(id).then(async()=>{if(active){await this.loadCanvas(this.store.catalog.activeId);}else this.refreshCanvasList();}).catch((e:Error)=>this.templateError('未能删除',e)).finally(()=>{this.canvasChanging=false;this.armScheduleTimer();this.updateScheduledScene(true);});
+      this.store.deleteCanvas(id).then(async()=>{if(active){await this.loadCanvas(this.store.catalog.activeId);}else this.refreshCanvasList();this.galleryRevision++;}).catch((e:Error)=>this.templateError('未能删除',e)).finally(()=>{this.canvasChanging=false;this.armScheduleTimer();this.updateScheduledScene(true);});
     }}});
   }
   private canvasTitle(id: string): string { return this.canvasEntries.find((entry: CanvasEntry)=>entry.id===id)?.name ?? ''; }
-  private canvasPopupWidth(): number { return Math.min(344, Math.max(240, this.screenWidth - 48)); }
-  private prepareCanvas(duplicate: boolean): void {
-    this.canvasDuplicate = duplicate; this.canvasDraftName = duplicate ? this.canvasName + ' 副本' : '画布 ' + (this.canvasEntries.length + 1); this.canvasCreating = true;
-  }
-  private renameCanvas(): void {
-    if (this.canvasChanging || !this.renameValue.trim()) return;
-    this.store.renameCanvas(this.renameValue.trim(),this.canvasRenameId); this.refreshCanvasList(); this.canvasRenameId=''; this.persist(false);
-  }
-  @Builder
-  canvasPicker() {
-    Scroll() {
-    Column({space:12}) {
-      Row({space:8}) {
-        if (this.canvasCreating) {
-          Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
-            SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
-          }.width(44).height(44).backgroundColor(Color.Transparent).accessibilityText('返回画布列表').onClick(()=>this.canvasCreating=false)
-        }
-        Text(this.canvasCreating?'新建画布':'画布').fontSize(18).fontWeight(FontWeight.Medium).fontColor(this.appText()).layoutWeight(1)
-        Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
-          SymbolGlyph($r('sys.symbol.xmark')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
-        }.width(44).height(44).backgroundColor(Color.Transparent).accessibilityText('关闭画布菜单').onClick(()=>this.canvasPickerOpen=false)
-      }.width('100%')
-      if (this.canvasCreating) {
-        TextInput({text:this.canvasDraftName,placeholder:'画布名称'}).height(44).fontColor(this.appText()).placeholderColor(this.appMuted())
-          .backgroundColor(AppDesign.popupChoice(this.appDark,false)).borderRadius(12).maxLength(30).onChange((value:string)=>this.canvasDraftName=value)
-
-        Button(this.canvasChanging?'创建中':'创建画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.EMPHASIZED})
-          .height(44).width('100%').backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).enabled(!this.canvasChanging && this.canvasDraftName.trim().length>0)
-          .onClick(()=>this.newCanvas(this.canvasDuplicate,this.canvasDraftName))
-      } else {
-        List({space:4}) {
-          ForEach(this.canvasEntries.map((entry:CanvasEntry)=>entry.id),(id:string)=>{
-            ListItem() {
-              Row({space:8}) {
-              if(this.canvasRenameId===id) {
-                TextInput({text:this.renameValue,placeholder:'画布名称'}).layoutWeight(1).height(48).fontSize(14).fontColor(this.appText()).backgroundColor(AppDesign.popupChoice(this.appDark,true)).borderRadius(12).maxLength(30).onChange((value:string)=>this.renameValue=value).onSubmit(()=>this.renameCanvas())
-                Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {SymbolGlyph($r('sys.symbol.checkmark')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}.width(44).height(44).backgroundColor(this.appControl()).accessibilityText('保存名称').enabled(this.renameValue.trim().length>0).onClick(()=>this.renameCanvas())
-              } else {
-              Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {
-                Row({space:8}) {
-                  Text(this.canvasTitle(id)).fontColor(this.appText()).fontSize(14).layoutWeight(1).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
-                  if(id===this.store.state.canvasId) {SymbolGlyph($r('sys.symbol.checkmark')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}
-                }.width('100%')
-              }.layoutWeight(1).height(48).padding({left:12,right:12}).backgroundColor(AppDesign.popupChoice(this.appDark,id===this.store.state.canvasId))
-                .accessibilityText('切换到 '+this.canvasTitle(id)).onClick(()=>this.chooseCanvas(id))
-                Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
-                  SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
-                }.width(44).height(44).backgroundColor(Color.Transparent).accessibilityText('改名 '+this.canvasTitle(id)).onClick(()=>{this.canvasRenameId=id;this.renameValue=this.canvasTitle(id);})
-                Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}) {
-                  SymbolGlyph($r('sys.symbol.rectangle_and_arrowshape_turn_up_right')).fontSize(20).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
-                }.id('shareCanvas_'+id).width(44).height(44).backgroundColor(AppDesign.popupChoice(this.appDark,true)).enabled(!this.sharing)
-                  .accessibilityText('分享 '+this.canvasTitle(id)).onClick(()=>this.shareCanvasFromPicker(id))
-                Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL,role:ButtonRole.ERROR}) {
-                  SymbolGlyph($r('sys.symbol.trash')).fontSize(18).fontColor(['#C43A35']).hitTestBehavior(HitTestMode.None)
-                }.width(44).height(44).backgroundColor(Color.Transparent).enabled(this.canvasEntries.length>1).accessibilityText('删除 '+this.canvasTitle(id)).onClick(()=>this.deleteCanvas(id))
-              }
-              }.width('100%')
-            }
-          },(id:string)=>id)
-        }.width('100%').height(Math.min(200,Math.max(48,this.canvasEntries.length*52))).scrollBar(BarState.Off)
-        if(this.sceneEntries.length>0) {
-          Text('定时场景').fontSize(13).fontWeight(FontWeight.Medium).fontColor(this.appMuted()).width('100%')
-          ForEach(this.sceneEntries,(entry:CanvasEntry)=>{
-            Row({space:4}) {
-            Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {
-              Row({space:8}) {
-                SymbolGlyph($r('sys.symbol.timer')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
-                Text(entry.name).fontSize(14).fontColor(this.appText()).layoutWeight(1).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis})
-                if(entry.id===this.store.state.canvasId){SymbolGlyph($r('sys.symbol.checkmark')).fontSize(18).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}else{SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([this.appMuted()]).hitTestBehavior(HitTestMode.None)}
-              }.width('100%')
-            }.layoutWeight(1).height(48).padding({left:12,right:12}).backgroundColor(AppDesign.popupChoice(this.appDark,entry.id===this.store.state.canvasId)).accessibilityText('编辑定时场景 '+entry.name).onClick(()=>this.editTimedScene(entry.id))
-            Button({type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL,role:ButtonRole.ERROR}){SymbolGlyph($r('sys.symbol.trash')).fontSize(18).fontColor(['#C43A35']).hitTestBehavior(HitTestMode.None)}.width(44).height(44).backgroundColor(Color.Transparent).accessibilityText('删除场景 '+entry.name).onClick(()=>this.confirmDeleteTimedScene(entry.id))
-            }.width('100%')
-          },(entry:CanvasEntry)=>entry.id)
-        }
-        Row({space:8}) {
-          Button('新画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).fontSize(13).padding({left:4,right:4}).backgroundColor(AppDesign.popupChoice(this.appDark,false)).fontColor(this.appText()).onClick(()=>this.prepareCanvas(false))
-          Button('复制画布',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).fontSize(13).padding({left:4,right:4}).backgroundColor(AppDesign.popupChoice(this.appDark,false)).fontColor(this.appText()).onClick(()=>this.prepareCanvas(true))
-          Button('导入',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).fontSize(13).padding({left:4,right:4}).fontColor(this.appText()).backgroundColor(AppDesign.popupChoice(this.appDark,false)).enabled(!this.sharing).onClick(()=>this.pickTemplate())
-          Button('Skill',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).layoutWeight(1).fontSize(13).padding({left:4,right:4}).fontColor(this.appText()).backgroundColor(AppDesign.popupChoice(this.appDark,false))
-            .bindMenu([{value:'Gitee',action:()=>this.openSkillRepository('https://gitee.com/alanmac/fridge-signing-system')},{value:'GitHub',action:()=>this.openSkillRepository('https://github.com/alanmacX/fridge-creating-skill')}],{placement:Placement.TopRight,systemMaterial:chromeMaterial(this.appDark),backgroundColor:AppDesign.popup(this.appDark)})
-        }.width('100%')
-
-      }
-    }.width('100%').padding(16).enabled(!this.canvasChanging)
-    }.width(this.canvasPopupWidth()).constraintSize({maxHeight:Math.max(160,this.screenHeight-this.safeTop-this.safeBottom-32)})
-      .scrollBar(BarState.Off).clip(true)
-  }
   private async openSkillRepository(url:string):Promise<void> {
     try {await (this.context as common.UIAbilityContext).openLink(url,{appLinkingOnly:false});}
     catch(_) {this.getUIContext().getPromptAction().showToast({message:'未能打开浏览器，请稍后重试'});}
@@ -765,7 +749,6 @@ struct Index {
     if(this.navMenuOpen){this.finishNavMenu(-1);return true;}
     if(this.deletionId)return true;
     if(this.scheduleOpen){this.scenePanelGeneration++;this.scheduleOpen=false;this.updateScheduledScene(true);return true;}
-    if(this.canvasPickerOpen){this.canvasPickerOpen=false;this.canvasCreating=false;return true;}
     if(this.backgroundOpen){this.closeBackgroundEditor();return true;}
     if(this.homeToolsOpen){this.homeToolsOpen=false;return true;}
     if(this.editing&&this.editorExpanded){this.expandEditor(false);return true;}
@@ -778,6 +761,7 @@ struct Index {
     if (this.editing) { this.closeEditor(); return true; }
     if(this.sceneEditing){this.leaveTimedScene();return true;}
     if (this.selectedId.length > 0) { this.selectedId = ''; return true; }
+    if (!this.galleryVisible) { this.showGallery(); return true; }
     return false;
   }
   // Use the live launcher ratio when available, as in the original full-host renderer.
@@ -791,7 +775,7 @@ struct Index {
   }
   private homeToolsChanged():void {
     if(!this.ready||this.editing||this.heroActive){this.homeToolsMotionGeneration++;this.homeToolsMoving=false;return;}
-    const layout=workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect);
+    const layout=workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop+56,this.safeBottom,this.canvasAspect);
     const target=layout.floating&&(this.homeToolsOpen||this.scheduleOpen||this.backgroundOpen)?layout.expandedBoardY:layout.boardY;
     const generation=++this.homeToolsMotionGeneration;this.homeToolsMoving=true;
     const motion=canvasToolsMotion(this.homeToolsOpen||this.scheduleOpen||this.backgroundOpen);
@@ -799,7 +783,7 @@ struct Index {
     this.getUIContext().animateTo(motion,()=>{this.boardTop=target;this.timingHeaderActive=this.scheduleOpen;this.backgroundHeaderActive=this.backgroundOpen&&!this.floatingHome();});
   }
   private layoutBoard(): void {
-    const layout=workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom,this.canvasAspect);
+    const layout=workspaceLayout(this.screenWidth,this.screenHeight,this.safeTop+56,this.safeBottom,this.canvasAspect);
     this.boardScale=layout.boardW/BOARD_W;this.boardHeight=layout.boardH;this.boardLeft=layout.boardX;this.boardTop=layout.floating&&(this.homeToolsOpen||this.scheduleOpen||this.backgroundOpen)?layout.expandedBoardY:layout.boardY;
     this.panelLeft=layout.panelX;this.panelTop=layout.panelY;this.panelWidth=layout.panelW;this.panelHeight=layout.panelH;
   }
@@ -856,6 +840,7 @@ struct Index {
   private openEditor(id: string, created: boolean = false): void {
     if(this.scheduledName||this.scheduleTransition){this.getUIContext().getPromptAction().showToast({message:'请先恢复原始画布再编辑'});return;}
     if (this.heroActive || this.arriving) return;
+    this.galleryVisible=false;
     this.editorExpanded=false;this.editorSheetHeightVp=0;this.editorBackPending=false;
     this.editorContentStage=0;this.editorMountGeneration++;
     this.heroHideContent = false; this.select(id, true); this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false;this.editorSection=0;this.editorSheetTab=0;this.settingsTab=this.preview.capability!==null?1:0;
@@ -982,6 +967,7 @@ struct Index {
   }
   private async reloadWidgetRoute():Promise<void> {
     if(!this.context || !this.alive)return;
+    this.galleryVisible=false;
     const canvas=this.routeCanvasId,id=this.viewRouteId;
     try {
       // A desktop tap is navigation, not an instruction to rebuild the same canvas.
@@ -1468,6 +1454,7 @@ struct Index {
           if (this.error.length > 0) { Button('重试', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).onClick(() => this.initialize()) }
         }.width('100%').height('100%').justifyContent(FlexAlign.Center)
       } else {
+        if (!this.galleryVisible) {
         Stack({alignContent:Alignment.TopStart}) {
         this.board()
         if (this.editing && this.editorReady) {
@@ -1534,6 +1521,17 @@ struct Index {
             .position({x:0,y:this.safeTop + EDITOR_SAFE_GAP}).opacity(this.editorOpacity).hitTestBehavior(HitTestMode.None)
         }
         if (this.viewing) { this.detail() }
+        if (!this.editing && !this.viewing && !this.arriving) { this.canvasNavigation() }
+        } else {
+          CanvasGallery({ entries: this.canvasEntries, appDark: this.appDark, viewportWidth: this.screenWidth, safeTop: this.safeTop, safeBottom: this.safeBottom,
+            busy: this.canvasChanging || this.busy || this.sharing, revision: this.galleryRevision,
+            onLoad: (id: string): Promise<FridgeState> => this.store.canvasSnapshot(id),
+            onOpen: (id: string) => this.openGalleryCanvas(id), onCreate: (name: string) => this.createGalleryCanvas(name),
+            onRename: (id: string, name: string) => this.renameGalleryCanvas(id, name),
+            onDuplicate: (id: string) => this.duplicateGalleryCanvas(id), onShare: (id: string) => this.shareCanvasById(id),
+            onDelete: (id: string) => this.deleteCanvas(id), onImport: () => this.pickTemplate(),
+            onSkill: (url: string) => this.openSkillRepository(url) })
+        }
         Column().width(1).height(1).position({x:this.navMenuX,y:this.navMenuY}).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
           .bindMenu(this.navMenuOpen,this.navMenuItems,{placement:Placement.BottomRight,systemMaterial:chromeMaterial(this.appDark),backgroundColor:AppDesign.popup(this.appDark),onDisappear:()=>this.finishNavMenu(this.navMenuResult)})
         if(this.canvasChanging){Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.Block).zIndex(200002)}
@@ -1684,11 +1682,11 @@ struct Index {
       Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
         Row({space:8}) {
           if(this.screenWidth>=360){SymbolGlyph($r('sys.symbol.square_stack_3d')).fontSize(20).fontColor([this.appText()])}
-          Text('画布').fontSize(15).fontWeight(FontWeight.Medium).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
+          Text('图层').fontSize(15).fontWeight(FontWeight.Medium).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(1)
           SymbolGlyph($r('sys.symbol.chevron_up')).fontSize(12).fontColor([this.appMuted()]).rotate({angle:this.homeToolsOpen?180:0})
         }.width('100%').hitTestBehavior(HitTestMode.None)
       }.height(48).layoutWeight(1).padding({left:12,right:12}).attributeModifier(immersiveChrome(this.appDark))
-        .accessibilityText('展开画布工具 '+this.canvasName).onClick(()=>{this.refreshCanvasList();this.scheduleOpen=false;this.backgroundOpen=false;this.homeToolsOpen=!this.homeToolsOpen;})
+        .accessibilityText('展开图层工具 '+this.canvasName).onClick(()=>{this.refreshCanvasList();this.scheduleOpen=false;this.backgroundOpen=false;this.homeToolsOpen=!this.homeToolsOpen;})
         .bindPopup(this.homeToolsOpen,{builder:this.phoneTools,placement:Placement.Top,width:this.screenWidth-32,radius:24,transition:canvasToolsTransition(),systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:false,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible)this.homeToolsOpen=false;}})
       this.timingButton(48)
       this.homeBackgroundButton(48)
@@ -1823,13 +1821,9 @@ struct Index {
   homeToolIslands(floating:boolean=false) {
         Row({space:floating?8:6}) {
 
-          Button({type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}) {
-            Row({space:6}) {
-              Text(this.sceneEditing?'定时场景 · '+this.canvasName:'画布').fontSize(floating?17:15).fontWeight(FontWeight.Medium).fontColor(this.appText()).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).layoutWeight(!floating&&(this.timingHeaderActive||this.backgroundHeaderActive)?0:1)
-              if(floating||!(this.timingHeaderActive||this.backgroundHeaderActive)){SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(14).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)}
-            }.width(!floating&&(this.timingHeaderActive||this.backgroundHeaderActive)?'auto':'100%')
-          }.id('shareCanvas').padding({left:floating?12:8,right:floating?12:8}).accessibilityText('切换画布 '+this.canvasName).height(44).layoutWeight(!floating&&(this.timingHeaderActive||this.backgroundHeaderActive)?0:1).constraintSize({maxWidth:!floating&&(this.timingHeaderActive||this.backgroundHeaderActive)?this.panelWidth*.45:this.panelWidth}).fontSize(12).fontColor(this.appText()).backgroundColor(this.appControl()).attributeModifier(immersiveChrome(this.appDark)).onClick(()=>{if(this.canvasChanging||this.sceneNavigationBusy)return;this.scenePanelGeneration++;if(this.scheduleOpen||this.backgroundOpen){this.scheduleOpen=false;this.backgroundOpen=false;return;}this.refreshCanvasList();this.canvasCreating=false;this.canvasRenameId='';if(!floating)this.homeToolsOpen=false;this.scheduleOpen=false;this.canvasPickerOpen=!this.canvasPickerOpen;})
-            .bindPopup(this.canvasPickerOpen,{builder:this.canvasPicker,placement:Placement.Top,width:this.canvasPopupWidth(),radius:20,transition:canvasToolsTransition(),systemMaterial:popupMaterial(this.appDark),popupColor:AppDesign.popup(this.appDark),backgroundBlurStyle:BlurStyle.COMPONENT_THICK,enableArrow:true,autoCancel:true,focusable:true,mask:{color:Color.Transparent},onStateChange:(event)=>{if(!event.isVisible){this.canvasPickerOpen=false;this.canvasCreating=false;}}})
+          Button('图层',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL})
+            .height(44).layoutWeight(1).fontSize(15).fontColor(this.appText()).backgroundColor(this.appControl()).attributeModifier(immersiveChrome(this.appDark))
+            .onClick(()=>{this.scenePanelGeneration++;this.scheduleOpen=false;this.backgroundOpen=false;})
           if(!floating){this.timingButton(44);this.homeBackgroundButton(44)}
           Button(this.groupSelecting ? '取消' : '多选', { type: ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).width(48).padding({left:8,right:8}).height(44).fontSize(13).backgroundColor(this.appControl()).fontColor(this.appText()).attributeModifier(immersiveChrome(this.appDark)).enabled(!this.scheduledName).onClick(() => { this.scheduleOpen=false;this.backgroundOpen=false;this.groupSelecting = !this.groupSelecting; this.groupSelection = []; })
           if(!floating) {
@@ -1992,7 +1986,7 @@ struct Index {
   private openBackgroundEditor():void {
     if(!this.context||this.sceneNavigationBusy||this.canvasChanging)return;this.scenePanelGeneration++;
     const generation=++this.backgroundMountGeneration;this.backgroundContentStage=0;
-    this.homeToolsOpen=false;this.scheduleOpen=false;this.canvasPickerOpen=false;this.backgroundOpen=true;
+    this.homeToolsOpen=false;this.scheduleOpen=false;this.backgroundOpen=true;
     this.mountBackgroundSection(generation,1);
   }
   private mountBackgroundSection(generation:number,stage:number):void {
@@ -2111,9 +2105,8 @@ struct Index {
     console.warn('Template operation failed: '+error.name+' '+error.message);
     this.getUIContext().getPromptAction().showToast({message:prefix+'：'+(error.message??'请重试'),duration:3500});
   }
-  private shareCanvasFromPicker(id:string):void {
-    this.canvasPickerOpen=false;
-    // Native popup dismissal owns focus until its exit finishes; a simultaneous dialog is cancelled.
+  private shareCanvasById(id:string):void {
+    // Let the native context menu release focus before opening the share choices.
     setTimeout(()=>{if(this.alive&&!this.editing&&!this.canvasChanging)this.shareMenu(false,id);},220);
   }
   private async shareMenu(single: boolean, canvasId: string = ''): Promise<void> {
@@ -2122,11 +2115,12 @@ struct Index {
     this.sharing=true;
     try { const source=await this.store.canvasSnapshot(canvasId||this.store.state.canvasId);
       if(single && !source.cards.some((card:FridgeCard)=>card.id===id))return;
-      const choice=await this.navChoice(single?'卡片作品':'画布作品',[single?'分享可编辑卡片':'分享可编辑画布',single?'分享卡片图片':'分享展示图'],single?'shareCard':'shareCanvas');
+      const anchor=single?'shareCard':this.galleryVisible?'shareCanvas_'+source.canvasId:'shareCanvas';
+      const choice=await this.navChoice(single?'卡片作品':'画布作品',[single?'分享可编辑卡片':'分享可编辑画布',single?'分享卡片图片':'分享展示图'],anchor);
       if(choice<0)return;
       if(choice===1){await this.shareArtwork(single,source,id);return;}
       const path=await taskpool.execute(new taskpool.Task(exportTemplate,JSON.stringify(source),id,this.context.filesDir,this.context.cacheDir)) as string;
-      await shareTemplateFile(this.context as common.UIAbilityContext,path,single?'shareCard':'shareCanvas');
+      await shareTemplateFile(this.context as common.UIAbilityContext,path,anchor);
     }catch(e){this.templateError('分享未完成',e as Error);}finally{this.sharing=false;}
   }
   private incomingTemplateChanged(): void {
@@ -2162,7 +2156,7 @@ struct Index {
       if(!this.alive){if(this.context)removeStagedTemplate(uri,this.context.cacheDir);return;}
       this.templateReviewOpen=true;
       const finish=():void=>{if(this.context)removeStagedTemplate(uri,this.context.cacheDir);this.templateReviewOpen=false;this.incomingTemplateChanged();};
-      this.getUIContext().showAlertDialog({cancel:finish,title:summary.kind==='card'?'导入卡片':'导入画布',message:summary.count+' 张卡片，'+summary.images+' 个图片资源。只导入设计，能力使用你的本机数据。'+(summary.kind==='canvas'?'保存为独立画布，保留现有作品。':'添加到当前画布。'),primaryButton:{value:'取消',action:finish},secondaryButton:{value:summary.kind==='canvas'?'保存新画布':'添加到画布',action:()=>{this.importTemplate(uri,summary.kind).finally(finish);}}});
+      this.getUIContext().showAlertDialog({cancel:finish,title:summary.kind==='card'?'导入卡片':'导入画布',message:summary.count+' 张卡片，'+summary.images+' 个图片资源。只导入设计，能力使用你的本机数据。'+(summary.kind==='canvas'?'保存为独立画布，保留现有作品。':'添加到“'+this.canvasName+'”。'),primaryButton:{value:'取消',action:finish},secondaryButton:{value:summary.kind==='canvas'?'保存新画布':'添加到画布',action:()=>{this.importTemplate(uri,summary.kind).finally(finish);}}});
     }catch(e){if(this.context)removeStagedTemplate(uri,this.context.cacheDir);this.templateReviewOpen=false;this.templateError('无法导入',e as Error);}
   }
   private async importTemplate(uri:string,kind:string):Promise<void>{
@@ -2175,12 +2169,12 @@ struct Index {
         if(saved)for(const card of cards)if(card.capability?.k==='timetable')card.capability=useSavedTimetable(card.capability,saved);
       }
       if(kind==='canvas') {
-        await this.store.save(false); this.backgroundGeneration++; fitImportedCanvas(cards,state.canvasAspect,this.canvasAspect);remapSceneSchedules(state,cards,()=>this.store.newId(),this.canvasAspect); state.cards=cards; state.canvasAspect=this.canvasAspect;
+        await this.store.save(false); this.backgroundGeneration++; const targetAspect=this.galleryVisible?state.canvasAspect:this.canvasAspect; fitImportedCanvas(cards,state.canvasAspect,targetAspect);remapSceneSchedules(state,cards,()=>this.store.newId(),targetAspect); state.cards=cards; state.canvasAspect=targetAspect;
         const id=this.store.createCanvas('导入的画布',state); this.busy=false; await this.chooseCanvas(id); return;
       }
       if(kind==='card'&&cards.length===1){cards[0].x=Math.max(0,(BOARD_W-cards[0].w)/2);cards[0].y=Math.max(0,(BOARD_H-cards[0].h)/2);}
       cards.forEach((c:FridgeCard)=>this.clamp(c));this.store.addCards(cards.slice().sort((a:FridgeCard,b:FridgeCard)=>a.z-b.z));this.render();this.persist(true);this.scheduleBackground();this.refreshCapabilities();
-      if(cards.length>0)this.select(cards[0].id);
+      if(cards.length>0){this.galleryVisible=false;this.boardOpacity=1;this.startupCardCount=-1;this.select(cards[0].id);}
     }catch(e){this.templateError('导入未完成',e as Error);}finally{this.busy=false;}
   }
   private async shareArtwork(single: boolean, source: FridgeState, cardId: string): Promise<void> {
@@ -2205,7 +2199,7 @@ struct Index {
       if (!single) this.shareHeight += 38;
       const scale = Math.min(3, 1280/this.getUIContext().vp2px(Math.max(this.shareWidth,this.shareHeight)));
       const pixel = await this.getUIContext().getComponentSnapshot().createFromBuilder(() => { this.shareScene(); }, 350, true, { scale: scale, waitUntilRenderFinished: true });
-      try { await sharePixelMap(this.context as common.UIAbilityContext, pixel, single && this.shareOpaque, single ? 'shareCard' : 'shareCanvas'); }
+      try { await sharePixelMap(this.context as common.UIAbilityContext, pixel, single && this.shareOpaque, single ? 'shareCard' : this.galleryVisible ? 'shareCanvas_'+source.canvasId : 'shareCanvas'); }
       finally { await pixel.release(); }
     } catch (e) {
       // Action-menu cancellation has no message; actual export errors are actionable.
