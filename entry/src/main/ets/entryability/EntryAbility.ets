@@ -18,27 +18,53 @@ export default class EntryAbility extends UIAbility {
     AppStorage.setOrCreate('appWindowFocused',true);AppStorage.setOrCreate('appBackgrounded', false); this.updateAppearance(this.context.config.colorMode);
     this.routeCard(want);
     this.routeTemplate(want);
-    if (want.parameters?.['demo'] === 'sketch') this.launchPage = 'pages/SketchLab';
-    if (want.parameters?.['demo'] === 'cloud') this.launchPage = 'pages/CloudAcceptance';
-    if (want.parameters?.['demo'] === 'edges') this.launchPage = 'pages/ReadingEdgeStudy';
-    if (want.parameters?.['demo'] === 'mica') this.launchPage = 'pages/MicaStudy';
-    if (want.parameters?.['demo'] === 'album') {
-      this.launchPage = 'pages/AlbumStudy';
-      const content = Number(want.parameters?.['albumContent'] ?? 0);
-      AppStorage.setOrCreate('albumStudyContent', [0,1,2].includes(content) ? content : 0);
-    }
-    if (want.parameters?.['demo'] === 'preview') {
-      this.launchPage = 'pages/FridgePreviewer';
-      const source = want.parameters?.['previewFile'];
-      AppStorage.setOrCreate('previewFile', typeof source === 'string' ? source : '');
-      AppStorage.setOrCreate('previewCapture', want.parameters?.['previewCapture'] === 'yes');
-      AppStorage.setOrCreate('previewTransparent', want.parameters?.['previewTransparent'] === 'yes');
-    }
+
   }
 
   private mainWindow: window.Window | null = null;
   private windowReady: boolean = false;
   private appliedAppearance: boolean | null = null;
+  private foldStatusWatching: boolean = false;
+  private foldModeWatching: boolean = false;
+  private appliedOrientation: window.Orientation | null = null;
+  private desiredOrientation: window.Orientation = window.Orientation.PORTRAIT;
+  private orientationGeneration: number = 0;
+  private orientationUpdating: boolean = false;
+  private foldStatusChanged = (status: display.FoldStatus): void => { this.updateOrientation(status); };
+  private foldModeChanged = (_mode: display.FoldDisplayMode): void => { this.updateOrientation(); };
+  private watchOrientation(): void {
+    try {if(display.isFoldable()) {
+      if(!this.foldStatusWatching){display.on('foldStatusChange',this.foldStatusChanged);this.foldStatusWatching=true;}
+      if(!this.foldModeWatching){display.on('foldDisplayModeChange',this.foldModeChanged);this.foldModeWatching=true;}
+    }} catch(e) {hilog.warn(0x0000,TAG,'fold watcher %{public}s',(e as Error).message);}
+  }
+  private stopOrientation(): void {
+    this.orientationGeneration++;this.orientationUpdating=false;this.appliedOrientation=null;
+    try {if(this.foldStatusWatching)display.off('foldStatusChange',this.foldStatusChanged);}catch(_){}
+    try {if(this.foldModeWatching)display.off('foldDisplayModeChange',this.foldModeChanged);}catch(_){}
+    this.foldStatusWatching=false;this.foldModeWatching=false;
+  }
+  private updateOrientation(eventStatus?: display.FoldStatus): void {
+    if(!this.windowReady||!this.mainWindow)return;
+    let foldable=false,status=0,mode=0;
+    try {foldable=display.isFoldable();if(foldable){status=eventStatus??display.getFoldStatus();mode=display.getFoldDisplayMode();}}
+    catch(e) {hilog.warn(0x0000,TAG,'fold query %{public}s',(e as Error).message);}
+    this.desiredOrientation=lockPhonePortrait(deviceInfo.deviceType,foldable,status,mode)?window.Orientation.PORTRAIT:window.Orientation.AUTO_ROTATION_UNSPECIFIED;
+    if(!this.orientationUpdating&&this.appliedOrientation!==this.desiredOrientation)this.applyOrientation();
+  }
+  private async applyOrientation(): Promise<void> {
+    const target=this.mainWindow,generation=this.orientationGeneration;if(!target)return;
+    this.orientationUpdating=true;
+    try {
+      // Serialize requests: a late unfold result cannot overwrite a newer fold.
+      while(generation===this.orientationGeneration&&this.windowReady&&this.appliedOrientation!==this.desiredOrientation) {
+        const orientation=this.desiredOrientation;await target.setPreferredOrientation(orientation);
+        if(generation!==this.orientationGeneration)return;
+        this.appliedOrientation=orientation;
+      }
+    } catch(e) {if(generation===this.orientationGeneration)this.appliedOrientation=null;hilog.warn(0x0000,TAG,'orientation %{public}s',(e as Error).message);}
+    finally {if(generation===this.orientationGeneration)this.orientationUpdating=false;}
+  }
   private updateAppearance(mode: ConfigurationConstant.ColorMode | undefined): void {
     const dark = mode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
     AppStorage.setOrCreate('appDark', dark);
@@ -102,6 +128,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onDestroy(): void {
+    this.stopOrientation();
     hilog.info(0x0000, TAG, 'onDestroy');
   }
 
@@ -117,8 +144,7 @@ export default class EntryAbility extends UIAbility {
       this.windowReady = true;
       // Window properties and UIContext insets require loaded content on physical devices.
       try {
-        mainWindow.setPreferredOrientation(lockPhonePortrait(deviceInfo.deviceType, display.isFoldable()) ? window.Orientation.PORTRAIT : window.Orientation.AUTO_ROTATION_UNSPECIFIED)
-          .catch((e: Error) => hilog.warn(0x0000, TAG, 'orientation %{public}s', e.message));
+        this.watchOrientation();this.updateOrientation();
         mainWindow.setImmersiveModeEnabledState(true);
         this.updateAppearance(this.context.config.colorMode);
         const updateInsets = (): void => {
@@ -139,9 +165,9 @@ export default class EntryAbility extends UIAbility {
     });
   }
 
-  onWindowStageDestroy(): void { cancelStartupReveal(); this.appliedAppearance=null;this.windowReady = false; this.mainWindow = null; }
+  onWindowStageDestroy(): void { this.stopOrientation();cancelStartupReveal(); this.appliedAppearance=null;this.windowReady = false; this.mainWindow = null; }
 
-  onForeground(): void { AppStorage.setOrCreate('appBackgrounded', false); this.updateAppearance(this.context.config.colorMode); }
+  onForeground(): void { AppStorage.setOrCreate('appBackgrounded', false); this.updateAppearance(this.context.config.colorMode);this.watchOrientation();this.updateOrientation(); }
 
   onBackground(): void { AppStorage.setOrCreate('appBackgrounded', true); }
 }

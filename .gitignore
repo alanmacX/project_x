@@ -27,3 +27,8 @@ build-profile.json5.bak
 local.properties
 *.trace
 *.log
+
+# Local exports, device captures, temporary renders and photo study fixture
+/output/
+/tmp/
+/previewer/material-study-local.js

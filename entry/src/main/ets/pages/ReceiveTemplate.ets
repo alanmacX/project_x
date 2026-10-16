@@ -26,7 +26,7 @@ struct ReceiveTemplate {
     const context = this.getUIContext().getHostContext() as common.UIExtensionContext;
     if(context){this.cacheDir=context.cacheDir;}
     if(context)this.dark=context.config.colorMode===ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
-    if (!context || !this.uri) { this.message = '请分享一个冰箱贴 .fridge 作品文件'; return; }
+    if (!context || !this.uri) { this.message = '请分享一个冰箱贴桌面小组件 .fridge 作品文件'; return; }
     try {
       this.ownedUri = await taskpool.execute(new taskpool.Task(stageIncomingTemplate,this.uri,context.cacheDir)) as string;
       const summary = JSON.parse(await taskpool.execute(new taskpool.Task(inspectTemplate,this.ownedUri)) as string) as TemplateSummary;
@@ -52,7 +52,7 @@ struct ReceiveTemplate {
         Text(this.title).fontSize(24).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.dark))
         Text(this.message).fontSize(14).fontColor(AppDesign.muted(this.dark)).textAlign(TextAlign.Center).lineHeight(24)
       }.width('100%').padding(24).borderRadius(24).backgroundColor(AppDesign.surface(this.dark))
-      Button(this.opening?'打开中':'在冰箱贴中打开',{type:ButtonType.Capsule})
+      Button(this.opening?'打开中':'在冰箱贴桌面小组件中打开',{type:ButtonType.Capsule})
         .height(48).width('100%').enabled(this.ready&&!this.opening).onClick(()=>this.open())
     }.width('100%').height('100%').padding(24).justifyContent(FlexAlign.Center).backgroundColor(AppDesign.background(this.dark))
   }

@@ -124,7 +124,8 @@
    body+=`<g ${!useDepth&&c.shape==='subject'&&c.cutout?`mask="url(#${id}alpha)"`:useDepth&&c.shape==='subject'?'':`clip-path="url(#${id}clip)"`}>`;
    if(content)body+=albumBody({...content,cover:media(content.cover),background:media(content.background)},c.w,c.h,c.capability.albumPresentation||'cover',id);
    else{
-    body+=`<rect width="${c.w}" height="${c.h}" fill="${color(paper)}"/>`;
+    // Native depthContents starts with the transparent cutout for subject cards.
+    if(!(useDepth&&c.shape==='subject'))body+=`<rect width="${c.w}" height="${c.h}" fill="${color(paper)}"/>`;
     if(c.depthPass!=='base'&&c.shape==='subject'&&c.subjectPhoto&&c.cutout)body+=image(media(c.cutout),offsetX,offsetY,innerW,innerH,0,id+'photo','none');
     const layers=behind=>(c.elements||[]).filter(el=>el.behindCapability===behind&&(c.depthPass!=='base'||!el.depthFront)).map((el,j)=>element(el,innerW,innerH,offsetX,offsetY,ink,media,id+(behind?'back':'front')+j)).join('');
     if(useDepth){

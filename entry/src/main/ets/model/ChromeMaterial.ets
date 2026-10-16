@@ -44,8 +44,9 @@ class ChromeModifier implements AttributeModifier<ButtonAttribute> {
     // Native system material is scoped to navigation/tab bars and popup hosts.
     // Floating canvas tools still need a native blur/tint fallback in ordinary content.
     if(!this.emphasized)instance.backgroundColor(this.dark?'#E63B3933':'#E6F6F2E9');
-    instance.border({width:this.emphasized?0:.5,color:this.dark?'#38FFFFFF':'#18000000'});
     const material=deviceInfo.sdkApiVersion>=26?chromeMaterial(this.dark,this.emphasized):undefined;
+    // Material owns the curved light edge; a second hairline creates jagged double contours.
+    instance.border({width:material!==undefined||this.emphasized?0:.5,color:this.dark?'#38FFFFFF':'#18000000'});
     if(material!==undefined) {instance.systemMaterial(material);}
     else {
       if(!this.emphasized)instance.backgroundBlurStyle(BlurStyle.COMPONENT_THIN);

@@ -2,11 +2,11 @@
   "string": [
     {
       "name": "app_name",
-      "value": "冰箱贴桌面"
+      "value": "冰箱贴桌面小组件"
     },
     {
       "name": "module_desc",
-      "value": "冰箱贴桌面主模块"
+      "value": "冰箱贴桌面小组件主模块"
     },
     {
       "name": "ability_desc",
@@ -14,11 +14,11 @@
     },
     {
       "name": "start_window",
-      "value": "冰箱贴桌面"
+      "value": "冰箱贴桌面小组件"
     },
     {
       "name": "form_display",
-      "value": "冰箱贴"
+      "value": "冰箱贴桌面小组件"
     },
     {
       "name": "form_desc",

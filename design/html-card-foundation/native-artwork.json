@@ -1,0 +1,18 @@
+{
+  "previewVersion": 1,
+  "sourceFingerprint": "15bb4091ed0c04c39b0ab89dbe06338fb8045e798abddfead749c8dc72d77b54",
+  "appVersion": "1.0.0",
+  "appVersionCode": 1000000,
+  "renderer": "CardFace/CanvasBackdrop",
+  "transparentDemo": false,
+  "packageVersion": 2,
+  "schemaVersion": 2,
+  "canvasAspect": 1,
+  "widthVp": 300,
+  "heightVp": 300,
+  "tick": 1791429300000,
+  "cards": 1,
+  "host": "app",
+  "clockMode": "system-live",
+  "actualFormVerified": false
+}

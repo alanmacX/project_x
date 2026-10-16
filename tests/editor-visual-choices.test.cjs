@@ -30,3 +30,9 @@ const external=new FridgeCard();external.cutout='file:///subject.png';external.c
 for(const c of editorVisualChoices(external,'shape')){assert.equal(c.card.capability,null,'hidden content cannot offset the shape thumbnail');assert.equal(c.offsetX,0);assert.equal(c.offsetY,0);assert.ok(Math.abs(Math.max(c.card.w*c.scale/82,c.card.h*c.scale/92)-1)<.00001,'shape fills the fitted thumbnail frame');}
 const large=editorViewport(40,80,0,400,900,36,24,false,700);assert.ok(large.scale*80>600,'small source artwork still uses available editor height');
 console.log('PASS shape choices ignore hidden/external data and small cards fill the preview.');
+
+const {applyEditorShape}=load('EditorVisualChoices');
+for(const key of ['round','pill']){const c=new FridgeCard();c.w=180;c.h=180;applyEditorShape(c,key);assert.equal(c.h,108);c.w=220;c.h=140;applyEditorShape(c,key);assert.equal(c.h,140);}
+const square=new FridgeCard();square.w=180;square.h=180;
+for(const c of editorVisualChoices(square,'shape').filter(c=>['round','pill'].includes(c.key)))assert.equal(c.card.w/c.card.h,180/108);
+assert.equal(square.h,180,'shape candidates do not resize the artwork');

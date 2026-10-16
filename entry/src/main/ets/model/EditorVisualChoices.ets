@@ -16,6 +16,12 @@ export function editorReadingPlacement(card:FridgeCard,blend:string):ElementBox 
   }
   return box;
 }
+/** A square collapses both an ellipse and a capsule to a circle. Preserve existing non-square art. */
+export function applyEditorShape(card:FridgeCard,key:string):void {
+  card.shape=key;
+  if(key==='subject')card.h=card.w/card.subjectAspect;
+  else if((key==='round'||key==='pill')&&Math.abs(card.w-card.h)<.5)card.h=card.w*.6;
+}
 /** Build detached candidates once per inspector session, never during a gesture or clock tick. */
 export function editorVisualChoices(source:FridgeCard,mode:string):EditorVisualChoice[] {
   const keys=mode==='material'?['paper','matte']:mode==='album'?['cover','classic','row']:mode==='shape'?['rect','round','pill','blob'].concat(source.cutout?['subject']:[]):readingStyles(source.capability?.k??'');
@@ -29,7 +35,7 @@ export function editorVisualChoices(source:FridgeCard,mode:string):EditorVisualC
     const choice=new EditorVisualChoice(),card=cardStorageShell(detached);if(detached.capability){card.capability=JSON.parse(capabilityJSON) as CapBlock;card.capability.courses=courses;}choice.key=key;card.rot=0;
     if(mode==='material'&&card.capability){card.capability.readingMaterial=key;card.capability.readingMaterialStudy=undefined;choice.label=key==='paper'?'暖白细纸':'轻透磨砂';}
     else if(mode==='album'&&card.capability){card.capability.albumPresentation=key;card.w=key==='row'?300:180;card.h=key==='row'?150:180;choice.label=['纯封面','经典信息','横向信息'][keys.indexOf(key)];}
-    else if(mode==='shape'){card.capability=null;card.capFree=false;card.elements=[];card.shape=key;if(key==='subject')card.h=card.w/card.subjectAspect;choice.label=['圆角矩形','椭圆','胶囊','自由边角','照片主体'][keys.indexOf(key)];}
+    else if(mode==='shape'){card.capability=null;card.capFree=false;card.elements=[];applyEditorShape(card,key);if(key==='round'||key==='pill'){card.w=180;card.h=108;}choice.label=['圆角矩形','椭圆','胶囊','自由边角','照片主体'][keys.indexOf(key)];}
     else if(card.capability){card.capability.readingBlend=key;card.capability.readingStyle='surface';card.capBox=editorReadingPlacement(card,key);card.capFree=true;card.capability.readingEdge=key==='sticker'?(source.capability?.readingEdge||'left'):'';
       if(key==='sticker'){const attached=edgeAttachment(card,card.capBox,card.capability.readingEdge,card.capability.readingOutside===true);card.capBox=attached.box;card.capBox.rot=0;}
       choice.label=READING_COMPOSITION_LABELS[READING_COMPOSITIONS.indexOf(key)];

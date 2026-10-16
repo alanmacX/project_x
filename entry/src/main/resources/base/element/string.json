@@ -1,10 +1,28 @@
 {
   "string": [
-    { "name": "app_name", "value": "冰箱贴桌面" },
-    { "name": "module_desc", "value": "冰箱贴桌面主模块" },
-    { "name": "ability_desc", "value": "卡片白板编辑器" },
-    { "name": "start_window", "value": "冰箱贴桌面" },
-    { "name": "form_display", "value": "冰箱贴" },
-    { "name": "form_desc", "value": "自由摆放的卡片画布" }
+    {
+      "name": "app_name",
+      "value": "冰箱贴桌面小组件"
+    },
+    {
+      "name": "module_desc",
+      "value": "冰箱贴桌面小组件主模块"
+    },
+    {
+      "name": "ability_desc",
+      "value": "卡片白板编辑器"
+    },
+    {
+      "name": "start_window",
+      "value": "冰箱贴桌面小组件"
+    },
+    {
+      "name": "form_display",
+      "value": "冰箱贴桌面小组件"
+    },
+    {
+      "name": "form_desc",
+      "value": "自由摆放的卡片画布"
+    }
   ]
 }

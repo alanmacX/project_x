@@ -152,7 +152,7 @@ struct FridgeWidgetCard {
         }
       }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
       if(this.canvasBackground.mode==='transparent'&&this.cardIds.length===0){
-        Column({space:8}){Text('冰箱贴').fontSize(18).fontWeight(FontWeight.Medium).fontColor('#302D23');Text('点击添加卡片').fontSize(13).fontColor('#696459')}
+        Column({space:8}){Text($r('app.string.app_name')).fontSize(18).fontWeight(FontWeight.Medium).fontColor('#302D23');Text('点击添加卡片').fontSize(13).fontColor('#696459')}
          .width('72%').height('28%').justifyContent(FlexAlign.Center).backgroundColor('#F2FAF8EF').borderRadius(20).position({x:'14%',y:'36%'}).hitTestBehavior(HitTestMode.None)
       }
       ForEach(this.cardIds.filter((id:string)=>!this.cardMap[id].hidden), (id: string) => {
@@ -176,7 +176,7 @@ struct FridgeWidgetCard {
           this.measuredWidth = width; this.measuredHeight = height;
         }
       })
-      .accessibilityText('打开冰箱贴画布')
+      .accessibilityText('打开冰箱贴桌面小组件画布')
       .onClick(() => this.open())
   }
 }
