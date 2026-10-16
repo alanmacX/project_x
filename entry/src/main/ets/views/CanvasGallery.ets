@@ -159,10 +159,14 @@ export struct CanvasGallery {
   private previewFrameCorner(state:FridgeState):number{
     const rect=galleryPreviewSize(state.canvasDimension,state.canvasAspect,this.contentWidth(),this.widgetRects);return widgetFrameMetrics(rect[0],rect[1]).cornerPercent;
   }
+  private previewRadius(state:FridgeState):number{
+    const rect=galleryPreviewSize(state.canvasDimension,state.canvasAspect,this.contentWidth(),this.widgetRects);
+    return widgetFrameMetrics(rect[0],rect[1]).radius*BOARD_W/rect[0];
+  }
   private previewAspect(state:FridgeState):number {
     const rect=galleryPreviewSize(state.canvasDimension,state.canvasAspect,this.contentWidth(),this.widgetRects);return rect[0]/rect[1];
   }
-  private previewSource(state:FridgeState):string {return 'v4:'+storageSnapshot(state)+':hostAspect='+this.previewAspect(state)+':corner='+this.previewFrameCorner(state);}
+  private previewSource(state:FridgeState):string {return 'v6-frame-clip:'+storageSnapshot(state)+':hostAspect='+this.previewAspect(state)+':corner='+this.previewFrameCorner(state);}
   private artworkCards(state: FridgeState): FridgeCard[] {
     return depthRenderCards(state.cards.filter((card: FridgeCard) => !card.hidden).map((card: FridgeCard) => cardRenderSnapshot(card)))
       .sort((a: FridgeCard, b: FridgeCard) => a.z - b.z);
@@ -179,7 +183,7 @@ export struct CanvasGallery {
       if (state.background.frameStyle !== 'none') {
         CanvasFrame({ material: state.background.frameMaterial, style: state.background.frameStyle, cornerPercent: this.previewFrameCorner(state) }).width('100%').height('100%').zIndex(100000)
       }
-    }.width(BOARD_W).height(BOARD_W / this.previewAspect(state)).clip(true)
+    }.width(BOARD_W).height(BOARD_W / this.previewAspect(state)).borderRadius(this.previewRadius(state)).clip(true)
   }
   private columns(): number { const small=galleryPreviewSize('2*2',1,this.contentWidth(),this.widgetRects)[0];return Math.max(1,Math.min(4,Math.floor((this.contentWidth()+16)/(small+16)))); }
   private contentWidth(): number { return Math.min(1120, this.viewportWidth - (this.viewportWidth >= 720 ? 48 : 32)); }
@@ -215,8 +219,8 @@ export struct CanvasGallery {
               Text(item.failed ? '预览暂不可用' : item.loaded ? '正在生成预览' : '正在读取画布').fontSize(12).fontColor(AppDesign.muted(this.appDark))
             }
           }
-        }.width('100%').height(this.previewHeight(item, wide)).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(16).clip(true)
-      }.width('100%').height(this.previewHeight(item, wide)).padding(0).borderRadius(16).backgroundColor(Color.Transparent)
+        }.width('100%').height(this.previewHeight(item, wide)).backgroundColor(Color.Transparent).clip(true)
+      }.width('100%').height(this.previewHeight(item, wide)).padding(0).borderRadius(0).backgroundColor(Color.Transparent)
         .enabled(!this.busy).accessibilityText('打开画布 ' + item.name).onClick(() => this.onOpen(item.id))
         .onVisibleAreaChange([0], (visible: boolean) => { if (visible) { this.visibleIds.add(item.id); this.requestPreview(item.id); } else this.visibleIds.delete(item.id); })
       if (this.renameId === item.id) {

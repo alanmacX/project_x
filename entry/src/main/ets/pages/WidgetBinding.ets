@@ -58,7 +58,7 @@ struct WidgetBinding {
         Stack(){
           if(item.preview){Image(item.preview).width('100%').height('100%').objectFit(ImageFit.Contain)}
           else{SymbolGlyph($r('sys.symbol.square_stack_3d')).fontSize(22).fontColor([AppDesign.muted(this.appDark)])}
-        }.width(44).height(44).borderRadius(10).backgroundColor(AppDesign.surface(this.appDark)).clip(true)
+        }.width(44).height(44).backgroundColor(Color.Transparent)
         Column({space:3}){
           Text(item.name).fontSize(15).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
           Text(item.cardCount+' 张卡片').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')

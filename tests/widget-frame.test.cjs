@@ -7,3 +7,9 @@ for(const [width,height] of [[172,154],[190,170],[344,154],[360,172],[344,300],[
 }
 const small=ctx.exports.widgetFrameMetrics(190,170),large=ctx.exports.widgetFrameMetrics(600,520);assert(small.cornerPercent>large.cornerPercent,'small frames need larger corner proportions');
 console.log('PASS widget frame: 2×2, 2×4 and 4×4 host masking, proportional tiles and nonnegative edge lengths.');
+
+const gallery=fs.readFileSync('entry/src/main/ets/views/CanvasGallery.ets','utf8'),widget=fs.readFileSync('entry/src/main/ets/widget/pages/FridgeWidgetCard.ets','utf8'),binding=fs.readFileSync('entry/src/main/ets/pages/WidgetBinding.ets','utf8');
+assert.match(gallery,/borderRadius\(this.previewRadius\(state\)\)\.clip\(true\)/,'snapshot clips artwork and texture together');
+assert.doesNotMatch(widget,/CanvasFrame\(\{[^\n]+square:true/,'desktop keeps its original rounded frame');assert.doesNotMatch(gallery,/CanvasFrame\(\{[^\n]+square:true/,'preview keeps the same original rounded frame');
+assert.doesNotMatch(gallery,/backgroundColor\(AppDesign.surface\(this.appDark\)\)\.borderRadius\(16\)\.clip/,'no opaque thumbnail surface can peek through corners');
+assert.doesNotMatch(binding,/width\(44\)\.height\(44\)\.borderRadius/,'thumbnail does not add a second corner mask');
