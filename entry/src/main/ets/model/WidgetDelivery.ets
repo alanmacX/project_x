@@ -9,6 +9,9 @@ import { prepareWidgetPayload } from './WidgetPayload';
 /** Form binding also serializes the large scene; keep that native work off the UI thread. */
 @Concurrent
 export async function deliverWidget(formId: string, json: string, dim: string, sceneContext:string='', contourCache:string='', queuedAt:number=0, previousManifest:string=''): Promise<string> {
+  const authored=JSON.parse(json) as FridgeState;
+  if(authored.canvasId&&authored.canvasDimension!==dim)throw new Error('WIDGET_SIZE_MISMATCH');
+  try{const native=await formProvider.getPublishedRunningFormInfoById(formId);const expected=native.dimension===2?'2*2':native.dimension===3?'2*4':native.dimension===4?'4*4':native.dimension===7?'6*4':'';if(expected&&expected!==dim)throw new Error('WIDGET_SIZE_MISMATCH');}catch(e){if((e as Error).message==='WIDGET_SIZE_MISMATCH')throw e as Error;}
   const started=Date.now();
   let canvasWidth = 344, canvasHeight = dim === '2*4' ? 172 : (dim === '6*4' ? 516 : 344);
   try { const rect = await formProvider.getFormRect(formId); if (rect.width > 0 && rect.height > 0) { canvasWidth = rect.width; canvasHeight = rect.height; } } catch (_) {}

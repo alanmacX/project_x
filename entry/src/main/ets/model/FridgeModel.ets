@@ -1,4 +1,4 @@
-import { independentBindings } from './WidgetBindingMigration';
+import { importLegacyWidgets, widgetInstances, detachDeletedCanvas } from './WidgetRegistry';
 import { normalizeCanvasRotation } from './CanvasRotation';
 import { creationDimension, creationAspect } from './CanvasSize';
 import { SceneRule } from './SceneScheduleSchema';
@@ -190,9 +190,7 @@ export class FridgeStore {
     this.catalog.canvases = this.catalog.canvases.filter((c) => c.id !== id); this.documents = this.documents.filter((c) => c.id !== id);
     this.catalog.rotation=normalizeCanvasRotation(this.catalog.rotation,this.catalog.canvases.map(c=>c.id));
     if (this.prefs !== null) {
-      const bindings = JSON.parse(await this.prefs.get('fridge_form_bindings_json','{}') as string) as Record<string,string>;
-      for (const key of Object.keys(bindings)) if (bindings[key] === id) bindings[key] = this.catalog.activeId;
-      await this.prefs.put('fridge_form_bindings_json',JSON.stringify(bindings));
+      if(this.context)await detachDeletedCanvas(this.context,id);
       await this.save(false); await this.prefs.delete(canvasKey(id)); await this.prefs.delete('fridge_render_contours_v1_'+id); await this.prefs.flush();
       for (const queue of Object.values(this.widgetQueues)) queue.invalidate();
       const retained: Record<string,LatestWidgetQueue> = {};
@@ -212,7 +210,7 @@ export class FridgeStore {
     try {
       const catalogJson = await this.prefs.get('fridge_canvases_json', '') as string;
       this.catalog = readCatalog(catalogJson);this.selectionMigrationPending=false; this.lastCatalog = catalogJson; this.documents = []; this.savedScenes = {};
-      await independentBindings(this.prefs);
+      await importLegacyWidgets(context);
 
       for (const entry of this.catalog.canvases.filter((c)=>c.id===this.catalog.activeId)) {
         let json = await this.prefs.get(canvasKey(entry.id), '') as string;
@@ -269,7 +267,7 @@ export class FridgeStore {
   }
   async refreshCanvasSpecs(): Promise<void> {
     if (this.prefs === null) return;
-    const dims = JSON.parse(await this.prefs.get('fridge_form_dims_json', '{}') as string) as Record<string, string>;
+    const dims:Record<string,string>={};if(this.context)for(const item of await widgetInstances(this.context))dims[item.id]=item.dimension;
     await Promise.all(Object.keys(dims).map(async (id: string) => {
       try {
         const rect = await formProvider.getFormRect(id);

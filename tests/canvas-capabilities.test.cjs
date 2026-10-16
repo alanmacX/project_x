@@ -6,6 +6,8 @@ const vm = require('node:vm');
 const ts = require(process.env.FRIDGE_TYPESCRIPT || '/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
 const root = path.resolve(__dirname, '../entry/src/main/ets/model');
 const disk = new Map();
+const rdb=require('./helpers/widget-rdb.cjs').createWidgetRdb();
+const originalClear=disk.clear.bind(disk);disk.clear=()=>{originalClear();try{rdb.reset();}catch(_){}};
 const writes = [], updates = [], closed = [], opened = [], schedules = [];
 let failWrite = false, failForm = false, removedForm = '';
 const prefs = {
@@ -19,6 +21,7 @@ const prefs = {
   delete: async key => disk.delete(key),
 };
 const kits = {
+ '@kit.ArkData':rdb,
   '@kit.BasicServicesKit':{batteryInfo:{batterySOC:60,chargingStatus:0,BatteryChargeState:{ENABLE:1}}},
   '@kit.CalendarKit':{calendarManager:{}},
   '@kit.AbilityKit':{abilityAccessCtrl:{GrantStatus:{PERMISSION_GRANTED:0},createAtManager:()=>({checkAccessToken:async()=>-1})}},
@@ -27,7 +30,7 @@ const kits = {
   '@kit.FormKit': {
     formInfo: {VisibilityType:{FORM_VISIBLE:1}},
     formBindingData: { createFormBindingData: data => data },
-    formProvider: { setFormNextRefreshTime: async(id,minutes)=>schedules.push({id,minutes}), updateForm: async (id, data) => {
+    formProvider: {getPublishedRunningFormInfoById:async id=>{const dimensions=JSON.parse(disk.get('fridge_form_dims_json')||'{}');if(!dimensions[id])throw Error('not published');return {dimension:dimensions[id]==='2*2'?2:dimensions[id]==='2*4'?3:4};}, setFormNextRefreshTime: async(id,minutes)=>schedules.push({id,minutes}), updateForm: async (id, data) => {
       if (id === removedForm) { const e=Error('removed form'); e.code=16501001; throw e; }
       if (failForm) { failForm = false; throw Error('removed form'); }
       updates.push({id, data});
@@ -62,13 +65,14 @@ function load(name) {
 (async()=>{
  const {FridgeStore,FridgeCard,CanvasElement,defaultState}=load('FridgeModel');
  const {readCatalog,boundCanvas,canvasKey}=load('CanvasLibrary');
+ const registry=load('WidgetRegistry');
  const {backgroundSignature}=load('BackgroundInputs');
  const data=load('CapabilityData'),{readCapability,systemAgenda}=load('CapabilityService'),{refreshMinutes}=load('WidgetRefreshPolicy');
  const original=defaultState(),card=new FridgeCard();card.id='original';card.capability={k:'clock'};original.cards=[card];
  disk.set('fridge_state_json',JSON.stringify(original));disk.set('fridge_form_dims_json',JSON.stringify({home:'4*4'}));
  const store=new FridgeStore();await store.init({});await store.repairDesktopSelection();const afterMigration=updates.length;await store.repairDesktopSelection();assert.equal(updates.length,afterMigration,'upgrade repair publishes once, not on every foreground/background');await store.save();
  assert.equal(store.state.cards[0].id,'original','legacy artwork is migrated intact');
- assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).home,'canvas_main');
+ assert.equal((await registry.widgetInstance({},'home')).canvasId,'canvas_main');
  const old=store.state,second=store.createCanvas('第二张');await store.save();
  const other=new FridgeCard();other.id='other';other.capability={k:'battery'};store.addCard(other);await store.save();
  assert.equal(JSON.parse(disk.get(canvasKey('canvas_main'))).cards[0].id,'original','new canvas never overwrites original');
@@ -87,13 +91,13 @@ function load(name) {
  // still be republished when another form is rebound to it after deletion.
  await reloaded.save();const beforeRebind=updates.length;
  await reloaded.openCanvas(second);await reloaded.deleteCanvas(second);
- assert.ok(updates.slice(beforeRebind).some(u=>u.id==='second'&&u.data.canvasId==='canvas_main'),'deletion immediately delivers the fallback to its newly rebound form');
- await reloaded.save();assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).second,'canvas_main','deleted source is explicitly rebound');assert.ok(!disk.has(canvasKey(second)));
+ assert(!updates.slice(beforeRebind).some(u=>u.id==='second'),'deleting a bound document retains the desktop last frame, never another canvas');
+ await reloaded.save();assert.equal((await registry.widgetInstance({},'second')).canvasId,second);assert.ok(!disk.has(canvasKey(second)));
  assert.equal(boundCanvas({a:'canvas_main'},'a',reloaded.catalog),'canvas_main');assert.throws(()=>readCatalog('{"version":1,"canvases":[]}'));
  await reloaded.selectCanvas(duplicate);
  assert.equal(readCatalog(disk.get('fridge_canvases_json')).activeId,duplicate,'manual selection is durable before returning');
- assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).home,'canvas_main');
- assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).second,'canvas_main','editor selection never rewrites desktop bindings');
+ assert.equal((await registry.widgetInstance({},'home')).canvasId,'canvas_main');
+ assert.equal((await registry.widgetInstance({},'second')).canvasId,second,'editor selection never rewrites desktop bindings');
  assert.equal(updates.at(-1).data.canvasId,'canvas_main','manual selection does not deliver an unbound canvas');assert.equal(boundCanvas({home:'canvas_main'},'home',readCatalog(disk.get('fridge_canvases_json'))),'canvas_main','binding owns desktop selection');
  const selectedRestart=new FridgeStore();await selectedRestart.init({});assert.equal(selectedRestart.state.canvasId,duplicate,'relaunch never restores old selection');
  const unchangedUpdates=updates.length;await selectedRestart.refreshWidgets();await selectedRestart.refreshWidgets();assert.equal(updates.length,unchangedUpdates,'refreshing an unbound editor cannot change another widget');
@@ -138,17 +142,18 @@ function load(name) {
  const state=defaultState();const lesson=new FridgeCard();lesson.capability=timetable;state.cards=[lesson];assert.equal(refreshMinutes(state,new Date('2026-09-07T07:58:00').getTime()),5,'system one-shot minimum is respected');assert.equal(refreshMinutes(state,new Date('2026-09-07T07:45:00').getTime()),15,'nearest lesson boundary schedules an update');
  const {importAgenda,importCourses}=load('ScheduleImport'),ics='BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nDTSTART:20261004T100000Z\r\nDTEND:20261004T110000Z\r\nSUMMARY:Discuss\\, tomorrow\r\nLOCATION:Room A\r\nEND:VEVENT\r\nEND:VCALENDAR';const events=importAgenda(ics,new Date('2026-10-03').getTime());assert.equal(events[0].start,Date.UTC(2026,9,4,10));assert.equal(events[0].title,'Discuss, tomorrow');assert.ok(importAgenda(ics.replace('SUMMARY:','RRULE:FREQ=WEEKLY;COUNT=4\r\nSUMMARY:'),new Date('2026-10-03').getTime()).length===4,'weekly recurrence expands into actual instances');assert.throws(()=>importAgenda(ics.replace('SUMMARY:','RRULE:FREQ=MONTHLY\r\nSUMMARY:')),/复杂重复/);assert.throws(()=>importAgenda(ics.replace('DTSTART:20261004T100000Z','DTSTART;TZID=Asia/Shanghai:20261004T100000')),/时区/);assert.equal(importCourses(JSON.stringify([course])).length,1);assert.throws(()=>importCourses(JSON.stringify([{...course,day:9}])));
  const modelPath=path.resolve(root,'../form/FridgeFormAbility.ets');kits['@kit.FormKit'].FormExtensionAbility=class{constructor(){this.context=ctx;}};const Form=load('../form/FridgeFormAbility').default;
- const a=defaultState(),b=defaultState();a.canvasId='canvas_main';a.cards=[card];b.canvasId='canvas_second';other.capability={k:'battery',percent:1};b.cards=[other];disk.set('fridge_canvases_json',JSON.stringify({version:1,activeId:'canvas_second',canvases:[{id:'canvas_main',name:'A'},{id:'canvas_second',name:'B'}]}));disk.set(canvasKey(a.canvasId),JSON.stringify(a));disk.set(canvasKey(b.canvasId),JSON.stringify(b));disk.set('fridge_form_dims_json',JSON.stringify({fa:'4*4',fb:'4*4'}));disk.set('fridge_form_bindings_json',JSON.stringify({fa:'canvas_main',fb:'canvas_second'}));const form=new Form();form.onUpdateForm('fb');await form.actionQueue;assert.equal(JSON.parse(disk.get(canvasKey(b.canvasId))).cards[0].capability.percent,72,'background Form refresh reads live battery');assert.equal(JSON.parse(disk.get(canvasKey(a.canvasId))).cards[0].id,'original','another canvas is untouched');assert.equal(updates.at(-1).data.canvasId,'canvas_second');
+ const a=defaultState(),b=defaultState();a.canvasId='canvas_main';a.cards=[card];b.canvasId='canvas_second';other.capability={k:'battery',percent:1};b.cards=[other];disk.set('fridge_canvases_json',JSON.stringify({version:1,activeId:'canvas_second',canvases:[{id:'canvas_main',name:'A'},{id:'canvas_second',name:'B'}]}));disk.set(canvasKey(a.canvasId),JSON.stringify(a));disk.set(canvasKey(b.canvasId),JSON.stringify(b));disk.set('fridge_form_dims_json',JSON.stringify({fa:'4*4',fb:'4*4'}));disk.set('fridge_form_bindings_json',JSON.stringify({fa:'canvas_main',fb:'canvas_second'}));const form=new Form();await registry.importLegacyWidgets(ctx);form.onUpdateForm('fb');await form.actionQueue;assert.equal(JSON.parse(disk.get(canvasKey(b.canvasId))).cards[0].capability.percent,72,'background Form refresh reads live battery');assert.equal(JSON.parse(disk.get(canvasKey(a.canvasId))).cards[0].id,'original','another canvas is untouched');assert.equal(updates.at(-1).data.canvasId,'canvas_second');
  // First delivery must resolve the durable instance binding before reading artwork.
  const added=new Form();let releaseRegistration,finishAdd,firstDelivery;
  const registration=new Promise(resolve=>releaseRegistration=resolve),completedAdd=new Promise(resolve=>finishAdd=resolve),delivered=new Promise(resolve=>firstDelivery=resolve);
- added.register=()=>registration;added.refreshDueData=async()=>{};added.scheduleForm=async()=>finishAdd();
+ added.register=()=>registration.then(()=>registry.registerWidget(ctx,'instant','4*4'));added.refreshDueData=async()=>{};added.scheduleForm=async()=>finishAdd();
  const originalUpdate=kits['@kit.FormKit'].formProvider.updateForm;
  kits['@kit.FormKit'].formProvider.updateForm=async(id,payload)=>{await originalUpdate(id,payload);if(id==='instant')firstDelivery();};
  const beforeRegistration=updates.length;
- added.onAddForm({parameters:{'ohos.extra.param.key.form_identity':'instant','ohos.extra.param.key.form_dimension':4}});
- await new Promise(resolve=>setImmediate(resolve));assert.equal(updates.length,beforeRegistration,'no wrong-canvas first-frame delivery');releaseRegistration();await delivered;await completedAdd;kits['@kit.FormKit'].formProvider.updateForm=originalUpdate;
- const {pushWidgets}=load('WidgetSync');removedForm='fb';await pushWidgets(ctx,JSON.stringify(b));assert.ok(!JSON.parse(disk.get('fridge_form_dims_json')).fb,'removed form is pruned without retrying indefinitely');assert.equal(JSON.parse(disk.get('fridge_form_dims_json')).fa,'4*4','another live canvas binding is preserved');assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).fa,'canvas_main');removedForm='';
+ const restoration=added.onAddForm({parameters:{'ohos.extra.param.key.form_identity':'instant','ohos.extra.param.key.form_dimension':4}});
+ assert.deepEqual(restoration,{formId:'instant'},'onAdd restoration never returns empty faceCards, scenePacket or canvasId');
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(updates.length,beforeRegistration,'no wrong-canvas first-frame delivery');releaseRegistration();await completedAdd;assert(!updates.slice(beforeRegistration).some(u=>u.id==='instant'),'unbound instance never publishes an empty restoration');kits['@kit.FormKit'].formProvider.updateForm=originalUpdate;
+ const {pushWidgets}=load('WidgetSync');removedForm='fb';await pushWidgets(ctx,JSON.stringify(b));assert(!(await registry.widgetInstance(ctx,'fb')).removed,'transient IPC error cannot delete a binding');removedForm='';await form.register('fb','',true);assert((await registry.widgetInstance(ctx,'fb')).removed,'native removal retires only the named instance');assert.equal((await registry.widgetInstance(ctx,'fa')).canvasId,'canvas_main');
  const ordinarySchedules=schedules.length;await pushWidgets(ctx,JSON.stringify(b));assert.equal(schedules.length,ordinarySchedules,'ordinary saves never re-request an acknowledged content boundary');schedules.length=0;
  // Use midday: a real run near midnight has a nearer calendar refresh boundary.
  const actualNow=Date.now;Date.now=()=>new Date('2026-10-04T12:00:00').getTime();
@@ -174,7 +179,7 @@ function load(name) {
  const putScene=()=>{disk.set(canvasKey(source.canvasId),JSON.stringify(source));disk.set(canvasKey(destination.canvasId),JSON.stringify(destination));};
  disk.set('fridge_canvases_json',JSON.stringify({version:1,activeId:source.canvasId,canvases:[{id:source.canvasId,name:'Source'},{id:destination.canvasId,name:'Target'}]}));
  disk.set('fridge_form_dims_json',JSON.stringify({scene:'4*4'}));disk.set('fridge_form_bindings_json',JSON.stringify({scene:source.canvasId}));putScene();
- const liveStore=new FridgeStore();await liveStore.init({});const sceneForm=new Form();sceneForm.onUpdateForm('scene');await sceneForm.actionQueue;
+ const liveStore=new FridgeStore();await liveStore.init({});const sceneForm=new Form();await registry.importLegacyWidgets(ctx);sceneForm.onUpdateForm('scene');await sceneForm.actionQueue;
  let storedScene=JSON.parse(disk.get(canvasKey(source.canvasId))),packet=JSON.parse(updates.at(-1).data.scenePacket);
  assert.equal(storedScene.cards[0].rot,18);assert.equal(storedScene.cards[1].x,140,'battery updates never save swept positions');
  assert.equal(storedScene.cards[0].capability.percent,72);assert.equal(JSON.parse(packet.cards)[0].rot,0);assert.equal(JSON.parse(packet.context).baseId,source.canvasId);
@@ -209,6 +214,11 @@ function load(name) {
  await pushWidgets(ctx,JSON.stringify(source));assert(updates.length>beforeIsolated,'healthy bound canvas still delivers');assert.equal(disk.get(canvasKey(destination.canvasId)),'{broken');
  assert(updates.slice(beforeIsolated).every(u=>u.data.canvasId===source.canvasId),'obsolete bindings to a corrupt inactive canvas do not hide the healthy active canvas');
  const isolatedCatalog=JSON.parse(disk.get('fridge_canvases_json'));isolatedCatalog.activeId=destination.canvasId;disk.set('fridge_canvases_json',JSON.stringify(isolatedCatalog));const beforeMalformed=updates.length;await pushWidgets(ctx,JSON.stringify(source));assert(updates.slice(beforeMalformed).every(u=>u.id==='scene'),'foreground selection does not redirect healthy bindings to the corrupt canvas');disk.set(canvasKey(destination.canvasId),JSON.stringify({cards:null}));await pushWidgets(ctx,JSON.stringify(source));assert(updates.slice(beforeMalformed).every(u=>u.id==='scene'),'corrupt widget retains its last artwork');
+ // Broken/missing/mismatched bound documents must never turn into default empty scene packets.
+ const existingScene=await registry.widgetInstance(ctx,'scene'),beforeMissing=updates.length,keptSource=disk.get(canvasKey(source.canvasId));
+ disk.delete(canvasKey(source.canvasId));await assert.rejects(sceneForm.pushForm('scene'),/无法读取/);assert.equal(updates.length,beforeMissing);
+ disk.set(canvasKey(source.canvasId),JSON.stringify({...source,canvasDimension:'2*2'}));await assert.rejects(sceneForm.pushForm('scene'),/尺寸/);assert.equal(updates.length,beforeMissing);
+ disk.set(canvasKey(source.canvasId),keptSource);assert.equal((await registry.widgetInstance(ctx,'scene')).revision,existingScene.revision);
  // Reusable timetable migration must tolerate one damaged inactive canvas and
  // never overwrite a newer edit while an asynchronous legacy scan is pending.
  disk.clear();
@@ -236,7 +246,7 @@ function load(name) {
  const timedBase=defaultState();timedBase.cards=[new FridgeCard()];timedBase.cards[0].id='timed-base';disk.set('fridge_canvases_json','');disk.set('fridge_state_json',JSON.stringify(timedBase));disk.set('fridge_form_dims_json',JSON.stringify({timed:'4*4'}));disk.set('fridge_form_bindings_json','{}');
  const sceneStore=new FridgeStore();await sceneStore.init({});await sceneStore.save(true);const mainId=sceneStore.catalog.activeId,baseJSON=disk.get('fridge_state_json'),sourceCard=sceneStore.state.cards[0];
  const sceneId=sceneStore.createTimedScene('喝水',sourceCard);assert.equal(sceneStore.catalog.activeId,mainId);assert.equal(sceneStore.state.cards.length,1);assert.notEqual(sceneStore.state.cards[0].id,sourceCard.id);await sceneStore.save(true);assert.equal(disk.get('fridge_state_json'),baseJSON,'editing central card cannot overwrite fallback main document');
- assert.throws(()=>sceneStore.addCard(new FridgeCard()),/一张/);assert.equal(JSON.parse(disk.get('fridge_form_bindings_json')).timed,mainId);
+ assert.throws(()=>sceneStore.addCard(new FridgeCard()),/一张/);assert.equal((await registry.widgetInstance({},'timed')).canvasId,mainId);
  await sceneStore.openCanvas(mainId);await assert.rejects(sceneStore.copyCardTo(sourceCard,sceneId),/已有/);await sceneStore.copyCardTo(sourceCard,sceneId,true);assert.equal((await sceneStore.canvasSnapshot(sceneId)).cards.length,1);
  const Rule=load('SceneScheduleSchema').SceneRule,job=new Rule();Object.assign(job,{id:'owned-scene',kind:'focus',centralOnly:true,targetId:sceneId,createdAt:0,start:(new Date().getHours()*60+new Date().getMinutes()+1439)%1440,timeoutMinutes:120,enabled:true});sceneStore.catalog.sceneRules=[job];await sceneStore.save(true);const beforeRuleEdit=updates.length;job.timeoutMinutes=1;await sceneStore.save(true);assert(updates.length>beforeRuleEdit,'rule-only edit invalidates desktop publisher cache');
  const mainBeforeDelete=disk.get(canvasKey(mainId));await sceneStore.deleteTimedScene(mainId);assert.equal(disk.get(canvasKey(mainId)),mainBeforeDelete,'wrong scene delete identifier cannot erase a normal canvas');
@@ -258,18 +268,16 @@ function load(name) {
  const {bindWidget,widgetDimension}=load('WidgetBinding');
  assert.equal(widgetDimension(2),'2*2');assert.equal(widgetDimension(3),'2*4');
  const smallId=sizeStore.createCanvas('小尺寸绑定',undefined,'2*2');await sizeStore.save(false);
- const oldPolicy=JSON.parse(disk.get('fridge_canvases_json'));oldPolicy.desktopFollowsSelection=true;disk.set('fridge_canvases_json',JSON.stringify(oldPolicy));
- await bindWidget({},'small-form',smallId,'2*2');
- assert.equal(JSON.parse(disk.get('fridge_canvases_json')).desktopFollowsSelection,false,'configuring from the system freezes the old policy before the app opens');
- const afterSystemBinding=new FridgeStore();await afterSystemBinding.init({});assert.equal(JSON.parse(disk.get('fridge_form_bindings_json'))['small-form'],smallId,'later app startup cannot overwrite the system choice');
- await assert.rejects(bindWidget({},'wrong-size',smallId,'4*4'),/相同尺寸/);
- const beforeNavBindings=disk.get('fridge_form_bindings_json');await sizeStore.selectCanvas(mainId);
- assert.equal(disk.get('fridge_form_bindings_json'),beforeNavBindings,'navigating after configuring an instance leaves every binding unchanged');
+ await registry.registerWidget({},'small-form','2*2');await bindWidget({},'small-form',smallId,'2*2');
+ const afterSystemBinding=new FridgeStore();await afterSystemBinding.init({});assert.equal((await registry.widgetInstance({},'small-form')).canvasId,smallId,'later app startup cannot overwrite system choice');
+ await registry.registerWidget({},'wrong-size','4*4');await assert.rejects(bindWidget({},'wrong-size',smallId,'4*4'),/相同尺寸/);
+ const beforeNavBinding=(await registry.widgetInstance({},'small-form')).revision;await sizeStore.selectCanvas(mainId);
+ assert.equal((await registry.widgetInstance({},'small-form')).revision,beforeNavBinding,'navigation leaves binding revision unchanged');
  await sizeStore.openCanvas(smallId);sizeStore.catalog.sceneRules=[];sizeStore.catalog.rotation.enabled=false;sizeStore.state.background.color='#ABC123';const beforeSmall=updates.length;await sizeStore.save(true);
- assert(updates.slice(beforeSmall).some(u=>u.id==='small-form'&&u.data.canvasId===smallId),'editing a bound small canvas refreshes its instance');
- const newForm=new Form();await newForm.register('new-unbound','2*2');assert.equal(JSON.parse(disk.get('fridge_form_bindings_json'))['new-unbound'],'');
- await newForm.register('preview-copy','2*2',false,0,0,'small-form');assert.equal(JSON.parse(disk.get('fridge_form_bindings_json'))['preview-copy'],smallId,'native editor preview inherits its edited instance');
- await newForm.register('preview-copy','',true);assert.equal(JSON.parse(disk.get('fridge_form_bindings_json'))['small-form'],smallId,'temporary preview cleanup preserves the real instance');
+ assert(updates.slice(beforeSmall).some(u=>u.id==='small-form'&&u.data.canvasId===smallId),'editing bound small canvas refreshes its instance');
+ const newForm=new Form();await newForm.register('new-unbound','2*2');assert.equal((await registry.widgetInstance({},'new-unbound')).canvasId,'');
+ await newForm.register('preview-copy','2*2',false,0,0,'small-form');assert.equal((await registry.widgetInstance({},'preview-copy')).canvasId,smallId);
+ await newForm.register('preview-copy','',true);assert.equal((await registry.widgetInstance({},'small-form')).canvasId,smallId);
  for(const [dimension,aspect] of [['2*2',1],['2*4',2],['4*4',1]]){
   const id=sizeStore.createCanvas('尺寸回归 '+dimension,undefined,dimension);await sizeStore.save(false);
   const reopened=new FridgeStore();await reopened.init({});await reopened.openCanvas(id);

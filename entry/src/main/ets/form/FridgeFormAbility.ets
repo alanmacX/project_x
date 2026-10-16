@@ -1,4 +1,4 @@
-import { independentBindings } from '../model/WidgetBindingMigration';
+import { registerWidget, removeWidget, promoteWidget, widgetInstance, widgetInstances, WidgetGuard } from '../model/WidgetRegistry';
 import { widgetDimension } from '../model/WidgetBinding';
 import { canvasRotationEnabled } from '../model/CanvasRotation';
 import { systemIsDark } from '../model/SystemAppearance';
@@ -6,7 +6,7 @@ import { resolveScheduledScene, sceneWidgetContext, dismissScene, ScheduledScene
 import { pushWidgets } from '../model/WidgetSync';
 import { widgetBoundary, scheduleWidget } from '../model/WidgetSchedule';
 import { needsDataRefresh, capabilityRequestKey, mergeCapabilityResult } from '../model/CapabilityData';
-import { readCatalog, withScenePolicy, sceneDocumentExists, canvasKey, boundCanvas } from '../model/CanvasLibrary';
+import { readCatalog, withScenePolicy, sceneDocumentExists, canvasKey } from '../model/CanvasLibrary';
 import { FormExtensionAbility, formBindingData, formProvider } from '@kit.FormKit';
 import { Want, Configuration } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -17,7 +17,6 @@ import { updateWidget } from '../model/WidgetSync';
 
 const STORE_NAME: string = 'fridge_store';
 const KEY_STATE: string = 'fridge_state_json';
-const KEY_DIMS: string = 'fridge_form_dims_json';
 
 /** Local schedules are evaluated on system refresh; original documents remain unchanged. */
 export default class FridgeFormAbility extends FormExtensionAbility {
@@ -36,45 +35,38 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     await preferences.removePreferencesFromCache(this.context, STORE_NAME);
     const prefs = await preferences.getPreferences(this.context, STORE_NAME);
     const catalogJson = await prefs.get('fridge_canvases_json','') as string;
-    const catalog = readCatalog(catalogJson), bindings = JSON.parse(await prefs.get('fridge_form_bindings_json','{}') as string) as Record<string,string>;
-    const id = boundCanvas(bindings,formId,catalog);
-    if(!id){const empty=defaultState();empty.canvasId='';empty.background.mode='transparent';empty.background.frameStyle='none';return empty;}
-    const json = await prefs.get(catalogJson ? canvasKey(id) : KEY_STATE, '') as string;
-    return withScenePolicy(json.length > 0 ? normalizeState(JSON.parse(json) as FridgeState) : defaultState(),catalog,(this.appearanceDark??systemIsDark(this.context)));
+    const catalog = readCatalog(catalogJson),instance=await widgetInstance(this.context,formId);
+    if(!instance||instance.removed)throw new Error('小组件实例尚未就绪');
+    const id=instance.canvasId;
+    if(!id){const empty=defaultState();empty.canvasId='';empty.canvasDimension=instance.dimension;empty.background.mode='transparent';empty.background.frameStyle='none';return empty;}
+    if(!catalog.canvases.some(c=>c.id===id))throw new Error('绑定画布已不存在，已保留桌面内容');
+    const json=await prefs.get(canvasKey(id),'') as string;
+    if(!json)throw new Error('绑定画布无法读取，已保留桌面内容');
+    const source=JSON.parse(json) as FridgeState;
+    if(!Array.isArray(source.cards)||source.canvasDimension!==instance.dimension)throw new Error('绑定画布尺寸不符，已保留桌面内容');
+    return withScenePolicy(normalizeState(source),catalog,(this.appearanceDark??systemIsDark(this.context)));
   }
 
-  private async loadDims(): Promise<Record<string, string>> {
-    const prefs = await preferences.getPreferences(this.context, STORE_NAME);
-    return JSON.parse(await prefs.get(KEY_DIMS, '{}') as string) as Record<string, string>;
+  private async loadDims():Promise<Record<string,string>>{
+    const dims:Record<string,string>={};for(const item of await widgetInstances(this.context))dims[item.id]=item.dimension;return dims;
   }
-
-  private register(formId: string, dim: string, remove: boolean = false, width: number = 0, height: number = 0, editFormId: string = ''): Promise<void> {
-    this.registrationQueue = this.registrationQueue.catch(() => {}).then(async () => {
-      await preferences.removePreferencesFromCache(this.context,STORE_NAME);
-      const prefs=await preferences.getPreferences(this.context,STORE_NAME);
-      const bindings=await independentBindings(prefs);
-      const dims = await this.loadDims();
-      const kept: Record<string, string> = {};
-      for (const id of Object.keys(dims)) { if (id !== formId) kept[id] = dims[id]; }
-      if (!remove) kept[formId] = dim;
-      await prefs.put(KEY_DIMS, JSON.stringify(kept));
-      if (remove) { const rest: Record<string,string> = {}; for(const key of Object.keys(bindings)) if(key!==formId) rest[key]=bindings[key]; await prefs.put('fridge_form_bindings_json',JSON.stringify(rest)); }
-      else { if(bindings[formId]===undefined)bindings[formId]=editFormId?(bindings[editFormId]??''):''; await prefs.put('fridge_form_bindings_json',JSON.stringify(bindings)); }
-      if (width > 0 && height > 0 && width / height >= .3 && width / height <= 3) {
-        const specs = JSON.parse(await prefs.get('fridge_canvas_specs_json', '{}') as string) as Record<string, number>;
-        specs[dim] = width / height; await prefs.put('fridge_canvas_specs_json', JSON.stringify(specs));
-        const rects=JSON.parse(await prefs.get('fridge_widget_rects_json','{}') as string) as Record<string,number[]>;rects[dim]=[width,height];await prefs.put('fridge_widget_rects_json',JSON.stringify(rects));
+  private register(formId:string,dim:string,remove:boolean=false,width:number=0,height:number=0,editFormId:string='',temporary:boolean=false):Promise<void>{
+    this.registrationQueue=this.registrationQueue.catch(()=>{}).then(async()=>{
+      if(remove){await removeWidget(this.context,formId);return;}
+      const instance=await registerWidget(this.context,formId,dim,editFormId,temporary);
+      if(!instance.ownerId&&instance.kind==='desktop'&&width>0&&height>0){
+        const prefs=await preferences.getPreferences(this.context,STORE_NAME);
+        const rects=JSON.parse(await prefs.get('fridge_widget_rects_json','{}') as string) as Record<string,number[]>;
+        rects[instance.dimension]=[width,height];await prefs.put('fridge_widget_rects_json',JSON.stringify(rects));await prefs.flush();
       }
-      await prefs.flush();
-    });
-    return this.registrationQueue;
+    });return this.registrationQueue;
   }
 
   private async displayedScene(formId:string):Promise<ScheduledScene> {
     const base=await this.loadState(formId);
     const scene=await resolveScheduledScene(base,Date.now(),async(id:string):Promise<FridgeState|null>=>{
       const prefs=await preferences.getPreferences(this.context,STORE_NAME);const catalog=readCatalog(await prefs.get('fridge_canvases_json','') as string);if(!sceneDocumentExists(catalog,id))return null;
-      const json=await prefs.get(canvasKey(id),'') as string;return json?normalizeState(JSON.parse(json) as FridgeState):null;
+      const json=await prefs.get(canvasKey(id),'') as string;if(!json)return null;const target=normalizeState(JSON.parse(json) as FridgeState);return target.canvasDimension===base.canvasDimension?target:null;
     });
     return scene;
   }
@@ -82,17 +74,16 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     const prefs=await preferences.getPreferences(this.context,STORE_NAME);
     return await prefs.get('fridge_render_contours_v1_'+canvasId,'') as string;
   }
-  private async pushForm(formId: string): Promise<void> {
+  private async pushForm(formId:string):Promise<void>{
+    const instance=await widgetInstance(this.context,formId);if(!instance||instance.removed||!instance.canvasId)return; // Unknown/unbound restoration cannot clear cached desktop artwork.
     const scene=await this.displayedScene(formId);
-    const state=scene.state;
-    const dims = await this.loadDims();
-    await updateWidget(formId, JSON.stringify(state), dims[formId] ?? '4*4',sceneWidgetContext(scene),await this.contourCache(state.canvasId));
+    await updateWidget(formId,JSON.stringify(scene.state),instance.dimension,sceneWidgetContext(scene),await this.contourCache(scene.state.canvasId),new WidgetGuard(this.context,instance));
   }
   private async scheduleForm(formId:string):Promise<void> {
     const base=await this.loadState(formId);
     const scene=await resolveScheduledScene(base,Date.now(),async(id:string):Promise<FridgeState|null>=>{
       const prefs=await preferences.getPreferences(this.context,STORE_NAME);
-      const json=await prefs.get(canvasKey(id),'') as string;return json?normalizeState(JSON.parse(json) as FridgeState):null;
+      const json=await prefs.get(canvasKey(id),'') as string;if(!json)return null;const target=normalizeState(JSON.parse(json) as FridgeState);return target.canvasDimension===base.canvasDimension?target:null;
     });
     const prefs=await preferences.getPreferences(this.context,STORE_NAME),now=Date.now();
     await scheduleWidget(prefs,formId,Math.min(widgetBoundary(base,now),widgetBoundary(scene.state,now)),now);
@@ -104,16 +95,18 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     const dim=widgetDimension(value);
     const width = Number(want.parameters?.['ohos.extra.param.key.form_width'] ?? 0), height = Number(want.parameters?.['ohos.extra.param.key.form_height'] ?? 0);
     const editFormId=want.parameters?.['ohos.extra.param.key.edit_form_id'];
-    this.register(id,dim,false,width,height,typeof editFormId==='string'?editFormId:'').then(async()=>{
-      const scene=await this.displayedScene(id);
-      await updateWidget(id,JSON.stringify(scene.state),dim,sceneWidgetContext(scene),await this.contourCache(scene.state.canvasId));
+    this.register(id,dim,false,width,height,typeof editFormId==='string'?editFormId:'',want.parameters?.['ohos.extra.param.key.form_temporary']===true).then(async()=>{
+      await this.pushForm(id);
       if(await this.refreshDueData(id))await this.pushForm(id);await this.scheduleForm(id);
     }).catch((e: Error) => {
       hilog.error(0x0000, 'FridgeForm', 'add %{public}s', e.message);
     });
-    return formBindingData.createFormBindingData({ 'faceCards': '[]', 'doorCards': '[]', 'canvasId':'', 'formId':id, 'dim': dim, 'rev': 0, 'canvasWidth': width > 0 ? width : 344, 'canvasHeight': height > 0 ? height : (dim === '2*4' ? 172 : (dim === '6*4' ? 516 : 344)) });
+    // An onAdd callback may also restore an existing widget after a package update.
+    // Return no empty scene fields: they would erase its last artwork before async storage loads.
+    const initial:Record<string,Object>={'formId':id};return formBindingData.createFormBindingData(initial);
   }
 
+  onCastToNormalForm(formId:string):void{this.registrationQueue=this.registrationQueue.catch(()=>{}).then(()=>promoteWidget(this.context,formId));this.registrationQueue.catch((e:Error)=>hilog.warn(0,'FridgeForm','promote %{public}s',e.message));}
   onUpdateForm(formId: string): void {
     this.actionQueue = this.actionQueue.catch(() => {}).then(async () => {
       try {await this.refreshDueData(formId);}catch(e){hilog.warn(0,'FridgeForm','local data refresh: %{public}s',(e as Error).message);}

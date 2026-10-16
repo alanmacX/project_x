@@ -1,3 +1,4 @@
+import { widgetFrameMetrics } from '../../model/WidgetFrameGeometry';
 import { depthRenderCards } from '../../model/DepthComposition';
 import { capabilityRenderTick } from '../../model/CapabilityClock';
 import { cardRenderSnapshot } from '../../model/CardViewSnapshot';
@@ -153,9 +154,19 @@ struct FridgeWidgetCard {
           }.width('100%').height('100%').opacity(this.mix)
         }
       }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
-      if(this.canvasBackground.mode==='transparent'&&this.cardIds.length===0){
-        Column({space:8}){Text($r('app.string.app_name')).fontSize(18).fontWeight(FontWeight.Medium).fontColor('#302D23');Text((this.displayCanvasId||this.canvasId)?'点击添加卡片':'点击选择绑定画布').fontSize(13).fontColor('#696459')}
-         .width('72%').height('28%').justifyContent(FlexAlign.Center).backgroundColor('#F2FAF8EF').borderRadius(20).position({x:'14%',y:'36%'}).hitTestBehavior(HitTestMode.None)
+      if(!(this.displayCanvasId||this.canvasId)){
+        Column({space:8}){
+          Stack(){
+            SymbolGlyph($r('sys.symbol.square_stack_3d')).fontSize(this.widthValue()<240||this.heightValue()<220?26:36).fontColor(['#69604F'])
+          }.width(this.widthValue()<240||this.heightValue()<220?48:64).height(this.widthValue()<240||this.heightValue()<220?48:64).borderRadius(16).backgroundColor('#E9E3D7')
+          Text('选择你的画布').fontSize(this.widthValue()<240||this.heightValue()<220?16:22).fontWeight(FontWeight.Medium).fontColor('#302D23').maxLines(1)
+          Text('轻点此处，开始绑定').fontSize(this.widthValue()<240||this.heightValue()<220?11:14).fontColor('#77705F').maxLines(1)
+          Row({space:4}){Text('选择画布').fontSize(12).fontWeight(FontWeight.Medium).fontColor('#514A3F');SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(11).fontColor(['#514A3F'])}
+            .padding({left:14,right:14,top:7,bottom:7}).borderRadius(18).backgroundColor('#E9E3D7')
+        }.width('100%').height('100%').justifyContent(FlexAlign.Center).padding(12).backgroundColor('#F8F5EE').hitTestBehavior(HitTestMode.None)
+      }else if(this.cardIds.length===0){
+        Column({space:8}){Text('这张画布还没有卡片').fontSize(16).fontWeight(FontWeight.Medium).fontColor('#302D23');Text('轻点打开 App，继续创作').fontSize(12).fontColor('#696459')}
+          .width('100%').height('100%').justifyContent(FlexAlign.Center).backgroundColor('#F2FAF8EF').hitTestBehavior(HitTestMode.None)
       }
       ForEach(this.cardIds.filter((id:string)=>!this.cardMap[id].hidden), (id: string) => {
         Stack({alignContent:Alignment.TopStart}) {
@@ -167,8 +178,8 @@ struct FridgeWidgetCard {
           .rotate({angle:this.cardMap[id].rot,centerX:0,centerY:'100%'})
           .zIndex(this.cardMap[id].z).hitTestBehavior(HitTestMode.None)
       }, (id: string) => id)
-      if(this.canvasBackground.frameStyle!=='none'){CanvasFrame({material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle}).width('100%').height('100%').zIndex(100000).hitTestBehavior(HitTestMode.None)}
-    }.width('100%').height('100%').backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:this.canvasBackground.color).borderRadius(this.canvasBackground.frameStyle==='none'?24:this.widthValue()*31/600).clip(true)
+      if((this.displayCanvasId||this.canvasId)&&this.canvasBackground.frameStyle!=='none'){CanvasFrame({material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle,cornerPercent:widgetFrameMetrics(this.widthValue(),this.heightValue()).cornerPercent}).width('100%').height('100%').zIndex(100000).hitTestBehavior(HitTestMode.None)}
+    }.width('100%').height('100%').backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:this.canvasBackground.color).borderRadius(!(this.displayCanvasId||this.canvasId)||this.canvasBackground.frameStyle==='none'?24:widgetFrameMetrics(this.widthValue(),this.heightValue()).radius).clip(true)
       // Cache the complete clipped form, including shadow fringes, while its
       // host scales it during launch/return. Crossfades render live until settled.
       .renderGroup(this.incoming===null)

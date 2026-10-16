@@ -1,3 +1,4 @@
+import { widgetFrameMetrics } from '../model/WidgetFrameGeometry';
 import { widgetRectangles } from '../model/WidgetGeometry';
 import { GalleryThumbnail, cachedGalleryPreview, saveGalleryPreview, removeGalleryPreview } from '../model/GalleryPreviewCache';
 import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode, TextStyleMode } from '@kit.UIDesignKit';
@@ -155,10 +156,13 @@ export struct CanvasGallery {
     const dir=this.getUIContext().getHostContext()?.cacheDir??'';
     removeGalleryPreview(dir,id).catch(()=>{});
   }
+  private previewFrameCorner(state:FridgeState):number{
+    const rect=galleryPreviewSize(state.canvasDimension,state.canvasAspect,this.contentWidth(),this.widgetRects);return widgetFrameMetrics(rect[0],rect[1]).cornerPercent;
+  }
   private previewAspect(state:FridgeState):number {
     const rect=galleryPreviewSize(state.canvasDimension,state.canvasAspect,this.contentWidth(),this.widgetRects);return rect[0]/rect[1];
   }
-  private previewSource(state:FridgeState):string {return 'v3:'+storageSnapshot(state)+':hostAspect='+this.previewAspect(state);}
+  private previewSource(state:FridgeState):string {return 'v4:'+storageSnapshot(state)+':hostAspect='+this.previewAspect(state)+':corner='+this.previewFrameCorner(state);}
   private artworkCards(state: FridgeState): FridgeCard[] {
     return depthRenderCards(state.cards.filter((card: FridgeCard) => !card.hidden).map((card: FridgeCard) => cardRenderSnapshot(card)))
       .sort((a: FridgeCard, b: FridgeCard) => a.z - b.z);
@@ -173,7 +177,7 @@ export struct CanvasGallery {
           .rotate({ angle: card.rot, centerX: 0, centerY: '100%' }).zIndex(card.z)
       }, (card: FridgeCard) => card.id)
       if (state.background.frameStyle !== 'none') {
-        CanvasFrame({ material: state.background.frameMaterial, style: state.background.frameStyle, square: true }).width('100%').height('100%').zIndex(100000)
+        CanvasFrame({ material: state.background.frameMaterial, style: state.background.frameStyle, cornerPercent: this.previewFrameCorner(state) }).width('100%').height('100%').zIndex(100000)
       }
     }.width(BOARD_W).height(BOARD_W / this.previewAspect(state)).clip(true)
   }

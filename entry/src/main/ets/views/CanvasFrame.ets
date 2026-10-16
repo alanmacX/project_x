@@ -2,6 +2,7 @@
 @Component
 export struct CanvasFrame {
   @Prop square:boolean=false;
+  @Prop cornerPercent:number=8;
   @Prop style:string='auto';
   @Prop material:string='stone';
   private tiles():Resource[]{
@@ -27,7 +28,7 @@ export struct CanvasFrame {
   }
   @Builder
   corner(index:number,id:string,rules:AlignRuleOption){
-    Image(this.tiles()[index]).id(id).width('8%').aspectRatio(1).alignRules(rules)
+    Image(this.tiles()[index]).id(id).width(this.cornerPercent+'%').aspectRatio(1).alignRules(rules)
       .objectFit(ImageFit.Fill).draggable(false).hitTestBehavior(HitTestMode.None)
   }
   @Builder

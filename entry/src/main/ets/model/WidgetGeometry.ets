@@ -1,10 +1,11 @@
+import { widgetInstances } from './WidgetRegistry';
 import preferences from '@ohos.data.preferences';
 import { formProvider } from '@kit.FormKit';
 /** Native launcher rectangles are in vp, matching ArkUI preview dimensions. */
 export async function widgetRectangles(context:Context):Promise<Record<string,number[]>>{
   const prefs=await preferences.getPreferences(context,'fridge_store');
   const rects=JSON.parse(await prefs.get('fridge_widget_rects_json','{}') as string) as Record<string,number[]>;
-  const dims=JSON.parse(await prefs.get('fridge_form_dims_json','{}') as string) as Record<string,string>;
+  const dims:Record<string,string>={};for(const item of await widgetInstances(context))dims[item.id]=item.dimension;
   const visited:Set<string>=new Set();
   for(const id of Object.keys(dims)){
     if(visited.has(dims[id]))continue;

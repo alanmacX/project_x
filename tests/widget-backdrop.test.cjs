@@ -18,7 +18,7 @@ const routerEnv={exports:{},postCardAction:(_,action)=>routed=action};vm.runInNe
 const router=new routerEnv.exports.Router();Object.assign(router,{displayCanvasId:'shown',canvasId:'base',dim:'4*4',sceneAnimating:true,widthValue:()=>400,heightValue:()=>300,hostAspect:()=>4/3});router.open();assert.equal(routed.params.canvasId,'shown');assert.equal(routed.params.viewCardId,'');assert.equal(routed.action,'router');assert(!form.includes('widgetHit'));assert(!form.includes('Button('));
 console.log('PASS Form backdrop: immediate cold load, decode-gated fade, repeated/interrupting packets, hidden cleanup and whole-widget routing.');
 
-assert.ok(form.trimEnd().endsWith(".accessibilityText('打开冰箱贴画布')\n      .onClick(() => this.open())\n  }\n}"), 'root Form directly owns the launch action');
+assert.ok(form.trimEnd().endsWith(".accessibilityText('打开冰箱贴桌面小组件画布')\n      .onClick(() => this.open())\n  }\n}"), 'root Form directly owns the launch action');
 assert.ok(!form.includes('HitTestMode.Block')&&!form.includes(".accessibilityLevel('no')"), 'no separate blocking overlay or inaccessible root');
 const clockSource=form.slice(form.indexOf('  private syncRenderClock()'),form.indexOf("  @LocalStorageProp('canvasId')"));
 const clockEnv={exports:{},Date};vm.runInNewContext(ts.transpileModule('export class Clock {'+clockSource+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,clockEnv);

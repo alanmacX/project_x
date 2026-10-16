@@ -24,7 +24,7 @@ export function readCatalog(json: string): CanvasCatalog {
 export function boundCanvas(bindings: Record<string,string>, formId: string, catalog: CanvasCatalog): string {
   const id = bindings[formId];
   if (id === '') return '';
-  return catalog.canvases.some(c => c.id === id) ? id : catalog.activeId;
+  return catalog.canvases.some(c => c.id === id) ? id : ''; // An absent binding is never the foreground document.
 }
 export function cloneCanvas(state: FridgeState, id: string): FridgeState {
   const next = normalizeState(JSON.parse(JSON.stringify(state)) as FridgeState); next.canvasId = id; return next;
