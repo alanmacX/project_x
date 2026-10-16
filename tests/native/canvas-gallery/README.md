@@ -71,3 +71,12 @@ Final signed-package capture: `output/final-binding-polished.png` shows the actu
 ## Preview corner clipping correction · 2026-10-17
 
 Preserve the original rounded material frame on desktop and in preview snapshots. The attempted square-tile/native-rounded-mask change was withdrawn before commit because it changed the frame to an outer-round/inner-square appearance. The final change only clips preview artwork to the original frame's outer radius, converted from native host vp to snapshot coordinates; removes the opaque thumbnail backing that leaked through transparent corners; and avoids a second arbitrary 10vp mask on system-editor thumbnails. Cache signature v6 regenerates the affected PNGs. Native signed compilation/install and widget-frame, canvas-gallery, gallery-preview-cache, widget-backdrop and soft-relief-frame tests passed. `output/fixed-preview-corners.png` shows the final 4×4 and 2×2 gallery previews with the original rounded frame and no backing surface outside it.
+
+
+## Gallery content behind the immersive title · 2026-10-17
+
+The scroll surface now occupies the whole page beneath a sibling native HDS navigation layer. Initial content padding compensates for the former navigation safe-area inset, keeping the title/menu positions identical and filter/artwork positions within one physical pixel of the baseline. HDS component safe-area handling extends the native material behind the status bar; the gallery opts into a 32vp gradient tail while the workbench keeps its existing setting. Removed the Scroll fading edge that cut content before it reached the material.
+
+Physical API26 evidence: `output/header-safearea.png` shows scrolling artwork behind the status bar/title and the gradient fading into the gallery. `header-before.json` / `header-safearea.json` record matching title/menu bounds and the 1px filter/artwork rounding difference. Swiping still scrolls the content; the floating create button opens the size/name controls; Cancel returns without creating a canvas; native More opens both Skill entries. No artwork or widget bindings were changed. Signed native compilation and canvas-gallery, chrome-material and chrome-material-compatibility tests passed.
+
+Reference: [Huawei navigation dynamic blur](https://developer.huawei.com/consumer/cn/doc/HarmonyOS-Guides/ui-design-navigation-dynamic-blur); safe-area/title options were checked against the installed HDS SDK declarations.

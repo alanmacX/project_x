@@ -7,7 +7,6 @@ import { navigationChrome } from '../model/NavigationChrome';
 import { CREATION_DIMENSIONS, creationDimension } from '../model/CanvasSize';
 import { image } from '@kit.ImageKit';
 import { fileIo } from '@kit.CoreFileKit';
-import { LengthMetrics } from '@kit.ArkUI';
 import { taskpool } from '@kit.ArkTS';
 import lazy { prepareSceneRelief } from '../model/SceneRelief';
 import { CanvasEntry } from '../model/CanvasLibrary';
@@ -251,7 +250,7 @@ export struct CanvasGallery {
   }
   build() {
     Stack({ alignContent: Alignment.Bottom }) {
-      HdsNavigation() {
+      // Keep scrolling artwork under the system safe area; only its initial content inset avoids the title.
       Scroll(this.scroller) {
         Column({ space: 20 }) {
           Scroll() {
@@ -298,10 +297,14 @@ export struct CanvasGallery {
               Text(this.filter ? '可以先查看全部作品' : '添加照片、文字或实用卡片，创作自己的桌面作品').fontSize(14).fontColor(AppDesign.muted(this.appDark))
             }.width('100%').padding({ top: 64, bottom: 64 })
           }
-        }.width(this.contentWidth()).padding({ top: 76, bottom: this.safeBottom + 104 }).alignItems(HorizontalAlign.Start)
-      }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring).fadingEdge(true, { fadingEdgeLength: LengthMetrics.vp(12) })
+        }.width(this.contentWidth()).padding({ top: 76 + this.safeTop + 4, bottom: this.safeBottom + 104 }).alignItems(HorizontalAlign.Start)
+      }.width('100%').height('100%')
+        .align(Alignment.Top).clip(false).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring)
+      // A sibling native title bar can blur the full scroll surface without clipping it at the safe area.
+      HdsNavigation() {
+        Column().width(1).height(1)
       }.titleMode(HdsNavigationTitleMode.MINI)
-        .titleBar({ content: {
+        .titleBar({ enableComponentSafeArea: true, avoidLayoutSafeArea: true, content: {
           title: { mainTitle: '我的画布', subTitle: this.entries.length + ' 张画布' },
           menu: { maxCount: 3, value: [
             { content: { icon: new SymbolGlyphModifier($r('sys.symbol.square_and_arrow_down')).fontSize(22).fontColor([AppDesign.text(this.appDark)]),
@@ -310,9 +313,11 @@ export struct CanvasGallery {
               label: '新建画布', type: IconStyleMode.NORMAL, isEnabled: !this.busy, action: () => this.startCreating() } },
             { content: { label: '更多', type: TextStyleMode.NORMAL, isEnabled: !this.busy, action: () => this.toolsOpen = true } }
           ] }
-        }, style: navigationChrome(this.appDark) })
+        }, style: navigationChrome(this.appDark, 32) })
         .bindToScrollable([this.scroller]).hideBackButton(true).hideToolBar(true).mode(NavigationMode.Stack)
-        .width('100%').height('100%').padding({ top: this.safeTop + 4 }).backgroundColor(Color.Transparent)
+        .width('100%').height('100%').padding({ top: 4 }).position({ x: 0, y: 0 })
+        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
+        .hitTestBehavior(HitTestMode.Transparent).clip(false).backgroundColor(Color.Transparent)
       Column().width(1).height(1).position({ x: this.viewportWidth - 24, y: this.safeTop + 60 }).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
         .bindMenu(this.toolsOpen, [{ value: '创作 Skill · Gitee', action: () => { this.toolsOpen = false; this.onSkill('https://gitee.com/alanmac/fridge-signing-system'); } },
           { value: '创作 Skill · GitHub', action: () => { this.toolsOpen = false; this.onSkill('https://github.com/alanmacX/fridge-creating-skill'); } }],
