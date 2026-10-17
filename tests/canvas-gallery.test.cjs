@@ -123,7 +123,8 @@ const { Fixture } = execute(`class Fixture {
   shared.getUIContext=()=>({postFrameCallback:frame=>frame.start(),getComponentSnapshot:()=>({get:async()=>({release:async()=>{}})}),animateTo:(options,update)=>{update();sharedCompletions.push(options.onFinish);}});
   await shared.setGalleryPage(false);
   assert.equal(shared.galleryHeroSource,'file://canvas.png');assert.equal(shared.galleryHeroX,23);assert.equal(shared.galleryHeroY,160,'shared preview lands on the measured board');
-  sharedCompletions.shift()();assert.equal(shared.galleryHeroSource,'','completion restores live artwork');
+  sharedCompletions.shift()();assert.equal(shared.galleryArtworkOpacity,1,'decoded live surface is restored under the landing image');assert.equal(shared.galleryHeroSource,'file://canvas.png');
+  sharedCompletions.shift()();assert.equal(shared.galleryHeroSource,'','dissolve completion releases the landing image');
   await shared.setGalleryPage(true);assert.equal(shared.galleryHeroX,16);assert.equal(shared.galleryHeroY,120,'return lands on the retained thumbnail');
   sharedCompletions.shift()();shared.screenWidth=600;await shared.setGalleryPage(false);
   assert.equal(shared.galleryHeroSource,'','resized windows cannot reuse stale thumbnail coordinates');sharedCompletions.shift()();
@@ -157,12 +158,21 @@ const { Fixture } = execute(`class Fixture {
 
 const sizes=execute(fs.readFileSync('entry/src/main/ets/model/CanvasSize.ets','utf8'));
 const galleryView=fs.readFileSync('entry/src/main/ets/views/CanvasGallery.ets','utf8');
-const createStart=galleryView.slice(galleryView.indexOf('  private startCreating()'),galleryView.indexOf('  private startCreating()')+galleryView.slice(galleryView.indexOf('  private startCreating()')).indexOf('\n'));
-const creationFixture=execute('export class CreationFixture { '+createStart+' }',{creationDimension:sizes.creationDimension,Edge:{Top:0}}).CreationFixture;
-for(const [filter,expected] of [['2*2','2*2'],['2*4','2*4'],['','4*4']]){
- const f=new creationFixture();f.filter=filter;f.scroller={scrollEdge(){}};f.startCreating();assert.equal(f.draftDimension,expected);assert.equal(f.creating,true);
+const creationMethods=galleryView.slice(galleryView.indexOf('  private startCreating('),galleryView.indexOf('  private splitWidth('));
+const creationCalls=[];
+const CreationFixture=execute('export class CreationFixture { '+creationMethods+' }',{CREATION_DIMENSIONS:sizes.CREATION_DIMENSIONS,curves:{springMotion:()=>0}}).CreationFixture;
+for(const dimension of sizes.CREATION_DIMENSIONS){
+ const f=new CreationFixture();Object.assign(f,{busy:false,filter:'4*4',splitOpen:true,sizeMenuOpen:true,onCreate:(...args)=>creationCalls.push(args),getUIContext:()=>({animateTo:(_,change)=>change()})});
+ f.startCreating(dimension);assert.equal(f.draftDimension,dimension,'explicit size wins over active browsing filter');assert.equal(f.creating,true);assert.equal(f.splitOpen,false);assert.equal(f.sizeMenuOpen,false);
+ f.createNamedCanvas();assert.equal(creationCalls.length,0,'empty names cannot create a canvas');
+ f.draftName='  小画布  ';f.createNamedCanvas();assert.deepEqual(creationCalls.pop(),['小画布',dimension]);
+ f.busy=true;f.startCreating('2*2');assert.equal(f.draftDimension,dimension,'pending save cannot replace creation intent');f.createNamedCanvas();assert.equal(creationCalls.length,0);
 }
-assert.match(galleryView,/onCreate\(this.draftName.trim\(\) \|\| '新画布', this.draftDimension\)/);
+const invalid=new CreationFixture();invalid.startCreating('unsupported');assert.equal(invalid.creating,undefined);
+assert.match(galleryView,/borderRadius\(widgetFrameMetrics\(this.tileWidth\(item\),this.previewHeight\(item,wide\)\).radius\)\.clip\(true\)/,'native pressed overlay follows the same measured frame mask');
+assert(!galleryView.includes('this.scroller.scrollEdge(Edge.Top)'),'creation does not jump the gallery scroll position');
+assert.match(page,/this.canvasChanging\|\|this.galleryTransitioning\|\|this.scheduleTransition/,'async derived surfaces must wait for the landing dissolve');
+assert.match(fs.readFileSync('entry/src/main/ets/views/BoardCard.ets','utf8'),/CardFace\(\{ snapshot:true/,'local artwork is decoded before the gallery uncovers the board');
 
 for(const available of [288,358,700]){
  const small=model.galleryPreviewSize('2*2',1,available,{}),large=model.galleryPreviewSize('4*4',1,available,{}),strip=model.galleryPreviewSize('2*4',2,available,{});

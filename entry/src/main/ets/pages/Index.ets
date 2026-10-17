@@ -142,6 +142,8 @@ struct Index {
   private galleryAnchorWidth:number=0;
   private galleryAnchorHeight:number=0;
   @State galleryHeroSource:string='';
+  @State galleryArtworkOpacity:number=1;
+  @State galleryHeroOpacity:number=1;
   @State galleryHeroId:string='';
   @State galleryHeroX:number=0;
   @State galleryHeroY:number=0;
@@ -464,7 +466,7 @@ struct Index {
     this.galleryTransitionGeneration++;
     const release=this.galleryFrameResolve;this.galleryFrameResolve=null;release?.();
     if (this.galleryTransitionTimer >= 0) clearTimeout(this.galleryTransitionTimer);
-    this.galleryTransitionTimer = -1; this.galleryTransitioning = false;this.galleryHeroSource='';this.galleryHeroId='';
+    this.galleryTransitionTimer = -1; this.galleryTransitioning = false;this.galleryHeroSource='';this.galleryHeroId='';this.galleryArtworkOpacity=1;this.galleryHeroOpacity=1;
   }
   private waitGalleryFrame():Promise<void>{
     return new Promise<void>((resolve)=>{
@@ -489,7 +491,7 @@ struct Index {
     }
     const anchor=this.galleryAnchor;
     if(anchor&&anchor.id===this.store.state.canvasId&&this.galleryAnchorWidth===this.screenWidth&&this.galleryAnchorHeight===this.screenHeight&&anchor.y>=this.safeTop&&anchor.y+anchor.h<=this.screenHeight-this.safeBottom){
-      this.galleryHeroSource=rememberedGalleryPreview(this.context?.cacheDir??'',anchor.id)?.path??anchor.preview;this.galleryHeroId=anchor.id;
+      this.galleryHeroSource=rememberedGalleryPreview(this.context?.cacheDir??'',anchor.id)?.path??anchor.preview;this.galleryHeroId=anchor.id;this.galleryArtworkOpacity=.001;this.galleryHeroOpacity=1;
       this.galleryHeroX=library?this.boardLeft:anchor.x;this.galleryHeroY=library?this.boardTop:anchor.y;
       this.galleryHeroW=library?BOARD_W*this.boardScale:anchor.w;this.galleryHeroH=library?this.boardHeight:anchor.h;
       // The shared image needs an initial rendered pose before its target can be animated.
@@ -500,9 +502,17 @@ struct Index {
       if (!this.alive || generation !== this.galleryTransitionGeneration) return;
       this.cancelGalleryTransition(); this.armScheduleTimer(); this.updateScheduledScene(true);
     };
-    // Native completion can be omitted when the window is backgrounded mid-transition.
-    this.galleryTransitionTimer = setTimeout(finish, CANVAS_PAGE_DURATION + 160);
-    this.getUIContext().animateTo({ duration: CANVAS_PAGE_DURATION, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: finish },
+    const landed = ():void => {
+      if(!this.alive||generation!==this.galleryTransitionGeneration)return;
+      if(library||!this.galleryHeroSource){finish();return;}
+      // Restore the already decoded, persistent artwork before dissolving the landing image.
+      // Keeping the two surfaces overlapped avoids a one-frame card/cache swap at completion.
+      this.galleryArtworkOpacity=1;
+      this.getUIContext().animateTo({duration:140,curve:Curve.EaseOut,onFinish:finish},()=>this.galleryHeroOpacity=0);
+    };
+    // Include the landing dissolve in the cancellation deadline.
+    this.galleryTransitionTimer = setTimeout(finish, CANVAS_PAGE_DURATION + 140 + 160);
+    this.getUIContext().animateTo({ duration: CANVAS_PAGE_DURATION, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: landed },
       () => {
         this.galleryVisible = library;
         if(this.galleryHeroSource&&anchor){
@@ -833,6 +843,7 @@ struct Index {
   aboutToDisappear(): void { this.cancelGalleryTransition();this.canvasFlightGeneration++;this.canvasFlightY=0;this.canvasFlightX=0;this.canvasFlightAngle=0;this.canvasChanging=false; this.reliefGeneration++;if(this.reliefTimer>=0)clearTimeout(this.reliefTimer); this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer); if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
     if(this.galleryTransitioning)return true;
+    if(this.galleryVisible&&this.galleryController.dismiss())return true;
     if(this.navMenuOpen){this.finishNavMenu(-1);return true;}
     if(this.deletionId)return true;
     if(this.scheduleOpen){this.scenePanelGeneration++;this.scheduleOpen=false;this.updateScheduledScene(true);return true;}
@@ -1171,7 +1182,7 @@ struct Index {
   private reliefKeys:Map<string,string>=new Map();
   // Async artwork must never replace a surface during an interactive transform.
   private artworkInteractionBusy():boolean {
-    return !!(this.activeBoardId||this.gestureGroup||this.heroActive||this.layerDrag||this.arriving||this.canvasChanging||this.scheduleTransition||this.deletionId);
+    return !!(this.activeBoardId||this.gestureGroup||this.heroActive||this.layerDrag||this.arriving||this.canvasChanging||this.galleryTransitioning||this.scheduleTransition||this.deletionId);
   }
   private artworkPageActive():boolean {return this.alive&&this.pageVisible&&this.appWindowFocused&&!this.appBackgrounded;}
   private reliefKey(c:FridgeCard):string{return [c.w,c.h,c.cutout,c.subjectVersion,c.paper,c.material,c.subjectPhoto,c.ink].join(':');}
@@ -1485,7 +1496,7 @@ struct Index {
     }catch(e){if(this.alive)this.getUIContext().getPromptAction().showToast({message:(e as Error).message});}
   }
   private async refreshCapabilities():Promise<void> {
-    if(!this.ready||!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||this.canvasChanging||this.arriving||this.heroActive||this.activeBoardId||this.layerDrag||this.gestureGroup.length>0||this.refreshingCapabilities||!this.context)return;
+    if(!this.ready||!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||this.canvasChanging||this.galleryTransitioning||this.arriving||this.heroActive||this.activeBoardId||this.layerDrag||this.gestureGroup.length>0||this.refreshingCapabilities||!this.context)return;
     this.refreshingCapabilities=true;const canvasId=this.store.state.canvasId,generation=this.foregroundGeneration;
     const sources:FridgeCard[]=[],previous:CapBlock[]=[],results:CapBlock[]=[],keys:string[]=[];
     try {
@@ -1495,7 +1506,7 @@ struct Index {
         if(!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||generation!==this.foregroundGeneration||this.store.state.canvasId!==canvasId)return;
         sources.push(card);previous.push(cap);results.push(next);keys.push(key);
       }
-      if(this.gestureGroup||this.layerDrag||this.activeBoardId||this.arriving||this.heroActive||this.appBackgrounded){this.scheduleForegroundRefresh();return;}
+      if(this.gestureGroup||this.layerDrag||this.activeBoardId||this.arriving||this.heroActive||this.canvasChanging||this.galleryTransitioning||this.appBackgrounded){this.scheduleForegroundRefresh();return;}
       let changed=false;
       sources.forEach((card:FridgeCard,index:number)=>{
         const cap=previous[index],next=results[index];
@@ -1531,8 +1542,8 @@ struct Index {
           }.width('100%').height('100%').opacity(this.editorOpacity).hitTestBehavior(HitTestMode.None)
         }
         this.editingScene()
-        if(!this.viewing&&this.canvasBackground.frameStyle!=='none'){CanvasFrame({material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle}).width(BOARD_W*this.boardScale).height(this.boardHeight).position({x:this.boardLeft,y:this.boardTop}).opacity(this.boardOpacity).zIndex(100003).hitTestBehavior(HitTestMode.None)}
-        }.id('canvasArtwork').width('100%').height('100%').opacity(this.galleryHeroSource ? .001 : 1)
+        if(!this.viewing&&this.canvasBackground.frameStyle!=='none'){CanvasFrame({snapshot:true,material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle}).width(BOARD_W*this.boardScale).height(this.boardHeight).position({x:this.boardLeft,y:this.boardTop}).opacity(this.boardOpacity).zIndex(100003).hitTestBehavior(HitTestMode.None)}
+        }.id('canvasArtwork').width('100%').height('100%').opacity(this.galleryArtworkOpacity)
           .translate({x:this.canvasFlightX,y:this.canvasFlightY})
           .rotate({angle:this.canvasFlightAngle,centerX:this.boardLeft+BOARD_W*this.boardScale/2,centerY:this.boardTop+this.boardHeight/2})
           .hitTestBehavior(this.canvasChanging?HitTestMode.BLOCK_DESCENDANTS:HitTestMode.Transparent)
@@ -1612,7 +1623,7 @@ struct Index {
           .bindMenu(this.navMenuOpen,this.navMenuItems,{placement:Placement.BottomRight,systemMaterial:chromeMaterial(this.appDark),backgroundColor:AppDesign.popup(this.appDark),onDisappear:()=>this.finishNavMenu(this.navMenuResult)})
         if(this.galleryHeroSource){
           Image(this.galleryHeroSource).id('galleryTransitionArtwork').syncLoad(true).objectFit(ImageFit.Fill)
-            .width(this.galleryHeroW).height(this.galleryHeroH).position({x:this.galleryHeroX,y:this.galleryHeroY})
+            .width(this.galleryHeroW).height(this.galleryHeroH).position({x:this.galleryHeroX,y:this.galleryHeroY}).opacity(this.galleryHeroOpacity)
             .hitTestBehavior(HitTestMode.None).accessibilityLevel('no').zIndex(200001)
         }
         if(this.canvasChanging||this.galleryTransitioning){Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.Block).zIndex(200002)}
@@ -1718,7 +1729,7 @@ struct Index {
   board() {
     Stack({ alignContent: Alignment.TopStart }) {
       Stack({ alignContent: Alignment.TopStart }) {
-        CanvasBackdrop({ sceneBackground: this.canvasBackground,showFrame:false }).width('100%').height('100%')
+        CanvasBackdrop({ snapshot:true, sceneBackground: this.canvasBackground,showFrame:false }).width('100%').height('100%')
         Column().width('100%').height('100%').onClick(() => { this.selectedId = ''; })
         if (this.cards.length === 0) {
           Text('放一张自己的卡片').fontSize(16).fontColor('#989898').width('100%').height('100%').textAlign(TextAlign.Center).hitTestBehavior(HitTestMode.None)

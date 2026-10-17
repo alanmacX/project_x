@@ -1,6 +1,7 @@
 /** Retained gallery refreshes behind the workspace before returning to it. */
 export class GalleryAnchor { id:string='';preview:string='';x:number=0;y:number=0;w:number=0;h:number=0; }
 export class GalleryController {
+  dismiss: () => boolean = () => false;
   prepare: () => Promise<void> = async () => {};
   anchor: (id:string) => GalleryAnchor|null = () => null;
 }

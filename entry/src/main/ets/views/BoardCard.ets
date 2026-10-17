@@ -294,7 +294,8 @@ export struct BoardCard {
       Stack() {
         // Shadow fringe stays in the texture; rotation and translation stay outside it.
         Stack({ alignContent: Alignment.TopStart }) {
-          CardFace({ layerMotion:this.layerMotion, card: this.faceCard(), scaleFactor: this.scaleFactor, tick: this.tick, lifted: this.moving || this.motion.ids.includes(this.card.id), hideContent: this.hideContent, animateContent:this.animateContent, movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
+          // Decode local artwork while the gallery still covers this persistent surface.
+          CardFace({ snapshot:true, layerMotion:this.layerMotion, card: this.faceCard(), scaleFactor: this.scaleFactor, tick: this.tick, lifted: this.moving || this.motion.ids.includes(this.card.id), hideContent: this.hideContent, animateContent:this.animateContent, movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
             .width(this.card.w*this.scaleFactor).height(this.card.h*this.scaleFactor).position({ x: 24+this.attachmentOverflow().left, y: 24+this.attachmentOverflow().top }).hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS)
         }.width(this.card.w*this.scaleFactor+48+this.attachmentOverflow().left+this.attachmentOverflow().right).height(this.card.h*this.scaleFactor+48+this.attachmentOverflow().top+this.attachmentOverflow().bottom).scale({x:this.resizeScale(),y:this.resizeScale(),centerX:0,centerY:0}).position({ x: -this.shadowFringe(), y: -this.shadowFringe() })
           .id('deleteFace_'+this.card.id).renderGroup(this.moving || this.motion.ids.includes(this.card.id) || (this.movingLayerId.length === 0 && this.card.elements.every(el => !el.animated))).hitTestBehavior(HitTestMode.None)

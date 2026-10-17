@@ -2,9 +2,9 @@ import { widgetFrameMetrics } from '../model/WidgetFrameGeometry';
 import { widgetRectangles } from '../model/WidgetGeometry';
 import { GalleryThumbnail, rememberedGalleryPreview, rememberedGalleryRects, cachedGalleryPreview, saveGalleryPreview, removeGalleryPreview } from '../model/GalleryPreviewCache';
 import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode, TextStyleMode } from '@kit.UIDesignKit';
-import { SymbolGlyphModifier } from '@kit.ArkUI';
+import { curves, SymbolGlyphModifier } from '@kit.ArkUI';
 import { navigationChrome } from '../model/NavigationChrome';
-import { CREATION_DIMENSIONS, creationDimension } from '../model/CanvasSize';
+import { CREATION_DIMENSIONS } from '../model/CanvasSize';
 import { image } from '@kit.ImageKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { taskpool } from '@kit.ArkTS';
@@ -50,6 +50,10 @@ export struct CanvasGallery {
   @State toolsOpen: boolean = false;
   @State filter: string = '';
   @State creating: boolean = false;
+  @State sizeMenuOpen: boolean = false;
+  @State sizeMenuX: number = 0;
+  @State sizeMenuY: number = 0;
+  @State splitOpen: boolean = false;
   @State draftName: string = '';
   @State draftDimension: string = '4*4';
   @State renameId: string = '';
@@ -66,6 +70,7 @@ export struct CanvasGallery {
   aboutToAppear(): void {
     this.alive = true;
     this.widgetRects=rememberedGalleryRects(this.getUIContext().getHostContext()?.cacheDir??'',this.entries.map((entry:CanvasEntry)=>entry.id));
+    this.controller.dismiss=()=>{if(!this.splitOpen)return false;this.setSplitOpen(false);return true;};
     this.controller.prepare=async()=>{await this.loadItems(true);};
     this.controller.anchor=(id:string):GalleryAnchor|null=>{
       const item=this.items.find((entry:GalleryItem)=>entry.id===id);if(!item?.preview)return null;
@@ -81,14 +86,85 @@ export struct CanvasGallery {
   }
   aboutToDisappear(): void { this.alive = false; this.generation++; }
   private pageVisibilityChanged():void{
-    if(!this.pageVisible){this.creating=false;this.renameId='';this.toolsOpen=false;}
+    if(!this.pageVisible){this.creating=false;this.sizeMenuOpen=false;this.splitOpen=false;this.renameId='';this.toolsOpen=false;}
   }
   private previewTimeChanged():void{
     this.previewTick=Date.now();
     if(this.alive)this.visibleIds.forEach((id:string)=>{this.requestPreview(id);});
   }
   private reload(): void { if (this.alive) this.loadItems(); }
-  private startCreating(): void { this.draftDimension = creationDimension(this.filter); this.creating = true; this.draftName = ''; this.scroller.scrollEdge(Edge.Top); }
+  private startCreating(dimension: string): void {
+    if(this.busy || !CREATION_DIMENSIONS.includes(dimension))return;
+    this.sizeMenuOpen=false;this.setSplitOpen(false);this.draftDimension=dimension;this.draftName='';this.creating=true;
+  }
+  private setSplitOpen(open: boolean): void {
+    this.getUIContext().animateTo({duration:420,curve:curves.springMotion(.42,.78)},()=>this.splitOpen=open);
+  }
+  private openSizeMenu():void {
+    if(this.busy)return;
+    this.setSplitOpen(false);this.sizeMenuX=this.viewportWidth-96;this.sizeMenuY=this.safeTop+60;
+    try{
+      const ui=this.getUIContext(),rect=ui.getComponentUtils().getRectangleById('galleryAddCanvas');
+      if(rect.size.width>0){this.sizeMenuX=ui.px2vp(rect.windowOffset.x+rect.size.width);this.sizeMenuY=ui.px2vp(rect.windowOffset.y+rect.size.height)+4;}
+    }catch(_){}
+    this.sizeMenuOpen=true;
+  }
+  private sizeChoices(): MenuElement[] {
+    return CREATION_DIMENSIONS.map((dimension:string):MenuElement=>({value:dimension.replace('*','×')+' 画布',action:()=>this.startCreating(dimension)}));
+  }
+  private createNamedCanvas(): void {
+    if(this.busy || !this.draftName.trim())return;
+    this.creating=false;
+    this.onCreate(this.draftName.trim(), this.draftDimension);
+  }
+  private splitWidth(): number {return Math.min(344,this.viewportWidth-32);}
+  private splitSizeWidth():number{return (this.splitWidth()-48-24)/3;}
+  private splitOffset(index:number):number{return -this.splitWidth()/2+this.splitSizeWidth()/2+index*(this.splitSizeWidth()+8);}
+  @Builder
+  creationSheet() {
+    Column({space:18}) {
+      Row({space:8}) {
+        Text('命名画布').fontSize(22).fontWeight(FontWeight.Bold).fontColor(AppDesign.text(this.appDark)).layoutWeight(1)
+        Button('取消',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(44).width(56).padding(0)
+          .backgroundColor(Color.Transparent).fontColor(AppDesign.text(this.appDark)).onClick(()=>this.creating=false)
+        Button('创建',{type:ButtonType.Capsule}).height(44).width(80).padding(0)
+          .backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark))
+          .enabled(!this.busy&&!!this.draftName.trim()).onClick(()=>this.createNamedCanvas())
+      }.width('100%')
+      Text(this.draftDimension.replace('*','×')+' · 桌面小组件').fontSize(14).fontColor(AppDesign.muted(this.appDark)).width('100%')
+      TextInput({text:this.draftName,placeholder:'输入画布名称'}).id('newCanvasName').height(52).maxLength(40)
+        .backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).borderRadius(16)
+        .defaultFocus(true).enterKeyType(EnterKeyType.Done).onChange((value:string)=>this.draftName=value).onSubmit(()=>this.createNamedCanvas())
+    }.width('100%').padding({left:24,right:24,top:24,bottom:24})
+  }
+  @Builder
+  splitCreationButton() {
+    Stack() {
+      // All four pieces share the original capsule's centre. Persistent nodes stretch apart and merge back.
+      ForEach(CREATION_DIMENSIONS,(dimension:string,index:number)=>{
+        Button(dimension.replace('*','×'),{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL})
+          .width(this.splitSizeWidth()).height(48).fontSize(16).fontWeight(FontWeight.Medium)
+          .backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark))
+          .scale({x:this.splitOpen?1:.35,y:this.splitOpen?1:.82}).opacity(this.splitOpen?1:0)
+          .translate({x:this.splitOpen?this.splitOffset(index):0,y:this.splitOpen?0:6})
+          .hitTestBehavior(this.splitOpen?HitTestMode.Default:HitTestMode.None).enabled(!this.busy&&this.splitOpen)
+          .accessibilityLevel(this.splitOpen?'auto':'no-hide-descendants').accessibilityText('新建 '+dimension.replace('*','×')+' 画布')
+          .onClick(()=>this.startCreating(dimension))
+      },(dimension:string)=>dimension)
+      Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
+        Stack() {
+          Text('+ 新建画布').width(144).maxLines(1).fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.onSelected(this.appDark))
+            .opacity(this.splitOpen?0:1)
+          SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([AppDesign.onSelected(this.appDark)])
+            .rotate({angle:this.splitOpen?45:0}).opacity(this.splitOpen?1:0)
+        }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
+      }.width(this.splitOpen?48:144).height(48).padding(0).backgroundColor(AppDesign.selected(this.appDark))
+        .translate({x:this.splitOpen?(this.splitWidth()-48)/2:0})
+        .accessibilityText(this.splitOpen?'收起新建画布':'新建画布，选择尺寸').enabled(!this.busy)
+        .onClick(()=>this.setSplitOpen(!this.splitOpen))
+    }.width(this.splitWidth()).height(56).margin({bottom:this.safeBottom+12})
+      .opacity(this.pageVisible?1:0).hitTestBehavior(this.pageVisible?HitTestMode.Transparent:HitTestMode.None)
+  }
   private async loadItems(warm:boolean=false): Promise<void> {
     const generation = ++this.generation;this.previewTick=Date.now();
     const context=this.getUIContext().getHostContext();const cacheDir=context?.cacheDir??'';
@@ -257,7 +333,7 @@ export struct CanvasGallery {
           }
         }.width('100%').height(this.previewHeight(item, wide)).backgroundColor(Color.Transparent).clip(true)
           .opacity(this.heroId===item.id ? .001 : 1)
-      }.id('canvasPreview_'+item.id).width('100%').height(this.previewHeight(item, wide)).padding(0).borderRadius(0).backgroundColor(Color.Transparent)
+      }.id('canvasPreview_'+item.id).width('100%').height(this.previewHeight(item, wide)).padding(0).borderRadius(widgetFrameMetrics(this.tileWidth(item),this.previewHeight(item,wide)).radius).clip(true).backgroundColor(Color.Transparent)
         .accessibilityText('打开画布 ' + item.name).onClick(() => { if(!this.busy)this.onOpen(item.id); })
         .onVisibleAreaChange([0], (visible: boolean) => { if (visible) { this.visibleIds.add(item.id); this.requestPreview(item.id); } else this.visibleIds.delete(item.id); })
       if (this.renameId === item.id) {
@@ -305,29 +381,6 @@ export struct CanvasGallery {
               }, (dimension: string) => dimension || 'all')
             }
           }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
-          if (this.creating) {
-            Column({ space: 12 }) {
-              Text('画布尺寸').fontSize(14).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
-              Row({ space: 8 }) {
-                ForEach(CREATION_DIMENSIONS, (dimension: string) => {
-                  Button(dimension.replace('*', '×'), { type: ButtonType.Capsule, buttonStyle: ButtonStyleMode.NORMAL })
-                    .height(44).layoutWeight(1).fontSize(14).padding({ left: 8, right: 8 })
-                    .backgroundColor(AppDesign.choice(this.appDark, this.draftDimension === dimension))
-                    .fontColor(AppDesign.choiceText(this.appDark, this.draftDimension === dimension))
-                    .accessibilityText('创建 ' + dimension.replace('*', '×') + ' 画布' + (this.draftDimension === dimension ? '，已选中' : ''))
-                    .onClick(() => this.draftDimension = dimension)
-                }, (dimension: string) => dimension)
-              }.width('100%')
-              TextInput({ text: this.draftName, placeholder: '新画布名称' }).height(48).maxLength(40).fontColor(AppDesign.text(this.appDark))
-                .backgroundColor(AppDesign.control(this.appDark)).borderRadius(12).onChange((value: string) => this.draftName = value)
-              Row({ space: 8 }) {
-                Text('创建后即可添加卡片').fontSize(12).fontColor(AppDesign.muted(this.appDark)).layoutWeight(1)
-                Button('取消', { type: ButtonType.Capsule, buttonStyle: ButtonStyleMode.NORMAL }).height(44).backgroundColor(AppDesign.control(this.appDark)).fontColor(AppDesign.text(this.appDark)).onClick(() => this.creating = false)
-                Button('创建画布', { type: ButtonType.Capsule }).height(44).backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark))
-                  .enabled(!this.busy).onClick(() => this.onCreate(this.draftName.trim() || '新画布', this.draftDimension))
-              }.width('100%')
-            }.width('100%').padding(16).borderRadius(20).backgroundColor(AppDesign.surface(this.appDark))
-          }
           ForEach(galleryRows(this.items, this.filter, this.columns()), (row: GalleryRow) => {
             Row({ space: 16 }) {
               ForEach(row.items, (item: GalleryItem) => { this.tile(item, row.wide) }, (item: GalleryItem) => item.id)
@@ -350,7 +403,7 @@ export struct CanvasGallery {
             { content: { icon: new SymbolGlyphModifier($r('sys.symbol.square_and_arrow_down')).fontSize(22).fontColor([AppDesign.text(this.appDark)]),
               label: '导入作品', type: IconStyleMode.NORMAL, isEnabled: !this.busy, action: () => this.onImport() } },
             { content: { icon: new SymbolGlyphModifier($r('sys.symbol.plus')).fontSize(22).fontColor([AppDesign.text(this.appDark)]),
-              label: '新建画布', type: IconStyleMode.NORMAL, isEnabled: !this.busy, action: () => this.startCreating() } },
+              label: '新建画布', componentId:'galleryAddCanvas', type: IconStyleMode.NORMAL, isEnabled: !this.busy, action: () => this.openSizeMenu() } },
             { content: { label: '更多', type: TextStyleMode.NORMAL, isEnabled: !this.busy, action: () => this.toolsOpen = true } }
           ] }
         }, style: navigationChrome(this.appDark, true) })
@@ -363,11 +416,11 @@ export struct CanvasGallery {
         .bindMenu(this.toolsOpen, [{ value: '创作 Skill · Gitee', action: () => { this.toolsOpen = false; this.onSkill('https://gitee.com/alanmac/fridge-signing-system'); } },
           { value: '创作 Skill · GitHub', action: () => { this.toolsOpen = false; this.onSkill('https://github.com/alanmacX/fridge-creating-skill'); } }],
           { systemMaterial: chromeMaterial(this.appDark), backgroundColor: AppDesign.popup(this.appDark), onDisappear: () => this.toolsOpen = false })
-      if (!this.creating) {
-        Button('+ 新建画布', { type: ButtonType.Capsule, buttonStyle: ButtonStyleMode.NORMAL }).height(48).padding({ left: 24, right: 24 }).fontSize(16)
-          .backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).margin({ bottom: this.safeBottom + 16 })
-          .opacity(this.pageVisible?1:0).enabled(!this.busy).onClick(() => this.startCreating())
-      }
+      Column().width(1).height(1).position({x:this.sizeMenuX,y:this.sizeMenuY}).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
+        .bindMenu(this.sizeMenuOpen,this.sizeChoices(),{placement:Placement.BottomRight,systemMaterial:chromeMaterial(this.appDark),backgroundColor:AppDesign.popup(this.appDark),onDisappear:()=>this.sizeMenuOpen=false})
+      this.splitCreationButton()
     }.width('100%').height('100%').backgroundColor(Color.Transparent)
+      .bindSheet($$this.creating,this.creationSheet,{height:SheetSize.FIT_CONTENT,preferType:this.viewportWidth>=600?SheetType.CENTER:SheetType.BOTTOM,
+        width:Math.min(480,this.viewportWidth),keyboardAvoidMode:SheetKeyboardAvoidMode.TRANSLATE_AND_RESIZE,showClose:false,dragBar:false,backgroundColor:AppDesign.background(this.appDark),onDisappear:()=>this.creating=false})
   }
 }

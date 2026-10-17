@@ -113,3 +113,14 @@ Acceptance used a newly created independent API26 phone emulator, `FridgeGlitchQ
 `native-material-boundary.test.cjs` guards window-space native ancestors, artwork-only snapshots (including exclusion of editor chrome), native-owned scrolling hierarchy, top layout-safe-area expansion and explicit light/dark title styles. The gallery regression also exercises closing retained transient forms without resetting the current filter. Targeted native/material/gallery/editor/startup/widget regression results are in `output/glitch-fix-tests.log`, and native signed build results are in `output/glitch-fix-build.log`.
 
 Reference: [Huawei native navigation dynamic blur](https://developer.huawei.com/consumer/cn/doc/HarmonyOS-Guides/ui-design-navigation-dynamic-blur), especially native Scroll/List ownership, component safe areas and unclipped content. The offscreen nature of renderGroup was checked against the installed ArkUI SDK declaration. The original screenshot's exact GPU failure is an inference from the code/rendering boundary, not an OS-level root-cause trace.
+
+
+## Press mask, landing dissolve and split creation · 2026-10-18
+
+Acceptance on the independent API26 FridgeGlitchQA phone emulator:
+- Native top plus opens an anchored HDS size menu. Created 2×2 with a name from this menu, 2×4 from the split bottom control while the gallery filter was 2×2, and 4×4 while browsing 2×4. The resulting gallery labels and strip geometry retain the explicit creation size. Original QA documents were preserved.
+- Bottom controls emerge from the original capsule centre; X merges the pieces back. A later final-build check covers system Back closing the expanded control. Naming actions remain visible above the system keyboard (`output/split-name-final.png`); empty-name submission is disabled.
+- Imported a synthetic fixture containing nine distinct 1024px JPEG assets (6.11MB package) using the system document picker into a new, independent canvas. Three gallery/workspace round trips were sampled, eight entrance frames and four exit frames per cycle. All nine photos remain present through the observed handoff, without blank card replacement; see `output/gallery-nine-contact.png` and `output/gallery-nine-enter-*` / `exit-*`. This is emulator sampling, not frame-perfect physical-device acceptance.
+- Regression includes `gallery-surface-readiness.test.cjs`: an in-flight data request cannot mutate artwork during landing and resumes after settlement. Gallery tests exercise explicit creation sizes, empty/busy submission, landing overlay lifetime and cancellation. Native-material boundary tests keep the HDS sampler outside transformed/cached ancestors.
+
+Artifacts: `output/gallery-split-build.log`, `output/gallery-split-tests.log`, `output/split-expanded-final.png`, `output/split-created-strip.png`, `output/split-created-large.png`.
