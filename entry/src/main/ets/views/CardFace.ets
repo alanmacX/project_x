@@ -13,6 +13,7 @@ export struct CardFace {
   @Prop tick: number = 0;
   @Prop lifted: boolean = false;
   @Prop widget: boolean = false;
+  @Prop snapshot: boolean = false;
   @Prop hideContent: boolean = false;
   @Prop animateContent: boolean = false;
   @State layerMotion: EditorLayerMotion = new EditorLayerMotion();
@@ -34,22 +35,33 @@ export struct CardFace {
   private depthScale(): number { return cardDepthScale(this.scaleFactor); }
   private paper(): string { return materialColors(this.card.material,this.card.paper,this.card.ink)[0]; }
   private edge(): string { return cardEdgeColor(this.paper(),this.card.shape==='subject'&&this.card.subjectPhoto); }
+  private elliptical(): boolean { return this.card.shape === 'round' && this.card.capability?.k !== 'album'; }
   @Builder
   backing(color: string, offset: number, radius: number, shadowColor: string, shadowY: number) {
+    if (this.elliptical()) {
+      if(radius>0){
+        // A node shadow follows its rectangular bounds; blur the elliptical silhouette itself.
+        Ellipse().width('100%').height('100%').fill(shadowColor).blur(vp2px(radius))
+          .translate({y:offset+shadowY}).hitTestBehavior(HitTestMode.None)
+      }
+      Ellipse().width('100%').height('100%').fill(color)
+        .translate({y:offset}).hitTestBehavior(HitTestMode.None)
+    } else {
     Column().width('100%').height('100%').backgroundColor(color).borderRadius(cardCornerRadius(this.card,this.scaleFactor))
       .translate({y:offset}).shadow({radius:vp2px(radius),color:shadowColor,offsetY:vp2px(shadowY)}).hitTestBehavior(HitTestMode.None)
+    }
   }
 
   build() {
     Stack() {
       if(this.card.depthPass==='foreground'){
-        CardCanvas({card:this.card,layerMotion:this.layerMotion,scaleFactor:this.scaleFactor,tick:this.tick,widget:this.widget,hideContent:this.hideContent}).width(subjectSurfaceFactor(this.card)*100+'%').height(subjectSurfaceFactor(this.card)*100+'%')
+        CardCanvas({snapshot:this.snapshot,card:this.card,layerMotion:this.layerMotion,scaleFactor:this.scaleFactor,tick:this.tick,widget:this.widget,hideContent:this.hideContent}).width(subjectSurfaceFactor(this.card)*100+'%').height(subjectSurfaceFactor(this.card)*100+'%')
       }else {
       // Soft cast shadow + tight contact shadow + a solid, slightly warm sidewall.
       // The cached face owns these layers; pan/rotation only transform its texture.
       if(this.card.shape==='subject'&&(this.card.reliefSrc.length>0||this.commands().length>0)){
         if(this.card.reliefSrc){
-          Image(this.card.reliefSrc).width((this.card.w+48)*this.scaleFactor).height((this.card.h+48)*this.scaleFactor)
+          Image(this.card.reliefSrc).syncLoad(this.snapshot).width((this.card.w+48)*this.scaleFactor).height((this.card.h+48)*this.scaleFactor)
             .position({x:-24*this.scaleFactor,y:-24*this.scaleFactor}).objectFit(ImageFit.Fill).draggable(false).hitTestBehavior(HitTestMode.None)
         }else{
           // Visible fallback while an off-thread cache is prepared: no shadow nodes.
@@ -64,11 +76,15 @@ export struct CardFace {
         this.backing(this.card.shape==='subject'&&this.card.subjectPhoto?'#FFFFFF':this.paper(),0,0,'#00000000',0)
       }.width('100%').height('100%')
       }
-      CardCanvas({ layerMotion:this.layerMotion, card: this.card, scaleFactor: this.scaleFactor, tick: this.tick, widget: this.widget, hideContent: this.hideContent, animateContent:this.animateContent,
+      CardCanvas({ snapshot:this.snapshot, layerMotion:this.layerMotion, card: this.card, scaleFactor: this.scaleFactor, tick: this.tick, widget: this.widget, hideContent: this.hideContent, animateContent:this.animateContent,
         movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
         .width((subjectSurfaceFactor(this.card) * 100) + '%').height((subjectSurfaceFactor(this.card) * 100) + '%')
-        .borderRadius(cardCornerRadius(this.card,this.scaleFactor)).border({ width: this.card.frame && this.card.shape !== 'subject' ? 3 * this.scaleFactor : 0, color: '#FFFFFF' })
-      if(this.card.shape!=='subject') {
+        .borderRadius(this.elliptical() ? 0 : cardCornerRadius(this.card,this.scaleFactor)).border({ width: this.card.frame && this.card.shape !== 'subject' && !this.elliptical() ? 3 * this.scaleFactor : 0, color: '#FFFFFF' })
+      if (this.elliptical()) {
+        Ellipse().width('100%').height('100%').fill(Color.Transparent)
+          .stroke(this.card.frame ? '#FFFFFF' : '#48FFFFFF').strokeWidth(this.card.frame ? 3*this.scaleFactor : .6)
+          .hitTestBehavior(HitTestMode.None)
+      } else if(this.card.shape!=='subject') {
         Column().width('100%').height('100%').borderRadius(cardCornerRadius(this.card,this.scaleFactor))
           .border({width:.6,color:{top:'#88FFFFFF',left:'#48FFFFFF',right:'#14000000',bottom:'#20000000'}})
           .hitTestBehavior(HitTestMode.None)

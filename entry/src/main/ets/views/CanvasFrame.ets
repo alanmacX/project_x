@@ -1,6 +1,7 @@
 /** Approved stone recipe, baked offline. Eight tiles leave the center truly transparent. */
 @Component
 export struct CanvasFrame {
+  @Prop snapshot:boolean=false;
   @Prop square:boolean=false;
   @Prop cornerPercent:number=8;
   @Prop style:string='auto';
@@ -28,12 +29,12 @@ export struct CanvasFrame {
   }
   @Builder
   corner(index:number,id:string,rules:AlignRuleOption){
-    Image(this.tiles()[index]).id(id).width(this.cornerPercent+'%').aspectRatio(1).alignRules(rules)
+    Image(this.tiles()[index]).syncLoad(this.snapshot).id(id).width(this.cornerPercent+'%').aspectRatio(1).alignRules(rules)
       .objectFit(ImageFit.Fill).draggable(false).hitTestBehavior(HitTestMode.None)
   }
   @Builder
   strip(index:number,rules:AlignRuleOption){
-    Image(this.tiles()[index]).alignRules(rules)
+    Image(this.tiles()[index]).syncLoad(this.snapshot).alignRules(rules)
       .objectFit(ImageFit.Fill).draggable(false).hitTestBehavior(HitTestMode.None)
   }
   build(){

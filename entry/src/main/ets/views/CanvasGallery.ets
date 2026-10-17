@@ -1,6 +1,6 @@
 import { widgetFrameMetrics } from '../model/WidgetFrameGeometry';
 import { widgetRectangles } from '../model/WidgetGeometry';
-import { GalleryThumbnail, cachedGalleryPreview, saveGalleryPreview, removeGalleryPreview } from '../model/GalleryPreviewCache';
+import { GalleryThumbnail, rememberedGalleryPreview, rememberedGalleryRects, cachedGalleryPreview, saveGalleryPreview, removeGalleryPreview } from '../model/GalleryPreviewCache';
 import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode, TextStyleMode } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { navigationChrome } from '../model/NavigationChrome';
@@ -11,7 +11,7 @@ import { taskpool } from '@kit.ArkTS';
 import lazy { prepareSceneRelief } from '../model/SceneRelief';
 import { CanvasEntry } from '../model/CanvasLibrary';
 import { FridgeState, FridgeCard, BOARD_W, BOARD_H } from '../model/CardSchema';
-import { GalleryItem, GalleryRow, galleryRows, galleryRowKey, galleryPreviewSize } from '../model/CanvasGallery';
+import { GalleryAnchor, GalleryController, GalleryItem, GalleryRow, galleryRows, galleryRowKey, galleryPreviewSize } from '../model/CanvasGallery';
 import { AppDesign } from '../model/AppDesign';
 import { immersiveChrome, chromeMaterial } from '../model/ChromeMaterial';
 import { storageSnapshot } from '../model/StorageSnapshot';
@@ -31,6 +31,9 @@ export struct CanvasGallery {
   @Prop safeTop: number = 0;
   @Prop safeBottom: number = 0;
   @Prop busy: boolean = false;
+  @Prop heroId: string = '';
+  @Prop @Watch('previewTimeChanged') previewMinute: number = 0;
+  controller: GalleryController = new GalleryController();
   onLoad: (id: string) => Promise<FridgeState> = async () => new FridgeState();
   onOpen: (id: string) => void = () => {};
   onCreate: (name: string, dimension: string) => void = () => {};
@@ -58,92 +61,121 @@ export struct CanvasGallery {
   private previewTick: number = Date.now();
   private scroller: Scroller = new Scroller();
 
-  aboutToAppear(): void { this.alive = true; this.loadItems(); }
+  aboutToAppear(): void {
+    this.alive = true;
+    this.widgetRects=rememberedGalleryRects(this.getUIContext().getHostContext()?.cacheDir??'',this.entries.map((entry:CanvasEntry)=>entry.id));
+    this.controller.prepare=async()=>{await this.loadItems(true);};
+    this.controller.anchor=(id:string):GalleryAnchor|null=>{
+      const item=this.items.find((entry:GalleryItem)=>entry.id===id);if(!item?.preview)return null;
+      try{
+        const rect=this.getUIContext().getComponentUtils().getRectangleById('canvasPreview_'+id),ui=this.getUIContext();
+        const anchor=new GalleryAnchor();anchor.id=id;anchor.preview=item.preview;anchor.x=ui.px2vp(rect.windowOffset.x);anchor.y=ui.px2vp(rect.windowOffset.y);
+        anchor.w=ui.px2vp(rect.size.width);anchor.h=ui.px2vp(rect.size.height);
+        // The window owner validates visibility and rotation against its measured viewport.
+        return anchor.w>0&&anchor.h>0?anchor:null;
+      }catch(_){return null;}
+    };
+    this.loadItems();
+  }
   aboutToDisappear(): void { this.alive = false; this.generation++; }
+  private previewTimeChanged():void{
+    this.previewTick=Date.now();
+    if(this.alive)this.visibleIds.forEach((id:string)=>{this.requestPreview(id);});
+  }
   private reload(): void { if (this.alive) this.loadItems(); }
   private startCreating(): void { this.draftDimension = creationDimension(this.filter); this.creating = true; this.draftName = ''; this.scroller.scrollEdge(Edge.Top); }
-  private async loadItems(): Promise<void> {
-    const generation = ++this.generation;
-    this.documents.clear();
-    this.items = this.entries.map((entry: CanvasEntry): GalleryItem => {
-      const item = new GalleryItem(); item.id = entry.id; item.name = entry.name; return item;
-    });
+  private async loadItems(warm:boolean=false): Promise<void> {
+    const generation = ++this.generation;this.previewTick=Date.now();
     const context=this.getUIContext().getHostContext();const cacheDir=context?.cacheDir??'';
-    if(context){try{this.widgetRects=await widgetRectangles(context);}catch(_){}}
-    for (const entry of this.entries) {
-      if (!this.alive || generation !== this.generation) return;
-      try {
-        const cached=await cachedGalleryPreview(cacheDir,entry.id);
-        if (!this.alive || generation !== this.generation) return;
-        if(cached)this.items=this.items.map((item:GalleryItem):GalleryItem=>{
-          if(item.id!==entry.id)return item;
-          const next=new GalleryItem();next.id=item.id;next.name=item.name;next.dimension=cached.dimension;next.aspect=cached.aspect;next.preview=cached.path;return next;
-        });
-        const state = await this.onLoad(entry.id);
-        if (!this.alive || generation !== this.generation) return;
-        this.documents.set(entry.id, state);
-        this.items = this.items.map((source: GalleryItem): GalleryItem => {
-          if (source.id !== entry.id) return source;
-          const item = new GalleryItem(); item.id = source.id; item.name = source.name;
-          item.dimension = state.canvasDimension; item.aspect = state.canvasAspect;
-          item.loaded = true;
-
-          if (cached?.source === this.previewSource(state)) item.preview = cached.path;
-          return item;
-        });
-        if (this.visibleIds.has(entry.id)) this.requestPreview(entry.id);
-      } catch (_) {
-        if (!this.alive || generation !== this.generation) return;
-        this.items = this.items.map((item: GalleryItem): GalleryItem => {
-          if (item.id === entry.id) { const failed = new GalleryItem(); failed.id = item.id; failed.name = item.name; failed.failed = true; return failed; }
-          return item;
-        });
-      }
-    }
-  }
-  private requestPreview(id: string): void {
-    const item = this.items.find((value: GalleryItem) => value.id === id);
-    if (!this.alive || !item?.loaded || item.preview || this.pendingIds.has(id)) return;
-    this.pendingIds.add(id);
-    const generation = this.generation;
-    this.previewQueue = this.previewQueue.catch(() => {}).then(async () => {
-      try {
-        const state = this.documents.get(id);
-        if (!this.alive || generation !== this.generation || !state || !this.visibleIds.has(id)) return;
-        const context = this.getUIContext().getHostContext(); if (!context) return;
-        const source = this.previewSource(state);
-        const relief = JSON.parse(await taskpool.execute(new taskpool.Task(prepareSceneRelief, JSON.stringify(state.cards))) as string) as Record<string, string>;
-        state.cards.forEach((card: FridgeCard) => { card.reliefSrc = relief[card.id] ?? card.reliefSrc; });
-        await primeRenderContours(state.cards, storageSnapshot(state));
-        if (!this.alive || generation !== this.generation) return;
-        const pixel = await this.getUIContext().getComponentSnapshot().createFromBuilder(() => { this.artwork(state); }, 180, true,
-          { scale: 1, waitUntilRenderFinished: true });
-        const path = context.cacheDir + '/gallery_v2_' + id + '_' + Date.now() + '.png';
-        const packer = image.createImagePacker(); let file: fileIo.File | null = null;
-        try {
-          file = await fileIo.open(path, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE);
-          await packer.packToFile(pixel, file.fd, { format: 'image/png', quality: 100 });
-        } finally {
-          try { if (file) fileIo.closeSync(file.fd); }
-          finally { try { await packer.release(); } finally { await pixel.release(); } }
-        }
-        const cached = new GalleryThumbnail(); cached.source = source; cached.path = 'file://' + path;
-        cached.dimension=state.canvasDimension;cached.aspect=state.canvasAspect;
-        await saveGalleryPreview(context.cacheDir,id,cached);
-        if (!this.alive || generation !== this.generation) return;
-        this.items = this.items.map((value: GalleryItem): GalleryItem => {
-          if (value.id !== id) return value;
-          const next = new GalleryItem(); next.id = value.id; next.name = value.name; next.dimension = value.dimension;
-          next.aspect = value.aspect; next.loaded = true; next.preview = cached.path; return next;
-        });
-      } catch (_) {
-        // Original artwork stays available even if a disposable preview cannot render.
-        if (this.alive && generation === this.generation) this.previewUnavailable(id);
-      } finally {
-        this.pendingIds.delete(id);
-        if (this.alive && generation !== this.generation && this.visibleIds.has(id)) this.requestPreview(id);
-      }
+    const previous=new Map<string,GalleryItem>();this.items.forEach((item:GalleryItem)=>previous.set(item.id,item));
+    this.items=this.entries.map((entry:CanvasEntry):GalleryItem=>{
+      const old=previous.get(entry.id),cached=rememberedGalleryPreview(cacheDir,entry.id),item=new GalleryItem();
+      item.id=entry.id;item.name=entry.name;item.dimension=old?.dimension??cached?.dimension??'';item.aspect=old?.aspect??cached?.aspect??1;
+      item.preview=old?.preview||cached?.path||'';item.previewSource=old?.previewSource||cached?.source||'';item.loaded=old?.loaded??false;return item;
     });
+    const ids=new Set(this.entries.map((entry:CanvasEntry)=>entry.id));
+    this.documents.forEach((_:FridgeState,id:string)=>{if(!ids.has(id))this.documents.delete(id);});
+    // Restore all image/size metadata before slow documents or native host queries can delay another row.
+    await Promise.all(this.entries.map(async(entry:CanvasEntry)=>{
+      const cached=await cachedGalleryPreview(cacheDir,entry.id);
+      if(!cached||!this.alive||generation!==this.generation)return;
+      this.items=this.items.map((item:GalleryItem):GalleryItem=>{
+        if(item.id!==entry.id||item.preview)return item;
+        const next=new GalleryItem();next.id=item.id;next.name=item.name;next.dimension=cached.dimension;next.aspect=cached.aspect;
+        next.preview=cached.path;next.previewSource=cached.source;return next;
+      });
+    }));
+    if(!this.alive||generation!==this.generation)return;
+    if(context){try{this.widgetRects=await widgetRectangles(context);}catch(_){}}
+    if(!this.alive||generation!==this.generation)return;
+    await Promise.all(this.entries.map(async(entry:CanvasEntry)=>{
+      try {
+        const state=await this.onLoad(entry.id);
+        if(!this.alive||generation!==this.generation)return;
+        this.documents.set(entry.id,state);
+        this.items=this.items.map((old:GalleryItem):GalleryItem=>{
+          if(old.id!==entry.id)return old;
+          const item=new GalleryItem();item.id=old.id;item.name=old.name;item.dimension=state.canvasDimension;item.aspect=state.canvasAspect;
+          item.loaded=true;item.preview=old.preview;item.previewSource=old.previewSource;return item;
+        });
+        if(warm||this.visibleIds.has(entry.id))await this.requestPreview(entry.id,warm);
+      }catch(_){
+        if(!this.alive||generation!==this.generation)return;
+        this.items=this.items.map((item:GalleryItem):GalleryItem=>{
+          if(item.id!==entry.id)return item;
+          const failed=new GalleryItem();failed.id=item.id;failed.name=item.name;failed.dimension=item.dimension;failed.aspect=item.aspect;
+          failed.preview=item.preview;failed.previewSource=item.previewSource;failed.failed=true;return failed;
+        });
+      }
+    }));
+  }
+  private requestPreview(id: string, force:boolean=false): Promise<void> {
+    const item=this.items.find((value:GalleryItem)=>value.id===id),state=this.documents.get(id);
+    if(!this.alive||!item?.loaded||!state||(item.preview&&item.previewSource===this.previewSource(state)))return Promise.resolve();
+    if(this.pendingIds.has(id))return this.previewQueue.then(()=>{if(this.alive)return this.requestPreview(id,force);return Promise.resolve();});
+    this.pendingIds.add(id);
+    const generation=this.generation;
+    this.previewQueue=this.previewQueue.catch(()=>{}).then(async()=>{
+      try {
+        if(!this.alive||generation!==this.generation||(!force&&!this.visibleIds.has(id)))return;
+        const context=this.getUIContext().getHostContext();if(!context)return;
+        const source=this.previewSource(state);
+        const relief=JSON.parse(await taskpool.execute(new taskpool.Task(prepareSceneRelief,JSON.stringify(state.cards))) as string) as Record<string,string>;
+        state.cards.forEach((card:FridgeCard)=>{card.reliefSrc=relief[card.id]??card.reliefSrc;});
+        await primeRenderContours(state.cards, storageSnapshot(state));
+        if(!this.alive||generation!==this.generation)return;
+        let pixel:image.PixelMap;
+        try{pixel=await this.getUIContext().getComponentSnapshot().createFromBuilder(()=>{this.artwork(state);},0,true,
+          {scale:1,waitUntilRenderFinished:true});}
+        catch(_){
+          // A missing photo must not suppress every other card in this canvas preview.
+          pixel=await this.getUIContext().getComponentSnapshot().createFromBuilder(()=>{this.artwork(state);},0,false,
+            {scale:1,waitUntilRenderFinished:true});
+        }
+        const path=context.cacheDir+'/gallery_v2_'+id+'_'+Date.now()+'.png';
+        const packer=image.createImagePacker();let file:fileIo.File|null=null;
+        try{file=await fileIo.open(path,fileIo.OpenMode.CREATE|fileIo.OpenMode.READ_WRITE);await packer.packToFile(pixel,file.fd,{format:'image/png',quality:100});}
+        finally{try{if(file)fileIo.closeSync(file.fd);}finally{try{await packer.release();}finally{await pixel.release();}}}
+        if(!this.alive||generation!==this.generation){fileIo.unlink(path).catch(()=>{});return;}
+        const cached=new GalleryThumbnail();cached.source=source;cached.path='file://'+path;
+        cached.dimension=state.canvasDimension;cached.aspect=state.canvasAspect;cached.rects=this.widgetRects;
+        await saveGalleryPreview(context.cacheDir,id,cached);
+        if(!this.alive||generation!==this.generation)return;
+        this.items=this.items.map((value:GalleryItem):GalleryItem=>{
+          if(value.id!==id)return value;
+          const next=new GalleryItem();next.id=value.id;next.name=value.name;next.dimension=value.dimension;next.aspect=value.aspect;
+          next.loaded=true;next.preview=cached.path;next.previewSource=source;return next;
+        });
+      }catch(_){
+        // Keep the last good image while an updated disposable preview is unavailable.
+        if(this.alive&&generation===this.generation)this.items=this.items.map((value:GalleryItem):GalleryItem=>{
+          if(value.id!==id||value.preview)return value;
+          const failed=new GalleryItem();failed.id=value.id;failed.name=value.name;failed.dimension=value.dimension;failed.aspect=value.aspect;
+          failed.loaded=true;failed.failed=true;return failed;
+        });
+      }finally{this.pendingIds.delete(id);}
+    });
+    return this.previewQueue;
   }
   private previewUnavailable(id: string, expectedPath: string = ''): void {
     if (!this.alive || (expectedPath && this.items.find((item: GalleryItem) => item.id === id)?.preview !== expectedPath)) return;
@@ -165,7 +197,7 @@ export struct CanvasGallery {
   private previewAspect(state:FridgeState):number {
     const rect=galleryPreviewSize(state.canvasDimension,state.canvasAspect,this.contentWidth(),this.widgetRects);return rect[0]/rect[1];
   }
-  private previewSource(state:FridgeState):string {return 'v6-frame-clip:'+storageSnapshot(state)+':hostAspect='+this.previewAspect(state)+':corner='+this.previewFrameCorner(state);}
+  private previewSource(state:FridgeState):string {return 'v9-decoded-artwork:'+storageSnapshot(state)+':hostAspect='+this.previewAspect(state)+':corner='+this.previewFrameCorner(state)+':minute='+(state.cards.some((card:FridgeCard)=>card.capability!==null&&card.capability.k!=='album')?Math.floor(this.previewTick/60000):0);}
   private artworkCards(state: FridgeState): FridgeCard[] {
     return depthRenderCards(state.cards.filter((card: FridgeCard) => !card.hidden).map((card: FridgeCard) => cardRenderSnapshot(card)))
       .sort((a: FridgeCard, b: FridgeCard) => a.z - b.z);
@@ -173,14 +205,14 @@ export struct CanvasGallery {
   @Builder
   artwork(state: FridgeState) {
     Stack({ alignContent: Alignment.TopStart }) {
-      CanvasBackdrop({ sceneBackground: state.background, showFrame: false }).width('100%').height('100%')
+      CanvasBackdrop({ snapshot:true, sceneBackground: state.background, showFrame: false }).width('100%').height('100%')
       ForEach(this.artworkCards(state), (card: FridgeCard) => {
-        CardFace({ card: card, scaleFactor: 1, tick: this.previewTick, widget: true })
+        CardFace({ snapshot:true, card: card, scaleFactor: 1, tick: this.previewTick, widget: true })
           .width(card.w).height(card.h).position({ x: card.x, y: card.y * (BOARD_W / this.previewAspect(state)) / BOARD_H })
           .rotate({ angle: card.rot, centerX: 0, centerY: '100%' }).zIndex(card.z)
       }, (card: FridgeCard) => card.id)
       if (state.background.frameStyle !== 'none') {
-        CanvasFrame({ material: state.background.frameMaterial, style: state.background.frameStyle, cornerPercent: this.previewFrameCorner(state) }).width('100%').height('100%').zIndex(100000)
+        CanvasFrame({ snapshot:true, material: state.background.frameMaterial, style: state.background.frameStyle, cornerPercent: this.previewFrameCorner(state) }).width('100%').height('100%').zIndex(100000)
       }
     }.width(BOARD_W).height(BOARD_W / this.previewAspect(state)).borderRadius(this.previewRadius(state)).clip(true)
   }
@@ -202,7 +234,7 @@ export struct CanvasGallery {
     this.items = this.items.map((value: GalleryItem): GalleryItem => {
       if (value.id !== item.id) return value;
       const next = new GalleryItem(); next.id = value.id; next.name = this.renameName.trim(); next.dimension = value.dimension;
-      next.aspect = value.aspect; next.preview = value.preview; next.loaded = value.loaded; next.failed = value.failed; return next;
+      next.aspect = value.aspect; next.preview = value.preview; next.previewSource = value.previewSource; next.loaded = value.loaded; next.failed = value.failed; return next;
     });
     this.renameId = '';
   }
@@ -211,16 +243,17 @@ export struct CanvasGallery {
     Column({ space: 4 }) {
       Button({ type: ButtonType.ROUNDED_RECTANGLE, buttonStyle: ButtonStyleMode.NORMAL }) {
         Stack() {
-          if (item.preview) { Image(item.preview).width('100%').height('100%').objectFit(ImageFit.Contain).draggable(false).onError(() => this.previewUnavailable(item.id, item.preview)) }
+          if (item.preview) { Image(item.preview).syncLoad(true).width('100%').height('100%').objectFit(ImageFit.Contain).draggable(false).onError(() => this.previewUnavailable(item.id, item.preview)) }
           else {
             Column({ space: 10 }) {
               SymbolGlyph($r('sys.symbol.square_stack_3d')).fontSize(28).fontColor([AppDesign.muted(this.appDark)])
-              Text(item.failed ? '预览暂不可用' : item.loaded ? '正在生成预览' : '正在读取画布').fontSize(12).fontColor(AppDesign.muted(this.appDark))
+              if(item.failed){Text('预览暂不可用').fontSize(12).fontColor(AppDesign.muted(this.appDark))}
             }
           }
         }.width('100%').height(this.previewHeight(item, wide)).backgroundColor(Color.Transparent).clip(true)
-      }.width('100%').height(this.previewHeight(item, wide)).padding(0).borderRadius(0).backgroundColor(Color.Transparent)
-        .enabled(!this.busy).accessibilityText('打开画布 ' + item.name).onClick(() => this.onOpen(item.id))
+          .opacity(this.heroId===item.id ? .001 : 1)
+      }.id('canvasPreview_'+item.id).width('100%').height(this.previewHeight(item, wide)).padding(0).borderRadius(0).backgroundColor(Color.Transparent)
+        .accessibilityText('打开画布 ' + item.name).onClick(() => { if(!this.busy)this.onOpen(item.id); })
         .onVisibleAreaChange([0], (visible: boolean) => { if (visible) { this.visibleIds.add(item.id); this.requestPreview(item.id); } else this.visibleIds.delete(item.id); })
       if (this.renameId === item.id) {
         Column({ space: 4 }) {

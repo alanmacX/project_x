@@ -1,5 +1,7 @@
+import { GalleryAnchor, GalleryController } from '../model/CanvasGallery';
+import { primeGalleryPreviews, rememberedGalleryPreview } from '../model/GalleryPreviewCache';
 import { cardActionAnchor, CardActionAnchor } from '../model/CardActionPlacement';
-import { canvasPageTransition, CANVAS_PAGE_DURATION } from '../model/CanvasPageMotion';
+import { CANVAS_PAGE_DURATION, CANVAS_WORKSPACE_REST_SCALE, GALLERY_DEPARTURE_SCALE } from '../model/CanvasPageMotion';
 import { navigationChrome } from '../model/NavigationChrome';
 import lazy { CanvasGallery } from '../views/CanvasGallery';
 import { depthElement, hasDepthSubject, internalDepth, depthOwner, depthRenderCards } from '../model/DepthComposition';
@@ -137,6 +139,19 @@ struct Index {
   @State enhancingBackground: boolean = false;
   private photoCropDialog: CustomDialogController | null = null;
   @State galleryVisible: boolean = true;
+  @State workspaceMounted: boolean = false;
+  @State galleryMounted: boolean = true;
+  private galleryAnchor: GalleryAnchor|null = null;
+  private galleryAnchorWidth:number=0;
+  private galleryAnchorHeight:number=0;
+  @State galleryHeroSource:string='';
+  @State galleryHeroId:string='';
+  @State galleryHeroX:number=0;
+  @State galleryHeroY:number=0;
+  @State galleryHeroW:number=0;
+  @State galleryHeroH:number=0;
+  private galleryController: GalleryController = new GalleryController();
+  private galleryFrameResolve: (()=>void)|null = null;
   @State galleryTransitioning: boolean = false;
   private galleryTransitionGeneration: number = 0;
   private galleryTransitionTimer: number = -1;
@@ -333,7 +348,7 @@ struct Index {
     this.alive = true;
     this.context = this.getUIContext().getHostContext() ?? null;
     this.initialize();
-    this.clockTimer = setInterval(() => { if(!this.alive||!this.ready||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||this.deletionId || this.readingComparisonOpen || this.gestureGroup || this.activeBoardId || this.heroActive || this.arriving)return;this.tick = Math.floor(Date.now()/60000)*60000;this.refreshCapabilities();this.updateScheduledScene(true); }, 60000);
+    this.clockTimer = setInterval(() => { if(!this.alive||!this.ready||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||this.galleryTransitioning||this.canvasChanging||this.deletionId || this.readingComparisonOpen || this.gestureGroup || this.activeBoardId || this.heroActive || this.arriving)return;this.tick = Math.floor(Date.now()/60000)*60000;this.refreshCapabilities();this.updateScheduledScene(true); }, 60000);
     this.batteryObserver.start(()=>this.refreshCapabilities());
   }
   private initialize(): void {
@@ -355,7 +370,8 @@ struct Index {
       // scatter/prepare sequence underneath it fights quick gesture cancellation.
       const widgetLaunch=AppStorage.get<boolean>('launchFromWidget')===true;
       const routedLaunch = widgetLaunch || this.routedId.length > 0 || this.viewRouteId.length > 0;
-      this.galleryVisible = !routedLaunch;
+      this.galleryVisible = !routedLaunch;this.workspaceMounted=routedLaunch;this.galleryMounted=!routedLaunch;
+      if(!routedLaunch)await primeGalleryPreviews(this.context!.cacheDir,this.canvasEntries.map((entry:CanvasEntry)=>entry.id));
       this.canvasBackground = this.store.state.background; this.layoutBoard();
       startupMark('geometry-ready');
       if(!this.alive)return;
@@ -390,28 +406,36 @@ struct Index {
   }
   private async openGalleryCanvas(id: string): Promise<void> {
     if (!this.alive || this.galleryTransitioning || this.canvasChanging || this.busy || this.sharing || this.sceneNavigationBusy) return;
-    this.canvasChanging = true;
+    this.canvasChanging = true;const intentGeneration=this.galleryTransitionGeneration;
+    this.galleryAnchor=this.galleryController.anchor(id);this.galleryAnchorWidth=this.screenWidth;this.galleryAnchorHeight=this.screenHeight;
     try {
       await this.loadCanvas(id, true);
-      if (!this.alive) return;
+      if (!this.alive||intentGeneration!==this.galleryTransitionGeneration) return;
       this.sceneEditing = false; this.selectedId = ''; this.groupSelecting = false; this.groupSelection = [];
       this.canvasFlightX = 0; this.canvasFlightY = 0; this.canvasFlightAngle = 0;
       this.boardOpacity = 1; this.scatter = 0; this.startupCardCount = -1;
-      this.setGalleryPage(false);
+      await this.setGalleryPage(false);
     } catch (e) { this.templateError('画布打开未完成', e as Error); }
     finally { this.canvasChanging = false; this.armScheduleTimer(); this.updateScheduledScene(true); }
   }
   private async showGallery(): Promise<void> {
     if (this.galleryVisible || this.galleryTransitioning || this.arriving || this.heroActive || this.editing || this.viewing || this.canvasChanging || this.busy || this.sharing || this.deletionId || this.activeBoardId || this.sceneNavigationBusy || this.scheduleTransition) return;
     if (this.sceneEditing) { await this.leaveTimedScene(); return; }
-    this.canvasChanging = true;
+    this.canvasChanging = true;const intentGeneration=this.galleryTransitionGeneration;
     this.scenePanelGeneration++; this.cancelScheduledTransition();
     this.homeToolsOpen = false; this.scheduleOpen = false; this.backgroundOpen = false;
     this.selectedId = ''; this.groupSelecting = false; this.groupSelection = [];
     try {
       this.flushPendingEdits(); await this.store.save(false);
-      if (!this.alive) return;
-      this.refreshCanvasList(); this.galleryRevision++; this.setGalleryPage(true);
+      if (!this.alive||intentGeneration!==this.galleryTransitionGeneration) return;
+      this.refreshCanvasList();
+      if(!this.galleryMounted){
+        const generation=this.galleryTransitionGeneration;this.galleryMounted=true;
+        await this.waitGalleryFrame();if(!this.alive||generation!==this.galleryTransitionGeneration)return;
+      }
+      await this.galleryController.prepare();
+      if(!this.alive||intentGeneration!==this.galleryTransitionGeneration)return;
+      await this.setGalleryPage(true);
       AppStorage.setOrCreate('launchFromWidget', false);
       if (this.scheduleTimer >= 0) { clearTimeout(this.scheduleTimer); this.scheduleTimer = -1; }
     } catch (e) { this.templateError('画布保存未完成', e as Error); }
@@ -428,7 +452,7 @@ struct Index {
       await this.store.save(false);
       const next = this.store.createCanvas(this.canvasTitle(id) + ' 副本', source);
       await this.loadCanvas(next, true);
-      if (this.alive) { this.boardOpacity = 1; this.startupCardCount = -1; this.setGalleryPage(false); }
+      if (this.alive) { this.boardOpacity = 1; this.startupCardCount = -1; await this.setGalleryPage(false); }
     } catch (e) { this.templateError('画布复制未完成', e as Error); }
     finally { this.canvasChanging = false; this.armScheduleTimer(); this.updateScheduledScene(true); }
   }
@@ -441,14 +465,40 @@ struct Index {
   }
   private cancelGalleryTransition(): void {
     this.galleryTransitionGeneration++;
+    const release=this.galleryFrameResolve;this.galleryFrameResolve=null;release?.();
     if (this.galleryTransitionTimer >= 0) clearTimeout(this.galleryTransitionTimer);
-    this.galleryTransitionTimer = -1; this.galleryTransitioning = false;
+    this.galleryTransitionTimer = -1; this.galleryTransitioning = false;this.galleryHeroSource='';this.galleryHeroId='';
   }
-  private setGalleryPage(library: boolean): void {
+  private waitGalleryFrame():Promise<void>{
+    return new Promise<void>((resolve)=>{
+      this.galleryFrameResolve=resolve;
+      this.getUIContext().postFrameCallback(new PreparedTransition(()=>{if(this.galleryFrameResolve===resolve)this.galleryFrameResolve=null;resolve();}));
+    });
+  }
+  private async setGalleryPage(library: boolean): Promise<void> {
     if (this.galleryVisible === library) return;
     this.cancelGalleryTransition();
     const generation = this.galleryTransitionGeneration;
     this.galleryTransitioning = true;
+    if(!library){
+      this.workspaceMounted=true;
+      // Mount and measure the destination under the still-opaque gallery, then flush its render commands.
+      await this.waitGalleryFrame();
+      if(!this.alive||generation!==this.galleryTransitionGeneration)return;
+      await this.waitGalleryFrame();
+      if(!this.alive||generation!==this.galleryTransitionGeneration)return;
+      try{const surface=await this.getUIContext().getComponentSnapshot().get('canvasWorkspace',{waitUntilRenderFinished:true});await surface.release();}catch(_){}
+      if(!this.alive||generation!==this.galleryTransitionGeneration)return;
+    }
+    const anchor=this.galleryAnchor;
+    if(anchor&&anchor.id===this.store.state.canvasId&&this.galleryAnchorWidth===this.screenWidth&&this.galleryAnchorHeight===this.screenHeight&&anchor.y>=this.safeTop&&anchor.y+anchor.h<=this.screenHeight-this.safeBottom){
+      this.galleryHeroSource=rememberedGalleryPreview(this.context?.cacheDir??'',anchor.id)?.path??anchor.preview;this.galleryHeroId=anchor.id;
+      this.galleryHeroX=library?this.boardLeft:anchor.x;this.galleryHeroY=library?this.boardTop:anchor.y;
+      this.galleryHeroW=library?BOARD_W*this.boardScale:anchor.w;this.galleryHeroH=library?this.boardHeight:anchor.h;
+      // The shared image needs an initial rendered pose before its target can be animated.
+      await this.waitGalleryFrame();
+      if(!this.alive||generation!==this.galleryTransitionGeneration)return;
+    }
     const finish = (): void => {
       if (!this.alive || generation !== this.galleryTransitionGeneration) return;
       this.cancelGalleryTransition(); this.armScheduleTimer(); this.updateScheduledScene(true);
@@ -456,7 +506,13 @@ struct Index {
     // Native completion can be omitted when the window is backgrounded mid-transition.
     this.galleryTransitionTimer = setTimeout(finish, CANVAS_PAGE_DURATION + 160);
     this.getUIContext().animateTo({ duration: CANVAS_PAGE_DURATION, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: finish },
-      () => { this.galleryVisible = library; });
+      () => {
+        this.galleryVisible = library;
+        if(this.galleryHeroSource&&anchor){
+          this.galleryHeroX=library?anchor.x:this.boardLeft;this.galleryHeroY=library?anchor.y:this.boardTop;
+          this.galleryHeroW=library?anchor.w:BOARD_W*this.boardScale;this.galleryHeroH=library?anchor.h:this.boardHeight;
+        }
+      });
   }
   @Builder
   canvasNavigation() {
@@ -672,8 +728,14 @@ struct Index {
     this.scenePanelGeneration++;this.cancelScheduledTransition();
     try {
       this.backgroundGeneration++; if(this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); this.backgroundBusy = false;
-      if(manual){if(!await this.store.selectCanvas(id,false))return;}else{await this.store.save(false);if(!await this.store.openCanvas(id))return;await this.store.save(false);}
+      if(manual){if(!await this.store.selectCanvas(id,false))throw new Error('画布已不存在');}else{await this.store.save(false);if(!await this.store.openCanvas(id))return;await this.store.save(false);}
       await primeRenderContours(this.store.state.cards,storageSnapshot(this.store.state));
+      // Derived relief must settle under the gallery, rather than replacing a vector surface mid-entrance.
+      const artwork=this.store.state.cards.filter((card:FridgeCard)=>card.shape==='subject'&&card.cutout.startsWith('file://'));
+      if(artwork.length){try{
+        const relief=JSON.parse(await taskpool.execute(new taskpool.Task(prepareSceneRelief,JSON.stringify(artwork))) as string) as Record<string,string>;
+        for(const card of artwork){if(relief[card.id]){card.reliefSrc=relief[card.id];this.reliefKeys.set(card.id,this.reliefKey(card));}}
+      }catch(_){}}
       if(beforeReveal!==null){await beforeReveal();if(!this.alive)return;}
       this.sceneEditing=this.store.catalog.scenes.some(c=>c.id===this.store.state.canvasId);this.scheduleGeneration++;this.timedScene=null;this.scheduleOverride=null;this.scheduledName='';this.scheduledFocusId='';this.syncSchedules();
       this.selectedId = ''; this.activeBoardId = ''; this.groupSelection = []; this.groupSelecting = false;
@@ -689,7 +751,7 @@ struct Index {
       await this.store.save(false);this.backgroundGeneration++;
       const source = duplicate ? this.store.state : undefined;
       const id = this.store.createCanvas(name.trim() || (duplicate ? this.canvasName+' 副本' : '画布 '+(this.canvasEntries.length+1)),source,dimension);
-      await this.loadCanvas(id,true); if(this.alive)this.setGalleryPage(false);
+      await this.loadCanvas(id,true); if(this.alive)await this.setGalleryPage(false);
     } catch(e) {this.templateError('画布未创建',e as Error);}finally{this.canvasChanging=false;this.armScheduleTimer();this.updateScheduledScene(true);}
   }
   private deleteCanvas(id: string): void {
@@ -1482,7 +1544,7 @@ struct Index {
           if (this.error.length > 0) { Button('重试', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).onClick(() => this.initialize()) }
         }.width('100%').height('100%').justifyContent(FlexAlign.Center)
       } else {
-        if (!this.galleryVisible) {
+        if (this.workspaceMounted || !this.galleryVisible) {
         Stack({alignContent:Alignment.TopStart}) {
         Stack({alignContent:Alignment.TopStart}) {
         this.board()
@@ -1496,7 +1558,7 @@ struct Index {
         }
         this.editingScene()
         if(!this.viewing&&this.canvasBackground.frameStyle!=='none'){CanvasFrame({material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle}).width(BOARD_W*this.boardScale).height(this.boardHeight).position({x:this.boardLeft,y:this.boardTop}).opacity(this.boardOpacity).zIndex(100003).hitTestBehavior(HitTestMode.None)}
-        }.width('100%').height('100%')
+        }.width('100%').height('100%').opacity(this.galleryHeroSource ? .001 : 1)
           .translate({x:this.canvasFlightX,y:this.canvasFlightY})
           .rotate({angle:this.canvasFlightAngle,centerX:this.boardLeft+BOARD_W*this.boardScale/2,centerY:this.boardTop+this.boardHeight/2})
           .hitTestBehavior(this.canvasChanging?HitTestMode.BLOCK_DESCENDANTS:HitTestMode.Transparent)
@@ -1558,19 +1620,34 @@ struct Index {
         }
         if (this.viewing) { this.detail() }
         if (!this.editing && !this.viewing && !this.arriving) { this.canvasNavigation() }
-        }.width('100%').height('100%').transition(canvasPageTransition(false))
-        } else {
+        }.id('canvasWorkspace').width('100%').height('100%').renderGroup(true)
+          .scale({x:this.galleryVisible?CANVAS_WORKSPACE_REST_SCALE:1,y:this.galleryVisible?CANVAS_WORKSPACE_REST_SCALE:1})
+          .visibility(!this.galleryVisible||this.galleryTransitioning?Visibility.Visible:Visibility.Hidden)
+          .hitTestBehavior(this.galleryVisible?HitTestMode.None:HitTestMode.Transparent)
+          .accessibilityLevel(this.galleryVisible?'no-hide-descendants':'auto')
+        }
+        if(this.galleryMounted){
           CanvasGallery({ entries: this.canvasEntries, appDark: this.appDark, viewportWidth: this.screenWidth, safeTop: this.safeTop, safeBottom: this.safeBottom,
-            busy: this.canvasChanging || this.galleryTransitioning || this.busy || this.sharing, revision: this.galleryRevision,
+            busy: this.canvasChanging || this.galleryTransitioning || this.busy || this.sharing, revision: this.galleryRevision, controller:this.galleryController, heroId:this.galleryHeroId, previewMinute:this.tick,
             onLoad: (id: string): Promise<FridgeState> => this.store.canvasSnapshot(id),
             onOpen: (id: string) => this.openGalleryCanvas(id), onCreate: (name: string, dimension: string) => this.createGalleryCanvas(name, dimension),
             onRename: (id: string, name: string) => this.renameGalleryCanvas(id, name),
             onDuplicate: (id: string) => this.duplicateGalleryCanvas(id), onShare: (id: string) => this.shareCanvasById(id),
             onDelete: (id: string) => this.deleteCanvas(id), onImport: () => this.pickTemplate(),
-            onSkill: (url: string) => this.openSkillRepository(url) }).transition(canvasPageTransition(true))
+            onSkill: (url: string) => this.openSkillRepository(url) })
+            .renderGroup(true).opacity(this.galleryVisible?1:0)
+            .scale({x:this.galleryVisible?1:GALLERY_DEPARTURE_SCALE,y:this.galleryVisible?1:GALLERY_DEPARTURE_SCALE})
+            .visibility(this.galleryVisible||this.galleryTransitioning?Visibility.Visible:Visibility.Hidden)
+            .hitTestBehavior(this.galleryVisible?HitTestMode.Transparent:HitTestMode.None)
+            .accessibilityLevel(this.galleryVisible?'auto':'no-hide-descendants')
         }
         Column().width(1).height(1).position({x:this.navMenuX,y:this.navMenuY}).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
           .bindMenu(this.navMenuOpen,this.navMenuItems,{placement:Placement.BottomRight,systemMaterial:chromeMaterial(this.appDark),backgroundColor:AppDesign.popup(this.appDark),onDisappear:()=>this.finishNavMenu(this.navMenuResult)})
+        if(this.galleryHeroSource){
+          Image(this.galleryHeroSource).id('galleryTransitionArtwork').syncLoad(true).objectFit(ImageFit.Fill)
+            .width(this.galleryHeroW).height(this.galleryHeroH).position({x:this.galleryHeroX,y:this.galleryHeroY})
+            .hitTestBehavior(HitTestMode.None).accessibilityLevel('no').zIndex(200001)
+        }
         if(this.canvasChanging||this.galleryTransitioning){Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.Block).zIndex(200002)}
         if(this.deletionId){
           Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.Block).zIndex(200000)
@@ -1582,7 +1659,7 @@ struct Index {
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_: Area, area: Area) => {
         const width = Number(area.width), height = Number(area.height);
-        if (width > 0 && height > 0 && (width!==this.screenWidth || height!==this.screenHeight)) { this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height);if(this.editing&&!this.heroActive)this.editorSheetOpen=!this.editorLandscape(); this.layoutBoard(); }
+        if (width > 0 && height > 0 && (width!==this.screenWidth || height!==this.screenHeight)) { if(this.galleryTransitioning)this.cancelGalleryTransition();this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height);if(this.editing&&!this.heroActive)this.editorSheetOpen=!this.editorLandscape(); this.layoutBoard(); }
       })
   }
   private showCardActions(): boolean {

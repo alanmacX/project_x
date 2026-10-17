@@ -35,7 +35,7 @@ const routeMethods = page.slice(page.indexOf('  private canvasRouteChanged('), p
 const calls = [];
 const motionTimers = new Map(); let motionTimerId = 0;
 const { Fixture } = execute(`class Fixture {
- alive=true;galleryVisible=true;galleryRevision=0;galleryTransitioning=false;galleryTransitionGeneration=0;galleryTransitionTimer=-1;frameRate={};canvasChanging=false;busy=false;sharing=false;sceneNavigationBusy=false;
+ alive=true;galleryVisible=true;galleryMounted=true;galleryRevision=0;galleryController={prepare:async()=>calls.push("prepare-gallery"),anchor:()=>null};galleryFrameResolve=null;workspaceMounted=false;galleryTransitioning=false;galleryTransitionGeneration=0;galleryTransitionTimer=-1;frameRate={};canvasChanging=false;busy=false;sharing=false;sceneNavigationBusy=false;
  heroActive=false;editing=false;viewing=false;deletionId='';activeBoardId='';sceneEditing=false;selectedId='';
  homeToolsOpen=true;scheduleOpen=true;backgroundOpen=true;groupSelecting=true;groupSelection=['card'];scheduleTimer=-1;scenePanelGeneration=0;
  boardOpacity=0;scatter=1;startupCardCount=4;ready=true;launchFromWidget=false;routeCanvasId='';
@@ -46,10 +46,10 @@ const { Fixture } = execute(`class Fixture {
  templateError(prefix,error){calls.push('error:'+prefix);}
  leaveTimedScene=async()=>calls.push('leave-scene');
  scheduleWidgetRoute(){calls.push('widget-route');}
- getUIContext(){return {animateTo:(options,update)=>{update();options.onFinish();}};}
+ getUIContext(){return {postFrameCallback:frame=>frame.start(),getComponentSnapshot:()=>({get:async()=>({release:async()=>{}})}),animateTo:(options,update)=>{update();options.onFinish();}};}
  ${methods}
  ${routeMethods}
-}exports.Fixture=Fixture;`, { calls, CANVAS_PAGE_DURATION:320, Curve:{Friction:0}, setTimeout:fn=>{motionTimers.set(++motionTimerId,fn);return motionTimerId;}, clearTimeout:id=>motionTimers.delete(id), AppStorage: { setOrCreate: (key, value) => calls.push([key, value]) } });
+}exports.Fixture=Fixture;`, { calls, rememberedGalleryPreview:()=>null,BOARD_W:344,PreparedTransition:class{constructor(start){this.start=start;}}, CANVAS_PAGE_DURATION:360, Curve:{Friction:0}, setTimeout:fn=>{motionTimers.set(++motionTimerId,fn);return motionTimerId;}, clearTimeout:id=>motionTimers.delete(id), AppStorage: { setOrCreate: (key, value) => calls.push([key, value]) } });
 
 (async () => {
   const f = new Fixture();
@@ -62,7 +62,7 @@ const { Fixture } = execute(`class Fixture {
   assert.equal(f.boardOpacity, 1); assert.equal(f.startupCardCount, -1, 'editor does not inherit partial cold-start surfaces');
   calls.length = 0;
   await f.showGallery();
-  assert.equal(f.galleryVisible, true); assert.equal(f.galleryRevision, 1);
+  assert.equal(f.galleryVisible, true); assert.equal(f.galleryRevision, 0);assert(calls.indexOf("save")<calls.indexOf("prepare-gallery"));
   assert(calls.indexOf('flush') < calls.indexOf('save')); assert(calls.indexOf('save') < calls.indexOf('list'), 'save completes before thumbnails are read');
   assert(calls.some(value => Array.isArray(value) && value[0] === 'launchFromWidget' && value[1] === false));
   assert.equal(f.homeToolsOpen, false); assert.equal(f.backgroundOpen, false);
@@ -80,27 +80,60 @@ const { Fixture } = execute(`class Fixture {
   const stopped = new Fixture(); let finish; stopped.loadCanvas = async () => { await new Promise(resolve => finish = resolve); };
   const stale = stopped.openGalleryCanvas('a'); stopped.alive = false; finish(); await stale;
   assert.equal(stopped.galleryVisible, true, 'late load cannot open a destroyed page');
+  const hiddenDuringLoad=new Fixture();let resolveHiddenLoad;
+  hiddenDuringLoad.loadCanvas=()=>new Promise(resolve=>resolveHiddenLoad=resolve);
+  const hiddenOpening=hiddenDuringLoad.openGalleryCanvas('a');hiddenDuringLoad.cancelGalleryTransition();resolveHiddenLoad();await hiddenOpening;
+  assert.equal(hiddenDuringLoad.galleryVisible,true,'backgrounding invalidates a late open even when the page remains alive');
+  const hiddenDuringPreview=new Fixture();hiddenDuringPreview.galleryVisible=false;let resolveHiddenPreview;
+  hiddenDuringPreview.galleryController.prepare=()=>new Promise(resolve=>resolveHiddenPreview=resolve);
+  const hiddenReturn=hiddenDuringPreview.showGallery();await new Promise(resolve=>setImmediate(resolve));hiddenDuringPreview.cancelGalleryTransition();resolveHiddenPreview();await hiddenReturn;
+  assert.equal(hiddenDuringPreview.galleryVisible,false,'backgrounding cannot restart navigation after a slow preview refresh');
   const widget = new Fixture(); widget.launchFromWidget = true; calls.length = 0; widget.widgetLaunchChanged();
   assert.deepEqual(calls, ['widget-route'], 'warm widget launch bypasses the library too');
   const motion = new Fixture(), completions = [];
-  motion.getUIContext = () => ({ animateTo: (options, update) => { update(); completions.push(options.onFinish); } });
-  motion.setGalleryPage(false);
+  motion.getUIContext = () => ({ postFrameCallback:frame=>frame.start(),getComponentSnapshot:()=>({get:async()=>({release:async()=>{}})}),animateTo: (options, update) => { update(); completions.push(options.onFinish); } });
+  await motion.setGalleryPage(false);
   assert.equal(motion.galleryTransitioning, true); assert.equal(motion.galleryVisible, false);
   await motion.showGallery(); assert.equal(motion.galleryVisible, false, 'back cannot replace an active native transition');
-  motion.cancelGalleryTransition(); motion.setGalleryPage(true);
+  motion.cancelGalleryTransition(); await motion.setGalleryPage(true);
   completions.shift()(); assert.equal(motion.galleryTransitioning, true, 'old animation completion cannot release a newer transition');
   completions.shift()(); assert.equal(motion.galleryTransitioning, false); assert.equal(motionTimers.size, 0);
-  motion.setGalleryPage(false); motionTimers.values().next().value();
+  await motion.setGalleryPage(false); motionTimers.values().next().value();
   assert.equal(motion.galleryTransitioning, false, 'deadline releases the interaction guard if native completion is omitted');
-  motion.setGalleryPage(true); motion.cancelGalleryTransition(); motion.alive = false;
+  await motion.setGalleryPage(true); motion.cancelGalleryTransition(); motion.alive = false;
   completions.forEach(finish => finish()); assert.equal(motion.galleryTransitioning, false, 'teardown remains cancelled after stale completions');
+  const preparing = new Fixture(); let layoutFrame, snapshotReady;
+  preparing.getUIContext=()=>({
+    postFrameCallback:frame=>{layoutFrame=frame;},
+    getComponentSnapshot:()=>({get:()=>new Promise(resolve=>snapshotReady=()=>resolve({release:async()=>{}}))}),
+    animateTo:(options,update)=>{update();options.onFinish();}
+  });
+  const reveal=preparing.setGalleryPage(false);
+  assert.equal(preparing.workspaceMounted,true);assert.equal(preparing.galleryVisible,true,'outgoing gallery covers destination construction');
+  layoutFrame.start();await new Promise(resolve=>setImmediate(resolve));layoutFrame.start();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(preparing.galleryVisible,true,'native render completion gates entrance');
+  snapshotReady();await reveal;assert.equal(preparing.galleryVisible,false);
+  const cancelled = new Fixture();let staleFrame;
+  cancelled.getUIContext=()=>({postFrameCallback:frame=>staleFrame=frame});
+  const abandoned=cancelled.setGalleryPage(false);cancelled.cancelGalleryTransition();await abandoned;
+  staleFrame.start();assert.equal(cancelled.galleryVisible,true,'background cancellation cannot reveal an unprepared workspace');
+  const shared = new Fixture();const sharedCompletions=[];
+  Object.assign(shared,{screenWidth:390,screenHeight:800,galleryAnchorWidth:390,galleryAnchorHeight:800,safeTop:36,safeBottom:24,boardLeft:23,boardTop:160,boardScale:1,boardHeight:344,
+    galleryAnchor:{id:'a',preview:'file://canvas.png',x:16,y:120,w:344,h:344}});
+  shared.getUIContext=()=>({postFrameCallback:frame=>frame.start(),getComponentSnapshot:()=>({get:async()=>({release:async()=>{}})}),animateTo:(options,update)=>{update();sharedCompletions.push(options.onFinish);}});
+  await shared.setGalleryPage(false);
+  assert.equal(shared.galleryHeroSource,'file://canvas.png');assert.equal(shared.galleryHeroX,23);assert.equal(shared.galleryHeroY,160,'shared preview lands on the measured board');
+  sharedCompletions.shift()();assert.equal(shared.galleryHeroSource,'','completion restores live artwork');
+  await shared.setGalleryPage(true);assert.equal(shared.galleryHeroX,16);assert.equal(shared.galleryHeroY,120,'return lands on the retained thumbnail');
+  sharedCompletions.shift()();shared.screenWidth=600;await shared.setGalleryPage(false);
+  assert.equal(shared.galleryHeroSource,'','resized windows cannot reuse stale thumbnail coordinates');sharedCompletions.shift()();
   const gallery = fs.readFileSync('entry/src/main/ets/views/CanvasGallery.ets', 'utf8');
   const loading = gallery.slice(gallery.indexOf('  private async loadItems('), gallery.indexOf('  private requestPreview('));
   const { Loader } = execute(`class Loader {
     alive=true;generation=0;items=[];entries=[{id:'a',name:'A'}];documents=new Map();visibleIds=new Set();
     getUIContext(){return {getHostContext:()=>undefined};}previewSource(state){return JSON.stringify(state);}requestPreview(){}onLoad=async()=>({cards:[],canvasDimension:'4*4',canvasAspect:1});
     ${loading}
-  }exports.Loader=Loader;`, { GalleryItem: model.GalleryItem,cachedGalleryPreview:async()=>null, storageSnapshot: JSON.stringify, fileIo: { unlink: async () => {} } });
+  }exports.Loader=Loader;`, { GalleryItem: model.GalleryItem,rememberedGalleryPreview:()=>null,cachedGalleryPreview:async()=>null, storageSnapshot: JSON.stringify, fileIo: { unlink: async () => {} } });
   let completeOld;
   const loader = new Loader(); loader.onLoad = async () => new Promise(resolve => completeOld = resolve);
   const old = loader.loadItems();await new Promise(resolve=>setImmediate(resolve));
@@ -111,6 +144,14 @@ const { Fixture } = execute(`class Fixture {
   const damaged = new Loader(); damaged.entries = [{ id: 'broken', name: 'Broken' }, { id: 'healthy', name: 'Healthy' }];
   damaged.onLoad = async id => { if (id === 'broken') throw Error('bad data'); return { cards: [], canvasDimension: '4*4', canvasAspect: 1 }; };
   await damaged.loadItems(); assert.equal(damaged.items[0].failed, true); assert.equal(damaged.items[1].loaded, true, 'one damaged preview cannot block the remaining library');
+  const retained=new Loader();retained.items=[{id:'a',name:'A',dimension:'2*2',aspect:1,preview:'file://last-good.png',previewSource:'old',loaded:true}];
+  let metadataReady;retained.onLoad=()=>new Promise(resolve=>metadataReady=resolve);
+  const refreshing=retained.loadItems();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(retained.items[0].preview,'file://last-good.png','reading new document bytes must not clear visible artwork');
+  metadataReady({cards:[],canvasDimension:'2*2',canvasAspect:1});await refreshing;
+  assert.equal(retained.items[0].preview,'file://last-good.png','stale image remains until a replacement is committed');
+  retained.onLoad=async()=>{throw Error('temporarily unreadable');};await retained.loadItems();
+  assert.equal(retained.items[0].preview,'file://last-good.png','read failure keeps last good preview');
   console.log('PASS gallery: mixed-size responsive rows, filters, serialized opening, save-before-return, load/save recovery, nested/scene back, teardown and warm widget route');
 })().catch(error => { console.error(error); process.exitCode = 1; });
 

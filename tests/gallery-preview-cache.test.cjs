@@ -6,9 +6,9 @@ const fileIo={OpenMode:{CREATE:1,READ_WRITE:2,TRUNC:4},readText:async p=>{if(!fi
 function load(){const context={exports:{},require:()=>({fileIo})};vm.runInNewContext(ts.transpileModule(fs.readFileSync('entry/src/main/ets/model/GalleryPreviewCache.ets','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,context);return context.exports;}
 (async()=>{
  let cache=load();assert.equal(await cache.cachedGalleryPreview('/cache','a'),null);
- files.set('/cache/gallery_v2_a_1.png','image');const item={source:'document-revision',path:'file:///cache/gallery_v2_a_1.png',dimension:'2*2',aspect:1};
+ files.set('/cache/gallery_v2_a_1.png','image');const item={source:'document-revision',path:'file:///cache/gallery_v2_a_1.png',dimension:'2*2',aspect:1,rects:{'2*2':[180,170]}};
  await cache.saveGalleryPreview('/cache','a',item);
- cache=load();assert.equal((await cache.cachedGalleryPreview('/cache','a')).source,'document-revision','cold process restores the persisted preview');
+ cache=load();await cache.primeGalleryPreviews('/cache',['missing','a']);assert.equal(cache.rememberedGalleryPreview('/cache','a').dimension,'2*2');assert.equal(cache.rememberedGalleryRects('/cache',['a'])['2*2'][1],170);assert.equal(cache.rememberedGalleryPreview('/other','a'),null,'cache directories cannot share process entries');assert.equal((await cache.cachedGalleryPreview('/cache','a')).source,'document-revision','cold process restores the persisted preview');
  files.set('/cache/gallery_v2_a_2.png','new');await cache.saveGalleryPreview('/cache','a',{...item,source:'updated-revision',path:'file:///cache/gallery_v2_a_2.png'});
  assert(!files.has('/cache/gallery_v2_a_1.png'),'replaced image is reclaimed after metadata is committed');
  cache=load();assert.equal((await cache.cachedGalleryPreview('/cache','a')).source,'updated-revision');

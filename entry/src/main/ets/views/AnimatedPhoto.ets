@@ -6,6 +6,7 @@ export struct AnimatedPhoto {
   @Prop src: string = '';
   @Prop animated: boolean = false;
   @Prop widget: boolean = false;
+  @Prop snapshot: boolean = false;
   private animationSource: string = '';
   private animatedDrawable: AnimatedDrawableDescriptor | undefined = undefined;
   private drawable(): AnimatedDrawableDescriptor {
@@ -23,7 +24,7 @@ export struct AnimatedPhoto {
           const controller = this.animatedDrawable?.getAnimationController(); if (visible) controller?.start(); else controller?.stop();
         })
     } else {
-      Image(localImageSource(this.src)).width('100%').height('100%').objectFit(ImageFit.Cover).draggable(false)
+      Image(localImageSource(this.src)).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Cover).draggable(false)
     }
   }
 }

@@ -1,3 +1,9 @@
+/** Retained gallery refreshes behind the workspace before returning to it. */
+export class GalleryAnchor { id:string='';preview:string='';x:number=0;y:number=0;w:number=0;h:number=0; }
+export class GalleryController {
+  prepare: () => Promise<void> = async () => {};
+  anchor: (id:string) => GalleryAnchor|null = () => null;
+}
 /** Gallery metadata is detached from the editor and never selects a canvas. */
 export class GalleryItem {
   id: string = '';
@@ -5,6 +11,7 @@ export class GalleryItem {
   dimension: string = '';
   aspect: number = 1;
   preview: string = '';
+  previewSource: string = '';
   loaded: boolean = false;
   failed: boolean = false;
 }
@@ -16,7 +23,7 @@ export class GalleryRow {
 /** ArkUI retains keyed builder arguments; replace a row when its async preview data settles. */
 export function galleryRowKey(row: GalleryRow): string {
   return JSON.stringify([row.id, row.wide, row.items.map((item: GalleryItem): string =>
-    JSON.stringify([item.id, item.name, item.dimension, item.aspect, item.loaded, item.failed, item.preview]))]);
+    JSON.stringify([item.id, item.name, item.dimension, item.aspect, item.preview ? false : item.loaded, item.preview ? false : item.failed, item.preview]))]);
 }
 export function galleryColumns(width: number): number {
   return width < 360 ? 1 : width >= 1100 ? 4 : width >= 720 ? 3 : 2;

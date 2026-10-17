@@ -1,3 +1,4 @@
+import { EllipseShape } from '@kit.ArkUI';
 import { depthElement, internalDepth } from '../model/DepthComposition';
 import { DepthForeground } from './DepthForeground';
 import { settingsReveal } from '../model/SettingsMotion';
@@ -19,6 +20,7 @@ export struct ElementView {
   @Prop ink: string = '#262824';
   @Prop scaleFactor: number = 1;
   @Prop widget: boolean = false;
+  @Prop snapshot: boolean = false;
   build() {
     if (this.element.kind === 'text') {
       Text(this.element.text).fontSize(this.element.fs * this.scaleFactor)
@@ -30,7 +32,7 @@ export struct ElementView {
         .width('100%').height('100%').textOverflow({ overflow: TextOverflow.Ellipsis })
     } else if (this.element.kind === 'image') {
       if (this.element.src.length > 0) {
-        AnimatedPhoto({ src: this.element.src, animated: this.element.animated, widget: this.widget }).width('100%').height('100%')
+        AnimatedPhoto({ snapshot:this.snapshot, src: this.element.src, animated: this.element.animated, widget: this.widget }).width('100%').height('100%')
       }
     } else {
       Column().width('100%').height(this.element.primitive === 'line' ? 3 : '100%')
@@ -46,9 +48,10 @@ struct CanvasElementLayer {
   @Prop ink:string='#262824';
   @Prop scaleFactor:number=1;
   @Prop widget:boolean=false;
+  @Prop snapshot:boolean=false;
   private box():ElementBox {return this.motion.id===this.element.id?this.motion.box:this.element;}
   build() {
-    Column() {ElementView({element:this.element,ink:this.ink,scaleFactor:this.scaleFactor,widget:this.widget})}
+    Column() {ElementView({snapshot:this.snapshot,element:this.element,ink:this.ink,scaleFactor:this.scaleFactor,widget:this.widget})}
       .width(this.box().w*100+'%').height(this.box().h*100+'%')
       .position({x:this.box().x*100+'%',y:this.box().y*100+'%'})
       .rotate({angle:this.box().rot}).opacity(this.box().opacity).renderGroup(!this.element.animated)
@@ -97,6 +100,7 @@ export struct CardCanvas {
   @Prop card: FridgeCard = new FridgeCard();
   @Prop scaleFactor: number = 1;
   @Prop widget: boolean = false;
+  @Prop snapshot: boolean = false;
   @Prop hideContent: boolean = false;
   @Prop animateContent: boolean = false;
   @Prop tick: number = 0;
@@ -114,26 +118,27 @@ export struct CardCanvas {
         this.depthContents()
       }else {
       if(this.photoOnly()){
-        Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
+        Image(this.card.cutout).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
       }else{
       Stack({ alignContent: Alignment.TopStart }) {
       if(this.card.capability?.k==='album') {
-        AlbumCapability({tick:this.tick,widget:this.widget,cap:this.card.capability!,cardWidth:this.card.w,cardHeight:this.card.h,scaleFactor:this.scaleFactor})
+        AlbumCapability({snapshot:this.snapshot,tick:this.tick,widget:this.widget,cap:this.card.capability!,cardWidth:this.card.w,cardHeight:this.card.h,scaleFactor:this.scaleFactor})
       } else {
       Column().width('100%').height('100%').backgroundColor(materialColors(this.card.material, this.card.paper, this.card.ink)[0])
       if (this.card.depthPass!=='base' && this.card.shape === 'subject' && this.card.subjectPhoto && this.card.cutout.length > 0) {
-        Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
+        Image(this.card.cutout).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
       }
       this.canvasElements(true)
       if (!(this.card.depthPass==='base'&&this.card.depthCapabilityFront) && !this.freeCapability() && !this.hideContent && this.card.capability !== null && !capabilityObstructed(this.card)) { CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}).transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY) }
       if (!this.hideContent) {Stack({alignContent:Alignment.TopStart}){this.canvasElements(false)}.width('100%').height('100%').transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY)}
       if (!(this.card.depthPass==='base'&&this.card.depthCapabilityFront) && !this.freeCapability() && !this.hideContent && this.card.capability !== null && capabilityObstructed(this.card)) { CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}).transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY) }
       if (this.card.shape === 'subject' && this.card.cutout.length > 0) {
-        Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
+        Image(this.card.cutout).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
           .blendMode(BlendMode.DST_IN, BlendApplyType.OFFSCREEN)
       }
       }
-    }.width('100%').height('100%').borderRadius(cardCornerRadius(this.card,this.scaleFactor)).clip(true)
+    }.width('100%').height('100%').borderRadius(this.card.shape === 'round' && this.card.capability?.k !== 'album' ? 0 : cardCornerRadius(this.card,this.scaleFactor)).clip(true)
+      .clipShape(this.card.shape === 'round' && this.card.capability?.k !== 'album' ? new EllipseShape({ width: this.card.w*this.scaleFactor, height: this.card.h*this.scaleFactor }) : undefined)
       .blendMode(BlendMode.SRC_OVER, this.card.shape === 'subject' ? BlendApplyType.OFFSCREEN : BlendApplyType.FAST)
       }
       if(!(this.card.depthPass==='base'&&this.card.depthCapabilityFront) && this.freeCapability() && !this.hideContent && this.card.capability!==null && this.card.capability.k!=='album') {
@@ -144,7 +149,7 @@ export struct CardCanvas {
   }
   @Builder
   foregroundContents(){
-    DepthForeground({card:this.card,motion:this.layerMotion})
+    DepthForeground({snapshot:this.snapshot,card:this.card,motion:this.layerMotion})
     this.depthElements(true,true)
     this.depthElements(true,false)
     if(!this.hideContent&&this.card.capability!==null&&this.card.depthCapabilityFront){CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick})}
@@ -153,29 +158,30 @@ export struct CardCanvas {
   depthContents(){
     Stack({alignContent:Alignment.TopStart}){
       if(this.card.shape==='subject'){
-        Image(this.card.cutout).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
+        Image(this.card.cutout).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
       }else {Column().width('100%').height('100%').backgroundColor(materialColors(this.card.material,this.card.paper,this.card.ink)[0])}
-      if(depthElement(this.card)!==undefined){CanvasElementLayer({motion:this.layerMotion,element:depthElement(this.card)!,ink:materialColors(this.card.material,this.card.paper,this.card.ink)[1],scaleFactor:this.scaleFactor,widget:this.widget})}
+      if(depthElement(this.card)!==undefined){CanvasElementLayer({snapshot:this.snapshot,motion:this.layerMotion,element:depthElement(this.card)!,ink:materialColors(this.card.material,this.card.paper,this.card.ink)[1],scaleFactor:this.scaleFactor,widget:this.widget})}
       this.depthElements(false,true)
       if(!this.hideContent&&this.card.capability!==null&&!this.card.depthCapabilityFront){CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick})}
       this.depthElements(false,false)
-      DepthForeground({card:this.card,motion:this.layerMotion})
+      DepthForeground({snapshot:this.snapshot,card:this.card,motion:this.layerMotion})
       this.depthElements(true,true)
       this.depthElements(true,false)
       if(!this.hideContent&&this.card.capability!==null&&this.card.depthCapabilityFront){CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick})}
-    }.width('100%').height('100%').borderRadius(cardCornerRadius(this.card,this.scaleFactor)).clip(this.card.shape!=='subject')
+    }.width('100%').height('100%').borderRadius(this.card.shape === 'round' && this.card.capability?.k !== 'album' ? 0 : cardCornerRadius(this.card,this.scaleFactor)).clip(this.card.shape!=='subject')
+      .clipShape(this.card.shape === 'round' && this.card.capability?.k !== 'album' ? new EllipseShape({ width: this.card.w*this.scaleFactor, height: this.card.h*this.scaleFactor }) : undefined)
   }
   @Builder
   depthElements(front:boolean,behind:boolean){
     ForEach(this.card.elements.filter(el=>el.id!==depthElement(this.card)?.id&&el.depthFront===front&&el.behindCapability===behind&&(behind||!this.hideContent)).map(el=>el.id),(id:string)=>{
-      CanvasElementLayer({motion:this.layerMotion,element:this.elementFor(id),ink:materialColors(this.card.material,this.card.paper,this.card.ink)[1],scaleFactor:this.scaleFactor,widget:this.widget})
+      CanvasElementLayer({snapshot:this.snapshot,motion:this.layerMotion,element:this.elementFor(id),ink:materialColors(this.card.material,this.card.paper,this.card.ink)[1],scaleFactor:this.scaleFactor,widget:this.widget})
     },(id:string)=>id)
   }
   private elementFor(id: string): CanvasElement { return this.card.elements.find((el: CanvasElement) => el.id === id) ?? new CanvasElement(); }
   @Builder
   canvasElements(behind: boolean) {
     ForEach(this.card.elements.filter((el: CanvasElement) => el.behindCapability === behind && (this.card.depthPass!=='base'||!el.depthFront)).map((el: CanvasElement) => el.id), (id: string) => {
-        CanvasElementLayer({motion:this.layerMotion,element:this.elementFor(id),ink:materialColors(this.card.material,this.card.paper,this.card.ink)[1],scaleFactor:this.scaleFactor,widget:this.widget})
+        CanvasElementLayer({snapshot:this.snapshot,motion:this.layerMotion,element:this.elementFor(id),ink:materialColors(this.card.material,this.card.paper,this.card.ink)[1],scaleFactor:this.scaleFactor,widget:this.widget})
       }, (id: string) => id)
   }
 
