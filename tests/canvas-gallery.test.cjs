@@ -169,3 +169,9 @@ for(const available of [288,358,700]){
  assert(large[0]>small[0]*1.9,'large and small squares cannot have identical preview sizes');assert.equal(strip[0],large[0]);assert.equal(strip[1],strip[0]/2);
 }
 const measured=model.galleryPreviewSize('2*2',1,600,{'2*2':[190,170]});assert.equal(measured[0],190);assert.equal(measured[1],170,'native vp rectangle wins over nominal square ratio');
+
+const visibilityStart=galleryView.indexOf('  private pageVisibilityChanged():');
+const visibilityEnd=galleryView.indexOf('  private previewTimeChanged():',visibilityStart);
+const VisibilityFixture=execute('export class VisibilityFixture { '+galleryView.slice(visibilityStart,visibilityEnd)+' }').VisibilityFixture;
+const retainedForm=new VisibilityFixture();Object.assign(retainedForm,{pageVisible:false,creating:true,renameId:'a',toolsOpen:true,filter:'2*2'});
+retainedForm.pageVisibilityChanged();assert.equal(retainedForm.creating,false);assert.equal(retainedForm.renameId,'');assert.equal(retainedForm.toolsOpen,false);assert.equal(retainedForm.filter,'2*2','transient form reset must retain gallery browsing intent');

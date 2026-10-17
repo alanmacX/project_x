@@ -11,6 +11,7 @@ export function navigationChrome(dark: boolean, nativeGradient: boolean = false)
     originalStyle: {
       backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: nativeGradient ? undefined : 0, blurRadius: 16 },
       contentStyle: {
+        titleStyle: { mainTitleColor: AppDesign.text(dark), subTitleColor: AppDesign.muted(dark) },
         menuStyle: { backgroundColor: AppDesign.surface(dark), textColor: AppDesign.text(dark), iconColor: AppDesign.text(dark) },
         backIconStyle: { backgroundColor: AppDesign.surface(dark), textColor: AppDesign.text(dark), iconColor: AppDesign.text(dark) }
       }
@@ -18,6 +19,7 @@ export function navigationChrome(dark: boolean, nativeGradient: boolean = false)
     scrollEffectStyle: {
       backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: nativeGradient ? undefined : 0, blurRadius: 16 },
       contentStyle: {
+        titleStyle: { mainTitleColor: AppDesign.text(dark), subTitleColor: AppDesign.muted(dark) },
         menuStyle: { backgroundColor: AppDesign.surface(dark), textColor: AppDesign.text(dark), iconColor: AppDesign.text(dark) },
         backIconStyle: { backgroundColor: AppDesign.surface(dark), textColor: AppDesign.text(dark), iconColor: AppDesign.text(dark) }
       }

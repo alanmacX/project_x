@@ -32,6 +32,8 @@ export struct CanvasGallery {
   @Prop safeBottom: number = 0;
   @Prop busy: boolean = false;
   @Prop heroId: string = '';
+  @Prop @Watch('pageVisibilityChanged') pageVisible: boolean = true;
+  @Prop chromeVisible: boolean = true;
   @Prop @Watch('previewTimeChanged') previewMinute: number = 0;
   controller: GalleryController = new GalleryController();
   onLoad: (id: string) => Promise<FridgeState> = async () => new FridgeState();
@@ -78,6 +80,9 @@ export struct CanvasGallery {
     this.loadItems();
   }
   aboutToDisappear(): void { this.alive = false; this.generation++; }
+  private pageVisibilityChanged():void{
+    if(!this.pageVisible){this.creating=false;this.renameId='';this.toolsOpen=false;}
+  }
   private previewTimeChanged():void{
     this.previewTick=Date.now();
     if(this.alive)this.visibleIds.forEach((id:string)=>{this.requestPreview(id);});
@@ -283,7 +288,11 @@ export struct CanvasGallery {
   }
   build() {
     Stack({ alignContent: Alignment.Bottom }) {
+      // Native background sampling must remain in window coordinates: never cache or transform this root.
+      Column().width('100%').height('100%').backgroundColor(AppDesign.background(this.appDark))
+        .opacity(this.pageVisible?1:0).hitTestBehavior(HitTestMode.None)
       // Keep scrolling artwork under the system safe area; only its initial content inset avoids the title.
+      HdsNavigation() {
       Scroll(this.scroller) {
         Column({ space: 20 }) {
           Scroll() {
@@ -332,10 +341,8 @@ export struct CanvasGallery {
           }
         }.width(this.contentWidth()).padding({ top: 76 + this.safeTop, bottom: this.safeBottom + 104 }).alignItems(HorizontalAlign.Start)
       }.width('100%').height('100%')
-        .align(Alignment.Top).clip(false).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring)
-      // A sibling native title bar can blur the full scroll surface without clipping it at the safe area.
-      HdsNavigation() {
-        Column().width(1).height(1)
+        .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+        .opacity(this.pageVisible?1:0).align(Alignment.Top).clip(false).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       }.titleMode(HdsNavigationTitleMode.MINI)
         .titleBar({ enableComponentSafeArea: true, avoidLayoutSafeArea: true, content: {
           title: { mainTitle: '我的画布', subTitle: this.entries.length + ' 张画布' },
@@ -350,6 +357,7 @@ export struct CanvasGallery {
         .bindToScrollable([this.scroller]).hideBackButton(true).hideToolBar(true).mode(NavigationMode.Stack)
         .width('100%').height('100%').align(Alignment.Top)
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
+        .hideTitleBar(!this.chromeVisible)
         .hitTestBehavior(HitTestMode.Transparent).clip(false).backgroundColor(Color.Transparent)
       Column().width(1).height(1).position({ x: this.viewportWidth - 24, y: this.safeTop + 60 }).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
         .bindMenu(this.toolsOpen, [{ value: '创作 Skill · Gitee', action: () => { this.toolsOpen = false; this.onSkill('https://gitee.com/alanmac/fridge-signing-system'); } },
@@ -358,8 +366,8 @@ export struct CanvasGallery {
       if (!this.creating) {
         Button('+ 新建画布', { type: ButtonType.Capsule, buttonStyle: ButtonStyleMode.NORMAL }).height(48).padding({ left: 24, right: 24 }).fontSize(16)
           .backgroundColor(AppDesign.selected(this.appDark)).fontColor(AppDesign.onSelected(this.appDark)).margin({ bottom: this.safeBottom + 16 })
-          .enabled(!this.busy).onClick(() => this.startCreating())
+          .opacity(this.pageVisible?1:0).enabled(!this.busy).onClick(() => this.startCreating())
       }
-    }.width('100%').height('100%').backgroundColor(AppDesign.background(this.appDark))
+    }.width('100%').height('100%').backgroundColor(Color.Transparent)
   }
 }

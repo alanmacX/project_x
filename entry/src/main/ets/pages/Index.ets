@@ -1,7 +1,7 @@
 import { GalleryAnchor, GalleryController } from '../model/CanvasGallery';
 import { primeGalleryPreviews, rememberedGalleryPreview } from '../model/GalleryPreviewCache';
 import { cardActionAnchor, CardActionAnchor } from '../model/CardActionPlacement';
-import { CANVAS_PAGE_DURATION, CANVAS_WORKSPACE_REST_SCALE, GALLERY_DEPARTURE_SCALE } from '../model/CanvasPageMotion';
+import { CANVAS_PAGE_DURATION } from '../model/CanvasPageMotion';
 import { navigationChrome } from '../model/NavigationChrome';
 import lazy { CanvasGallery } from '../views/CanvasGallery';
 import { depthElement, hasDepthSubject, internalDepth, depthOwner, depthRenderCards } from '../model/DepthComposition';
@@ -120,9 +120,6 @@ struct Index {
   @State navMenuY:number=0;
   private navMenuResult:number=-1;
   private navMenuResolve:((index:number)=>void)|null=null;
-  @State chromeSnapshot: image.PixelMap | undefined = undefined;
-  private retiredChrome: image.PixelMap | undefined = undefined;
-  private chromeSignature: string = '';
   @State heroHideContent: boolean = false;
   private batteryObserver:BatteryObserver=new BatteryObserver();
   private refreshingCapabilities:boolean=false;
@@ -487,7 +484,7 @@ struct Index {
       if(!this.alive||generation!==this.galleryTransitionGeneration)return;
       await this.waitGalleryFrame();
       if(!this.alive||generation!==this.galleryTransitionGeneration)return;
-      try{const surface=await this.getUIContext().getComponentSnapshot().get('canvasWorkspace',{waitUntilRenderFinished:true});await surface.release();}catch(_){}
+      try{const surface=await this.getUIContext().getComponentSnapshot().get('canvasArtwork',{waitUntilRenderFinished:true});await surface.release();}catch(_){}
       if(!this.alive||generation!==this.galleryTransitionGeneration)return;
     }
     const anchor=this.galleryAnchor;
@@ -833,7 +830,7 @@ struct Index {
       }
     } finally { this.repairingSubjects = false; }
   }
-  aboutToDisappear(): void { this.cancelGalleryTransition();this.canvasFlightGeneration++;this.canvasFlightY=0;this.canvasFlightX=0;this.canvasFlightAngle=0;this.canvasChanging=false; this.reliefGeneration++;if(this.reliefTimer>=0)clearTimeout(this.reliefTimer); this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer); if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.chromeSnapshot?.release(); this.chromeSnapshot = undefined; this.retiredChrome?.release(); this.retiredChrome = undefined; this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
+  aboutToDisappear(): void { this.cancelGalleryTransition();this.canvasFlightGeneration++;this.canvasFlightY=0;this.canvasFlightX=0;this.canvasFlightAngle=0;this.canvasChanging=false; this.reliefGeneration++;if(this.reliefTimer>=0)clearTimeout(this.reliefTimer); this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer); if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
     if(this.galleryTransitioning)return true;
     if(this.navMenuOpen){this.finishNavMenu(-1);return true;}
@@ -944,7 +941,7 @@ struct Index {
     this.editorMounted = true; this.editorReady = true; this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.editorOpacity = 0; this.boardOpacity = 1; this.heroActive = true; this.editing = true;this.editorSheetOpen=false;this.homeToolsOpen=false;
     this.prepareEditorMotion(() => {
       if (!this.alive || !this.editing || !this.heroActive) return;
-      this.getUIContext().animateTo({ duration: 380, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: () => { if (this.alive) { this.heroActive = false; this.creatingTransition = false; this.retireChrome();this.layoutBoard();if(this.editorBackPending){this.editorBackPending=false;this.closeEditor();}else{this.editorSheetOpen=!this.editorLandscape();this.mountEditorSection(this.editorMountGeneration,1);} } } }, () => {
+      this.getUIContext().animateTo({ duration: 380, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: () => { if (this.alive) { this.heroActive = false; this.creatingTransition = false; this.layoutBoard();if(this.editorBackPending){this.editorBackPending=false;this.closeEditor();}else{this.editorSheetOpen=!this.editorLandscape();this.mountEditorSection(this.editorMountGeneration,1);} } } }, () => {
         this.setHeroPose(this.editorRect()); this.setTransitionClip(false); this.scatter = 1; this.boardOpacity = 0; this.editorOpacity = 1;
       });
     });
@@ -956,33 +953,10 @@ struct Index {
       if(stage<2)this.mountEditorSection(generation,stage+1);
     }));
   }
-  private retireChrome(): void {
-    this.retiredChrome = this.chromeSnapshot; this.chromeSnapshot = undefined;
-  }
   private async prepareEditorMotion(start: () => void): Promise<void> {
-    let completed=false;
-    const finish=():void=>{if(completed)return;completed=true;clearTimeout(deadline);if(this.alive&&this.heroActive)start();};
-    // A snapshot is an optimization, never a prerequisite for opening controls.
-    const deadline=setTimeout(finish,300);
-    const signature = [this.selectedId, this.layerId, this.settingsTab, this.revision, this.screenWidth, this.screenHeight,
-      this.appDark, this.showBackgroundOptions, this.showLayerOptions, this.undoAvailable, this.redoAvailable,
-      this.scroller.currentOffset().yOffset].join(':');
-    if (this.retiredChrome !== undefined && this.chromeSignature === signature) {
-      this.chromeSnapshot = this.retiredChrome; this.retiredChrome = undefined;
-      this.getUIContext().postFrameCallback(new PreparedTransition(finish)); return;
-    }
-    if (this.retiredChrome !== undefined) { this.retiredChrome.release(); this.retiredChrome = undefined; }
-    // Material samples moving pixels behind it and cannot be renderGroup-cached.
-    // Capture the tools once; keep the actual card surface alive and interactive
-    // tools hidden only during the transition. Restore native material afterward.
-    this.getUIContext().postFrameCallback(new PreparedTransition(async () => {
-      try {
-        const snapshot = await this.getUIContext().getComponentSnapshot().get('editorMotionChrome', {scale: .75, waitUntilRenderFinished: false});
-        if (completed || !this.alive || !this.heroActive) { snapshot.release(); return; }
-        this.chromeSignature = signature; this.chromeSnapshot = snapshot;
-      } catch (_) { /* Native tools remain a usable fallback if capture is unavailable. */ }
-      if (!this.alive || !this.editing || !this.heroActive) return;
-      this.getUIContext().postFrameCallback(new PreparedTransition(finish));
+    // Measure native controls in place; snapshotting their backdrop filters corrupts sampling coordinates.
+    this.getUIContext().postFrameCallback(new PreparedTransition(()=>{
+      if(this.alive&&this.editing&&this.heroActive)start();
     }));
   }
   private setTransitionClip(board: boolean): void {
@@ -1018,7 +992,7 @@ struct Index {
     // Publish the edited card to the board once, before it fades back in.
     this.renderBoard();
     this.prepareEditorMotion(() => { this.getUIContext().animateTo({ duration: 340, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: () => {
-      if (this.alive) { this.editing = false; this.editorReady = false; this.heroActive = false; this.editorBackPending=false; this.retireChrome(); this.selectedId = ''; this.persist(true); this.scheduleBackground(); this.incomingTemplateChanged(); }
+      if (this.alive) { this.editing = false; this.editorReady = false; this.heroActive = false; this.editorBackPending=false;  this.selectedId = ''; this.persist(true); this.scheduleBackground(); this.incomingTemplateChanged(); }
     } }, () => { this.setHeroPose(this.boardRect()); this.setTransitionClip(true); this.editorOpacity = 0; this.boardOpacity = 1; this.scatter = 0; }); });
   }
   private orderedCards(): FridgeCard[] { return this.cards.slice().sort((a: FridgeCard, b: FridgeCard) => b.z - a.z); }
@@ -1069,7 +1043,7 @@ struct Index {
       await primeRenderContours(this.store.state.cards,storageSnapshot(this.store.state));
       if(!this.alive)return;
       this.refreshCanvasList();this.syncHostCanvasGeometry();this.canvasBackground=this.store.state.background;
-      this.retireChrome();this.editing=false;this.heroActive=false;this.viewing=false;this.selectedId='';this.activeBoardId='';this.boardOpacity=1;this.render();this.layoutBoard();
+      this.editing=false;this.heroActive=false;this.viewing=false;this.selectedId='';this.activeBoardId='';this.boardOpacity=1;this.render();this.layoutBoard();
       AppStorage.setOrCreate('viewCardId','');
       if(this.routeCanvasId===canvas)AppStorage.setOrCreate('routeCanvasId','');
       if(id&&this.store.findCard(id)){this.select(id);this.viewing=true;}
@@ -1558,7 +1532,7 @@ struct Index {
         }
         this.editingScene()
         if(!this.viewing&&this.canvasBackground.frameStyle!=='none'){CanvasFrame({material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle}).width(BOARD_W*this.boardScale).height(this.boardHeight).position({x:this.boardLeft,y:this.boardTop}).opacity(this.boardOpacity).zIndex(100003).hitTestBehavior(HitTestMode.None)}
-        }.width('100%').height('100%').opacity(this.galleryHeroSource ? .001 : 1)
+        }.id('canvasArtwork').width('100%').height('100%').opacity(this.galleryHeroSource ? .001 : 1)
           .translate({x:this.canvasFlightX,y:this.canvasFlightY})
           .rotate({angle:this.canvasFlightAngle,centerX:this.boardLeft+BOARD_W*this.boardScale/2,centerY:this.boardTop+this.boardHeight/2})
           .hitTestBehavior(this.canvasChanging?HitTestMode.BLOCK_DESCENDANTS:HitTestMode.Transparent)
@@ -1614,29 +1588,22 @@ struct Index {
             backgroundBlurStyle: chromeMaterial(this.appDark) !== undefined ? BlurStyle.NONE : BlurStyle.COMPONENT_THIN,
             enableArrow: false, autoCancel: false, focusable: false, mask: false })
         if (this.editorMounted) { this.editor() }
-        if (this.chromeSnapshot !== undefined) {
-          Image(this.chromeSnapshot).width(this.screenWidth).height(this.screenHeight - this.safeTop - EDITOR_SAFE_GAP)
-            .position({x:0,y:this.safeTop + EDITOR_SAFE_GAP}).opacity(this.editorOpacity).hitTestBehavior(HitTestMode.None)
-        }
         if (this.viewing) { this.detail() }
         if (!this.editing && !this.viewing && !this.arriving) { this.canvasNavigation() }
-        }.id('canvasWorkspace').width('100%').height('100%').renderGroup(true)
-          .scale({x:this.galleryVisible?CANVAS_WORKSPACE_REST_SCALE:1,y:this.galleryVisible?CANVAS_WORKSPACE_REST_SCALE:1})
+        }.id('canvasWorkspace').width('100%').height('100%')
           .visibility(!this.galleryVisible||this.galleryTransitioning?Visibility.Visible:Visibility.Hidden)
           .hitTestBehavior(this.galleryVisible?HitTestMode.None:HitTestMode.Transparent)
           .accessibilityLevel(this.galleryVisible?'no-hide-descendants':'auto')
         }
         if(this.galleryMounted){
           CanvasGallery({ entries: this.canvasEntries, appDark: this.appDark, viewportWidth: this.screenWidth, safeTop: this.safeTop, safeBottom: this.safeBottom,
-            busy: this.canvasChanging || this.galleryTransitioning || this.busy || this.sharing, revision: this.galleryRevision, controller:this.galleryController, heroId:this.galleryHeroId, previewMinute:this.tick,
+            busy: this.canvasChanging || this.galleryTransitioning || this.busy || this.sharing, revision: this.galleryRevision, controller:this.galleryController, pageVisible:this.galleryVisible, chromeVisible:this.galleryVisible&&!this.galleryTransitioning, heroId:this.galleryHeroId, previewMinute:this.tick,
             onLoad: (id: string): Promise<FridgeState> => this.store.canvasSnapshot(id),
             onOpen: (id: string) => this.openGalleryCanvas(id), onCreate: (name: string, dimension: string) => this.createGalleryCanvas(name, dimension),
             onRename: (id: string, name: string) => this.renameGalleryCanvas(id, name),
             onDuplicate: (id: string) => this.duplicateGalleryCanvas(id), onShare: (id: string) => this.shareCanvasById(id),
             onDelete: (id: string) => this.deleteCanvas(id), onImport: () => this.pickTemplate(),
             onSkill: (url: string) => this.openSkillRepository(url) })
-            .renderGroup(true).opacity(this.galleryVisible?1:0)
-            .scale({x:this.galleryVisible?1:GALLERY_DEPARTURE_SCALE,y:this.galleryVisible?1:GALLERY_DEPARTURE_SCALE})
             .visibility(this.galleryVisible||this.galleryTransitioning?Visibility.Visible:Visibility.Hidden)
             .hitTestBehavior(this.galleryVisible?HitTestMode.Transparent:HitTestMode.None)
             .accessibilityLevel(this.galleryVisible?'auto':'no-hide-descendants')
@@ -2432,10 +2399,10 @@ struct Index {
           }
         })
         .bindSheet(this.capabilityPickerOpen||this.readingComparisonOpen,this.editorTaskSheet,{height:this.taskSheetHeight(true),detents:[this.taskSheetHeight(true)],preferType:this.screenWidth>=600?SheetType.CENTER:SheetType.BOTTOM,width:Math.min(560,this.screenWidth-24),showClose:true,dragBar:true,backgroundColor:this.appBackground(),blurStyle:BlurStyle.COMPONENT_THIN,onDisappear:()=>{this.capabilityPickerOpen=false;this.readingComparisonOpen=false;}})
-        .id('editorMotionChrome').bindToScrollable([this.scroller]).hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).width('100%').height('100%').backgroundColor(Color.Transparent)
+        .id('editorNativeChrome').bindToScrollable([this.scroller]).hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).width('100%').height('100%').backgroundColor(Color.Transparent)
     }.width('100%').height('100%').padding({ top: this.safeTop + EDITOR_SAFE_GAP }).opacity(this.editorOpacity)
       .hitTestBehavior(!this.editing || this.heroActive ? HitTestMode.None : HitTestMode.Default)
-      .visibility(this.editing && this.chromeSnapshot === undefined ? Visibility.Visible : Visibility.Hidden)
+      .visibility(this.editing ? Visibility.Visible : Visibility.Hidden)
       .accessibilityLevel(this.editing ? 'yes' : 'no-hide-descendants')
   }
   private finishNavMenu(index:number):void {
