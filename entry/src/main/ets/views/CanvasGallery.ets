@@ -87,7 +87,7 @@ export struct CanvasGallery {
     this.controller.pausePreviews=()=>{this.previewsPaused=true;};
     this.controller.aspect=(dimension:string,fallback:number):number=>{const rect=this.widgetRects[dimension];return rect&&rect[0]>0&&rect[1]>0?rect[0]/rect[1]:fallback;};
     this.controller.dismiss=()=>{if(!this.splitOpen)return false;this.setSplitOpen(false);return true;};
-    this.controller.prepare=async(id:string)=>{await this.loadItems(id);};
+    this.controller.prepare=async(id:string)=>{await this.prepareReturn(id);};
     this.controller.previewReady=(id:string):boolean=>this.isPreviewReady(id);
     this.controller.anchor=(id:string,requireFresh:boolean=true):GalleryAnchor|null=>{
       const item=this.items.find((entry:GalleryItem)=>entry.id===id),state=this.documents.get(id);if(!item||!state||(requireFresh&&(!item.preview||item.previewSource!==this.previewSource(state))))return null;
@@ -204,6 +204,21 @@ export struct CanvasGallery {
         .onClick(()=>this.setSplitOpen(!this.splitOpen))
     }.width(this.splitWidth()).height(56).margin({bottom:this.safeBottom+12})
       .opacity(this.pageVisible?1:0).hitTestBehavior(this.pageVisible?HitTestMode.Transparent:HitTestMode.None)
+  }
+  /** Returning only refreshes the active in-memory document. Preserve every
+   * other row and avoid disk indexes / host IPC on the navigation path. */
+  private async prepareReturn(id:string):Promise<void>{
+    const previous=this.items.find((item:GalleryItem)=>item.id===id);
+    if(!previous){await this.loadItems(id);return;}
+    const generation=this.generation,state=await this.onLoad(id);
+    if(!this.alive||generation!==this.generation)return;
+    this.previewTick=Date.now();this.documents.set(id,state);
+    if(previous.loaded&&!previous.failed&&previous.dimension===state.canvasDimension&&previous.aspect===state.canvasAspect)return;
+    this.items=this.items.map((item:GalleryItem):GalleryItem=>{
+      if(item.id!==id)return item;
+      const next=new GalleryItem();next.id=item.id;next.name=item.name;next.dimension=state.canvasDimension;next.aspect=state.canvasAspect;
+      next.loaded=true;next.preview=item.preview;next.previewSource=item.previewSource;return next;
+    });
   }
   private async loadItems(refreshId:string=''): Promise<void> {
     const generation = ++this.generation;this.previewTick=Date.now();

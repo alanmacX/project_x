@@ -148,6 +148,7 @@ struct Index {
   @State galleryArtworkX:number=0;
   @State galleryArtworkY:number=0;
   @State galleryReturnBridge:boolean=false;
+  @State galleryReturning:boolean=false;
   @State galleryHeroOpacity:number=1;
   @State galleryHeroId:string='';
   @State galleryHeroX:number=0;
@@ -414,14 +415,18 @@ struct Index {
     this.canvasChanging = true;this.galleryController.pausePreviews();const intentGeneration=this.galleryTransitionGeneration;
     this.galleryAnchor=this.galleryController.anchor(id);this.galleryAnchorWidth=this.screenWidth;this.galleryAnchorHeight=this.screenHeight;
     try {
-      await this.loadCanvas(id, true);
+      if(id===this.store.state.canvasId&&this.workspaceMounted&&this.ready&&!this.timedScene&&!this.sceneEditing){
+        // The active document and its decoded surfaces survived the gallery.
+        // Reopening it must not flush/reload preferences and rebuild every card.
+        this.scenePanelGeneration++;this.cancelScheduledTransition();
+      }else{await this.loadCanvas(id,true);}
       if (!this.alive||intentGeneration!==this.galleryTransitionGeneration) return;
       this.sceneEditing = false; this.selectedId = ''; this.groupSelecting = false; this.groupSelection = [];
       this.canvasFlightX = 0; this.canvasFlightY = 0; this.canvasFlightAngle = 0;
       this.boardOpacity = 1; this.scatter = 0; this.startupCardCount = -1;
       await this.setGalleryPage(false);
     } catch (e) { this.templateError('画布打开未完成', e as Error); }
-    finally { this.canvasChanging = false; this.armScheduleTimer(); this.updateScheduledScene(true); }
+    finally { this.canvasChanging = false; this.armScheduleTimer(); this.updateScheduledScene(true);if(!this.galleryVisible)this.scheduleForegroundRefresh(); }
   }
   private async showGallery(): Promise<void> {
     if (this.galleryVisible || this.galleryTransitioning || this.arriving || this.heroActive || this.editing || this.viewing || this.canvasChanging || this.busy || this.sharing || this.deletionId || this.activeBoardId || this.sceneNavigationBusy || this.scheduleTransition) return;
@@ -470,11 +475,14 @@ struct Index {
     catch (e) { this.store.renameCanvas(previous, id); this.templateError('名称保存未完成', e as Error); }
     finally { this.canvasChanging = false; this.refreshCanvasList(); this.galleryRevision++; }
   }
+  private workspaceChromeVisible():boolean {
+    return !this.galleryVisible&&!this.canvasChanging&&!this.galleryTransitioning&&!this.galleryReturnBridge;
+  }
   private cancelGalleryTransition(): void {
     this.galleryTransitionGeneration++;
     const release=this.galleryFrameResolve;this.galleryFrameResolve=null;release?.();
     if (this.galleryTransitionTimer >= 0) clearTimeout(this.galleryTransitionTimer);
-    this.galleryTransitionTimer = -1; this.galleryTransitioning = false;this.galleryHeroSource='';this.galleryHeroId='';this.galleryArtworkOpacity=1;this.galleryHeroOpacity=1;this.galleryReturnBridge=false;this.galleryArtworkScaleX=1;this.galleryArtworkScaleY=1;this.galleryArtworkX=0;this.galleryArtworkY=0;
+    this.galleryTransitionTimer = -1; this.galleryTransitioning = false;this.galleryHeroSource='';this.galleryHeroId='';this.galleryArtworkOpacity=this.galleryVisible?0:1;this.galleryHeroOpacity=1;this.galleryReturnBridge=false;this.galleryReturning=false;this.galleryArtworkScaleX=1;this.galleryArtworkScaleY=1;this.galleryArtworkX=0;this.galleryArtworkY=0;
   }
   private waitGalleryFrame():Promise<void>{
     return new Promise<void>((resolve)=>{
@@ -489,14 +497,16 @@ struct Index {
     this.galleryHeroId='';
     this.getUIContext().animateTo({duration:140,curve:Curve.EaseOut,onFinish:()=>{
       if(!this.alive||generation!==this.galleryTransitionGeneration)return;
-      this.galleryReturnBridge=false;this.galleryArtworkOpacity=1;this.galleryArtworkScaleX=1;this.galleryArtworkScaleY=1;this.galleryArtworkX=0;this.galleryArtworkY=0;
+      this.galleryReturnBridge=false;this.galleryReturning=false;
+      // Keep the finished surface transparent at its landing pose. Reset only
+      // while covered by the gallery at the next navigation, never on this frame.
     }},()=>this.galleryArtworkOpacity=0);
   }
   private async setGalleryPage(library: boolean): Promise<void> {
     if (this.galleryVisible === library) return;
     this.cancelGalleryTransition();
     const generation = this.galleryTransitionGeneration;
-    this.galleryTransitioning = true;
+    this.galleryReturning=library;this.galleryTransitioning = true;
     if(!library){
       this.workspaceMounted=true;
       // Mount and measure the destination under the still-opaque gallery, then flush its render commands.
@@ -507,6 +517,7 @@ struct Index {
       // Local artwork is decoded on mount; avoid a full-window GPU readback that stalls navigation.
       if(!this.alive||generation!==this.galleryTransitionGeneration)return;
     }
+    this.galleryArtworkOpacity=1;
     const anchor=this.galleryAnchor;
     if(anchor&&anchor.id===this.store.state.canvasId&&this.galleryAnchorWidth===this.screenWidth&&this.galleryAnchorHeight===this.screenHeight&&anchor.y>=this.safeTop&&anchor.y+anchor.h<=this.screenHeight-this.safeBottom){
       this.galleryHeroId=anchor.id;this.galleryHeroOpacity=1;
@@ -1588,10 +1599,10 @@ struct Index {
         Stack({alignContent:Alignment.TopStart}) {
           if(this.floatingHome()){this.homeDock()}else{this.homeLayers()}
         }.width('100%').height('100%').opacity(this.arriving?1:this.boardOpacity)
-          .visibility(this.galleryVisible?Visibility.Hidden:Visibility.Visible)
+          .visibility(this.workspaceChromeVisible()?Visibility.Visible:Visibility.Hidden)
           .accessibilityLevel(this.editing||this.viewing?'no-hide-descendants':'auto')
           .hitTestBehavior(this.editing||this.viewing||this.canvasChanging?HitTestMode.BLOCK_DESCENDANTS:HitTestMode.Transparent)
-        if(this.scheduledFocusId && !this.editing) {
+        if(this.scheduledFocusId && !this.editing && this.workspaceChromeVisible()) {
           ForEach(this.cards.filter((card:FridgeCard)=>card.id===this.scheduledFocusId),(card:FridgeCard)=>{
             Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {}
               .width(card.w*this.boardScale+this.focusedFringe(card).left+this.focusedFringe(card).right).height(card.h*this.boardScale+this.focusedFringe(card).top+this.focusedFringe(card).bottom).backgroundColor(Color.Transparent)
@@ -1599,12 +1610,12 @@ struct Index {
               .zIndex(100004).enabled(!this.scheduleTransition).accessibilityText('关闭中央展示并恢复画布').onClick((event:ClickEvent)=>{if(cardContainsPoint(card,event.x-this.focusedFringe(card).left,event.y-this.focusedFringe(card).top,this.boardScale))this.restoreScheduledScene();})
           },(card:FridgeCard)=>card.id)
         }
-        if(this.scheduledName && !this.editing) {
+        if(this.scheduledName && !this.editing && this.workspaceChromeVisible()) {
           Button(this.scheduleOverride?'结束预览':this.timedScene?.focusId?'点击恢复':this.scheduledName+' · 返回编辑',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL})
             .height(44).fontSize(13).fontColor(this.appText()).backgroundColor(this.appSurface()).attributeModifier(immersiveChrome(this.appDark))
             .position({x:this.boardLeft+12,y:this.boardTop+12}).zIndex(100005).enabled(!this.scheduleTransition).onClick(()=>this.restoreScheduledScene())
         }
-        if(!this.editing && !this.viewing && !this.arriving && !this.groupSelecting && this.selectedGroup().length>1) {
+        if(!this.editing && !this.viewing && !this.arriving && this.workspaceChromeVisible() && !this.groupSelecting && this.selectedGroup().length>1) {
           GroupSelection({motion:this.boardMotion,box:this.selectedGroupBox(),minimum:groupMinimumScale(this.selectedGroup()),maximum:this.groupMaximumScale(),
             viewportW:BOARD_W*this.boardScale,viewportH:this.boardHeight,
             onBegin:()=>this.beginGroupTransform(),onFinish:(scale:number,angle:number)=>this.finishGroupTransform(scale,angle),onCancel:()=>this.cancelGroupTransform()})
@@ -1622,7 +1633,7 @@ struct Index {
               onDetentsDidChange:(height:number)=>{const expanded=this.getUIContext().px2vp(height)>this.editorWorkspace().body*.60;this.editorExpanded=expanded;},
               onWillDismiss:(action:DismissSheetAction)=>this.dismissEditorSheet(action),onWillSpringBackWhenDismiss:(action:SpringBackAction)=>action.springBack()
             })
-        if(!this.editing&&!this.viewing&&!this.arriving&&!this.groupSelecting&&this.selectedGroup().length<2&&!this.scheduledName&&!this.scheduleTransition) {
+        if(!this.editing&&!this.viewing&&!this.arriving&&this.workspaceChromeVisible()&&!this.groupSelecting&&this.selectedGroup().length<2&&!this.scheduledName&&!this.scheduleTransition) {
           ForEach(this.cardIds.filter((id:string)=>id===this.selectedId&&!this.cardMap[id].hidden),(id:string)=>{
             BoardCard({controlsOnly:true,appDark:this.appDark,card:this.cardMap[id],motion:this.boardMotion,selected:true,scaleFactor:this.boardScale,yScaleFactor:this.boardHeight/BOARD_H,
               boardLeft:this.boardLeft,boardTop:this.boardTop,controlViewportWidth:BOARD_W*this.boardScale,controlViewportHeight:this.boardHeight,
@@ -1639,8 +1650,8 @@ struct Index {
             enableArrow: false, autoCancel: false, focusable: false, mask: false })
         if (this.editorMounted) { this.editor() }
         if (this.viewing) { this.detail() }
-        if (!this.editing && !this.viewing && !this.arriving && !this.galleryVisible && !this.galleryTransitioning) { this.canvasNavigation() }
-        }.id('canvasWorkspace').width('100%').height('100%').zIndex(this.galleryVisible&&(this.galleryTransitioning||this.galleryReturnBridge)?200000:0)
+        if (!this.editing && !this.viewing && !this.arriving && this.workspaceChromeVisible()) { this.canvasNavigation() }
+        }.id('canvasWorkspace').width('100%').height('100%').zIndex(this.galleryReturning&&(this.galleryTransitioning||this.galleryReturnBridge)?200000:0)
           .visibility(!this.galleryVisible||this.galleryTransitioning||this.galleryReturnBridge?Visibility.Visible:Visibility.Hidden)
           .hitTestBehavior(this.galleryVisible?HitTestMode.None:HitTestMode.Transparent)
           .accessibilityLevel(this.galleryVisible?'no-hide-descendants':'auto')

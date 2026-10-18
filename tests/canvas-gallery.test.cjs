@@ -41,7 +41,7 @@ const { Fixture } = execute(`class Fixture {
  boardOpacity=0;scatter=1;startupCardCount=4;ready=true;launchFromWidget=false;routeCanvasId='';
  store={save:async()=>calls.push('save'),state:{canvasId:'a'}};
  loadCanvas=async id=>calls.push('load:'+id);
- armScheduleTimer(){}updateScheduledScene(){}cancelScheduledTransition(){calls.push('cancel-scene');}
+ armScheduleTimer(){}updateScheduledScene(){}scheduleForegroundRefresh(){}cancelScheduledTransition(){calls.push('cancel-scene');}
  flushPendingEdits(){calls.push('flush');}refreshCanvasList(){calls.push('list');}
  templateError(prefix,error){calls.push('error:'+prefix);}
  leaveTimedScene=async()=>calls.push('leave-scene');
@@ -67,6 +67,8 @@ const { Fixture } = execute(`class Fixture {
   assert(calls.some(value => Array.isArray(value) && value[0] === 'launchFromWidget' && value[1] === false));
   assert.equal(f.homeToolsOpen, false); assert.equal(f.backgroundOpen, false);
 
+  const warmOpen=new Fixture();warmOpen.workspaceMounted=true;let repeatedLoads=0;warmOpen.loadCanvas=async()=>{repeatedLoads++;};
+  await warmOpen.openGalleryCanvas('a');assert.equal(repeatedLoads,0,'same canvas reuses its decoded live scene rather than reopening preferences');
   const failed = new Fixture(); failed.loadCanvas = async () => { throw Error('corrupt'); };
   await failed.openGalleryCanvas('broken'); assert.equal(failed.galleryVisible, true); assert.equal(failed.canvasChanging, false, 'failed load retains navigable library');
   const saveFailed = new Fixture(); saveFailed.galleryVisible = false; saveFailed.store.save = async () => { throw Error('disk full'); };
@@ -129,7 +131,7 @@ const { Fixture } = execute(`class Fixture {
   sharedCompletions.shift()();assert.equal(shared.galleryTransitioning,false);assert.equal(shared.galleryReturnBridge,true,'thumbnail refresh does not block gallery interaction');
   shared.revealGalleryPreview('a');assert.equal(shared.galleryHeroId,'a','an undecoded image cannot replace the live bridge');
   shared.galleryController.previewReady=()=>true;shared.revealGalleryPreview('a');assert.equal(shared.galleryHeroId,'','decoded fresh image is revealed under the bridge');
-  sharedCompletions.shift()();assert.equal(shared.galleryReturnBridge,false);assert.equal(shared.galleryArtworkScaleX,1,'landing fade clears transforms');
+  sharedCompletions.shift()();assert.equal(shared.galleryReturnBridge,false);assert.equal(shared.galleryArtworkOpacity,0,'landing completion keeps the artwork transparent until the next covered preparation');
   shared.screenWidth=600;await shared.setGalleryPage(false);
   assert.equal(shared.galleryHeroSource,'','resized windows cannot reuse stale thumbnail coordinates');sharedCompletions.shift()();
   const scaledReturn=new Fixture();Object.assign(scaledReturn,{galleryVisible:false,screenWidth:390,screenHeight:800,galleryAnchorWidth:390,galleryAnchorHeight:800,safeTop:36,safeBottom:24,boardLeft:23,boardTop:160,boardScale:1,boardHeight:344,galleryAnchor:{id:'a',preview:'',x:16,y:120,w:172,h:172}});
@@ -138,6 +140,16 @@ const { Fixture } = execute(`class Fixture {
   assert.equal(scaledReturn.galleryArtworkScaleX,.5);
   assert.equal(23+(344-172)/2+scaledReturn.galleryArtworkX,16,'scale and rotation share a centre; translation must map the painted left edge, not just layout origin');
   assert.equal(160+(344-172)/2+scaledReturn.galleryArtworkY,120,'unequal preview sizes still land on the painted top edge');
+  const safeCleanup=new Fixture();Object.assign(safeCleanup,{galleryVisible:true,galleryReturnBridge:true,galleryReturning:true,galleryHeroId:'a',galleryArtworkScaleX:.5,galleryArtworkScaleY:.5,galleryArtworkOpacity:1});
+  safeCleanup.galleryController.previewReady=()=>true;let releaseBridge;
+  safeCleanup.getUIContext=()=>({animateTo:(options,update)=>{update();releaseBridge=options.onFinish;}});
+  safeCleanup.revealGalleryPreview('a');releaseBridge();assert.equal(safeCleanup.galleryArtworkOpacity,0);assert.equal(safeCleanup.galleryArtworkScaleX,.5,'cleanup cannot flash a full-size pose before visibility commits');
+  const chrome=new Fixture();chrome.galleryVisible=false;
+  assert.equal(chrome.workspaceChromeVisible(),true);
+  for(const flag of ['canvasChanging','galleryTransitioning','galleryReturnBridge']){chrome[flag]=true;assert.equal(chrome.workspaceChromeVisible(),false,'controls hide before the animation transaction: '+flag);chrome[flag]=false;}
+  const enteringOrder=new Fixture();enteringOrder.galleryVisible=true;let enterFrame;
+  enteringOrder.getUIContext=()=>({postFrameCallback:frame=>enterFrame=frame});
+  const preparingOrder=enteringOrder.setGalleryPage(false);assert.equal(enteringOrder.galleryReturning,false,'preparing the workspace never promotes it above the gallery');assert.equal(enteringOrder.galleryArtworkOpacity,0,'preparation starts with a transparent source');enteringOrder.cancelGalleryTransition();await preparingOrder;
   const interruptedReturn=new Fixture();interruptedReturn.galleryVisible=true;interruptedReturn.galleryReturnBridge=true;interruptedReturn.galleryHeroId='a';interruptedReturn.galleryArtworkScaleX=.4;
   interruptedReturn.galleryController.previewReady=()=>true;let lateDissolve;
   interruptedReturn.getUIContext=()=>({animateTo:(options,update)=>{update();lateDissolve=options.onFinish;}});
@@ -162,6 +174,15 @@ const { Fixture } = execute(`class Fixture {
   anchors.items[0].previewSource='old';assert.equal(anchors.controller.anchor('a'),null,'entry still rejects a stale preview');assert.equal(anchors.controller.anchor('a',false).y,120,'return geometry survives outdated pixels');
   anchors.items[0].previewSource='new';assert.equal(anchors.isPreviewReady('a'),false);anchors.previewDecoded('a','old.png');assert.equal(anchors.isPreviewReady('a'),false);anchors.previewDecoded('a','new.png');assert.equal(anchors.isPreviewReady('a'),true,'readiness requires the current image to decode');anchors.previewDecoded('a','old.png');assert.equal(anchors.isPreviewReady('a'),true,'a late old image callback cannot invalidate the decoded replacement');
   anchors.anchorViewportChanged();assert.equal(anchors.controller.anchor('a',false),null,'window changes invalidate retained tile geometry');
+  const fastReturn=gallery.slice(gallery.indexOf('  private async prepareReturn('),gallery.indexOf('  private async loadItems('));
+  const {FastReturn}=execute(`class FastReturn {
+    alive=true;generation=0;previewTick=0;documents=new Map();reads=[];fallbacks=0;
+    items=[{id:'a',name:'A',loaded:true,failed:false,dimension:'4*4',aspect:1,preview:'a.png'},{id:'b',name:'B',loaded:true,dimension:'2*2',aspect:1,preview:'b.png'}];
+    onLoad=async id=>{this.reads.push(id);return {canvasDimension:'4*4',canvasAspect:1,cards:[]};};loadItems=async()=>{this.fallbacks++;};
+    ${fastReturn}
+  }exports.FastReturn=FastReturn;`,{GalleryItem:model.GalleryItem});
+  const quick=new FastReturn(),previousRows=quick.items;await quick.prepareReturn('a');
+  assert.deepEqual(Array.from(quick.reads),['a']);assert.equal(quick.items,previousRows,'unchanged return metadata cannot rebuild visible rows');assert.equal(quick.fallbacks,0,'known canvas return does not enumerate disk cache indexes or host geometry');
   const loading = gallery.slice(gallery.indexOf('  private async loadItems('), gallery.indexOf('  private requestPreview('));
   const { Loader } = execute(`class Loader {
     alive=true;generation=0;items=[];entries=[{id:'a',name:'A'}];documents=new Map();visibleIds=new Set();
