@@ -1,6 +1,7 @@
 /** Retained gallery refreshes behind the workspace before returning to it. */
 export class GalleryAnchor { id:string='';preview:string='';x:number=0;y:number=0;w:number=0;h:number=0; }
 export class GalleryController {
+  resumePreviews: () => void = () => {};
   pausePreviews: () => void = () => {};
   aspect: (dimension:string,fallback:number) => number = (_dimension:string,fallback:number) => fallback;
   dismiss: () => boolean = () => false;

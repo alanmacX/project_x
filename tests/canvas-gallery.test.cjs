@@ -35,7 +35,7 @@ const routeMethods = page.slice(page.indexOf('  private canvasRouteChanged('), p
 const calls = [];
 const motionTimers = new Map(); let motionTimerId = 0;
 const { Fixture } = execute(`class Fixture {
- alive=true;galleryVisible=true;galleryMounted=true;galleryRevision=0;galleryController={pausePreviews(){},prepare:async()=>calls.push("prepare-gallery"),anchor:()=>null,previewReady:()=>false};galleryFrameResolve=null;workspaceMounted=false;galleryTransitioning=false;galleryTransitionGeneration=0;galleryTransitionTimer=-1;frameRate={};canvasChanging=false;busy=false;sharing=false;sceneNavigationBusy=false;
+ alive=true;galleryVisible=true;galleryMounted=true;galleryRevision=0;galleryController={pausePreviews(){},prepare:async()=>calls.push("prepare-gallery"),anchor:()=>null,previewReady:()=>false,resumePreviews(){}};galleryFrameResolve=null;workspaceMounted=false;galleryTransitioning=false;galleryTransitionGeneration=0;galleryTransitionTimer=-1;frameRate={};canvasChanging=false;busy=false;sharing=false;sceneNavigationBusy=false;
  heroActive=false;editing=false;viewing=false;deletionId='';activeBoardId='';sceneEditing=false;selectedId='';
  homeToolsOpen=true;scheduleOpen=true;backgroundOpen=true;groupSelecting=true;groupSelection=['card'];scheduleTimer=-1;scenePanelGeneration=0;
  boardOpacity=0;scatter=1;startupCardCount=4;ready=true;launchFromWidget=false;routeCanvasId='';
@@ -72,7 +72,7 @@ const { Fixture } = execute(`class Fixture {
   const failed = new Fixture(); failed.loadCanvas = async () => { throw Error('corrupt'); };
   await failed.openGalleryCanvas('broken'); assert.equal(failed.galleryVisible, true); assert.equal(failed.canvasChanging, false, 'failed load retains navigable library');
   const saveFailed = new Fixture(); saveFailed.galleryVisible = false; saveFailed.store.save = async () => { throw Error('disk full'); };
-  await saveFailed.showGallery(); assert.equal(saveFailed.galleryVisible, false); assert.equal(saveFailed.canvasChanging, false, 'save failure leaves artwork open for recovery');
+  await saveFailed.showGallery(); assert.equal(saveFailed.galleryVisible,true);assert.equal(saveFailed.canvasChanging,false,'persistence failure reports separately without locking the preview list');
 
   const editing = new Fixture(); editing.galleryVisible = false; editing.editing = true;
   const revision = editing.galleryRevision; await editing.showGallery(); assert.equal(editing.galleryRevision, revision, 'nested card editor must finish first');
@@ -89,7 +89,7 @@ const { Fixture } = execute(`class Fixture {
   const hiddenDuringPreview=new Fixture();hiddenDuringPreview.galleryVisible=false;let resolveHiddenPreview;
   hiddenDuringPreview.galleryController.prepare=()=>new Promise(resolve=>resolveHiddenPreview=resolve);
   const hiddenReturn=hiddenDuringPreview.showGallery();await new Promise(resolve=>setImmediate(resolve));hiddenDuringPreview.cancelGalleryTransition();resolveHiddenPreview();await hiddenReturn;
-  assert.equal(hiddenDuringPreview.galleryVisible,false,'backgrounding cannot restart navigation after a slow preview refresh');
+  assert.equal(hiddenDuringPreview.galleryVisible,true,'slow preview work cannot delay returning to the gallery');
   const widget = new Fixture(); widget.launchFromWidget = true; calls.length = 0; widget.widgetLaunchChanged();
   assert.deepEqual(calls, ['widget-route'], 'warm widget launch bypasses the library too');
   const motion = new Fixture(), completions = [];
@@ -97,13 +97,7 @@ const { Fixture } = execute(`class Fixture {
   await motion.setGalleryPage(false);
   assert.equal(motion.galleryTransitioning, true); assert.equal(motion.galleryVisible, false);
   await motion.showGallery(); assert.equal(motion.galleryVisible, false, 'back cannot replace an active native transition');
-  motion.cancelGalleryTransition(); await motion.setGalleryPage(true);
-  completions.shift()(); assert.equal(motion.galleryTransitioning, true, 'old animation completion cannot release a newer transition');
-  completions.shift()(); assert.equal(motion.galleryTransitioning, false); assert.equal(motionTimers.size, 0);
-  await motion.setGalleryPage(false); motionTimers.values().next().value();
-  assert.equal(motion.galleryTransitioning, false, 'deadline releases the interaction guard if native completion is omitted');
-  await motion.setGalleryPage(true); motion.cancelGalleryTransition(); motion.alive = false;
-  completions.forEach(finish => finish()); assert.equal(motion.galleryTransitioning, false, 'teardown remains cancelled after stale completions');
+  motion.cancelGalleryTransition();await motion.setGalleryPage(true);completions.shift()();assert.equal(motion.galleryTransitioning,false,'late entry completion cannot lock the returned homepage');assert.equal(motionTimers.size,0);
   const preparing = new Fixture(); let layoutFrame,snapshots=0;
   preparing.getUIContext=()=>({
     postFrameCallback:frame=>{layoutFrame=frame;},
@@ -126,38 +120,19 @@ const { Fixture } = execute(`class Fixture {
   assert.equal(shared.galleryHeroSource,'file://canvas.png');assert.equal(shared.galleryHeroX,23);assert.equal(shared.galleryHeroY,160,'shared preview lands on the measured board');
   sharedCompletions.shift()();assert.equal(shared.galleryArtworkOpacity,1,'decoded live surface is restored under the landing image');assert.equal(shared.galleryHeroSource,'file://canvas.png');
   sharedCompletions.shift()();assert.equal(shared.galleryHeroSource,'','dissolve completion releases the landing image');
-  await shared.setGalleryPage(true);assert.equal(shared.galleryHeroSource,'','return never substitutes an outdated thumbnail for live artwork');
-  assert.equal(shared.galleryArtworkX,-7);assert.equal(shared.galleryArtworkY,-40,'return moves the live board to the retained tile');
-  sharedCompletions.shift()();assert.equal(shared.galleryTransitioning,false);assert.equal(shared.galleryReturnBridge,true,'thumbnail refresh does not block gallery interaction');
-  shared.revealGalleryPreview('a');assert.equal(shared.galleryHeroId,'a','an undecoded image cannot replace the live bridge');
-  shared.galleryController.previewReady=()=>true;shared.revealGalleryPreview('a');assert.equal(shared.galleryHeroId,'','decoded fresh image is revealed under the bridge');
-  sharedCompletions.shift()();assert.equal(shared.galleryReturnBridge,false);assert.equal(shared.galleryArtworkOpacity,0,'landing completion keeps the artwork transparent until the next covered preparation');
-  shared.screenWidth=600;await shared.setGalleryPage(false);
-  assert.equal(shared.galleryHeroSource,'','resized windows cannot reuse stale thumbnail coordinates');sharedCompletions.shift()();
-  const scaledReturn=new Fixture();Object.assign(scaledReturn,{galleryVisible:false,screenWidth:390,screenHeight:800,galleryAnchorWidth:390,galleryAnchorHeight:800,safeTop:36,safeBottom:24,boardLeft:23,boardTop:160,boardScale:1,boardHeight:344,galleryAnchor:{id:'a',preview:'',x:16,y:120,w:172,h:172}});
-  scaledReturn.getUIContext=()=>({postFrameCallback:frame=>frame.start(),animateTo:(options,update)=>update()});
-  await scaledReturn.setGalleryPage(true);
-  assert.equal(scaledReturn.galleryArtworkScaleX,.5);
-  assert.equal(23+(344-172)/2+scaledReturn.galleryArtworkX,16,'scale and rotation share a centre; translation must map the painted left edge, not just layout origin');
-  assert.equal(160+(344-172)/2+scaledReturn.galleryArtworkY,120,'unequal preview sizes still land on the painted top edge');
-  const safeCleanup=new Fixture();Object.assign(safeCleanup,{galleryVisible:true,galleryReturnBridge:true,galleryReturning:true,galleryHeroId:'a',galleryArtworkScaleX:.5,galleryArtworkScaleY:.5,galleryArtworkOpacity:1});
-  safeCleanup.galleryController.previewReady=()=>true;let releaseBridge;
-  safeCleanup.getUIContext=()=>({animateTo:(options,update)=>{update();releaseBridge=options.onFinish;}});
-  safeCleanup.revealGalleryPreview('a');releaseBridge();assert.equal(safeCleanup.galleryArtworkOpacity,0);assert.equal(safeCleanup.galleryArtworkScaleX,.5,'cleanup cannot flash a full-size pose before visibility commits');
+  await shared.setGalleryPage(true);assert.equal(shared.galleryHeroSource,'');assert.equal(shared.galleryHeroId,'');assert.equal(shared.galleryArtworkOpacity,0);assert.equal(shared.galleryTransitioning,false,'return is immediately interactive without an animation completion');
+  assert.equal(sharedCompletions.length,0,'return schedules no live-surface bridge or dissolve');
+  shared.screenWidth=600;await shared.setGalleryPage(false);assert.equal(shared.galleryHeroSource,'');sharedCompletions.shift()();
+  const blockedIO=new Fixture();blockedIO.galleryVisible=false;
+  blockedIO.store.save=()=>new Promise(()=>{});blockedIO.galleryController.prepare=()=>new Promise(()=>{});
+  await Promise.race([blockedIO.showGallery(),new Promise((_,reject)=>setTimeout(()=>reject(Error('return waited for persistence/preview')),100))]);
+  assert.equal(blockedIO.galleryVisible,true);assert.equal(blockedIO.canvasChanging,false);assert.equal(blockedIO.galleryTransitioning,false);
   const chrome=new Fixture();chrome.galleryVisible=false;
   assert.equal(chrome.workspaceChromeVisible(),true);
-  for(const flag of ['canvasChanging','galleryTransitioning','galleryReturnBridge']){chrome[flag]=true;assert.equal(chrome.workspaceChromeVisible(),false,'controls hide before the animation transaction: '+flag);chrome[flag]=false;}
+  for(const flag of ['canvasChanging','galleryTransitioning']){chrome[flag]=true;assert.equal(chrome.workspaceChromeVisible(),false,'controls hide before the animation transaction: '+flag);chrome[flag]=false;}
   const enteringOrder=new Fixture();enteringOrder.galleryVisible=true;let enterFrame;
   enteringOrder.getUIContext=()=>({postFrameCallback:frame=>enterFrame=frame});
-  const preparingOrder=enteringOrder.setGalleryPage(false);assert.equal(enteringOrder.galleryReturning,false,'preparing the workspace never promotes it above the gallery');assert.equal(enteringOrder.galleryArtworkOpacity,0,'preparation starts with a transparent source');enteringOrder.cancelGalleryTransition();await preparingOrder;
-  const interruptedReturn=new Fixture();interruptedReturn.galleryVisible=true;interruptedReturn.galleryReturnBridge=true;interruptedReturn.galleryHeroId='a';interruptedReturn.galleryArtworkScaleX=.4;
-  interruptedReturn.galleryController.previewReady=()=>true;let lateDissolve;
-  interruptedReturn.getUIContext=()=>({animateTo:(options,update)=>{update();lateDissolve=options.onFinish;}});
-  interruptedReturn.revealGalleryPreview('a');interruptedReturn.cancelGalleryTransition();interruptedReturn.galleryArtworkScaleX=.8;lateDissolve();
-  assert.equal(interruptedReturn.galleryArtworkScaleX,.8,'late preview fade cannot reset a new navigation pose');
-  const noTarget=new Fixture();noTarget.galleryVisible=false;let finishNoTarget;
-  noTarget.getUIContext=()=>({animateTo:(options,update)=>{update();finishNoTarget=options.onFinish;}});
-  await noTarget.setGalleryPage(true);assert.equal(noTarget.galleryArtworkOpacity,0,'a filtered/offscreen destination fades rather than cutting off live artwork');finishNoTarget();
+  const preparingOrder=enteringOrder.setGalleryPage(false);assert.equal(enteringOrder.galleryArtworkOpacity,0,'preparation starts with a transparent source');enteringOrder.cancelGalleryTransition();await preparingOrder;
   const gallery = fs.readFileSync('entry/src/main/ets/views/CanvasGallery.ets', 'utf8');
   const anchorBinding=gallery.slice(gallery.indexOf('    this.controller.anchor='),gallery.indexOf('    this.loadItems();'));
   const readyMethods=gallery.slice(gallery.indexOf('  private anchorViewportChanged'),gallery.indexOf('  aboutToDisappear'));

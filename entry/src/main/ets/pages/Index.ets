@@ -143,12 +143,6 @@ struct Index {
   private galleryAnchorHeight:number=0;
   @State galleryHeroSource:string='';
   @State galleryArtworkOpacity:number=1;
-  @State galleryArtworkScaleX:number=1;
-  @State galleryArtworkScaleY:number=1;
-  @State galleryArtworkX:number=0;
-  @State galleryArtworkY:number=0;
-  @State galleryReturnBridge:boolean=false;
-  @State galleryReturning:boolean=false;
   @State galleryHeroOpacity:number=1;
   @State galleryHeroId:string='';
   @State galleryHeroX:number=0;
@@ -411,7 +405,6 @@ struct Index {
   }
   private async openGalleryCanvas(id: string): Promise<void> {
     if (!this.alive || this.galleryTransitioning || this.canvasChanging || this.busy || this.sharing || this.sceneNavigationBusy) return;
-    if(this.galleryReturnBridge)this.cancelGalleryTransition();
     this.canvasChanging = true;this.galleryController.pausePreviews();const intentGeneration=this.galleryTransitionGeneration;
     this.galleryAnchor=this.galleryController.anchor(id);this.galleryAnchorWidth=this.screenWidth;this.galleryAnchorHeight=this.screenHeight;
     try {
@@ -431,28 +424,28 @@ struct Index {
   private async showGallery(): Promise<void> {
     if (this.galleryVisible || this.galleryTransitioning || this.arriving || this.heroActive || this.editing || this.viewing || this.canvasChanging || this.busy || this.sharing || this.deletionId || this.activeBoardId || this.sceneNavigationBusy || this.scheduleTransition) return;
     if (this.sceneEditing) { await this.leaveTimedScene(); return; }
-    this.canvasChanging = true;const intentGeneration=this.galleryTransitionGeneration;
+    this.canvasChanging = true;
     this.scenePanelGeneration++; this.cancelScheduledTransition();
     this.homeToolsOpen = false; this.scheduleOpen = false; this.backgroundOpen = false;
     this.selectedId = ''; this.groupSelecting = false; this.groupSelection = [];
     try {
-      this.flushPendingEdits(); await this.store.save(false);
-      if (!this.alive||intentGeneration!==this.galleryTransitionGeneration) return;
-      this.refreshCanvasList();
-      if(!this.galleryMounted){
-        const generation=this.galleryTransitionGeneration;this.galleryMounted=true;
-        await this.waitGalleryFrame();if(!this.alive||generation!==this.galleryTransitionGeneration)return;
-      }
-      await this.galleryController.prepare(this.store.state.canvasId);
-      this.galleryAnchor=this.galleryController.anchor(this.store.state.canvasId,false);
-      this.galleryAnchorWidth=this.screenWidth;this.galleryAnchorHeight=this.screenHeight;
-      if(!this.alive||intentGeneration!==this.galleryTransitionGeneration)return;
+      this.flushPendingEdits();
+      // save() captures the current document synchronously; disk persistence and
+      // disposable previews must never gate returning to the retained gallery.
+      const id=this.store.state.canvasId,saved=this.store.save(false);
+      this.refreshCanvasList();this.galleryMounted=true;
       await this.setGalleryPage(true);
+      const returnedGeneration=this.galleryTransitionGeneration;
       AppStorage.setOrCreate('launchFromWidget', false);
-      if (this.scheduleTimer >= 0) { clearTimeout(this.scheduleTimer); this.scheduleTimer = -1; }
-    } catch (e) { this.templateError('画布保存未完成', e as Error); }
-    finally { this.canvasChanging = false; }
+      if(this.scheduleTimer>=0){clearTimeout(this.scheduleTimer);this.scheduleTimer=-1;}
+      saved.catch((error:Error)=>{if(this.alive)this.templateError('画布保存未完成',error);});
+      this.galleryController.prepare(id).then(()=>{
+        if(this.alive&&returnedGeneration===this.galleryTransitionGeneration&&this.galleryVisible)this.galleryController.resumePreviews();
+      }).catch(()=>{});
+    } catch(e){this.templateError('返回首页未完成',e as Error);}
+    finally{this.canvasChanging=false;}
   }
+
   private async createGalleryCanvas(name: string, dimension: string): Promise<void> {
     await this.newCanvas(false, name, dimension);
   }
@@ -476,13 +469,13 @@ struct Index {
     finally { this.canvasChanging = false; this.refreshCanvasList(); this.galleryRevision++; }
   }
   private workspaceChromeVisible():boolean {
-    return !this.galleryVisible&&!this.canvasChanging&&!this.galleryTransitioning&&!this.galleryReturnBridge;
+    return !this.galleryVisible&&!this.canvasChanging&&!this.galleryTransitioning;
   }
   private cancelGalleryTransition(): void {
     this.galleryTransitionGeneration++;
     const release=this.galleryFrameResolve;this.galleryFrameResolve=null;release?.();
     if (this.galleryTransitionTimer >= 0) clearTimeout(this.galleryTransitionTimer);
-    this.galleryTransitionTimer = -1; this.galleryTransitioning = false;this.galleryHeroSource='';this.galleryHeroId='';this.galleryArtworkOpacity=this.galleryVisible?0:1;this.galleryHeroOpacity=1;this.galleryReturnBridge=false;this.galleryReturning=false;this.galleryArtworkScaleX=1;this.galleryArtworkScaleY=1;this.galleryArtworkX=0;this.galleryArtworkY=0;
+    this.galleryTransitionTimer = -1; this.galleryTransitioning = false;this.galleryHeroSource='';this.galleryHeroId='';this.galleryArtworkOpacity=this.galleryVisible?0:1;this.galleryHeroOpacity=1;
   }
   private waitGalleryFrame():Promise<void>{
     return new Promise<void>((resolve)=>{
@@ -490,23 +483,17 @@ struct Index {
       this.getUIContext().postFrameCallback(new PreparedTransition(()=>{if(this.galleryFrameResolve===resolve)this.galleryFrameResolve=null;resolve();}));
     });
   }
-  private revealGalleryPreview(id:string):void {
-    if(!this.alive||!this.galleryReturnBridge||this.galleryTransitioning||this.galleryHeroId!==id||!this.galleryController.previewReady(id))return;
-    const generation=this.galleryTransitionGeneration;
-    // Decode completion, not a timer, releases the live artwork over the new tile.
-    this.galleryHeroId='';
-    this.getUIContext().animateTo({duration:140,curve:Curve.EaseOut,onFinish:()=>{
-      if(!this.alive||generation!==this.galleryTransitionGeneration)return;
-      this.galleryReturnBridge=false;this.galleryReturning=false;
-      // Keep the finished surface transparent at its landing pose. Reset only
-      // while covered by the gallery at the next navigation, never on this frame.
-    }},()=>this.galleryArtworkOpacity=0);
-  }
   private async setGalleryPage(library: boolean): Promise<void> {
     if (this.galleryVisible === library) return;
     this.cancelGalleryTransition();
+    if(library){
+      // Homepage is a preview list, not a live scene awaiting a handoff.
+      this.galleryArtworkOpacity=0;this.galleryVisible=true;
+      this.galleryTransitioning=false;
+      return;
+    }
     const generation = this.galleryTransitionGeneration;
-    this.galleryReturning=library;this.galleryTransitioning = true;
+    this.galleryTransitioning = true;
     if(!library){
       this.workspaceMounted=true;
       // Mount and measure the destination under the still-opaque gallery, then flush its render commands.
@@ -521,7 +508,7 @@ struct Index {
     const anchor=this.galleryAnchor;
     if(anchor&&anchor.id===this.store.state.canvasId&&this.galleryAnchorWidth===this.screenWidth&&this.galleryAnchorHeight===this.screenHeight&&anchor.y>=this.safeTop&&anchor.y+anchor.h<=this.screenHeight-this.safeBottom){
       this.galleryHeroId=anchor.id;this.galleryHeroOpacity=1;
-      // Return the persistent live artwork, including edits that are not cached yet.
+      // Entry uses the existing preview while the destination surface is prepared.
       this.galleryHeroSource=library?'':rememberedGalleryPreview(this.context?.cacheDir??'',anchor.id)?.path??anchor.preview;
       this.galleryArtworkOpacity=library?1:.001;
       this.galleryHeroX=library?this.boardLeft:anchor.x;this.galleryHeroY=library?this.boardTop:anchor.y;
@@ -532,13 +519,7 @@ struct Index {
     }
     const finish = (): void => {
       if (!this.alive || generation !== this.galleryTransitionGeneration) return;
-      if(library&&anchor&&this.galleryHeroId===anchor.id){
-        if(this.galleryTransitionTimer>=0)clearTimeout(this.galleryTransitionTimer);
-        this.galleryTransitionTimer=-1;this.galleryTransitioning=false;this.galleryReturnBridge=true;
-        this.galleryArtworkScaleX=anchor.w/(BOARD_W*this.boardScale);this.galleryArtworkScaleY=anchor.h/this.boardHeight;
-        this.galleryArtworkX=anchor.x+anchor.w/2-this.boardLeft-BOARD_W*this.boardScale/2;this.galleryArtworkY=anchor.y+anchor.h/2-this.boardTop-this.boardHeight/2;
-        this.revealGalleryPreview(anchor.id);
-      }else{this.cancelGalleryTransition();}
+      this.cancelGalleryTransition();
       this.armScheduleTimer(); this.updateScheduledScene(true);
     };
     const landed = ():void => {
@@ -554,11 +535,6 @@ struct Index {
     this.getUIContext().animateTo({ duration: CANVAS_PAGE_DURATION, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: landed },
       () => {
         this.galleryVisible = library;
-        if(library&&!this.galleryHeroId)this.galleryArtworkOpacity=0;
-        if(library&&anchor&&this.galleryHeroId===anchor.id){
-          this.galleryArtworkScaleX=anchor.w/(BOARD_W*this.boardScale);this.galleryArtworkScaleY=anchor.h/this.boardHeight;
-          this.galleryArtworkX=anchor.x+anchor.w/2-this.boardLeft-BOARD_W*this.boardScale/2;this.galleryArtworkY=anchor.y+anchor.h/2-this.boardTop-this.boardHeight/2;
-        }
         if(this.galleryHeroSource&&anchor){
           this.galleryHeroX=library?anchor.x:this.boardLeft;this.galleryHeroY=library?anchor.y:this.boardTop;
           this.galleryHeroW=library?anchor.w:BOARD_W*this.boardScale;this.galleryHeroH=library?anchor.h:this.boardHeight;
@@ -1592,8 +1568,7 @@ struct Index {
         this.editingScene()
         if(!this.viewing&&this.canvasBackground.frameStyle!=='none'){CanvasFrame({snapshot:true,material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle}).width(BOARD_W*this.boardScale).height(this.boardHeight).position({x:this.boardLeft,y:this.boardTop}).opacity(this.boardOpacity).zIndex(100003).hitTestBehavior(HitTestMode.None)}
         }.id('canvasArtwork').width('100%').height('100%').opacity(this.galleryArtworkOpacity)
-          .scale({x:this.galleryArtworkScaleX,y:this.galleryArtworkScaleY,centerX:this.boardLeft+BOARD_W*this.boardScale/2,centerY:this.boardTop+this.boardHeight/2})
-          .translate({x:this.canvasFlightX+this.galleryArtworkX,y:this.canvasFlightY+this.galleryArtworkY})
+          .translate({x:this.canvasFlightX,y:this.canvasFlightY})
           .rotate({angle:this.canvasFlightAngle,centerX:this.boardLeft+BOARD_W*this.boardScale/2,centerY:this.boardTop+this.boardHeight/2})
           .hitTestBehavior(this.canvasChanging?HitTestMode.BLOCK_DESCENDANTS:HitTestMode.Transparent)
         Stack({alignContent:Alignment.TopStart}) {
@@ -1651,8 +1626,8 @@ struct Index {
         if (this.editorMounted) { this.editor() }
         if (this.viewing) { this.detail() }
         if (!this.editing && !this.viewing && !this.arriving && this.workspaceChromeVisible()) { this.canvasNavigation() }
-        }.id('canvasWorkspace').width('100%').height('100%').zIndex(this.galleryReturning&&(this.galleryTransitioning||this.galleryReturnBridge)?200000:0)
-          .visibility(!this.galleryVisible||this.galleryTransitioning||this.galleryReturnBridge?Visibility.Visible:Visibility.Hidden)
+        }.id('canvasWorkspace').width('100%').height('100%')
+          .visibility(!this.galleryVisible||this.galleryTransitioning?Visibility.Visible:Visibility.Hidden)
           .hitTestBehavior(this.galleryVisible?HitTestMode.None:HitTestMode.Transparent)
           .accessibilityLevel(this.galleryVisible?'no-hide-descendants':'auto')
         }
@@ -1660,7 +1635,7 @@ struct Index {
           CanvasGallery({ entries: this.canvasEntries, appDark: this.appDark, viewportWidth: this.screenWidth, viewportHeight:this.screenHeight, safeTop: this.safeTop, safeBottom: this.safeBottom,
             busy: this.canvasChanging || this.galleryTransitioning || this.busy || this.sharing, revision: this.galleryRevision, controller:this.galleryController, pageVisible:this.galleryVisible, chromeVisible:this.galleryVisible&&!this.galleryTransitioning, heroId:this.galleryHeroId, previewMinute:this.tick,
             onLoad: async(id:string):Promise<FridgeState>=>{const state=await this.store.canvasPreviewSnapshot(id);state.canvasAspect=this.canvasHostAspect(state.canvasDimension,state.canvasAspect);return state;},
-            onPreviewReady:(id:string)=>this.revealGalleryPreview(id), onOpen: (id: string) => this.openGalleryCanvas(id), onCreate: (name: string, dimension: string) => this.createGalleryCanvas(name, dimension),
+            onOpen: (id: string) => this.openGalleryCanvas(id), onCreate: (name: string, dimension: string) => this.createGalleryCanvas(name, dimension),
             onRename: (id: string, name: string) => this.renameGalleryCanvas(id, name),
             onDuplicate: (id: string) => this.duplicateGalleryCanvas(id), onShare: (id: string) => this.shareCanvasById(id),
             onDelete: (id: string) => this.deleteCanvas(id), onImport: () => this.pickTemplate(),
@@ -1687,7 +1662,7 @@ struct Index {
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_: Area, area: Area) => {
         const width = Number(area.width), height = Number(area.height);
-        if (width > 0 && height > 0 && (width!==this.screenWidth || height!==this.screenHeight)) { if(this.galleryTransitioning||this.galleryReturnBridge)this.cancelGalleryTransition();this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height);if(this.editing&&!this.heroActive)this.editorSheetOpen=!this.editorLandscape(); this.layoutBoard(); }
+        if (width > 0 && height > 0 && (width!==this.screenWidth || height!==this.screenHeight)) { if(this.galleryTransitioning)this.cancelGalleryTransition();this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height);if(this.editing&&!this.heroActive)this.editorSheetOpen=!this.editorLandscape(); this.layoutBoard(); }
       })
   }
   private showCardActions(): boolean {

@@ -84,6 +84,7 @@ export struct CanvasGallery {
   aboutToAppear(): void {
     this.alive = true;
     this.widgetRects=rememberedGalleryRects(this.getUIContext().getHostContext()?.cacheDir??'',this.entries.map((entry:CanvasEntry)=>entry.id));
+    this.controller.resumePreviews=()=>this.previewWorkChanged();
     this.controller.pausePreviews=()=>{this.previewsPaused=true;};
     this.controller.aspect=(dimension:string,fallback:number):number=>{const rect=this.widgetRects[dimension];return rect&&rect[0]>0&&rect[1]>0?rect[0]/rect[1]:fallback;};
     this.controller.dismiss=()=>{if(!this.splitOpen)return false;this.setSplitOpen(false);return true;};
