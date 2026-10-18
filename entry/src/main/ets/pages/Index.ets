@@ -1,5 +1,5 @@
 import { GalleryAnchor, GalleryController } from '../model/CanvasGallery';
-import { primeGalleryPreviews, rememberedGalleryPreview } from '../model/GalleryPreviewCache';
+import { primeGalleryPreviews } from '../model/GalleryPreviewCache';
 import { cardActionAnchor, CardActionAnchor } from '../model/CardActionPlacement';
 import { CANVAS_PAGE_DURATION } from '../model/CanvasPageMotion';
 import { navigationChrome } from '../model/NavigationChrome';
@@ -500,12 +500,10 @@ struct Index {
       if(this.galleryTransitionTimer>=0)clearTimeout(this.galleryTransitionTimer);
       this.galleryTransitionTimer=-1;this.galleryReturnAnimating=false;this.galleryHeroSource='';this.galleryHeroId='';
     };
-    this.galleryTransitionTimer=setTimeout(finish,420);
+    this.galleryTransitionTimer=setTimeout(finish,CANVAS_PAGE_DURATION+160);
     this.getUIContext().postFrameCallback(new PreparedTransition(()=>{
       if(!this.alive||generation!==this.galleryTransitionGeneration||!this.galleryVisible)return;
-      this.getUIContext().animateTo({duration:260,curve:Curve.Friction,expectedFrameRateRange:this.frameRate,onFinish:finish},()=>{
-        this.galleryHeroX=anchor.x;this.galleryHeroY=anchor.y;this.galleryHeroW=anchor.w;this.galleryHeroH=anchor.h;
-      });
+      this.animateGalleryPreview(true,finish);
     }));
   }
   private async setGalleryPage(library: boolean): Promise<void> {
@@ -529,42 +527,37 @@ struct Index {
       // Local artwork is decoded on mount; avoid a full-window GPU readback that stalls navigation.
       if(!this.alive||generation!==this.galleryTransitionGeneration)return;
     }
-    this.galleryArtworkOpacity=1;
     const anchor=this.galleryAnchor;
-    if(anchor&&anchor.id===this.store.state.canvasId&&this.galleryAnchorWidth===this.screenWidth&&this.galleryAnchorHeight===this.screenHeight&&anchor.y>=this.safeTop&&anchor.y+anchor.h<=this.screenHeight-this.safeBottom){
-      this.galleryHeroId=anchor.id;this.galleryHeroOpacity=1;
-      // Entry uses the existing preview while the destination surface is prepared.
-      this.galleryHeroSource=library?'':rememberedGalleryPreview(this.context?.cacheDir??'',anchor.id)?.path??anchor.preview;
-      this.galleryArtworkOpacity=library?1:.001;
-      this.galleryHeroX=library?this.boardLeft:anchor.x;this.galleryHeroY=library?this.boardTop:anchor.y;
-      this.galleryHeroW=library?BOARD_W*this.boardScale:anchor.w;this.galleryHeroH=library?this.boardHeight:anchor.h;
-      // The shared image needs an initial rendered pose before its target can be animated.
+    const hasPreview=anchor?.preview&&anchor.id===this.store.state.canvasId&&this.galleryAnchorWidth===this.screenWidth&&this.galleryAnchorHeight===this.screenHeight&&anchor.y>=this.safeTop&&anchor.y+anchor.h<=this.screenHeight-this.safeBottom;
+    if(hasPreview&&anchor){
+      // Both directions move the very same cached preview. Only its rectangle changes.
+      this.galleryHeroId=anchor.id;this.galleryHeroOpacity=1;this.galleryHeroSource=anchor.preview;
+      this.galleryArtworkOpacity=.001;
+      this.galleryHeroX=anchor.x;this.galleryHeroY=anchor.y;
+      this.galleryHeroW=anchor.w;this.galleryHeroH=anchor.h;
       await this.waitGalleryFrame();
       if(!this.alive||generation!==this.galleryTransitionGeneration)return;
     }
     const finish = (): void => {
       if (!this.alive || generation !== this.galleryTransitionGeneration) return;
+      // Hand over at the exact landing rectangle, with no second fade or opacity reset.
+      this.galleryArtworkOpacity=1;
       this.cancelGalleryTransition();
       this.armScheduleTimer(); this.updateScheduledScene(true);
     };
-    const landed = ():void => {
-      if(!this.alive||generation!==this.galleryTransitionGeneration)return;
-      if(library||!this.galleryHeroSource){finish();return;}
-      // Restore the already decoded, persistent artwork before dissolving the landing image.
-      // Keeping the two surfaces overlapped avoids a one-frame card/cache swap at completion.
-      this.galleryArtworkOpacity=1;
-      this.getUIContext().animateTo({duration:140,curve:Curve.EaseOut,onFinish:finish},()=>this.galleryHeroOpacity=0);
-    };
-    // Include the landing dissolve in the cancellation deadline.
-    this.galleryTransitionTimer = setTimeout(finish, CANVAS_PAGE_DURATION + 140 + 160);
-    this.getUIContext().animateTo({ duration: CANVAS_PAGE_DURATION, curve: Curve.Friction, expectedFrameRateRange: this.frameRate, onFinish: landed },
-      () => {
-        this.galleryVisible = library;
-        if(this.galleryHeroSource&&anchor){
-          this.galleryHeroX=library?anchor.x:this.boardLeft;this.galleryHeroY=library?anchor.y:this.boardTop;
-          this.galleryHeroW=library?anchor.w:BOARD_W*this.boardScale;this.galleryHeroH=library?anchor.h:this.boardHeight;
-        }
-      });
+    // Page/chrome visibility is not part of the artwork animation transaction.
+    this.galleryVisible=false;
+    if(!hasPreview){finish();return;}
+    this.galleryTransitionTimer=setTimeout(finish,CANVAS_PAGE_DURATION+160);
+    this.animateGalleryPreview(false,finish);
+  }
+  private animateGalleryPreview(library:boolean,onFinish:()=>void):void {
+    const anchor=this.galleryAnchor;
+    this.getUIContext().animateTo({duration:CANVAS_PAGE_DURATION,curve:Curve.Friction,expectedFrameRateRange:this.frameRate,onFinish},()=>{
+      if(!anchor||!this.galleryHeroSource)return;
+      this.galleryHeroX=library?anchor.x:this.boardLeft;this.galleryHeroY=library?anchor.y:this.boardTop;
+      this.galleryHeroW=library?anchor.w:BOARD_W*this.boardScale;this.galleryHeroH=library?anchor.h:this.boardHeight;
+    });
   }
   @Builder
   canvasNavigation() {

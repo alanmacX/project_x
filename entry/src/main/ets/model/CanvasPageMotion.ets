@@ -1,2 +1,2 @@
-/** Retained chrome recedes while the selected preview moves between its measured gallery and board rectangles. */
-export const CANVAS_PAGE_DURATION: number = 360;
+/** One reversible cached-preview motion; native chrome stays in window coordinates. */
+export const CANVAS_PAGE_DURATION: number = 260;

@@ -49,7 +49,7 @@ const { Fixture } = execute(`class Fixture {
  getUIContext(){return {postFrameCallback:frame=>frame.start(),getComponentSnapshot:()=>({get:async()=>({release:async()=>{}})}),animateTo:(options,update)=>{update();options.onFinish();}};}
  ${methods}
  ${routeMethods}
-}exports.Fixture=Fixture;`, { calls, rememberedGalleryPreview:()=>null,BOARD_W:344,PreparedTransition:class{constructor(start){this.start=start;}}, CANVAS_PAGE_DURATION:360, Curve:{Friction:0}, setTimeout:fn=>{motionTimers.set(++motionTimerId,fn);return motionTimerId;}, clearTimeout:id=>motionTimers.delete(id), AppStorage: { setOrCreate: (key, value) => calls.push([key, value]) } });
+}exports.Fixture=Fixture;`, { calls, rememberedGalleryPreview:()=>null,BOARD_W:344,PreparedTransition:class{constructor(start){this.start=start;}}, CANVAS_PAGE_DURATION:execute(fs.readFileSync('entry/src/main/ets/model/CanvasPageMotion.ets','utf8')).CANVAS_PAGE_DURATION, Curve:{Friction:0}, setTimeout:fn=>{motionTimers.set(++motionTimerId,fn);return motionTimerId;}, clearTimeout:id=>motionTimers.delete(id), AppStorage: { setOrCreate: (key, value) => calls.push([key, value]) } });
 
 (async () => {
   const f = new Fixture();
@@ -93,11 +93,12 @@ const { Fixture } = execute(`class Fixture {
   const widget = new Fixture(); widget.launchFromWidget = true; calls.length = 0; widget.widgetLaunchChanged();
   assert.deepEqual(calls, ['widget-route'], 'warm widget launch bypasses the library too');
   const motion = new Fixture(), completions = [];
+  Object.assign(motion,{screenWidth:390,screenHeight:800,galleryAnchorWidth:390,galleryAnchorHeight:800,safeTop:36,safeBottom:24,boardLeft:23,boardTop:160,boardScale:1,boardHeight:344,galleryAnchor:{id:'a',preview:'file://canvas.png',x:16,y:120,w:172,h:172}});
   motion.getUIContext = () => ({ postFrameCallback:frame=>frame.start(),getComponentSnapshot:()=>({get:async()=>({release:async()=>{}})}),animateTo: (options, update) => { update(); completions.push(options.onFinish); } });
   await motion.setGalleryPage(false);
   assert.equal(motion.galleryTransitioning, true); assert.equal(motion.galleryVisible, false);
   await motion.showGallery(); assert.equal(motion.galleryVisible, false, 'back cannot replace an active native transition');
-  motion.cancelGalleryTransition();await motion.setGalleryPage(true);completions.shift()();assert.equal(motion.galleryTransitioning,false,'late entry completion cannot lock the returned homepage');assert.equal(motionTimers.size,0);
+  motion.cancelGalleryTransition();await motion.setGalleryPage(true);completions.shift()();assert.equal(motion.galleryTransitioning,false,'late entry completion cannot lock the returned homepage');motion.cancelGalleryTransition();assert.equal(motionTimers.size,0);
   const preparing = new Fixture(); let layoutFrame,snapshots=0;
   preparing.getUIContext=()=>({
     postFrameCallback:frame=>{layoutFrame=frame;},
@@ -112,17 +113,17 @@ const { Fixture } = execute(`class Fixture {
   cancelled.getUIContext=()=>({postFrameCallback:frame=>staleFrame=frame});
   const abandoned=cancelled.setGalleryPage(false);cancelled.cancelGalleryTransition();await abandoned;
   staleFrame.start();assert.equal(cancelled.galleryVisible,true,'background cancellation cannot reveal an unprepared workspace');
-  const shared = new Fixture();const sharedCompletions=[];
+  const shared = new Fixture();const sharedCompletions=[],sharedMotions=[];
   Object.assign(shared,{screenWidth:390,screenHeight:800,galleryAnchorWidth:390,galleryAnchorHeight:800,safeTop:36,safeBottom:24,boardLeft:23,boardTop:160,boardScale:1,boardHeight:344,
-    galleryAnchor:{id:'a',preview:'file://canvas.png',x:16,y:120,w:344,h:344}});
-  shared.getUIContext=()=>({postFrameCallback:frame=>frame.start(),getComponentSnapshot:()=>({get:async()=>({release:async()=>{}})}),animateTo:(options,update)=>{update();sharedCompletions.push(options.onFinish);}});
+    galleryAnchor:{id:'a',preview:'file://canvas.png',x:16,y:120,w:172,h:172}});
+  shared.getUIContext=()=>({postFrameCallback:frame=>frame.start(),getComponentSnapshot:()=>({get:async()=>({release:async()=>{}})}),animateTo:(options,update)=>{const start=[shared.galleryHeroX,shared.galleryHeroY,shared.galleryHeroW,shared.galleryHeroH];update();sharedMotions.push({duration:options.duration,curve:options.curve,start,end:[shared.galleryHeroX,shared.galleryHeroY,shared.galleryHeroW,shared.galleryHeroH],opacity:shared.galleryHeroOpacity});sharedCompletions.push(options.onFinish);}});
   await shared.setGalleryPage(false);
   assert.equal(shared.galleryHeroSource,'file://canvas.png');assert.equal(shared.galleryHeroX,23);assert.equal(shared.galleryHeroY,160,'shared preview lands on the measured board');
-  sharedCompletions.shift()();assert.equal(shared.galleryArtworkOpacity,1,'decoded live surface is restored under the landing image');assert.equal(shared.galleryHeroSource,'file://canvas.png');
-  sharedCompletions.shift()();assert.equal(shared.galleryHeroSource,'','dissolve completion releases the landing image');
+  sharedCompletions.shift()();assert.equal(shared.galleryArtworkOpacity,1,'decoded live surface is restored at landing');assert.equal(shared.galleryHeroSource,'','entry hands off without a second fade');assert.equal(sharedCompletions.length,0);
   await shared.setGalleryPage(true);assert.equal(shared.galleryHeroSource,'file://canvas.png');assert.equal(shared.galleryHeroId,'a');assert.equal(shared.galleryArtworkOpacity,0);assert.equal(shared.galleryTransitioning,false,'return is immediately interactive without an animation completion');
   assert.equal(sharedCompletions.length,1,'return animates a decorative cached image');const returnGeneration=shared.galleryTransitionGeneration;sharedCompletions.shift()();assert.equal(shared.galleryHeroSource,'','cached image releases without a preview decode wait');assert.equal(shared.galleryHeroId,'');assert.equal(shared.galleryTransitionGeneration,returnGeneration,'decorative completion must not invalidate pending preview refresh');
-  shared.screenWidth=600;await shared.setGalleryPage(false);assert.equal(shared.galleryHeroSource,'');sharedCompletions.shift()();
+  assert.equal(sharedMotions[0].duration,260);assert.equal(sharedMotions[1].duration,sharedMotions[0].duration);assert.equal(sharedMotions[1].curve,sharedMotions[0].curve);assert.deepEqual(sharedMotions[0].start,sharedMotions[1].end);assert.deepEqual(sharedMotions[0].end,sharedMotions[1].start);assert(sharedMotions.every(m=>m.opacity===1),'both directions move one opaque image without fading');
+  shared.screenWidth=600;await shared.setGalleryPage(false);assert.equal(shared.galleryHeroSource,'');assert.equal(shared.galleryTransitioning,false,'no visible target has no empty animation delay');
   const interrupted=new Fixture();Object.assign(interrupted,{screenWidth:390,screenHeight:800,galleryAnchorWidth:390,galleryAnchorHeight:800,safeTop:36,safeBottom:24,boardLeft:23,boardTop:160,boardScale:1,boardHeight:344,galleryVisible:false,galleryAnchor:{id:'a',preview:'cached.png',x:16,y:120,w:172,h:172}});
   let returnFrame,lateReturn;
   interrupted.getUIContext=()=>({postFrameCallback:frame=>returnFrame=frame,animateTo:(options,update)=>{update();lateReturn=options.onFinish;}});
