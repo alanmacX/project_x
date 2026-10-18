@@ -5,6 +5,8 @@ export class GalleryController {
   pausePreviews: () => void = () => {};
   aspect: (dimension:string,fallback:number) => number = (_dimension:string,fallback:number) => fallback;
   dismiss: () => boolean = () => false;
+  cancelWarmPreviews: () => void = () => {};
+  warmPreview: (id:string) => void = () => {};
   prepare: (id:string) => Promise<void> = async () => {};
   anchor: (id:string,requireFresh?:boolean) => GalleryAnchor|null = () => null;
   previewReady: (id:string) => boolean = () => false;

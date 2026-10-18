@@ -41,7 +41,7 @@ const { Fixture } = execute(`class Fixture {
  boardOpacity=0;scatter=1;startupCardCount=4;ready=true;launchFromWidget=false;routeCanvasId='';
  store={save:async()=>calls.push('save'),state:{canvasId:'a'}};
  loadCanvas=async id=>calls.push('load:'+id);
- armScheduleTimer(){}updateScheduledScene(){}scheduleForegroundRefresh(){}cancelScheduledTransition(){calls.push('cancel-scene');}
+ cancelGalleryWarm(){}armScheduleTimer(){}updateScheduledScene(){}scheduleForegroundRefresh(){}cancelScheduledTransition(){calls.push('cancel-scene');}
  flushPendingEdits(){calls.push('flush');}refreshCanvasList(){calls.push('list');}
  templateError(prefix,error){calls.push('error:'+prefix);}
  leaveTimedScene=async()=>calls.push('leave-scene');

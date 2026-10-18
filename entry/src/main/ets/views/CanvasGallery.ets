@@ -37,6 +37,7 @@ export struct CanvasGallery {
   @Prop @Watch('anchorViewportChanged') safeTop: number = 0;
   @Prop @Watch('anchorViewportChanged') safeBottom: number = 0;
   @Prop @Watch('previewWorkChanged') busy: boolean = false;
+  @Prop warmAllowed:boolean=false;
   @Prop heroId: string = '';
   @Prop @Watch('pageVisibilityChanged') pageVisible: boolean = true;
   @Prop chromeVisible: boolean = true;
@@ -79,6 +80,8 @@ export struct CanvasGallery {
   private previewTick: number = Math.floor(Date.now()/60000)*60000;
   private rectsLoaded:boolean=false;
   private previewsPaused:boolean=false;
+  private warmingIds:Set<string>=new Set();
+  private warmRequests:Map<string,number>=new Map();
   private documentRequests:Map<string,number>=new Map();
   private sourceCache:WeakMap<FridgeState,string>=new WeakMap();
   private scroller: Scroller = new Scroller();
@@ -90,6 +93,8 @@ export struct CanvasGallery {
     this.controller.pausePreviews=()=>{this.previewsPaused=true;};
     this.controller.aspect=(dimension:string,fallback:number):number=>{const rect=this.widgetRects[dimension];return rect&&rect[0]>0&&rect[1]>0?rect[0]/rect[1]:fallback;};
     this.controller.dismiss=()=>{if(!this.splitOpen)return false;this.setSplitOpen(false);return true;};
+    this.controller.cancelWarmPreviews=()=>this.warmingIds.clear();
+    this.controller.warmPreview=(id:string)=>{this.warmPreview(id).catch(()=>{});};
     this.controller.prepare=async(id:string)=>{await this.prepareReturn(id);};
     this.controller.previewReady=(id:string):boolean=>this.isPreviewReady(id);
     this.controller.anchor=(id:string,requireFresh:boolean=true):GalleryAnchor|null=>{
@@ -123,7 +128,16 @@ export struct CanvasGallery {
   private pageVisibilityChanged():void{
     if(!this.pageVisible){this.creating=false;this.sizeMenuOpen=false;this.splitOpen=false;this.renameId='';this.toolsOpen=false;}
   }
-  private previewWorkAllowed():boolean {return this.alive&&this.pageVisible&&!this.busy&&!this.previewsPaused;}
+  private async warmPreview(id:string):Promise<void> {
+    if(!this.alive||!this.warmAllowed||this.pageVisible||this.busy)return;
+    const request=(this.warmRequests.get(id)??0)+1;this.warmRequests.set(id,request);this.warmingIds.add(id);
+    try {
+      await this.prepareReturn(id);
+      let pending=this.requestPreview(id,true);
+      while(true){await pending;if(this.previewQueue===pending)break;pending=this.previewQueue;}
+    }finally{if(this.warmRequests.get(id)===request)this.warmingIds.delete(id);}
+  }
+  private previewWorkAllowed(warmId:string=''):boolean {return this.alive&&!this.busy&&((this.pageVisible&&!this.previewsPaused)||(!this.pageVisible&&this.warmAllowed&&this.warmingIds.has(warmId)));}
   private previewWorkChanged():void {
     if(this.pageVisible&&!this.busy)this.previewsPaused=false;
     if(this.previewWorkAllowed())this.visibleIds.forEach((id:string)=>{this.requestPreview(id);});
@@ -276,14 +290,14 @@ export struct CanvasGallery {
   }
   private requestPreview(id: string, force:boolean=false): Promise<void> {
     const item=this.items.find((value:GalleryItem)=>value.id===id),state=this.documents.get(id);
-    if(!this.previewWorkAllowed()||!item?.loaded||!state||(item.preview&&item.previewSource===this.previewSource(state)))return Promise.resolve();
+    if(!this.previewWorkAllowed(force?id:'')||!item?.loaded||!state||(item.preview&&item.previewSource===this.previewSource(state)))return Promise.resolve();
     if(this.pendingIds.has(id))return this.previewQueue.then(()=>{if(this.alive)return this.requestPreview(id,force);return Promise.resolve();});
     this.pendingIds.add(id);
     const generation=this.generation;
     this.previewQueue=this.previewQueue.catch(()=>{}).then(async()=>{
       let retry=false;
       try {
-        if(!this.previewWorkAllowed()||generation!==this.generation||(!force&&!this.visibleIds.has(id)))return;
+        if(!this.previewWorkAllowed(force?id:'')||generation!==this.generation||(!force&&!this.visibleIds.has(id)))return;
         const state=this.documents.get(id);if(!state)return;
         const context=this.getUIContext().getHostContext();if(!context)return;
         const source=this.previewSource(state);
@@ -291,7 +305,7 @@ export struct CanvasGallery {
         const relief:Record<string,string>=subjects.length?JSON.parse(await taskpool.execute(new taskpool.Task(prepareSceneRelief,JSON.stringify(subjects))) as string) as Record<string,string>:{};
         state.cards.forEach((card:FridgeCard)=>{card.reliefSrc=relief[card.id]??card.reliefSrc;});
         await primeRenderContours(state.cards, storageSnapshot(state));
-        if(!this.previewWorkAllowed()||generation!==this.generation)return;
+        if(!this.previewWorkAllowed(force?id:'')||generation!==this.generation)return;
         if(this.previewSource(this.documents.get(id)??state)!==source){retry=true;return;}
         // syncLoad only settles image decoding. Capability labels also measure text and their paper surface
         // through onSizeChange; forcing delay=0 snapshots the fallback height before those layout passes.
@@ -308,12 +322,12 @@ export struct CanvasGallery {
         const packer=image.createImagePacker();let file:fileIo.File|null=null;
         try{file=await fileIo.open(path,fileIo.OpenMode.CREATE|fileIo.OpenMode.READ_WRITE);await packer.packToFile(pixel,file.fd,{format:'image/png',quality:100});}
         finally{try{if(file)fileIo.closeSync(file.fd);}finally{try{await packer.release();}finally{await pixel.release();}}}
-        if(!this.previewWorkAllowed()||generation!==this.generation){fileIo.unlink(path).catch(()=>{});return;}
+        if(!this.previewWorkAllowed(force?id:'')||generation!==this.generation){fileIo.unlink(path).catch(()=>{});return;}
         if(this.previewSource(this.documents.get(id)??state)!==source){fileIo.unlink(path).catch(()=>{});retry=true;return;}
         const cached=new GalleryThumbnail();cached.source=source;cached.path='file://'+path;
         cached.dimension=state.canvasDimension;cached.aspect=state.canvasAspect;cached.rects=this.widgetRects;
         await saveGalleryPreview(context.cacheDir,id,cached);
-        if(!this.previewWorkAllowed()||generation!==this.generation)return;
+        if(!this.previewWorkAllowed(force?id:'')||generation!==this.generation)return;
         if(this.previewSource(this.documents.get(id)??state)!==source){retry=true;return;}
         this.items=this.items.map((value:GalleryItem):GalleryItem=>{
           if(value.id!==id)return value;
@@ -327,7 +341,7 @@ export struct CanvasGallery {
           const failed=new GalleryItem();failed.id=value.id;failed.name=value.name;failed.dimension=value.dimension;failed.aspect=value.aspect;
           failed.loaded=true;failed.failed=true;return failed;
         });
-      }finally{this.pendingIds.delete(id);if(retry&&this.previewWorkAllowed())this.requestPreview(id,force);}
+      }finally{this.pendingIds.delete(id);if(retry&&this.previewWorkAllowed(force?id:''))this.requestPreview(id,force);}
     });
     return this.previewQueue;
   }

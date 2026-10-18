@@ -428,6 +428,7 @@ struct Index {
     if (this.galleryVisible || this.galleryTransitioning || this.arriving || this.heroActive || this.editing || this.viewing || this.canvasChanging || this.busy || this.sharing || this.deletionId || this.activeBoardId || this.sceneNavigationBusy || this.scheduleTransition) return;
     if (this.sceneEditing) { await this.leaveTimedScene(); return; }
     this.canvasChanging = true;
+    this.cancelGalleryWarm();
     this.scenePanelGeneration++; this.cancelScheduledTransition();
     this.homeToolsOpen = false; this.scheduleOpen = false; this.backgroundOpen = false;
     this.selectedId = ''; this.groupSelecting = false; this.groupSelection = [];
@@ -957,7 +958,7 @@ struct Index {
       }
     } finally { this.repairingSubjects = false; }
   }
-  aboutToDisappear(): void { this.cancelGalleryTransition();this.canvasFlightGeneration++;this.canvasFlightY=0;this.canvasFlightX=0;this.canvasFlightAngle=0;this.canvasChanging=false; this.reliefGeneration++;if(this.reliefTimer>=0)clearTimeout(this.reliefTimer); this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer); if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
+  aboutToDisappear(): void { this.cancelGalleryWarm();this.cancelGalleryTransition();this.canvasFlightGeneration++;this.canvasFlightY=0;this.canvasFlightX=0;this.canvasFlightAngle=0;this.canvasChanging=false; this.reliefGeneration++;if(this.reliefTimer>=0)clearTimeout(this.reliefTimer); this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer); if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
     if(this.galleryTransitioning)return true;
     if(this.galleryVisible&&this.galleryController.dismiss())return true;
@@ -1297,6 +1298,21 @@ struct Index {
     this.queueReadingTints();this.queueRelief();
     this.store.save(syncWidgets).catch((e: Error) => { this.error = e.message === '桌面组件同步未完成' ? '桌面同步暂未完成，点此重试' : '保存失败，点此重试'; });
     this.refreshGalleryDocument();
+    this.scheduleGalleryWarm();
+  }
+  private galleryWarmTimer:number=-1;
+  private cancelGalleryWarm():void {if(this.galleryWarmTimer>=0)clearTimeout(this.galleryWarmTimer);this.galleryWarmTimer=-1;this.galleryController.cancelWarmPreviews();}
+  private scheduleGalleryWarm():void {
+    this.cancelGalleryWarm();
+    if(!this.alive||!this.galleryMounted||this.galleryVisible||!this.galleryWarmAllowed())return;
+    const id=this.store.state.canvasId;
+    this.galleryWarmTimer=setTimeout(()=>{
+      this.galleryWarmTimer=-1;
+      if(this.alive&&this.store.state.canvasId===id&&this.galleryWarmAllowed())this.galleryController.warmPreview(id);
+    },160);
+  }
+  private galleryWarmAllowed():boolean {
+    return this.pageVisible&&this.appWindowFocused&&!this.appBackgrounded&&!this.galleryVisible&&!this.editing&&!this.viewing&&!this.busy&&!this.sharing&&!this.artworkInteractionBusy();
   }
   private galleryDocumentRefresh:number=0;
   private refreshGalleryDocument():void {
@@ -1592,7 +1608,7 @@ struct Index {
       }
     });
   }
-  onPageHide(): void { this.cancelGalleryTransition();this.scenePanelGeneration++;this.pageVisible=false;this.cancelForegroundRefresh();this.flushPendingEdits(); }
+  onPageHide(): void { this.cancelGalleryWarm();this.cancelGalleryTransition();this.scenePanelGeneration++;this.pageVisible=false;this.cancelForegroundRefresh();this.flushPendingEdits(); }
   private compareReading():void {
     if(!this.current()?.capability||this.readingComparisonOpen||this.capabilityPickerOpen)return;
     this.readingComparisonOpen=true;
@@ -1669,7 +1685,7 @@ struct Index {
         }
         if(this.galleryMounted){
           CanvasGallery({ entries: this.canvasEntries, appDark: this.appDark, viewportWidth: this.screenWidth, viewportHeight:this.screenHeight, safeTop: this.safeTop, safeBottom: this.safeBottom,
-            busy: this.canvasChanging || this.galleryTransitioning || this.busy || this.sharing, revision: this.galleryRevision, controller:this.galleryController, pageVisible:this.galleryVisible, chromeVisible:this.galleryVisible, heroId:this.galleryHeroId, previewMinute:this.tick,
+            busy: this.canvasChanging || this.galleryTransitioning || this.busy || this.sharing, warmAllowed:this.galleryWarmAllowed(), revision: this.galleryRevision, controller:this.galleryController, pageVisible:this.galleryVisible, chromeVisible:this.galleryVisible, heroId:this.galleryHeroId, previewMinute:this.tick,
             onLoad: async(id:string):Promise<FridgeState>=>{const state=await this.store.canvasPreviewSnapshot(id);state.canvasAspect=this.canvasHostAspect(state.canvasDimension,state.canvasAspect);return state;},
             onOpen: (id: string) => this.openGalleryCanvas(id), onCreate: (name: string, dimension: string) => this.createGalleryCanvas(name, dimension),
             onRename: (id: string, name: string) => this.renameGalleryCanvas(id, name),
