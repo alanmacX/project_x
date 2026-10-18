@@ -9,7 +9,7 @@ const source=view.slice(view.indexOf('  private previewSource('),view.indexOf(' 
 const policy=view.slice(view.indexOf('  private previewWorkAllowed('),view.indexOf('  private previewTimeChanged('));
 const reads=[],snapshots=[];
 const {Fixture}=execute(`export class Fixture {
- alive=true;pageVisible=true;busy=false;generation=0;previewTick=0;rectsLoaded=true;widgetRects={};sourceCache=new WeakMap();
+ alive=true;pageVisible=true;busy=false;generation=0;previewTick=0;rectsLoaded=true;widgetRects={};sourceCache=new WeakMap();documentRequests=new Map();
  entries=[{id:'a',name:'A'},{id:'b',name:'B'},{id:'c',name:'C'}];items=[];documents=new Map([['b',{}],['c',{}]]);visibleIds=new Set(['a']);
  getUIContext(){return {getHostContext:()=>({cacheDir:'cache'})};}
  onLoad=async id=>{reads.push(id);return {canvasDimension:'2*4',canvasAspect:2,cards:[]};};

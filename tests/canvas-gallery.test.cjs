@@ -166,7 +166,7 @@ const { Fixture } = execute(`class Fixture {
   anchors.pageVisible=false;anchors.anchorViewportChanged();assert.equal(anchors.controller.anchor('a',false),null,'window changes invalidate retained tile geometry');
   const fastReturn=gallery.slice(gallery.indexOf('  private async prepareReturn('),gallery.indexOf('  private async loadItems('));
   const {FastReturn}=execute(`class FastReturn {
-    alive=true;generation=0;previewTick=0;documents=new Map();reads=[];fallbacks=0;
+    alive=true;generation=0;previewTick=0;documentRequests=new Map();documents=new Map();reads=[];fallbacks=0;
     items=[{id:'a',name:'A',loaded:true,failed:false,dimension:'4*4',aspect:1,preview:'a.png'},{id:'b',name:'B',loaded:true,dimension:'2*2',aspect:1,preview:'b.png'}];
     onLoad=async id=>{this.reads.push(id);return {canvasDimension:'4*4',canvasAspect:1,cards:[]};};loadItems=async()=>{this.fallbacks++;};
     ${fastReturn}
@@ -175,7 +175,7 @@ const { Fixture } = execute(`class Fixture {
   assert.deepEqual(Array.from(quick.reads),['a']);assert.equal(quick.items,previousRows,'unchanged return metadata cannot rebuild visible rows');assert.equal(quick.fallbacks,0,'known canvas return does not enumerate disk cache indexes or host geometry');
   const loading = gallery.slice(gallery.indexOf('  private async loadItems('), gallery.indexOf('  private requestPreview('));
   const { Loader } = execute(`class Loader {
-    alive=true;generation=0;items=[];entries=[{id:'a',name:'A'}];documents=new Map();visibleIds=new Set();
+    alive=true;generation=0;items=[];entries=[{id:'a',name:'A'}];documents=new Map();documentRequests=new Map();visibleIds=new Set();
     getUIContext(){return {getHostContext:()=>undefined};}previewSource(state){return JSON.stringify(state);}requestPreview(){}onLoad=async()=>({cards:[],canvasDimension:'4*4',canvasAspect:1});
     ${loading}
   }exports.Loader=Loader;`, { GalleryItem: model.GalleryItem,rememberedGalleryPreview:()=>null,cachedGalleryPreview:async()=>null, storageSnapshot: JSON.stringify, fileIo: { unlink: async () => {} } });

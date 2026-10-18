@@ -1,5 +1,6 @@
 import type uiMaterial from '@ohos.arkui.uiMaterial';
 import { deviceInfo } from '@kit.BasicServicesKit';
+import { AppDesign } from './AppDesign';
 let preparation: Promise<void> | undefined = undefined;
 const chromeMaterials: (uiMaterial.ImmersiveMaterial | undefined)[] = [];
 let factory: ((tint:string,interactive:boolean)=>uiMaterial.ImmersiveMaterial) | undefined = undefined;
@@ -67,3 +68,17 @@ export function immersiveChrome(dark:boolean=false,emphasized:boolean=false):Att
 export function immersiveReading(tint:string):AttributeModifier<ColumnAttribute> {
   let modifier=modifiers.get(tint);if(modifier===undefined){modifier=new ReadingModifier(tint);if(modifiers.size>32)modifiers.clear();modifiers.set(tint,modifier);}return modifier;
 }
+
+/** Floating geometry with an opaque fill: scrolling layers cannot bleed through controls. */
+class OpaqueChromeModifier implements AttributeModifier<ButtonAttribute> {
+  private dark:boolean;private emphasized:boolean;
+  constructor(dark:boolean,emphasized:boolean){this.dark=dark;this.emphasized=emphasized;}
+  applyNormalAttribute(instance:ButtonAttribute):void {
+    instance.backgroundColor(this.emphasized?AppDesign.selected(this.dark):AppDesign.control(this.dark))
+      .backgroundBlurStyle(BlurStyle.NONE)
+      .border({width:this.emphasized?0:.5,color:this.dark?'#38FFFFFF':'#18000000'})
+      .shadow({radius:10,color:this.dark?'#30000000':'#18000000',offsetY:3});
+  }
+}
+const opaqueModifiers:OpaqueChromeModifier[]=[new OpaqueChromeModifier(false,false),new OpaqueChromeModifier(true,false),new OpaqueChromeModifier(false,true),new OpaqueChromeModifier(true,true)];
+export function opaqueChrome(dark:boolean=false,emphasized:boolean=false):AttributeModifier<ButtonAttribute>{return opaqueModifiers[(dark?1:0)+(emphasized?2:0)];}

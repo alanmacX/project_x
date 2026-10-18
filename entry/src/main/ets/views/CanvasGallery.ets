@@ -74,10 +74,12 @@ export struct CanvasGallery {
   private visibleIds: Set<string> = new Set();
   private pendingIds: Set<string> = new Set();
   private previewQueue: Promise<void> = Promise.resolve();
+  private previewFileSequence:number=0;
   private generation: number = 0;
-  private previewTick: number = Date.now();
+  private previewTick: number = Math.floor(Date.now()/60000)*60000;
   private rectsLoaded:boolean=false;
   private previewsPaused:boolean=false;
+  private documentRequests:Map<string,number>=new Map();
   private sourceCache:WeakMap<FridgeState,string>=new WeakMap();
   private scroller: Scroller = new Scroller();
 
@@ -127,8 +129,10 @@ export struct CanvasGallery {
     if(this.previewWorkAllowed())this.visibleIds.forEach((id:string)=>{this.requestPreview(id);});
   }
   private previewTimeChanged():void{
-    this.previewTick=Date.now();
-    if(this.alive)this.visibleIds.forEach((id:string)=>{this.requestPreview(id);});
+    this.previewTick=Math.floor(Date.now()/60000)*60000;
+    if(this.previewWorkAllowed())this.visibleIds.forEach((id:string)=>{
+      this.prepareReturn(id).then(()=>{if(this.previewWorkAllowed())this.requestPreview(id);}).catch(()=>{});
+    });
   }
   private reload(): void { if (this.alive) this.loadItems(); }
   private startCreating(dimension: string): void {
@@ -211,9 +215,10 @@ export struct CanvasGallery {
   private async prepareReturn(id:string):Promise<void>{
     const previous=this.items.find((item:GalleryItem)=>item.id===id);
     if(!previous){await this.loadItems(id);return;}
-    const generation=this.generation,state=await this.onLoad(id);
-    if(!this.alive||generation!==this.generation)return;
-    this.previewTick=Date.now();this.documents.set(id,state);
+    const generation=this.generation,request=(this.documentRequests.get(id)??0)+1;this.documentRequests.set(id,request);
+    const state=await this.onLoad(id);
+    if(!this.alive||generation!==this.generation||this.documentRequests.get(id)!==request)return;
+    this.previewTick=Math.floor(Date.now()/60000)*60000;this.documents.set(id,state);
     if(previous.loaded&&!previous.failed&&previous.dimension===state.canvasDimension&&previous.aspect===state.canvasAspect)return;
     this.items=this.items.map((item:GalleryItem):GalleryItem=>{
       if(item.id!==id)return item;
@@ -222,7 +227,7 @@ export struct CanvasGallery {
     });
   }
   private async loadItems(refreshId:string=''): Promise<void> {
-    const generation = ++this.generation;this.previewTick=Date.now();
+    const generation = ++this.generation;this.previewTick=Math.floor(Date.now()/60000)*60000;
     const context=this.getUIContext().getHostContext();const cacheDir=context?.cacheDir??'';
     const previous=new Map<string,GalleryItem>();this.items.forEach((item:GalleryItem)=>previous.set(item.id,item));
     this.items=this.entries.map((entry:CanvasEntry):GalleryItem=>{
@@ -247,9 +252,10 @@ export struct CanvasGallery {
     if(!this.alive||generation!==this.generation)return;
     await Promise.all(this.entries.map(async(entry:CanvasEntry)=>{
       if(refreshId&&entry.id!==refreshId&&this.documents.has(entry.id))return;
+      const request=(this.documentRequests.get(entry.id)??0)+1;this.documentRequests.set(entry.id,request);
       try {
         const state=await this.onLoad(entry.id);
-        if(!this.alive||generation!==this.generation)return;
+        if(!this.alive||generation!==this.generation||this.documentRequests.get(entry.id)!==request)return;
         this.documents.set(entry.id,state);
         this.items=this.items.map((old:GalleryItem):GalleryItem=>{
           if(old.id!==entry.id)return old;
@@ -259,7 +265,7 @@ export struct CanvasGallery {
         // Navigation waits for metadata only. Decode/snapshot visible items once the transition settles.
         if(this.visibleIds.has(entry.id))this.requestPreview(entry.id);
       }catch(_){
-        if(!this.alive||generation!==this.generation)return;
+        if(!this.alive||generation!==this.generation||this.documentRequests.get(entry.id)!==request)return;
         this.items=this.items.map((item:GalleryItem):GalleryItem=>{
           if(item.id!==entry.id)return item;
           const failed=new GalleryItem();failed.id=item.id;failed.name=item.name;failed.dimension=item.dimension;failed.aspect=item.aspect;
@@ -275,8 +281,10 @@ export struct CanvasGallery {
     this.pendingIds.add(id);
     const generation=this.generation;
     this.previewQueue=this.previewQueue.catch(()=>{}).then(async()=>{
+      let retry=false;
       try {
         if(!this.previewWorkAllowed()||generation!==this.generation||(!force&&!this.visibleIds.has(id)))return;
+        const state=this.documents.get(id);if(!state)return;
         const context=this.getUIContext().getHostContext();if(!context)return;
         const source=this.previewSource(state);
         const subjects=state.cards.filter((card:FridgeCard)=>card.shape==='subject'&&card.cutout.startsWith('file://'));
@@ -284,6 +292,7 @@ export struct CanvasGallery {
         state.cards.forEach((card:FridgeCard)=>{card.reliefSrc=relief[card.id]??card.reliefSrc;});
         await primeRenderContours(state.cards, storageSnapshot(state));
         if(!this.previewWorkAllowed()||generation!==this.generation)return;
+        if(this.previewSource(this.documents.get(id)??state)!==source){retry=true;return;}
         // syncLoad only settles image decoding. Capability labels also measure text and their paper surface
         // through onSizeChange; forcing delay=0 snapshots the fallback height before those layout passes.
         const layoutDelay=state.cards.some((card:FridgeCard)=>!card.hidden&&card.capability!==null)?GALLERY_MEASUREMENT_DELAY_MS:0;
@@ -295,15 +304,17 @@ export struct CanvasGallery {
           pixel=await this.getUIContext().getComponentSnapshot().createFromBuilder(()=>{this.artwork(state);},layoutDelay,false,
             {scale:1,waitUntilRenderFinished:true});
         }
-        const path=context.cacheDir+'/gallery_v2_'+id+'_'+Date.now()+'.png';
+        const path=context.cacheDir+'/gallery_v2_'+id+'_'+Date.now()+'_'+(++this.previewFileSequence)+'.png';
         const packer=image.createImagePacker();let file:fileIo.File|null=null;
         try{file=await fileIo.open(path,fileIo.OpenMode.CREATE|fileIo.OpenMode.READ_WRITE);await packer.packToFile(pixel,file.fd,{format:'image/png',quality:100});}
         finally{try{if(file)fileIo.closeSync(file.fd);}finally{try{await packer.release();}finally{await pixel.release();}}}
         if(!this.previewWorkAllowed()||generation!==this.generation){fileIo.unlink(path).catch(()=>{});return;}
+        if(this.previewSource(this.documents.get(id)??state)!==source){fileIo.unlink(path).catch(()=>{});retry=true;return;}
         const cached=new GalleryThumbnail();cached.source=source;cached.path='file://'+path;
         cached.dimension=state.canvasDimension;cached.aspect=state.canvasAspect;cached.rects=this.widgetRects;
         await saveGalleryPreview(context.cacheDir,id,cached);
-        if(!this.alive||generation!==this.generation)return;
+        if(!this.previewWorkAllowed()||generation!==this.generation)return;
+        if(this.previewSource(this.documents.get(id)??state)!==source){retry=true;return;}
         this.items=this.items.map((value:GalleryItem):GalleryItem=>{
           if(value.id!==id)return value;
           const next=new GalleryItem();next.id=value.id;next.name=value.name;next.dimension=value.dimension;next.aspect=value.aspect;
@@ -316,7 +327,7 @@ export struct CanvasGallery {
           const failed=new GalleryItem();failed.id=value.id;failed.name=value.name;failed.dimension=value.dimension;failed.aspect=value.aspect;
           failed.loaded=true;failed.failed=true;return failed;
         });
-      }finally{this.pendingIds.delete(id);}
+      }finally{this.pendingIds.delete(id);if(retry&&this.previewWorkAllowed())this.requestPreview(id,force);}
     });
     return this.previewQueue;
   }
