@@ -124,6 +124,14 @@ const { Fixture } = execute(`class Fixture {
   assert.equal(sharedCompletions.length,1,'return animates a decorative cached image');const returnGeneration=shared.galleryTransitionGeneration;sharedCompletions.shift()();assert.equal(shared.galleryHeroSource,'','cached image releases without a preview decode wait');assert.equal(shared.galleryHeroId,'');assert.equal(shared.galleryTransitionGeneration,returnGeneration,'decorative completion must not invalidate pending preview refresh');
   assert.equal(sharedMotions[0].duration,260);assert.equal(sharedMotions[1].duration,sharedMotions[0].duration);assert.equal(sharedMotions[1].curve,sharedMotions[0].curve);assert.deepEqual(sharedMotions[0].start,sharedMotions[1].end);assert.deepEqual(sharedMotions[0].end,sharedMotions[1].start);assert(sharedMotions.every(m=>m.opacity===1),'both directions move one opaque image without fading');
   shared.screenWidth=600;await shared.setGalleryPage(false);assert.equal(shared.galleryHeroSource,'');assert.equal(shared.galleryTransitioning,false,'no visible target has no empty animation delay');
+  for(const y of [120,-20]){
+    const staleEntry=new Fixture();let moves=0,usedPreview='';
+    Object.assign(staleEntry,{screenWidth:390,screenHeight:800,safeTop:36,safeBottom:24,boardLeft:23,boardTop:160,boardScale:1,boardHeight:344});
+    staleEntry.galleryController.anchor=(id,requireFresh=true)=>requireFresh?null:{id,preview:'visible-old.png',x:16,y,w:172,h:172};
+    staleEntry.getUIContext=()=>({postFrameCallback:frame=>frame.start(),animateTo:(options,update)=>{moves++;usedPreview=staleEntry.galleryHeroSource;update();options.onFinish();}});
+    await staleEntry.openGalleryCanvas('a');
+    assert.equal(moves,1,'stale or partially visible preview must still expand');assert.equal(usedPreview,'visible-old.png');assert.equal(staleEntry.galleryVisible,false);
+  }
   const interrupted=new Fixture();Object.assign(interrupted,{screenWidth:390,screenHeight:800,galleryAnchorWidth:390,galleryAnchorHeight:800,safeTop:36,safeBottom:24,boardLeft:23,boardTop:160,boardScale:1,boardHeight:344,galleryVisible:false,galleryAnchor:{id:'a',preview:'cached.png',x:16,y:120,w:172,h:172}});
   let returnFrame,lateReturn;
   interrupted.getUIContext=()=>({postFrameCallback:frame=>returnFrame=frame,animateTo:(options,update)=>{update();lateReturn=options.onFinish;}});
@@ -152,9 +160,10 @@ const { Fixture } = execute(`class Fixture {
   }`,{GalleryAnchor:model.GalleryAnchor});
   const anchors=new Anchors();anchors.bind();assert.equal(anchors.controller.anchor('a').y,120);
   anchors.pageVisible=false;assert.equal(anchors.controller.anchor('a',false).y,120,'hidden native header cannot move the recorded landing target');assert.equal(anchors.reads,1,'return never measures hidden navigation geometry');
-  anchors.items[0].previewSource='old';assert.equal(anchors.controller.anchor('a'),null,'entry still rejects a stale preview');assert.equal(anchors.controller.anchor('a',false).y,120,'return geometry survives outdated pixels');
+  anchors.items[0].previewSource='old';assert.equal(anchors.controller.anchor('a'),null,'freshness queries still reject stale pixels');assert.equal(anchors.controller.anchor('a',false).y,120,'return geometry survives outdated pixels');
+  anchors.pageVisible=true;anchors.documents.clear();assert.equal(anchors.controller.anchor('a',false).preview,'new.png','cached visible geometry does not require a loaded document');assert.equal(anchors.controller.anchor('a'),null);anchors.documents.set('a',{signature:'new'});
   anchors.items[0].previewSource='new';assert.equal(anchors.isPreviewReady('a'),false);anchors.previewDecoded('a','old.png');assert.equal(anchors.isPreviewReady('a'),false);anchors.previewDecoded('a','new.png');assert.equal(anchors.isPreviewReady('a'),true,'readiness requires the current image to decode');anchors.previewDecoded('a','old.png');assert.equal(anchors.isPreviewReady('a'),true,'a late old image callback cannot invalidate the decoded replacement');
-  anchors.anchorViewportChanged();assert.equal(anchors.controller.anchor('a',false),null,'window changes invalidate retained tile geometry');
+  anchors.pageVisible=false;anchors.anchorViewportChanged();assert.equal(anchors.controller.anchor('a',false),null,'window changes invalidate retained tile geometry');
   const fastReturn=gallery.slice(gallery.indexOf('  private async prepareReturn('),gallery.indexOf('  private async loadItems('));
   const {FastReturn}=execute(`class FastReturn {
     alive=true;generation=0;previewTick=0;documents=new Map();reads=[];fallbacks=0;

@@ -7,6 +7,7 @@ const galleryHost=page.slice(page.indexOf('          CanvasGallery({'),page.inde
 for(const [name,source] of [['workspace',workspace],['gallery host',galleryHost]]){
  assert(!/\.renderGroup\(|\.scale\(|\.opacity\(/.test(source),name+' must not flatten, transform, or fade native material descendants');
 }
+assert.match(galleryHost,/chromeVisible:this.galleryVisible,/, 'visible homepage keeps native title layout while entry is being prepared');
 const navigation=page.slice(page.indexOf('  private async setGalleryPage('),page.indexOf('  @Builder\n  canvasNavigation('));
 assert(!navigation.includes('getComponentSnapshot'),'navigation must not read the full window back from GPU');
 assert((navigation.match(/await this.waitGalleryFrame\(\)/g)||[]).length>=2,'destination still mounts behind the gallery before handoff');

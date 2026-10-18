@@ -91,7 +91,7 @@ export struct CanvasGallery {
     this.controller.prepare=async(id:string)=>{await this.prepareReturn(id);};
     this.controller.previewReady=(id:string):boolean=>this.isPreviewReady(id);
     this.controller.anchor=(id:string,requireFresh:boolean=true):GalleryAnchor|null=>{
-      const item=this.items.find((entry:GalleryItem)=>entry.id===id),state=this.documents.get(id);if(!item||!state||(requireFresh&&(!item.preview||item.previewSource!==this.previewSource(state))))return null;
+      const item=this.items.find((entry:GalleryItem)=>entry.id===id),state=this.documents.get(id);if(!item||(requireFresh&&(!state||!item.preview||item.previewSource!==this.previewSource(state))))return null;
       if(!this.pageVisible){
         const previous=this.visibleAnchors.get(id);if(!previous)return null;
         const retained=new GalleryAnchor();retained.id=id;retained.preview=item.preview;retained.x=previous.x;retained.y=previous.y;retained.w=previous.w;retained.h=previous.h;return retained;

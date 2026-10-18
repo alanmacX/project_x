@@ -408,7 +408,8 @@ struct Index {
     if (!this.alive || this.galleryTransitioning || this.canvasChanging || this.busy || this.sharing || this.sceneNavigationBusy) return;
     if(this.galleryReturnAnimating)this.cancelGalleryTransition();
     this.canvasChanging = true;this.galleryController.pausePreviews();const intentGeneration=this.galleryTransitionGeneration;
-    this.galleryAnchor=this.galleryController.anchor(id);this.galleryAnchorWidth=this.screenWidth;this.galleryAnchorHeight=this.screenHeight;
+    // Animate the pixels the user actually tapped, even while a newer preview is pending.
+    this.galleryAnchor=this.galleryController.anchor(id,false);this.galleryAnchorWidth=this.screenWidth;this.galleryAnchorHeight=this.screenHeight;
     try {
       if(id===this.store.state.canvasId&&this.workspaceMounted&&this.ready&&!this.timedScene&&!this.sceneEditing){
         // The active document and its decoded surfaces survived the gallery.
@@ -488,7 +489,7 @@ struct Index {
   }
   private animateReturnPreview():void {
     const anchor=this.galleryAnchor;
-    if(!anchor?.preview||anchor.id!==this.store.state.canvasId||this.galleryAnchorWidth!==this.screenWidth||this.galleryAnchorHeight!==this.screenHeight||anchor.y<this.safeTop||anchor.y+anchor.h>this.screenHeight-this.safeBottom)return;
+    if(!anchor?.preview||anchor.id!==this.store.state.canvasId||this.galleryAnchorWidth!==this.screenWidth||this.galleryAnchorHeight!==this.screenHeight||anchor.y+anchor.h<=this.safeTop||anchor.y>=this.screenHeight-this.safeBottom)return;
     const generation=this.galleryTransitionGeneration;
     // One cached image is decorative only. The real gallery is already clickable
     // underneath. Only the matching tile image is covered while it moves.
@@ -528,7 +529,7 @@ struct Index {
       if(!this.alive||generation!==this.galleryTransitionGeneration)return;
     }
     const anchor=this.galleryAnchor;
-    const hasPreview=anchor?.preview&&anchor.id===this.store.state.canvasId&&this.galleryAnchorWidth===this.screenWidth&&this.galleryAnchorHeight===this.screenHeight&&anchor.y>=this.safeTop&&anchor.y+anchor.h<=this.screenHeight-this.safeBottom;
+    const hasPreview=anchor?.preview&&anchor.id===this.store.state.canvasId&&this.galleryAnchorWidth===this.screenWidth&&this.galleryAnchorHeight===this.screenHeight&&anchor.y+anchor.h>this.safeTop&&anchor.y<this.screenHeight-this.safeBottom;
     if(hasPreview&&anchor){
       // Both directions move the very same cached preview. Only its rectangle changes.
       this.galleryHeroId=anchor.id;this.galleryHeroOpacity=1;this.galleryHeroSource=anchor.preview;
@@ -1651,7 +1652,7 @@ struct Index {
         }
         if(this.galleryMounted){
           CanvasGallery({ entries: this.canvasEntries, appDark: this.appDark, viewportWidth: this.screenWidth, viewportHeight:this.screenHeight, safeTop: this.safeTop, safeBottom: this.safeBottom,
-            busy: this.canvasChanging || this.galleryTransitioning || this.busy || this.sharing, revision: this.galleryRevision, controller:this.galleryController, pageVisible:this.galleryVisible, chromeVisible:this.galleryVisible&&!this.galleryTransitioning, heroId:this.galleryHeroId, previewMinute:this.tick,
+            busy: this.canvasChanging || this.galleryTransitioning || this.busy || this.sharing, revision: this.galleryRevision, controller:this.galleryController, pageVisible:this.galleryVisible, chromeVisible:this.galleryVisible, heroId:this.galleryHeroId, previewMinute:this.tick,
             onLoad: async(id:string):Promise<FridgeState>=>{const state=await this.store.canvasPreviewSnapshot(id);state.canvasAspect=this.canvasHostAspect(state.canvasDimension,state.canvasAspect);return state;},
             onOpen: (id: string) => this.openGalleryCanvas(id), onCreate: (name: string, dimension: string) => this.createGalleryCanvas(name, dimension),
             onRename: (id: string, name: string) => this.renameGalleryCanvas(id, name),
