@@ -122,13 +122,20 @@ function renderFluidPixels(anchors:BackgroundAnchor[],base:string,width:number,h
     if(canvas){const ca=colorLab(a.color),cb=colorLab(b.color),na=Math.hypot(ca.a,ca.b)<16,nb=Math.hypot(cb.a,cb.b)<16;if(na!==nb)return na?-1:1;}
     return b.weight-a.weight||(canvas?a.color.localeCompare(b.color):0);
   });
-  const neutral=rgb(canvas&&fields.length>0?combineColors(fields):fields.length>0?fluidBase(fields):base),maxWeight=Math.max(.001,...fields.map((p:BackgroundAnchor)=>p.weight));
-  const colors=fields.map((p:BackgroundAnchor)=>rgb(p.color));
+  const foundation=canvas&&fields.length>0?combineColors(fields):fields.length>0?fluidBase(fields):base;
+  const foundationLab=colorLab(foundation);
+  const neutral=rgb(canvas?labColor({l:Math.max(78,foundationLab.l),a:foundationLab.a,b:foundationLab.b}):foundation),maxWeight=Math.max(.001,...fields.map((p:BackgroundAnchor)=>p.weight));
+  const colors=fields.map((p:BackgroundAnchor)=>{
+    if(!canvas)return rgb(p.color);
+    const lab=colorLab(p.color),neutralField=Math.hypot(lab.a,lab.b)<16;
+    const light=neutralField?Math.max(76,lab.l):Math.max(lab.l,72-(72-lab.l)*.3);
+    return rgb(labColor({l:light,a:lab.a,b:lab.b}));
+  });
   const profiles=fields.map((p:BackgroundAnchor,k:number):FluidFieldProfile=>{
     const relative=p.weight/maxWeight,radius=canvas?.24+.25*Math.pow(relative,.25):.3+.45*((k*7+3)%11)/10;
     const ry=radius*Math.max(width/height,1)*(canvas?.85+.25*((k*5+1)%7)/6:.65+.9*((k*5+1)%7)/6);
     const lab=colorLab(p.color),neutralField=canvas&&Math.hypot(lab.a,lab.b)<16;
-    return {radius:radius,ry:ry,opacity:canvas?(neutralField?.38:.55+.4*Math.pow(relative,.3)):.95*Math.pow(relative,.75),hx:Math.max(0,Math.min(1,p.x+.28*Math.sin(k*2.4+1))),hy:Math.max(0,Math.min(1,p.y+.24*Math.cos(k*1.7+1)))};
+    return {radius:radius,ry:ry,opacity:canvas?(neutralField?.38:.55+.4*Math.pow(relative,.3)):.95*Math.pow(relative,.75),hx:Math.max(0,Math.min(1,p.x+(canvas?.07:.28)*Math.sin(k*2.4+1))),hy:Math.max(0,Math.min(1,p.y+(canvas?.06:.24)*Math.cos(k*1.7+1)))};
   });
   const core=(r:number):number=>r<=.9?1:r>=1?0:1-(r-.9)/.1;
   const overlay=(b:number,h:number):number=>b<.5?2*b*h:1-2*(1-b)*(1-h);
@@ -147,7 +154,10 @@ function renderFluidPixels(anchors:BackgroundAnchor[],base:string,width:number,h
       alpha=ha+alpha*(1-ha);
     }
     const i=(y*width+x)*4;
-    for(let c=0;c<3;c++)bytes[i+c]=Math.round(255*(alpha>0?out[c]*(1-alpha)+overlay(out[c],high[c]/alpha)*alpha:out[c]));
+    for(let c=0;c<3;c++){
+      const mixed=alpha>0?out[c]*(1-alpha)+overlay(out[c],high[c]/alpha)*alpha:out[c];
+      bytes[i+c]=Math.round(255*(canvas&&mixed<out[c]?out[c]+(mixed-out[c])*.2:mixed));
+    }
     bytes[i+3]=255;
   }
   // Separable blur on the generated colour field, not on card artwork. O(pixels), off UI thread.

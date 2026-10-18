@@ -51,7 +51,7 @@ function pixels(main,accent,fraction){const out=new Uint8Array(48*48*4);for(let 
  const duoState=new FridgeState();duoState.canvasAspect=1;duoState.background.mode='blend';duoState.cards=[duo];
  const duoBg=JSON.parse(await createSmartBackground(JSON.stringify(duoState),'/cache'));
  assert.equal(duoBg.palette.length,2,'one card contributes both hues to the persisted palette');
- assert.ok(Math.hypot(duoBg.anchors[0].x-duoBg.anchors[1].x,duoBg.anchors[0].y-duoBg.anchors[1].y)>.4,'different hues get separate canvas regions');
+ assert.ok(Math.hypot(duoBg.anchors[0].x-duoBg.anchors[1].x,duoBg.anchors[0].y-duoBg.anchors[1].y)>.25,'different hues retain separate source regions');
  assert.ok(Math.abs(duoBg.anchors[0].weight-duoBg.anchors[1].weight)<.008,'equal areas keep equal votes');
  const read=new Map([['file:///two-tone.png',{width:48,height:48,rgba:twoTone}]]);
  const flat=new FridgeCard();flat.w=240;flat.h=240;flat.paper='#FFFFFF';
@@ -110,7 +110,17 @@ function pixels(main,accent,fraction){const out=new Uint8Array(48*48*4);for(let 
  assert.deepEqual(canvasColourFamilies(captured.slice().reverse()),families,'family selection ignores source enumeration order');
  const coverage=new Array(18*18).fill(1);for(let y=0;y<6;y++)for(let x=0;x<18;x++)coverage[y*18+x]=0;
  const positioned=canvasFluidLayout(families,coverage,18,18);
- assert.ok(positioned.some(a=>a.color==='#D60411'&&a.y<.4),'a minority hue can move out from behind its source card');
+ for(const point of positioned){const source=families.find(p=>p.color===point.color);assert.ok(Math.hypot(point.x-source.x,point.y-source.y)<=.120001,'empty space cannot pull a hue across the canvas');}
+ const redSeed=captured.find(p=>p.color==='#D60411'),redFamily=families.find(p=>p.color==='#D60411');
+ assert.equal(redFamily.x,redSeed.x);assert.equal(redFamily.y,redSeed.y,'other reddish shades cannot drag the red source centroid away');
+ assert.deepEqual(canvasFluidLayout(families,new Array(18*18).fill(0),18,18),families,'an exposed source needs no artificial displacement');
+ for(const [columns,rows] of [[18,28],[28,18]]){
+   const mapped=canvasFluidLayout(families,new Array(columns*rows).fill(0).map((_,i)=>i%3===0?0:1),columns,rows),short=Math.min(columns,rows);
+   mapped.forEach((p,i)=>assert.ok(Math.hypot((p.x-families[i].x)*columns/short,(p.y-families[i].y)*rows/short)<=.120001,'position bound uses the short edge on non-square canvases'));
+ }
+ const darkWarm=p.canvasBlendPixels([{x:.5,y:.5,color:'#3B3430',weight:.35},{x:.3,y:.3,color:'#E9BE48',weight:.35},{x:.7,y:.7,color:'#976147',weight:.3}],'#EEECE6',96,96);
+ let lightSum=0;for(let i=0;i<darkWarm.length;i+=4){const hex='#'+Array.from(darkWarm.slice(i,i+3)).map(v=>v.toString(16).padStart(2,'0')).join('');lightSum+=p.colorLab(hex).l;}
+ assert.ok(lightSum/(96*96)>70,'charcoal and brown do not turn the canvas into a dark foundation');
  const vividControl=[{x:.2,y:.2,color:'#E72B35',weight:1},{x:.8,y:.2,color:'#2862D6',weight:1},{x:.5,y:.85,color:'#F5CF32',weight:1}];
  const vivid=p.canvasBlendPixels(vividControl,'#CCCCCC',96,96);let redPixels=0,bluePixels=0,yellowPixels=0;
  for(let i=0;i<vivid.length;i+=4){const r=vivid[i],g=vivid[i+1],b=vivid[i+2];if(r>g*1.3&&r>b*1.2)redPixels++;if(b>r*1.2&&b>g*1.15)bluePixels++;if(r>b*1.4&&g>b*1.4)yellowPixels++;}
