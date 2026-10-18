@@ -120,9 +120,14 @@ const { Fixture } = execute(`class Fixture {
   assert.equal(shared.galleryHeroSource,'file://canvas.png');assert.equal(shared.galleryHeroX,23);assert.equal(shared.galleryHeroY,160,'shared preview lands on the measured board');
   sharedCompletions.shift()();assert.equal(shared.galleryArtworkOpacity,1,'decoded live surface is restored under the landing image');assert.equal(shared.galleryHeroSource,'file://canvas.png');
   sharedCompletions.shift()();assert.equal(shared.galleryHeroSource,'','dissolve completion releases the landing image');
-  await shared.setGalleryPage(true);assert.equal(shared.galleryHeroSource,'');assert.equal(shared.galleryHeroId,'');assert.equal(shared.galleryArtworkOpacity,0);assert.equal(shared.galleryTransitioning,false,'return is immediately interactive without an animation completion');
-  assert.equal(sharedCompletions.length,0,'return schedules no live-surface bridge or dissolve');
+  await shared.setGalleryPage(true);assert.equal(shared.galleryHeroSource,'file://canvas.png');assert.equal(shared.galleryHeroId,'a');assert.equal(shared.galleryArtworkOpacity,0);assert.equal(shared.galleryTransitioning,false,'return is immediately interactive without an animation completion');
+  assert.equal(sharedCompletions.length,1,'return animates a decorative cached image');const returnGeneration=shared.galleryTransitionGeneration;sharedCompletions.shift()();assert.equal(shared.galleryHeroSource,'','cached image releases without a preview decode wait');assert.equal(shared.galleryHeroId,'');assert.equal(shared.galleryTransitionGeneration,returnGeneration,'decorative completion must not invalidate pending preview refresh');
   shared.screenWidth=600;await shared.setGalleryPage(false);assert.equal(shared.galleryHeroSource,'');sharedCompletions.shift()();
+  const interrupted=new Fixture();Object.assign(interrupted,{screenWidth:390,screenHeight:800,galleryAnchorWidth:390,galleryAnchorHeight:800,safeTop:36,safeBottom:24,boardLeft:23,boardTop:160,boardScale:1,boardHeight:344,galleryVisible:false,galleryAnchor:{id:'a',preview:'cached.png',x:16,y:120,w:172,h:172}});
+  let returnFrame,lateReturn;
+  interrupted.getUIContext=()=>({postFrameCallback:frame=>returnFrame=frame,animateTo:(options,update)=>{update();lateReturn=options.onFinish;}});
+  await interrupted.setGalleryPage(true);assert.equal(interrupted.galleryVisible,true);assert.equal(interrupted.galleryTransitioning,false);assert.equal(interrupted.galleryHeroId,'a');assert.equal(interrupted.galleryHeroW,344);
+  returnFrame.start();assert.equal(interrupted.galleryHeroW,172);interrupted.cancelGalleryTransition();interrupted.galleryHeroSource='next.png';lateReturn();assert.equal(interrupted.galleryHeroSource,'next.png','late decorative animation cannot clear a subsequent navigation');
   const blockedIO=new Fixture();blockedIO.galleryVisible=false;
   blockedIO.store.save=()=>new Promise(()=>{});blockedIO.galleryController.prepare=()=>new Promise(()=>{});
   await Promise.race([blockedIO.showGallery(),new Promise((_,reject)=>setTimeout(()=>reject(Error('return waited for persistence/preview')),100))]);
