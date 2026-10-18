@@ -18,16 +18,16 @@ function labRGB(lab: LabColor): number[] {
 export function labColor(lab: LabColor): string { return '#'+labRGB(lab).map((v:number)=>v.toString(16).padStart(2,'0')).join('').toUpperCase(); }
 function distance(a: LabColor,b: LabColor): number { return (a.l-b.l)**2+(a.a-b.a)**2+(a.b-b.b)**2; }
 /** Alpha-weighted perceptual clusters: transparent padding and white margins do not vote. */
-export function representativeSwatches(rgba: Uint8Array, premultiplied: boolean = false): WeightedColor[] {
+export function representativeSwatches(rgba: Uint8Array, premultiplied: boolean = false, limit: number = 3, areaWeighted: boolean = false): WeightedColor[] {
   const bins=new Map<number,WeightedColor>();
   for(let i=0;i<rgba.length;i+=4){
-    const alpha=rgba[i+3]/255;if(alpha<.35)continue;
+    const alpha=rgba[i+3]/255;if(alpha<(areaWeighted?.1:.35))continue;
     const scale=premultiplied?1/alpha:1;
     const r=Math.min(255,rgba[i]*scale),g=Math.min(255,rgba[i+1]*scale),b=Math.min(255,rgba[i+2]*scale);
     const chroma=(Math.max(r,g,b)-Math.min(r,g,b))/255,light=(r+g+b)/765;
-    if(light>.97||light<.035)continue;
+    if(!areaWeighted&&(light>.97||light<.035))continue;
     const key=(Math.round(r/24)<<10)|(Math.round(g/24)<<5)|Math.round(b/24);
-    const weight=alpha*(.2+chroma)*(.45+Math.min(light,1-light));
+    const weight=areaWeighted?alpha:alpha*(.2+chroma)*(.45+Math.min(light,1-light));
     const previous=bins.get(key);
     if(previous!==undefined)previous.weight+=weight;
     else bins.set(key,{color:'#'+[r,g,b].map((v:number)=>Math.round(v).toString(16).padStart(2,'0')).join(''),weight:weight});
@@ -35,7 +35,7 @@ export function representativeSwatches(rgba: Uint8Array, premultiplied: boolean 
   const points=Array.from(bins.values()).sort((a:WeightedColor,b:WeightedColor)=>b.weight-a.weight).slice(0,96);
   if(points.length===0)return [{color:'#C5C1B8',weight:1}];
   const labs=points.map((p:WeightedColor)=>colorLab(p.color)),centres:LabColor[]=[labs[0]];
-  for(let c=1;c<Math.min(3,labs.length);c++){
+  for(let c=1;c<Math.min(limit,labs.length);c++){
     let best=0,score=-1;
     for(let i=0;i<labs.length;i++){const d=Math.min(...centres.map((p:LabColor)=>distance(p,labs[i])))*Math.sqrt(points[i].weight);if(d>score){score=d;best=i;}}
     centres.push(labs[best]);

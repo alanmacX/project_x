@@ -1,38 +1,31 @@
+import { ColorRaster, cardColorRaster, cardColorDistribution } from './CardColorDistribution';
 import { photoFrame } from './PhotoCropGeometry';
 import { image } from '@kit.ImageKit';
 import { fileIo } from '@kit.CoreFileKit';
-import { BackgroundAnchor, CanvasBackground, FridgeState, FridgeCard, materialColors, BOARD_W, BOARD_H } from './CardSchema';
-import { representativeColor, smartTone, blendPixels, combineColors, WeightedColor, colorLab, reduceBackgroundAnchors } from './BackgroundPalette';
+import { BackgroundAnchor, CanvasBackground, FridgeState, BOARD_W, BOARD_H } from './CardSchema';
+import { smartTone, blendPixels, WeightedColor, colorLab, reduceBackgroundAnchors } from './BackgroundPalette';
 
-import { imageSwatches, imageColor, cardSource, backgroundSignature, hash } from './BackgroundInputs';
+import { imageColorRaster, backgroundSignature, hash } from './BackgroundInputs';
 export { backgroundSignature } from './BackgroundInputs';
 @Concurrent
 export async function createSmartBackground(json:string,filesDir:string):Promise<string> {
   const state=JSON.parse(json) as FridgeState,bg=new CanvasBackground();bg.mode=state.background.mode;bg.frameStyle=state.background.frameStyle;bg.frameMaterial=state.background.frameMaterial;bg.transparentFrame=state.background.transparentFrame;
-  const colors:WeightedColor[]=[],anchors:BackgroundAnchor[]=[],cache=new Map<string,WeightedColor[]>();
+  const colors:WeightedColor[]=[],anchors:BackgroundAnchor[]=[],cache=new Map<string,ColorRaster>();
   for(const card of state.cards.filter(card=>!card.hidden)){
-    const samples:WeightedColor[]=[],paper=materialColors(card.material,card.paper)[0];
-    const cutout=card.shape==='subject'&&card.subjectPhoto?card.cutout:'';
-    if(cutout.startsWith('file://')){try{const palette=cache.get(cutout)??await imageSwatches(cutout);cache.set(cutout,palette);palette.forEach((p:WeightedColor)=>samples.push(p));}catch(_){}}
-    if(card.capability?.k==='album'&&card.capability.albumCover?.startsWith('file://')) {try{const palette=await imageSwatches(card.capability.albumCover);palette.forEach((p:WeightedColor)=>samples.push(p));}catch(_){}}
-    let filled=0;
-    for(const el of card.elements.filter((el)=>el.kind==='image'||el.kind==='shape').sort((a,b)=>b.w*b.h-a.w*a.h).slice(0,4)){
-      const weight=Math.max(0,Math.min(1,el.w*el.h*el.opacity));filled+=weight;
-      if(el.kind==='image'&&el.src.startsWith('file://')){try{const palette=cache.get(el.src)??await imageSwatches(el.src);cache.set(el.src,palette);palette.forEach((p:WeightedColor)=>samples.push({color:p.color,weight:weight*p.weight}));}catch(_){}}
-      if(el.kind==='shape'&&el.color.length>0)samples.push({color:el.color,weight:weight});
+    const sources=card.elements.filter(el=>el.kind==='image').map(el=>el.src);
+    if(card.shape==='subject')sources.push(card.cutout);
+    if(card.capability?.k==='album')sources.push(card.capability.albumCover??'');
+    for(const src of sources){if(!src.startsWith('file://')||cache.has(src))continue;try{cache.set(src,await imageColorRaster(src));}catch(_){}}
+    const distribution=cardColorDistribution(cardColorRaster(card,cache,48,state.canvasAspect));
+    const angle=card.rot*Math.PI/180,w=card.w/BOARD_W,h=card.h/BOARD_W,area=w*h*state.canvasAspect;
+    for(const p of distribution){
+      const x=card.x/BOARD_W+p.x*w*Math.cos(angle)+(1-p.y)*h*Math.sin(angle);
+      const y=card.y/BOARD_H+h*state.canvasAspect+p.x*w*state.canvasAspect*Math.sin(angle)-(1-p.y)*h*state.canvasAspect*Math.cos(angle);
+      const weight=p.weight*area;
+      colors.push({color:p.color,weight:weight});anchors.push({x:x,y:y,color:p.color,weight:weight});
     }
-    if(samples.length===0||paper.toUpperCase()!=='#FFFFFF'&&cutout.length===0)samples.push({color:paper,weight:Math.max(.1,1-filled)});
-    const color=combineColors(samples);
-    const a=card.rot*Math.PI/180,w=card.w/BOARD_W,shapeH=card.h/BOARD_W,h=shapeH*state.canvasAspect;
-    const x=card.x/BOARD_W+w*Math.cos(a)/2+shapeH*Math.sin(a)/2,y=card.y/BOARD_H+h+w*state.canvasAspect*Math.sin(a)/2-h*Math.cos(a)/2;
-    const boundsW=Math.abs(w*Math.cos(a))+Math.abs(shapeH*Math.sin(a)),boundsH=Math.abs(w*state.canvasAspect*Math.sin(a))+Math.abs(h*Math.cos(a));
-    const visible=Math.max(0,Math.min(1,x+boundsW/2)-Math.max(0,x-boundsW/2))*Math.max(0,Math.min(1,y+boundsH/2)-Math.max(0,y-boundsH/2));
-    if(visible<=0)continue;const weight=visible;
-    colors.push({color:color,weight:weight});
-    const influences=samples.slice().sort((a:WeightedColor,b:WeightedColor)=>b.weight-a.weight).slice(0,3),total=influences.reduce((sum:number,p:WeightedColor)=>sum+p.weight,0);
-    influences.forEach((p:WeightedColor,i:number)=>anchors.push({x:Math.max(0,Math.min(1,x+(i===1?-.2:i===2?.2:0))),y:Math.max(0,Math.min(1,y+(i===1?.16:i===2?-.16:0))),color:p.color,weight:weight*p.weight/Math.max(total,.001)}));
   }
-  bg.color=smartTone(colors);bg.signature=backgroundSignature(state);bg.palette=Array.from(new Set(colors.map((c:WeightedColor)=>c.color))).slice(0,6);
+  bg.color=smartTone(colors);bg.signature=backgroundSignature(state);
   // Keep at most six spatial influences; bitmap generation stays off the UI thread.
   // Repeated yellow cards must not create twelve opaque copies of one colour.
   // Merge only nearby clouds of the same tone. Distant artwork keeps its own light fold.
@@ -44,6 +37,7 @@ export async function createSmartBackground(json:string,filesDir:string):Promise
     else fields.push({x:candidate.x,y:candidate.y,color:candidate.color,weight:candidate.weight});
   }
   bg.anchors=reduceBackgroundAnchors(fields);
+  bg.palette=Array.from(new Set(bg.anchors.map((p:BackgroundAnchor)=>p.color))).slice(0,6);
   if(bg.mode==='smart')return JSON.stringify(bg);
   const width=320,height=Math.max(160,Math.min(512,Math.round(width/state.canvasAspect))),path=filesDir+'/canvas_blend_'+hash(bg.signature+'|'+JSON.stringify(bg.anchors))+'.png';
   try{if(await fileIo.access(path)){bg.src='file://'+path;return JSON.stringify(bg);}}catch(_){}
