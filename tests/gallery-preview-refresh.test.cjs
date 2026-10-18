@@ -10,6 +10,7 @@ const {Fixture}=execute(`export class Fixture {
  items=[{id:'a',name:'A',loaded:true,dimension:'4*4',aspect:1,preview:'old.png',previewSource:'previous'}];documents=new Map([['a',{signature:'old',cards:[],canvasDimension:'4*4',canvasAspect:1}]]);visibleIds=new Set(['a']);
  previewSource(state){return state.signature;}artwork(){}loadItems(){}onLoad=async()=>this.documents.get('a');
  getUIContext(){return {getHostContext:()=>({cacheDir:'/cache'}),getComponentSnapshot:()=>({createFromBuilder:async()=>{snapshotCount();return {release:async()=>{}};}})};}
+ ${between(view,'  private pageVisibilityChanged():', '  private async warmPreview(')}
  ${between(view,'  private async warmPreview(', '  private previewWorkAllowed(')}
  ${between(view,'  private previewWorkAllowed(', '  private reload(')}
  ${between(view,'  private async prepareReturn(', '  private async loadItems(')}
@@ -35,6 +36,20 @@ const nextState=signature=>({signature,cards:[],canvasDimension:'4*4',canvasAspe
  warm.warmAllowed=true;await warm.warmPreview('a');assert.equal(warm.items[0].previewSource,'old','idle workspace can prepare its next homepage image before returning');assert.equal(warm.warmingIds.size,0);
  committed.length=0;const gesture=new Fixture();gesture.pageVisible=false;gesture.warmAllowed=true;primeGate=new Promise(r=>release=r);const warming=gesture.warmPreview('a');await new Promise(r=>setImmediate(r));gesture.warmAllowed=false;release();await warming;
  assert.equal(committed.length,0,'a new gesture/navigation cancels pending warm publication');assert.equal(gesture.warmingIds.size,0);
+ // ArkUI can deliver the parent's explicit resume before pageVisible and busy props.
+ // Reproduce a cancelled warm capture followed by that exact return ordering.
+ for(const busyFirst of [true,false]){
+  committed.length=0;const returning=new Fixture();returning.pageVisible=false;returning.previewsPaused=true;returning.warmAllowed=true;
+  primeGate=new Promise(r=>release=r);const pendingWarm=returning.warmPreview('a');await new Promise(r=>setImmediate(r));
+  returning.warmingIds.clear();returning.warmAllowed=false;returning.documents.set('a',nextState('moved'));
+  returning.previewWorkChanged(); // parent resume still observes hidden props
+  returning.busy=true;
+  if(busyFirst){returning.busy=false;returning.previewWorkChanged();returning.pageVisible=true;returning.pageVisibilityChanged();}
+  else{returning.pageVisible=true;returning.pageVisibilityChanged();returning.busy=false;returning.previewWorkChanged();}
+  release();await pendingWarm;await drain(returning);
+  assert.equal(returning.items[0].previewSource,'moved','return reconciles newest geometry after cancelled warm capture, regardless of prop order');
+  assert.equal(returning.previewsPaused,false);assert.deepEqual(committed.map(x=>x.source),['moved']);
+ }
  const metadata=new Fixture(),oldRows=metadata.items;const resolvers=[];metadata.onLoad=()=>new Promise(r=>resolvers.push(r));
  const old=metadata.prepareReturn('a'),fresh=metadata.prepareReturn('a');resolvers[1](nextState('latest'));await fresh;resolvers[0](nextState('late-old'));await old;
  assert.equal(metadata.documents.get('a').signature,'latest','late metadata read cannot overwrite a more recent document');assert.equal(metadata.items,oldRows);assert.equal(metadata.previewTick,120000,'clock refresh uses stable minute buckets');

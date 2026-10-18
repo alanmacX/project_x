@@ -127,6 +127,9 @@ export struct CanvasGallery {
   aboutToDisappear(): void { this.alive = false; this.generation++; }
   private pageVisibilityChanged():void{
     if(!this.pageVisible){this.creating=false;this.sizeMenuOpen=false;this.splitOpen=false;this.renameId='';this.toolsOpen=false;}
+    // Parent callbacks can run before @Prop updates arrive. Reconcile again when
+    // visibility actually changes; the busy watcher handles either update order.
+    else this.previewWorkChanged();
   }
   private async warmPreview(id:string):Promise<void> {
     if(!this.alive||!this.warmAllowed||this.pageVisible||this.busy)return;
