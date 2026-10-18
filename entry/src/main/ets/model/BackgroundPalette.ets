@@ -156,3 +156,34 @@ export function blendPixels(anchors: BackgroundAnchor[], base: string, width: nu
   }
   return input;
 }
+
+/** Canvas washes use a light foundation and commutative perceptual mixing.
+ * Source colours remain in the palette; only their background presentation softens. */
+export function canvasBlendPixels(anchors:BackgroundAnchor[],base:string,width:number,height:number):Uint8Array {
+  const bytes=new Uint8Array(width*height*4),foundation=colorLab(base);
+  const chroma=Math.hypot(foundation.a,foundation.b),neutralScale=chroma>0?Math.min(4,chroma*.25)/chroma:0;
+  const neutral:LabColor={l:94,a:foundation.a*neutralScale,b:foundation.b*neutralScale};
+  // Sorting makes the result deterministic even when callers reorder equal fields.
+  const fields=anchors.filter((p:BackgroundAnchor)=>p.weight>0).slice().sort((a:BackgroundAnchor,b:BackgroundAnchor)=>a.x-b.x||a.y-b.y||a.color.localeCompare(b.color)||a.weight-b.weight);
+  const total=fields.reduce((sum:number,p:BackgroundAnchor)=>sum+p.weight,0);
+  const tones=fields.map((p:BackgroundAnchor):LabColor=>{
+    const lab=colorLab(p.color),c=Math.hypot(lab.a,lab.b),scale=c>0?Math.min(36,c*.6)/c:0;
+    const shadow=.45+.55*Math.min(1,lab.l/55);
+    return {l:85+4*lab.l/100,a:lab.a*scale*shadow,b:lab.b*scale*shadow};
+  });
+  const radii=fields.map((p:BackgroundAnchor)=>.13+.48*Math.sqrt(p.weight/Math.max(total,1e-12)));
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+    const nx=x/Math.max(1,width-1),ny=y/Math.max(1,height-1);
+    let mass=.24,l=neutral.l*mass,a=neutral.a*mass,b=neutral.b*mass;
+    for(let k=0;k<fields.length;k++){
+      const p=fields[k],r=radii[k],share=p.weight/Math.max(total,1e-12);
+      const d=((nx-p.x)**2+((ny-p.y)*height/width)**2)/(r*r);
+      // Integrated influence follows area; a tiny accent cannot cover the canvas.
+      const influence=.28*share/(r*r)*Math.exp(-d*1.6);
+      mass+=influence;l+=tones[k].l*influence;a+=tones[k].a*influence;b+=tones[k].b*influence;
+    }
+    const rgb=labRGB({l:l/mass,a:a/mass,b:b/mass}),i=(y*width+x)*4;
+    bytes[i]=rgb[0];bytes[i+1]=rgb[1];bytes[i+2]=rgb[2];bytes[i+3]=255;
+  }
+  return bytes;
+}

@@ -61,7 +61,7 @@ function sample(source:ColorRaster,u:number,v:number,aspect:number,cover:boolean
 }
 /** Up to six perceptual hues with actual visible area and measured centroids.
  * Alpha is area, not a chroma boost: a tiny saturated accent cannot outweigh paper. */
-export function cardColorDistribution(raster:ColorRaster):BackgroundAnchor[]{
+export function cardColorDistribution(raster:ColorRaster,minArea:number=.005):BackgroundAnchor[]{
   if(!raster.rgba.some((value:number,i:number)=>i%4===3&&value>0))return [];
   const palette=representativeSwatches(raster.rgba,false,6,true),labs=palette.map(p=>colorLab(p.color));
   const fields=palette.map(p=>({x:0,y:0,color:p.color,weight:0} as BackgroundAnchor));
@@ -72,5 +72,27 @@ export function cardColorDistribution(raster:ColorRaster):BackgroundAnchor[]{
     const p=fields[at];p.weight+=alpha;p.x+=(x+.5)/raster.width*alpha;p.y+=(y+.5)/raster.height*alpha;
   }
   const total=raster.width*raster.height;
-  return fields.filter(p=>p.weight/total>=.005).map(p=>({x:p.x/p.weight,y:p.y/p.weight,color:p.color,weight:p.weight/total} as BackgroundAnchor));
+  return fields.filter(p=>p.weight/total>=minArea).map(p=>({x:p.x/p.weight,y:p.y/p.weight,color:p.color,weight:p.weight/total} as BackgroundAnchor));
+}
+
+/** Measure only artwork visible after other cards cover it. The canvas grid bounds
+ * memory/work, and alpha transmittance keeps translucent foregrounds honest. */
+export function visibleCanvasColors(cards:FridgeCard[],rasters:ColorRaster[],aspect:number):BackgroundAnchor[]{
+  const width=96,height=Math.max(32,Math.min(160,Math.round(width/aspect))),covered=new Float32Array(width*height);
+  const order=cards.map((card:FridgeCard,i:number)=>i).sort((a:number,b:number)=>cards[b].z-cards[a].z||b-a);
+  const anchors:BackgroundAnchor[]=[];
+  for(const at of order){
+    const card=cards[at],source=rasters[at],rgba=new Uint8Array(width*height*4),angle=card.rot*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle);
+    for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+      const index=y*width+x;if(covered[index]>.999)continue;
+      const dx=((x+.5)/width-card.x/BOARD_W)*BOARD_W,dy=((y+.5)/height-card.y/BOARD_H)*BOARD_W/aspect-card.h;
+      const u=(dx*cos+dy*sin)/card.w,v=1-(dx*sin-dy*cos)/card.h;
+      if(u<0||u>=1||v<0||v>=1)continue;
+      const color=sample(source,u,v,card.w/card.h,false),alpha=color[3]/255,visible=alpha*(1-covered[index]);
+      rgba.set([color[0],color[1],color[2],Math.round(visible*255)],index*4);
+      covered[index]+=visible;
+    }
+    anchors.push(...cardColorDistribution({width:width,height:height,rgba:rgba},.0005));
+  }
+  return anchors;
 }

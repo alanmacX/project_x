@@ -1,30 +1,24 @@
-import { ColorRaster, cardColorRaster, cardColorDistribution } from './CardColorDistribution';
+import { ColorRaster, cardColorRaster, visibleCanvasColors } from './CardColorDistribution';
 import { photoFrame } from './PhotoCropGeometry';
 import { image } from '@kit.ImageKit';
 import { fileIo } from '@kit.CoreFileKit';
-import { BackgroundAnchor, CanvasBackground, FridgeState, BOARD_W, BOARD_H } from './CardSchema';
-import { smartTone, blendPixels, WeightedColor, colorLab, reduceBackgroundAnchors } from './BackgroundPalette';
+import { BackgroundAnchor, CanvasBackground, FridgeState } from './CardSchema';
+import { smartTone, canvasBlendPixels, WeightedColor, colorLab, reduceBackgroundAnchors } from './BackgroundPalette';
 
 import { imageColorRaster, backgroundSignature, hash } from './BackgroundInputs';
 export { backgroundSignature } from './BackgroundInputs';
 @Concurrent
 export async function createSmartBackground(json:string,filesDir:string):Promise<string> {
   const state=JSON.parse(json) as FridgeState,bg=new CanvasBackground();bg.mode=state.background.mode;bg.frameStyle=state.background.frameStyle;bg.frameMaterial=state.background.frameMaterial;bg.transparentFrame=state.background.transparentFrame;
-  const colors:WeightedColor[]=[],anchors:BackgroundAnchor[]=[],cache=new Map<string,ColorRaster>();
-  for(const card of state.cards.filter(card=>!card.hidden)){
+  const cache=new Map<string,ColorRaster>(),cards=state.cards.filter(card=>!card.hidden),rasters:ColorRaster[]=[];
+  for(const card of cards){
     const sources=card.elements.filter(el=>el.kind==='image').map(el=>el.src);
     if(card.shape==='subject')sources.push(card.cutout);
     if(card.capability?.k==='album')sources.push(card.capability.albumCover??'');
     for(const src of sources){if(!src.startsWith('file://')||cache.has(src))continue;try{cache.set(src,await imageColorRaster(src));}catch(_){}}
-    const distribution=cardColorDistribution(cardColorRaster(card,cache,48,state.canvasAspect));
-    const angle=card.rot*Math.PI/180,w=card.w/BOARD_W,h=card.h/BOARD_W,area=w*h*state.canvasAspect;
-    for(const p of distribution){
-      const x=card.x/BOARD_W+p.x*w*Math.cos(angle)+(1-p.y)*h*Math.sin(angle);
-      const y=card.y/BOARD_H+h*state.canvasAspect+p.x*w*state.canvasAspect*Math.sin(angle)-(1-p.y)*h*state.canvasAspect*Math.cos(angle);
-      const weight=p.weight*area;
-      colors.push({color:p.color,weight:weight});anchors.push({x:x,y:y,color:p.color,weight:weight});
-    }
+    rasters.push(cardColorRaster(card,cache));
   }
+  const anchors=visibleCanvasColors(cards,rasters,state.canvasAspect),colors:WeightedColor[]=anchors.map((p:BackgroundAnchor):WeightedColor=>({color:p.color,weight:p.weight}));
   bg.color=smartTone(colors);bg.signature=backgroundSignature(state);
   // Keep at most six spatial influences; bitmap generation stays off the UI thread.
   // Repeated yellow cards must not create twelve opaque copies of one colour.
@@ -41,7 +35,7 @@ export async function createSmartBackground(json:string,filesDir:string):Promise
   if(bg.mode==='smart')return JSON.stringify(bg);
   const width=320,height=Math.max(160,Math.min(512,Math.round(width/state.canvasAspect))),path=filesDir+'/canvas_blend_'+hash(bg.signature+'|'+JSON.stringify(bg.anchors))+'.png';
   try{if(await fileIo.access(path)){bg.src='file://'+path;return JSON.stringify(bg);}}catch(_){}
-  const rgba=blendPixels(bg.anchors,bg.color,width,height);let pixel:image.PixelMap|null=null,packer:image.ImagePacker|null=null,file:fileIo.File|null=null;
+  const rgba=canvasBlendPixels(bg.anchors,bg.color,width,height);let pixel:image.PixelMap|null=null,packer:image.ImagePacker|null=null,file:fileIo.File|null=null;
   try{
     pixel=await image.createPixelMap(rgba.buffer as ArrayBuffer,{size:{width:width,height:height},srcPixelFormat:image.PixelMapFormat.RGBA_8888,pixelFormat:image.PixelMapFormat.RGBA_8888,alphaType:image.AlphaType.OPAQUE});
     packer=image.createImagePacker();file=await fileIo.open(path,fileIo.OpenMode.CREATE|fileIo.OpenMode.READ_WRITE);await packer.packToFile(pixel,file.fd,{format:'image/png',quality:100});bg.src='file://'+path;return JSON.stringify(bg);

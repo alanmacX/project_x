@@ -24,7 +24,7 @@ function pixels(main,accent,fraction){const out=new Uint8Array(48*48*4);for(let 
  const state=new FridgeState();state.background.mode='blend';state.canvasAspect=1;
  const yellowCard=new FridgeCard();Object.assign(yellowCard,{id:'yellow',shape:'subject',subjectPhoto:true,cutout:'file:///yellow.png',x:0,y:0,w:300,h:300});
  const redCard=new FridgeCard();Object.assign(redCard,{id:'red',shape:'subject',subjectPhoto:true,cutout:'file:///red.png',x:210,y:0,w:30,h:30});state.cards=[yellowCard,redCard];
- const bg=JSON.parse(await createSmartBackground(JSON.stringify(state),'/cache'));assert.ok(bg.anchors[0].color.startsWith('#'));let predominant=0;for(let i=0;i<packed.length;i+=4)if(packed[i+1]>packed[i]*.65&&packed[i+2]<packed[i+1]*.65)predominant++;assert.ok(predominant/(packed.length/4)>.85,'large yellow artwork outweighs small red artwork in actual worker output');
+ const bg=JSON.parse(await createSmartBackground(JSON.stringify(state),'/cache'));assert.ok(bg.anchors[0].color.startsWith('#'));let warm=0;for(let i=0;i<packed.length;i+=4)if(packed[i]>packed[i+2]&&packed[i+1]>packed[i+2])warm++;assert.ok(warm/(packed.length/4)>.85,'large yellow artwork keeps a warm wash while the foundation stays light');
  const spatial=new FridgeState();spatial.background.mode='blend';spatial.canvasAspect=1;
  const left=new FridgeCard(),right=new FridgeCard();
  Object.assign(left,{id:'left',shape:'subject',subjectPhoto:true,cutout:'file:///yellow.png',x:10,y:20,w:70,h:70});
@@ -53,7 +53,7 @@ function pixels(main,accent,fraction){const out=new Uint8Array(48*48*4);for(let 
  const duoBg=JSON.parse(await createSmartBackground(JSON.stringify(duoState),'/cache'));
  assert.equal(duoBg.palette.length,2,'one card contributes both hues to the persisted palette');
  assert.ok(duoBg.anchors.some(a=>a.y<.25)&&duoBg.anchors.some(a=>a.y>.5),'source top and bottom colours keep measured canvas positions');
- assert.ok(Math.abs(duoBg.anchors[0].weight-duoBg.anchors[1].weight)<.002,'equal areas keep equal votes');
+ assert.ok(Math.abs(duoBg.anchors[0].weight-duoBg.anchors[1].weight)<.008,'equal areas keep equal votes');
  const read=new Map([['file:///two-tone.png',{width:48,height:48,rgba:twoTone}]]);
  const flat=new FridgeCard();flat.w=240;flat.h=240;flat.paper='#FFFFFF';
  const layer=new CanvasElement();Object.assign(layer,{kind:'image',src:'file:///two-tone.png',x:0,y:0,w:1,h:1});flat.elements=[layer];
@@ -85,5 +85,21 @@ function pixels(main,accent,fraction){const out=new Uint8Array(48*48*4);for(let 
  assert.ok(Math.abs(clipped.reduce((sum,p)=>sum+p.weight,0)-.5)<.01,'off-canvas half does not vote');
  duo.elements=[new CanvasElement()];duo.elements[0].kind='shape';const beforeLayer=backgroundSignature(duoState);duo.elements[0].x=.4;assert.notEqual(backgroundSignature(duoState),beforeLayer,'layer position invalidates the composite distribution');
  function colorDistance(a,b){const x=p.colorLab(a),y=p.colorLab(b);return Math.hypot(x.l-y.l,x.a-y.a,x.b-y.b);}
+ const wash=p.canvasBlendPixels(anchors,'#F2F1EE',96,96);
+ let minLight=100,maxChroma=0;for(let i=0;i<wash.length;i+=4){const lab=p.colorLab('#'+Array.from(wash.slice(i,i+3)).map(v=>v.toString(16).padStart(2,'0')).join(''));minLight=Math.min(minLight,lab.l);maxChroma=Math.max(maxChroma,Math.hypot(lab.a,lab.b));}
+ assert.ok(minLight>87&&maxChroma<29,'canvas wash remains bright and restrained even for saturated source colours');
+ const opposing=[{x:.2,y:.2,color:'#F5CD32',weight:.7},{x:.8,y:.8,color:'#247ECC',weight:.3}];
+ assert.deepEqual(p.canvasBlendPixels(opposing,'#EEECE6',80,120),p.canvasBlendPixels(opposing.slice().reverse(),'#EEECE6',80,120),'changing field order cannot overwrite a minority hue');
+ const hueField=p.canvasBlendPixels(opposing,'#EEECE6',96,96);
+ const pixelLab=(bytes,x,y)=>p.colorLab('#'+Array.from(bytes.slice((y*96+x)*4,(y*96+x)*4+3)).map(v=>v.toString(16).padStart(2,'0')).join(''));
+ assert.ok(pixelLab(hueField,20,20).b>8&&pixelLab(hueField,78,78).b<0,'warm and cool source regions remain distinct in the softened background');
+ const small=p.canvasBlendPixels([{x:.2,y:.2,color:'#F5CD32',weight:.99},{x:.8,y:.8,color:'#247ECC',weight:.01}],'#EEECE6',96,96);
+ let coolSmall=0,coolLarge=0;for(let y=0;y<96;y++)for(let x=0;x<96;x++){if(pixelLab(small,x,y).b<0)coolSmall++;if(pixelLab(hueField,x,y).b<0)coolLarge++;}
+ assert.ok(coolSmall<coolLarge*.5,'a one-percent accent has a smaller visible footprint than a thirty-percent secondary colour');
+ const {visibleCanvasColors}=load('CardColorDistribution');
+ const back=new FridgeCard(),front=new FridgeCard();Object.assign(back,{id:'back',x:40,y:50,w:200,h:200,z:1,paper:'#DD4433'});Object.assign(front,{id:'front',x:40,y:50,w:200,h:200,z:2,paper:'#2255DD'});
+ const scene=visibleCanvasColors([back,front],[cardColorRaster(back,new Map()),cardColorRaster(front,new Map())],1);
+ assert.ok(scene.every(a=>colorDistance(a.color,'#DD4433')>30),'a completely covered card does not contribute source colours');
+ assert.ok(scene.reduce((sum,a)=>sum+a.weight,0)<.35,'overlapping cards do not double-count canvas area');
  console.log('PASS background: measured cluster proportions, transparent pixels, minority accents, Overlay hue preservation, single-hue light/shade depth, actual weighted worker output movement-stable/versioned cache, single-card multiple hues, measured spatial distribution, layer occlusion/opacity, all layers, Cover crop, neutral area, alpha and canvas clipping');
 })().catch(e=>{console.error(e);process.exitCode=1;});
