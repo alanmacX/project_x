@@ -32,9 +32,10 @@ export struct CanvasGallery {
   @Prop entries: CanvasEntry[] = [];
   @Prop @Watch('reload') revision: number = 0;
   @Prop appDark: boolean = false;
-  @Prop viewportWidth: number = 390;
-  @Prop safeTop: number = 0;
-  @Prop safeBottom: number = 0;
+  @Prop @Watch('anchorViewportChanged') viewportWidth: number = 390;
+  @Prop @Watch('anchorViewportChanged') viewportHeight:number=0;
+  @Prop @Watch('anchorViewportChanged') safeTop: number = 0;
+  @Prop @Watch('anchorViewportChanged') safeBottom: number = 0;
   @Prop @Watch('previewWorkChanged') busy: boolean = false;
   @Prop heroId: string = '';
   @Prop @Watch('pageVisibilityChanged') pageVisible: boolean = true;
@@ -42,6 +43,9 @@ export struct CanvasGallery {
   @Prop @Watch('previewTimeChanged') previewMinute: number = 0;
   controller: GalleryController = new GalleryController();
   onLoad: (id: string) => Promise<FridgeState> = async () => new FridgeState();
+  onPreviewReady: (id:string) => void = () => {};
+  private decodedPreviews:Map<string,string>=new Map();
+  private visibleAnchors:Map<string,GalleryAnchor>=new Map();
   onOpen: (id: string) => void = () => {};
   onCreate: (name: string, dimension: string) => void = () => {};
   onRename: (id: string, name: string) => void = () => {};
@@ -84,17 +88,33 @@ export struct CanvasGallery {
     this.controller.aspect=(dimension:string,fallback:number):number=>{const rect=this.widgetRects[dimension];return rect&&rect[0]>0&&rect[1]>0?rect[0]/rect[1]:fallback;};
     this.controller.dismiss=()=>{if(!this.splitOpen)return false;this.setSplitOpen(false);return true;};
     this.controller.prepare=async(id:string)=>{await this.loadItems(id);};
-    this.controller.anchor=(id:string):GalleryAnchor|null=>{
-      const item=this.items.find((entry:GalleryItem)=>entry.id===id),state=this.documents.get(id);if(!item?.preview||!state||item.previewSource!==this.previewSource(state))return null;
+    this.controller.previewReady=(id:string):boolean=>this.isPreviewReady(id);
+    this.controller.anchor=(id:string,requireFresh:boolean=true):GalleryAnchor|null=>{
+      const item=this.items.find((entry:GalleryItem)=>entry.id===id),state=this.documents.get(id);if(!item||!state||(requireFresh&&(!item.preview||item.previewSource!==this.previewSource(state))))return null;
+      if(!this.pageVisible){
+        const previous=this.visibleAnchors.get(id);if(!previous)return null;
+        const retained=new GalleryAnchor();retained.id=id;retained.preview=item.preview;retained.x=previous.x;retained.y=previous.y;retained.w=previous.w;retained.h=previous.h;return retained;
+      }
       try{
         const rect=this.getUIContext().getComponentUtils().getRectangleById('canvasPreview_'+id),ui=this.getUIContext();
         const anchor=new GalleryAnchor();anchor.id=id;anchor.preview=item.preview;anchor.x=ui.px2vp(rect.windowOffset.x);anchor.y=ui.px2vp(rect.windowOffset.y);
         anchor.w=ui.px2vp(rect.size.width);anchor.h=ui.px2vp(rect.size.height);
         // The window owner validates visibility and rotation against its measured viewport.
-        return anchor.w>0&&anchor.h>0?anchor:null;
+        if(anchor.w<=0||anchor.h<=0)return null;this.visibleAnchors.set(id,anchor);return anchor;
       }catch(_){return null;}
     };
     this.loadItems();
+  }
+  private anchorViewportChanged():void {this.visibleAnchors.clear();}
+  private isPreviewReady(id:string):boolean {
+    const item=this.items.find((value:GalleryItem)=>value.id===id),state=this.documents.get(id);
+    return !!item?.preview&&!!state&&this.decodedPreviews.get(id)===item.preview&&item.previewSource===this.previewSource(state);
+  }
+  private previewDecoded(id:string,path:string):void {
+    if(this.items.find((item:GalleryItem)=>item.id===id)?.preview!==path)return;
+    this.decodedPreviews.set(id,path);
+    if(this.pageVisible&&!this.busy)this.controller.anchor(id,false);
+    if(this.isPreviewReady(id))this.onPreviewReady(id);
   }
   aboutToDisappear(): void { this.alive = false; this.generation++; }
   private pageVisibilityChanged():void{
@@ -353,7 +373,7 @@ export struct CanvasGallery {
     Column({ space: 4 }) {
       Button({ type: ButtonType.ROUNDED_RECTANGLE, buttonStyle: ButtonStyleMode.NORMAL }) {
         Stack() {
-          if (item.preview) { Image(item.preview).syncLoad(true).width('100%').height('100%').objectFit(ImageFit.Contain).draggable(false).onError(() => this.previewUnavailable(item.id, item.preview)) }
+          if (item.preview) { Image(item.preview).syncLoad(true).width('100%').height('100%').objectFit(ImageFit.Contain).draggable(false).onComplete(()=>this.previewDecoded(item.id,item.preview)).onError(() => this.previewUnavailable(item.id, item.preview)) }
           else {
             Column({ space: 10 }) {
               SymbolGlyph($r('sys.symbol.square_stack_3d')).fontSize(28).fontColor([AppDesign.muted(this.appDark)])
@@ -363,7 +383,7 @@ export struct CanvasGallery {
         }.width('100%').height(this.previewHeight(item, wide)).backgroundColor(Color.Transparent).clip(true)
           .opacity(this.heroId===item.id ? .001 : 1)
       }.id('canvasPreview_'+item.id).width('100%').height(this.previewHeight(item, wide)).padding(0).borderRadius(widgetFrameMetrics(this.tileWidth(item),this.previewHeight(item,wide)).radius).clip(true).backgroundColor(Color.Transparent)
-        .accessibilityText('打开画布 ' + item.name).onClick(() => { if(!this.busy)this.onOpen(item.id); })
+        .accessibilityText('打开画布 ' + item.name).onClick(() => { if(!this.busy){this.controller.anchor(item.id,false);this.onOpen(item.id);} })
         .onVisibleAreaChange([0], (visible: boolean) => { if (visible) { this.visibleIds.add(item.id); this.requestPreview(item.id); } else this.visibleIds.delete(item.id); })
       if (this.renameId === item.id) {
         Column({ space: 4 }) {

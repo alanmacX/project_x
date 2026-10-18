@@ -35,7 +35,7 @@ const routeMethods = page.slice(page.indexOf('  private canvasRouteChanged('), p
 const calls = [];
 const motionTimers = new Map(); let motionTimerId = 0;
 const { Fixture } = execute(`class Fixture {
- alive=true;galleryVisible=true;galleryMounted=true;galleryRevision=0;galleryController={pausePreviews(){},prepare:async()=>calls.push("prepare-gallery"),anchor:()=>null};galleryFrameResolve=null;workspaceMounted=false;galleryTransitioning=false;galleryTransitionGeneration=0;galleryTransitionTimer=-1;frameRate={};canvasChanging=false;busy=false;sharing=false;sceneNavigationBusy=false;
+ alive=true;galleryVisible=true;galleryMounted=true;galleryRevision=0;galleryController={pausePreviews(){},prepare:async()=>calls.push("prepare-gallery"),anchor:()=>null,previewReady:()=>false};galleryFrameResolve=null;workspaceMounted=false;galleryTransitioning=false;galleryTransitionGeneration=0;galleryTransitionTimer=-1;frameRate={};canvasChanging=false;busy=false;sharing=false;sceneNavigationBusy=false;
  heroActive=false;editing=false;viewing=false;deletionId='';activeBoardId='';sceneEditing=false;selectedId='';
  homeToolsOpen=true;scheduleOpen=true;backgroundOpen=true;groupSelecting=true;groupSelection=['card'];scheduleTimer=-1;scenePanelGeneration=0;
  boardOpacity=0;scatter=1;startupCardCount=4;ready=true;launchFromWidget=false;routeCanvasId='';
@@ -124,10 +124,44 @@ const { Fixture } = execute(`class Fixture {
   assert.equal(shared.galleryHeroSource,'file://canvas.png');assert.equal(shared.galleryHeroX,23);assert.equal(shared.galleryHeroY,160,'shared preview lands on the measured board');
   sharedCompletions.shift()();assert.equal(shared.galleryArtworkOpacity,1,'decoded live surface is restored under the landing image');assert.equal(shared.galleryHeroSource,'file://canvas.png');
   sharedCompletions.shift()();assert.equal(shared.galleryHeroSource,'','dissolve completion releases the landing image');
-  await shared.setGalleryPage(true);assert.equal(shared.galleryHeroX,16);assert.equal(shared.galleryHeroY,120,'return lands on the retained thumbnail');
-  sharedCompletions.shift()();shared.screenWidth=600;await shared.setGalleryPage(false);
+  await shared.setGalleryPage(true);assert.equal(shared.galleryHeroSource,'','return never substitutes an outdated thumbnail for live artwork');
+  assert.equal(shared.galleryArtworkX,-7);assert.equal(shared.galleryArtworkY,-40,'return moves the live board to the retained tile');
+  sharedCompletions.shift()();assert.equal(shared.galleryTransitioning,false);assert.equal(shared.galleryReturnBridge,true,'thumbnail refresh does not block gallery interaction');
+  shared.revealGalleryPreview('a');assert.equal(shared.galleryHeroId,'a','an undecoded image cannot replace the live bridge');
+  shared.galleryController.previewReady=()=>true;shared.revealGalleryPreview('a');assert.equal(shared.galleryHeroId,'','decoded fresh image is revealed under the bridge');
+  sharedCompletions.shift()();assert.equal(shared.galleryReturnBridge,false);assert.equal(shared.galleryArtworkScaleX,1,'landing fade clears transforms');
+  shared.screenWidth=600;await shared.setGalleryPage(false);
   assert.equal(shared.galleryHeroSource,'','resized windows cannot reuse stale thumbnail coordinates');sharedCompletions.shift()();
+  const scaledReturn=new Fixture();Object.assign(scaledReturn,{galleryVisible:false,screenWidth:390,screenHeight:800,galleryAnchorWidth:390,galleryAnchorHeight:800,safeTop:36,safeBottom:24,boardLeft:23,boardTop:160,boardScale:1,boardHeight:344,galleryAnchor:{id:'a',preview:'',x:16,y:120,w:172,h:172}});
+  scaledReturn.getUIContext=()=>({postFrameCallback:frame=>frame.start(),animateTo:(options,update)=>update()});
+  await scaledReturn.setGalleryPage(true);
+  assert.equal(scaledReturn.galleryArtworkScaleX,.5);
+  assert.equal(23+(344-172)/2+scaledReturn.galleryArtworkX,16,'scale and rotation share a centre; translation must map the painted left edge, not just layout origin');
+  assert.equal(160+(344-172)/2+scaledReturn.galleryArtworkY,120,'unequal preview sizes still land on the painted top edge');
+  const interruptedReturn=new Fixture();interruptedReturn.galleryVisible=true;interruptedReturn.galleryReturnBridge=true;interruptedReturn.galleryHeroId='a';interruptedReturn.galleryArtworkScaleX=.4;
+  interruptedReturn.galleryController.previewReady=()=>true;let lateDissolve;
+  interruptedReturn.getUIContext=()=>({animateTo:(options,update)=>{update();lateDissolve=options.onFinish;}});
+  interruptedReturn.revealGalleryPreview('a');interruptedReturn.cancelGalleryTransition();interruptedReturn.galleryArtworkScaleX=.8;lateDissolve();
+  assert.equal(interruptedReturn.galleryArtworkScaleX,.8,'late preview fade cannot reset a new navigation pose');
+  const noTarget=new Fixture();noTarget.galleryVisible=false;let finishNoTarget;
+  noTarget.getUIContext=()=>({animateTo:(options,update)=>{update();finishNoTarget=options.onFinish;}});
+  await noTarget.setGalleryPage(true);assert.equal(noTarget.galleryArtworkOpacity,0,'a filtered/offscreen destination fades rather than cutting off live artwork');finishNoTarget();
   const gallery = fs.readFileSync('entry/src/main/ets/views/CanvasGallery.ets', 'utf8');
+  const anchorBinding=gallery.slice(gallery.indexOf('    this.controller.anchor='),gallery.indexOf('    this.loadItems();'));
+  const readyMethods=gallery.slice(gallery.indexOf('  private anchorViewportChanged'),gallery.indexOf('  aboutToDisappear'));
+  const {Anchors}=execute(`export class Anchors {
+    pageVisible=true;busy=false;visibleAnchors=new Map();decodedPreviews=new Map();controller={};reads=0;
+    items=[{id:'a',preview:'new.png',previewSource:'new'}];documents=new Map([['a',{signature:'new'}]]);
+    onPreviewReady(){}previewSource(state){return state.signature;}
+    getUIContext(){return {px2vp:v=>v,getComponentUtils:()=>({getRectangleById:()=>{this.reads++;return {windowOffset:{x:16,y:this.pageVisible?120:64},size:{width:344,height:344}};}})};}
+    bind(){${anchorBinding}}
+    ${readyMethods}
+  }`,{GalleryAnchor:model.GalleryAnchor});
+  const anchors=new Anchors();anchors.bind();assert.equal(anchors.controller.anchor('a').y,120);
+  anchors.pageVisible=false;assert.equal(anchors.controller.anchor('a',false).y,120,'hidden native header cannot move the recorded landing target');assert.equal(anchors.reads,1,'return never measures hidden navigation geometry');
+  anchors.items[0].previewSource='old';assert.equal(anchors.controller.anchor('a'),null,'entry still rejects a stale preview');assert.equal(anchors.controller.anchor('a',false).y,120,'return geometry survives outdated pixels');
+  anchors.items[0].previewSource='new';assert.equal(anchors.isPreviewReady('a'),false);anchors.previewDecoded('a','old.png');assert.equal(anchors.isPreviewReady('a'),false);anchors.previewDecoded('a','new.png');assert.equal(anchors.isPreviewReady('a'),true,'readiness requires the current image to decode');anchors.previewDecoded('a','old.png');assert.equal(anchors.isPreviewReady('a'),true,'a late old image callback cannot invalidate the decoded replacement');
+  anchors.anchorViewportChanged();assert.equal(anchors.controller.anchor('a',false),null,'window changes invalidate retained tile geometry');
   const loading = gallery.slice(gallery.indexOf('  private async loadItems('), gallery.indexOf('  private requestPreview('));
   const { Loader } = execute(`class Loader {
     alive=true;generation=0;items=[];entries=[{id:'a',name:'A'}];documents=new Map();visibleIds=new Set();

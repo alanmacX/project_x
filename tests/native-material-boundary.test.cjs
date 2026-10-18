@@ -17,6 +17,10 @@ assert.match(gallery,/hideTitleBar\(!this.chromeVisible\)/,'native chrome only p
 assert.match(gallery,/opacity\(this.pageVisible\?1:0\)/,'fade pure content rather than native title sampler');
 const nativeBar=gallery.slice(gallery.indexOf('      HdsNavigation() {'),gallery.indexOf('      Column().width(1).height(1).position'));
 assert(!/\.scale\(|\.renderGroup\(/.test(nativeBar));
+const canvasChrome=page.slice(page.indexOf('  canvasNavigation()'),page.indexOf('  private async canvasMoreMenu'));
+assert.match(canvasChrome,/navigationChrome\(this.appDark, true\)/,'workspace chrome keeps native gradient extent');
+const editorChrome=page.slice(page.indexOf('  editor()'),page.indexOf('  private finishNavMenu'));
+assert.match(editorChrome,/navigationChrome\(this.appDark, true\)/,'card editor shares the same feathered native chrome');
 const appSource=fs.readFileSync('entry/src/main/ets/model/AppDesign.ets','utf8');
 function execute(source,require){const context={exports:{},require,Color:{Transparent:0}};vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,context);return context.exports;}
 const {AppDesign}=execute(appSource,()=>({}));

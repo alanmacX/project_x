@@ -5,7 +5,8 @@ export class GalleryController {
   aspect: (dimension:string,fallback:number) => number = (_dimension:string,fallback:number) => fallback;
   dismiss: () => boolean = () => false;
   prepare: (id:string) => Promise<void> = async () => {};
-  anchor: (id:string) => GalleryAnchor|null = () => null;
+  anchor: (id:string,requireFresh?:boolean) => GalleryAnchor|null = () => null;
+  previewReady: (id:string) => boolean = () => false;
 }
 /** Gallery metadata is detached from the editor and never selects a canvas. */
 export class GalleryItem {
