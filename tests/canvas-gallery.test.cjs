@@ -30,7 +30,7 @@ pendingRow.items[0].loaded = true; pendingRow.items[0].preview = 'file://preview
 assert.notEqual(model.galleryRowKey(pendingRow), pendingKey, 'settled async previews must replace ArkUI builders that captured a loading row');
 
 const page = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
-const methods = page.slice(page.indexOf('  private async openGalleryCanvas('), page.indexOf('  @Builder\n  canvasNavigation('));
+const methods = page.slice(page.indexOf('  private async openGalleryCanvas('), page.indexOf('  @Builder\n  canvasWorkspaceContent('));
 const routeMethods = page.slice(page.indexOf('  private canvasRouteChanged('), page.indexOf('  private async foregroundSchedules('));
 const calls = [];
 const motionTimers = new Map(); let motionTimerId = 0;

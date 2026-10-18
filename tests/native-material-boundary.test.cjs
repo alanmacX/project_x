@@ -20,6 +20,9 @@ const nativeBar=gallery.slice(gallery.indexOf('      HdsNavigation() {'),gallery
 assert(!/\.scale\(|\.renderGroup\(/.test(nativeBar));
 const canvasChrome=page.slice(page.indexOf('  canvasNavigation()'),page.indexOf('  private async canvasMoreMenu'));
 assert.match(canvasChrome,/navigationChrome\(this.appDark, true\)/,'workspace chrome keeps native gradient extent');
+assert.match(canvasChrome,/enableComponentSafeArea: true, avoidLayoutSafeArea: true/,'canvas navigation delegates system avoidance to HDS');
+assert.match(canvasChrome,/height\('100%'\)\.expandSafeArea/,'native canvas navigation owns a full page, allowing its gradient to extend below the title');
+assert.match(canvasChrome,/HdsNavigation\(\) \{\s*this.canvasWorkspaceContent\(\)/,'canvas content renders inside its actual native navigation');
 const editorChrome=page.slice(page.indexOf('  editor()'),page.indexOf('  private finishNavMenu'));
 assert.match(editorChrome,/navigationChrome\(this.appDark, true\)/,'card editor shares the same feathered native chrome');
 const appSource=fs.readFileSync('entry/src/main/ets/model/AppDesign.ets','utf8');

@@ -561,11 +561,87 @@ struct Index {
     });
   }
   @Builder
+  canvasWorkspaceContent() {
+    Stack({alignContent:Alignment.TopStart}) {
+        Stack({alignContent:Alignment.TopStart}) {
+        this.board()
+        if (this.editing && this.editorReady) {
+          // Backdrop and chrome are separate from the persistent card surface.
+          Stack({ alignContent: Alignment.TopStart }) {
+            Column().width('100%').height('100%').backgroundColor(this.appBackground())
+            Column().width(this.editorViewportWidth()).height(this.editorCanvasHeight()).backgroundColor(this.appPanel())
+              .position({ x: 0, y: this.safeTop + 76 })
+          }.width('100%').height('100%').opacity(this.editorOpacity).hitTestBehavior(HitTestMode.None)
+        }
+        this.editingScene()
+        if(!this.viewing&&this.canvasBackground.frameStyle!=='none'){CanvasFrame({snapshot:true,material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle}).width(BOARD_W*this.boardScale).height(this.boardHeight).position({x:this.boardLeft,y:this.boardTop}).opacity(this.boardOpacity).zIndex(100003).hitTestBehavior(HitTestMode.None)}
+        }.id('canvasArtwork').width('100%').height('100%').opacity(this.galleryArtworkOpacity)
+          .translate({x:this.canvasFlightX,y:this.canvasFlightY})
+          .rotate({angle:this.canvasFlightAngle,centerX:this.boardLeft+BOARD_W*this.boardScale/2,centerY:this.boardTop+this.boardHeight/2})
+          .hitTestBehavior(this.canvasChanging?HitTestMode.BLOCK_DESCENDANTS:HitTestMode.Transparent)
+        Stack({alignContent:Alignment.TopStart}) {
+          if(this.floatingHome()){this.homeDock()}else{this.homeLayers()}
+        }.width('100%').height('100%').opacity(this.arriving?1:this.boardOpacity)
+          .visibility(this.workspaceChromeVisible()?Visibility.Visible:Visibility.Hidden)
+          .accessibilityLevel(this.editing||this.viewing?'no-hide-descendants':'auto')
+          .hitTestBehavior(this.editing||this.viewing||this.canvasChanging?HitTestMode.BLOCK_DESCENDANTS:HitTestMode.Transparent)
+        if(this.scheduledFocusId && !this.editing && this.workspaceChromeVisible()) {
+          ForEach(this.cards.filter((card:FridgeCard)=>card.id===this.scheduledFocusId),(card:FridgeCard)=>{
+            Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {}
+              .width(card.w*this.boardScale+this.focusedFringe(card).left+this.focusedFringe(card).right).height(card.h*this.boardScale+this.focusedFringe(card).top+this.focusedFringe(card).bottom).backgroundColor(Color.Transparent)
+              .position({x:this.boardLeft+card.x*this.boardScale-this.focusedFringe(card).left,y:this.boardTop+card.y*this.boardHeight/BOARD_H-this.focusedFringe(card).top})
+              .zIndex(100004).enabled(!this.scheduleTransition).accessibilityText('关闭中央展示并恢复画布').onClick((event:ClickEvent)=>{if(cardContainsPoint(card,event.x-this.focusedFringe(card).left,event.y-this.focusedFringe(card).top,this.boardScale))this.restoreScheduledScene();})
+          },(card:FridgeCard)=>card.id)
+        }
+        if(this.scheduledName && !this.editing && this.workspaceChromeVisible()) {
+          Button(this.scheduleOverride?'结束预览':this.timedScene?.focusId?'点击恢复':this.scheduledName+' · 返回编辑',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL})
+            .height(44).fontSize(13).fontColor(this.appText()).backgroundColor(this.appSurface()).attributeModifier(immersiveChrome(this.appDark))
+            .position({x:this.boardLeft+12,y:this.boardTop+12}).zIndex(100005).enabled(!this.scheduleTransition).onClick(()=>this.restoreScheduledScene())
+        }
+        if(!this.editing && !this.viewing && !this.arriving && this.workspaceChromeVisible() && !this.groupSelecting && this.selectedGroup().length>1) {
+          GroupSelection({motion:this.boardMotion,box:this.selectedGroupBox(),minimum:groupMinimumScale(this.selectedGroup()),maximum:this.groupMaximumScale(),
+            viewportW:BOARD_W*this.boardScale,viewportH:this.boardHeight,
+            onBegin:()=>this.beginGroupTransform(),onFinish:(scale:number,angle:number)=>this.finishGroupTransform(scale,angle),onCancel:()=>this.cancelGroupTransform()})
+            .position({x:this.boardLeft,y:this.boardTop}).zIndex(100003).hitTestBehavior(this.homeToolsMoving?HitTestMode.None:HitTestMode.Transparent)
+        }
+          // The embedded sheet belongs to the stable window root, not a rebuilding navigation body.
+          Column().width(1).height(1).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
+            .bindSheet($$this.editorSheetOpen,this.editorSectionSheet,{
+              mode:SheetMode.EMBEDDED,preferType:SheetType.BOTTOM,
+              detents:[this.editorWorkspace().body*.40+this.safeBottom,this.editorWorkspace().body*.78+this.safeBottom],
+              detentSelection:this.editorControlHeight()+this.safeBottom,
+              showClose:false,dragBar:true,enableOutsideInteractive:true,maskColor:Color.Transparent,
+              backgroundColor:this.appSurface(),blurStyle:BlurStyle.NONE,scrollSizeMode:ScrollSizeMode.CONTINUOUS,
+              onHeightDidChange:(height:number)=>this.editorSheetHeightChanged(height),
+              onDetentsDidChange:(height:number)=>{const expanded=this.getUIContext().px2vp(height)>this.editorWorkspace().body*.60;this.editorExpanded=expanded;},
+              onWillDismiss:(action:DismissSheetAction)=>this.dismissEditorSheet(action),onWillSpringBackWhenDismiss:(action:SpringBackAction)=>action.springBack()
+            })
+        if(!this.editing&&!this.viewing&&!this.arriving&&this.workspaceChromeVisible()&&!this.groupSelecting&&this.selectedGroup().length<2&&!this.scheduledName&&!this.scheduleTransition) {
+          ForEach(this.cardIds.filter((id:string)=>id===this.selectedId&&!this.cardMap[id].hidden),(id:string)=>{
+            BoardCard({controlsOnly:true,appDark:this.appDark,card:this.cardMap[id],motion:this.boardMotion,selected:true,scaleFactor:this.boardScale,yScaleFactor:this.boardHeight/BOARD_H,
+              boardLeft:this.boardLeft,boardTop:this.boardTop,controlViewportWidth:BOARD_W*this.boardScale,controlViewportHeight:this.boardHeight,
+              onDelete:(id:string)=>this.deleteCard(id),onEdit:(id:string)=>this.openEditor(id),
+              onInteraction:(active:boolean)=>this.boardInteraction(id,active),onCommit:(next:FridgeCard)=>this.commitGeometry(next)})
+          },(id:string)=>id)
+        }
+        Column().width(1).height(1).position({ x: this.selectedActionAnchor().x, y: this.selectedActionAnchor().y })
+          .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
+          .bindPopup(this.showCardActions(), { builder: this.cardActions, width: 176, radius: 26, targetSpace: 8,
+            placement: this.selectedActionAnchor().above ? Placement.Top : Placement.Bottom,
+            systemMaterial: chromeMaterial(this.appDark), popupColor: AppDesign.popup(this.appDark),
+            backgroundBlurStyle: chromeMaterial(this.appDark) !== undefined ? BlurStyle.NONE : BlurStyle.COMPONENT_THIN,
+            enableArrow: false, autoCancel: false, focusable: false, mask: false })
+        if (this.editorMounted) { this.editor() }
+        if (this.viewing) { this.detail() }
+    }.width('100%').height('100%')
+      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+  }
+  @Builder
   canvasNavigation() {
     HdsNavigation() {
-      Column().width('100%').height(0).hitTestBehavior(HitTestMode.None)
+      this.canvasWorkspaceContent()
     }.titleMode(HdsNavigationTitleMode.MINI)
-      .titleBar({ content: {
+      .titleBar({ enableComponentSafeArea: true, avoidLayoutSafeArea: true, content: {
         title: { mainTitle: this.canvasName, subTitle: this.canvasDimension.replace('*', '×') },
         backIcon: { icon: new SymbolGlyphModifier($r('sys.symbol.chevron_left')).fontSize(20).fontColor([this.appText()]),
           label: this.sceneEditing ? '返回定时设置' : '返回作品库', type: IconStyleMode.NORMAL,
@@ -574,7 +650,9 @@ struct Index {
           isEnabled: !this.canvasChanging && !this.galleryTransitioning && !this.busy && !this.sharing, action: () => this.canvasMoreMenu() } }] }
       }, style: navigationChrome(this.appDark, true) })
       .hideBackButton(false).hideToolBar(true).mode(NavigationMode.Stack).backgroundColor(Color.Transparent)
-      .width('100%').height(56).clip(false).position({ x: 0, y: this.safeTop + 4 }).zIndex(150000).hitTestBehavior(HitTestMode.Transparent)
+      .width('100%').height('100%').expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
+      .hideTitleBar(this.editing||this.viewing||this.arriving||!this.workspaceChromeVisible())
+      .clip(false).hitTestBehavior(HitTestMode.Transparent)
   }
   private async canvasMoreMenu(): Promise<void> {
     const id = this.store.state.canvasId;
@@ -1574,77 +1652,7 @@ struct Index {
       } else {
         if (this.workspaceMounted || !this.galleryVisible) {
         Stack({alignContent:Alignment.TopStart}) {
-        Stack({alignContent:Alignment.TopStart}) {
-        this.board()
-        if (this.editing && this.editorReady) {
-          // Backdrop and chrome are separate from the persistent card surface.
-          Stack({ alignContent: Alignment.TopStart }) {
-            Column().width('100%').height('100%').backgroundColor(this.appBackground())
-            Column().width(this.editorViewportWidth()).height(this.editorCanvasHeight()).backgroundColor(this.appPanel())
-              .position({ x: 0, y: this.safeTop + 76 })
-          }.width('100%').height('100%').opacity(this.editorOpacity).hitTestBehavior(HitTestMode.None)
-        }
-        this.editingScene()
-        if(!this.viewing&&this.canvasBackground.frameStyle!=='none'){CanvasFrame({snapshot:true,material:this.canvasBackground.frameMaterial,style:this.canvasBackground.frameStyle}).width(BOARD_W*this.boardScale).height(this.boardHeight).position({x:this.boardLeft,y:this.boardTop}).opacity(this.boardOpacity).zIndex(100003).hitTestBehavior(HitTestMode.None)}
-        }.id('canvasArtwork').width('100%').height('100%').opacity(this.galleryArtworkOpacity)
-          .translate({x:this.canvasFlightX,y:this.canvasFlightY})
-          .rotate({angle:this.canvasFlightAngle,centerX:this.boardLeft+BOARD_W*this.boardScale/2,centerY:this.boardTop+this.boardHeight/2})
-          .hitTestBehavior(this.canvasChanging?HitTestMode.BLOCK_DESCENDANTS:HitTestMode.Transparent)
-        Stack({alignContent:Alignment.TopStart}) {
-          if(this.floatingHome()){this.homeDock()}else{this.homeLayers()}
-        }.width('100%').height('100%').opacity(this.arriving?1:this.boardOpacity)
-          .visibility(this.workspaceChromeVisible()?Visibility.Visible:Visibility.Hidden)
-          .accessibilityLevel(this.editing||this.viewing?'no-hide-descendants':'auto')
-          .hitTestBehavior(this.editing||this.viewing||this.canvasChanging?HitTestMode.BLOCK_DESCENDANTS:HitTestMode.Transparent)
-        if(this.scheduledFocusId && !this.editing && this.workspaceChromeVisible()) {
-          ForEach(this.cards.filter((card:FridgeCard)=>card.id===this.scheduledFocusId),(card:FridgeCard)=>{
-            Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}) {}
-              .width(card.w*this.boardScale+this.focusedFringe(card).left+this.focusedFringe(card).right).height(card.h*this.boardScale+this.focusedFringe(card).top+this.focusedFringe(card).bottom).backgroundColor(Color.Transparent)
-              .position({x:this.boardLeft+card.x*this.boardScale-this.focusedFringe(card).left,y:this.boardTop+card.y*this.boardHeight/BOARD_H-this.focusedFringe(card).top})
-              .zIndex(100004).enabled(!this.scheduleTransition).accessibilityText('关闭中央展示并恢复画布').onClick((event:ClickEvent)=>{if(cardContainsPoint(card,event.x-this.focusedFringe(card).left,event.y-this.focusedFringe(card).top,this.boardScale))this.restoreScheduledScene();})
-          },(card:FridgeCard)=>card.id)
-        }
-        if(this.scheduledName && !this.editing && this.workspaceChromeVisible()) {
-          Button(this.scheduleOverride?'结束预览':this.timedScene?.focusId?'点击恢复':this.scheduledName+' · 返回编辑',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL})
-            .height(44).fontSize(13).fontColor(this.appText()).backgroundColor(this.appSurface()).attributeModifier(immersiveChrome(this.appDark))
-            .position({x:this.boardLeft+12,y:this.boardTop+12}).zIndex(100005).enabled(!this.scheduleTransition).onClick(()=>this.restoreScheduledScene())
-        }
-        if(!this.editing && !this.viewing && !this.arriving && this.workspaceChromeVisible() && !this.groupSelecting && this.selectedGroup().length>1) {
-          GroupSelection({motion:this.boardMotion,box:this.selectedGroupBox(),minimum:groupMinimumScale(this.selectedGroup()),maximum:this.groupMaximumScale(),
-            viewportW:BOARD_W*this.boardScale,viewportH:this.boardHeight,
-            onBegin:()=>this.beginGroupTransform(),onFinish:(scale:number,angle:number)=>this.finishGroupTransform(scale,angle),onCancel:()=>this.cancelGroupTransform()})
-            .position({x:this.boardLeft,y:this.boardTop}).zIndex(100003).hitTestBehavior(this.homeToolsMoving?HitTestMode.None:HitTestMode.Transparent)
-        }
-          // The embedded sheet belongs to the stable window root, not a rebuilding navigation body.
-          Column().width(1).height(1).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
-            .bindSheet($$this.editorSheetOpen,this.editorSectionSheet,{
-              mode:SheetMode.EMBEDDED,preferType:SheetType.BOTTOM,
-              detents:[this.editorWorkspace().body*.40+this.safeBottom,this.editorWorkspace().body*.78+this.safeBottom],
-              detentSelection:this.editorControlHeight()+this.safeBottom,
-              showClose:false,dragBar:true,enableOutsideInteractive:true,maskColor:Color.Transparent,
-              backgroundColor:this.appSurface(),blurStyle:BlurStyle.NONE,scrollSizeMode:ScrollSizeMode.CONTINUOUS,
-              onHeightDidChange:(height:number)=>this.editorSheetHeightChanged(height),
-              onDetentsDidChange:(height:number)=>{const expanded=this.getUIContext().px2vp(height)>this.editorWorkspace().body*.60;this.editorExpanded=expanded;},
-              onWillDismiss:(action:DismissSheetAction)=>this.dismissEditorSheet(action),onWillSpringBackWhenDismiss:(action:SpringBackAction)=>action.springBack()
-            })
-        if(!this.editing&&!this.viewing&&!this.arriving&&this.workspaceChromeVisible()&&!this.groupSelecting&&this.selectedGroup().length<2&&!this.scheduledName&&!this.scheduleTransition) {
-          ForEach(this.cardIds.filter((id:string)=>id===this.selectedId&&!this.cardMap[id].hidden),(id:string)=>{
-            BoardCard({controlsOnly:true,appDark:this.appDark,card:this.cardMap[id],motion:this.boardMotion,selected:true,scaleFactor:this.boardScale,yScaleFactor:this.boardHeight/BOARD_H,
-              boardLeft:this.boardLeft,boardTop:this.boardTop,controlViewportWidth:BOARD_W*this.boardScale,controlViewportHeight:this.boardHeight,
-              onDelete:(id:string)=>this.deleteCard(id),onEdit:(id:string)=>this.openEditor(id),
-              onInteraction:(active:boolean)=>this.boardInteraction(id,active),onCommit:(next:FridgeCard)=>this.commitGeometry(next)})
-          },(id:string)=>id)
-        }
-        Column().width(1).height(1).position({ x: this.selectedActionAnchor().x, y: this.selectedActionAnchor().y })
-          .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
-          .bindPopup(this.showCardActions(), { builder: this.cardActions, width: 176, radius: 26, targetSpace: 8,
-            placement: this.selectedActionAnchor().above ? Placement.Top : Placement.Bottom,
-            systemMaterial: chromeMaterial(this.appDark), popupColor: AppDesign.popup(this.appDark),
-            backgroundBlurStyle: chromeMaterial(this.appDark) !== undefined ? BlurStyle.NONE : BlurStyle.COMPONENT_THIN,
-            enableArrow: false, autoCancel: false, focusable: false, mask: false })
-        if (this.editorMounted) { this.editor() }
-        if (this.viewing) { this.detail() }
-        if (!this.editing && !this.viewing && !this.arriving && this.workspaceChromeVisible()) { this.canvasNavigation() }
+          this.canvasNavigation()
         }.id('canvasWorkspace').width('100%').height('100%')
           .visibility(!this.galleryVisible||this.galleryTransitioning?Visibility.Visible:Visibility.Hidden)
           .hitTestBehavior(this.galleryVisible?HitTestMode.None:HitTestMode.Transparent)
