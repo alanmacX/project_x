@@ -1,8 +1,10 @@
 /** Retained gallery refreshes behind the workspace before returning to it. */
 export class GalleryAnchor { id:string='';preview:string='';x:number=0;y:number=0;w:number=0;h:number=0; }
 export class GalleryController {
+  pausePreviews: () => void = () => {};
+  aspect: (dimension:string,fallback:number) => number = (_dimension:string,fallback:number) => fallback;
   dismiss: () => boolean = () => false;
-  prepare: () => Promise<void> = async () => {};
+  prepare: (id:string) => Promise<void> = async () => {};
   anchor: (id:string) => GalleryAnchor|null = () => null;
 }
 /** Gallery metadata is detached from the editor and never selects a canvas. */

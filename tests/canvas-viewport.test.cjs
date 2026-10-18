@@ -38,7 +38,7 @@ for(const [w,h] of [[300,500],[500,300],[940,330],[330,940]]){
 const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
 const method=index.slice(index.indexOf('  private syncHostCanvasGeometry()'),index.indexOf('  private widgetFrameChanged()'));
 const env={exports:{}};vm.runInNewContext(ts.transpileModule('export class Harness {'+method+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,env);
-const view=new env.exports.Harness();view.store={state:{canvasDimension:'4*4',canvasAspect:1},canvasSpecs:{'4*4':1.2}};view.widgetDimension='4*4';view.widgetAspect=1.6;
+const view=new env.exports.Harness();view.galleryController={aspect:(_dimension,fallback)=>fallback};view.store={state:{canvasDimension:'4*4',canvasAspect:1},canvasSpecs:{'4*4':1.2}};view.widgetDimension='4*4';view.widgetAspect=1.6;
 view.syncHostCanvasGeometry();assert.equal(view.canvasAspect,1.6);
 view.widgetAspect=0;view.syncHostCanvasGeometry();assert.equal(view.canvasAspect,1.2);
 view.store.canvasSpecs={};view.syncHostCanvasGeometry();assert.equal(view.canvasAspect,1);
@@ -48,3 +48,7 @@ console.log('PASS original normalized full-host placement and App live-host/cach
 view.store.state={canvasDimension:'2*2',canvasAspect:1};view.widgetDimension='4*4';view.widgetAspect=2;
 view.syncHostCanvasGeometry();assert.equal(view.canvasDimension,'2*2');assert.equal(view.canvasAspect,1,'stale widget dimensions cannot override a new small canvas');
 view.store.state={canvasDimension:'2*4',canvasAspect:2};view.syncHostCanvasGeometry();assert.equal(view.canvasDimension,'2*4');assert.equal(view.canvasAspect,2);
+
+view.galleryController.aspect=(dimension,fallback)=>dimension==='2*4'?2.25:fallback;
+view.syncHostCanvasGeometry();assert.equal(view.canvasAspect,2.25,'gallery and editor use the same latest measured host ratio');
+assert.equal(view.store.state.canvasAspect,2,'measured geometry remains separate from authored geometry');

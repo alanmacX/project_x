@@ -124,3 +124,26 @@ Acceptance on the independent API26 FridgeGlitchQA phone emulator:
 - Regression includes `gallery-surface-readiness.test.cjs`: an in-flight data request cannot mutate artwork during landing and resumes after settlement. Gallery tests exercise explicit creation sizes, empty/busy submission, landing overlay lifetime and cancellation. Native-material boundary tests keep the HDS sampler outside transformed/cached ancestors.
 
 Artifacts: `output/gallery-split-build.log`, `output/gallery-split-tests.log`, `output/split-expanded-final.png`, `output/split-created-strip.png`, `output/split-created-large.png`.
+
+
+## Geometry parity and navigation critical path · 2026-10-18
+
+New independent test canvas contains a short horizontal card, tall narrow card, ellipse, capsule-like card and a rotated card. Native preview bounds `[56,640][1200,1784]` were compared against the live board `[43,758][1213,1928]` after normalization to board size. Colored silhouette bounding boxes differ by at most 0.00183 of board width/height (under 0.2%; rasterization and scaled antialiasing remain). Artifacts: `output/geometry-after-preview.png`, `output/geometry-after-live.png`, `output/gallery-geometry-comparison.json`. This quantitative check covers the five test cards on API26, not every existing user composition.
+
+The model regression checks detached exact active-document geometry and equality of inactive-preview/editor hydration, including an off-canvas rotated tall card. Viewport regression checks shared measured host ratio. `gallery-preview-policy.test.cjs` verifies metadata return does not await a never-resolving screenshot, unchanged canvases are not reread, hidden/busy galleries do not resume work, and rotating albums invalidate at their own period. A persistent plus glyph guards against text-plus/X crossfade substitution.
+
+Three nine-JPEG round trips were sampled after removing the navigation GPU readback (`output/fast-gallery-nine-enter-*`, `exit-*`). Entry retains layout frame barriers and the landing dissolve. Gallery content is no longer synchronously rebuilt before return; only visible thumbnails resume after settlement. Build and regression results: `output/gallery-geometry-build.log`, `output/gallery-geometry-tests.log`. Native-material boundary tests now prohibit snapshot readback in navigation, while still excluding all HDS chrome from cached/transformed ancestors.
+
+
+### Capability backing follow-up (actual reproduced failure)
+
+A four-timetable canvas reproduced a concrete failure missed by the earlier primitive-card checks: first-frame offscreen capture stretched the paper backing downward and extended the cloud backing beyond the card (`output/capability-before-preview.png` vs `capability-before-live.png`). Reading surfaces use nested native measurement callbacks; image syncLoad plus waitUntilRenderFinished does not settle those later state updates when capture is forced at delay 0.
+
+Capability captures now use the native offscreen API's default 300ms settling delay, outside navigation; static artwork still uses zero. The cache version invalidates previously stretched PNGs. Normal and missing-image fallback captures share the layout delay.
+
+QA included adding a real course and semester through native editor controls (shared templates intentionally strip personal courses). `output/capability-lessons-live.png` and `capability-lessons-preview-full.png` compare a populated timetable and three other timetable surface styles. Normalized paper-boundary differences are at most 0.00154 (under 0.2% of board size). The second fixture covers agenda, world clock, calendar and battery with paper/tag/cloud/badge backings; maximum boundary difference is 0.00305 (under 0.4%). See `output/capability-lessons-comparison.png/json` and `capability-mixed-comparison.png/json`. These are emulator raster comparisons, not physical-device or every-capability certification. The stale retained preview is intentionally visible until its new PNG commits; comparisons wait for the new course content to appear.
+
+Build: `output/gallery-capability-build.log`. Regression: `output/gallery-capability-tests.log`. `gallery-preview-policy.test.cjs` guards both snapshot paths retaining measurement delay, transition suspension and nonblocking navigation.
+
+
+Final native run sampled three additional round trips on the populated timetable canvas (`output/capability-final-enter-*`, `exit-*`) and checked that the course text survives each entrance. The reversible persistent plus/X control and system-Back collapse were exercised again (`output/plus-final-open-*`, `close-*`). The wall times in `capability-native-roundtrips.json` include multiple screenshot commands and layout dumps; they are not animation latency or FPS measurements.

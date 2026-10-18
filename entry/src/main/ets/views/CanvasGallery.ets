@@ -1,3 +1,5 @@
+import { capabilityRenderTick } from '../model/CapabilityClock';
+import { sceneRect } from '../model/SceneLayout';
 import { widgetFrameMetrics } from '../model/WidgetFrameGeometry';
 import { widgetRectangles } from '../model/WidgetGeometry';
 import { GalleryThumbnail, rememberedGalleryPreview, rememberedGalleryRects, cachedGalleryPreview, saveGalleryPreview, removeGalleryPreview } from '../model/GalleryPreviewCache';
@@ -22,6 +24,9 @@ import { CanvasBackdrop } from './CanvasBackdrop';
 import { CanvasFrame } from './CanvasFrame';
 import { CardFace } from './CardFace';
 
+// Native offscreen capture default: measured reading backings need layout feedback before capture.
+const GALLERY_MEASUREMENT_DELAY_MS:number=300;
+
 @Component
 export struct CanvasGallery {
   @Prop entries: CanvasEntry[] = [];
@@ -30,7 +35,7 @@ export struct CanvasGallery {
   @Prop viewportWidth: number = 390;
   @Prop safeTop: number = 0;
   @Prop safeBottom: number = 0;
-  @Prop busy: boolean = false;
+  @Prop @Watch('previewWorkChanged') busy: boolean = false;
   @Prop heroId: string = '';
   @Prop @Watch('pageVisibilityChanged') pageVisible: boolean = true;
   @Prop chromeVisible: boolean = true;
@@ -65,15 +70,20 @@ export struct CanvasGallery {
   private previewQueue: Promise<void> = Promise.resolve();
   private generation: number = 0;
   private previewTick: number = Date.now();
+  private rectsLoaded:boolean=false;
+  private previewsPaused:boolean=false;
+  private sourceCache:WeakMap<FridgeState,string>=new WeakMap();
   private scroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
     this.alive = true;
     this.widgetRects=rememberedGalleryRects(this.getUIContext().getHostContext()?.cacheDir??'',this.entries.map((entry:CanvasEntry)=>entry.id));
+    this.controller.pausePreviews=()=>{this.previewsPaused=true;};
+    this.controller.aspect=(dimension:string,fallback:number):number=>{const rect=this.widgetRects[dimension];return rect&&rect[0]>0&&rect[1]>0?rect[0]/rect[1]:fallback;};
     this.controller.dismiss=()=>{if(!this.splitOpen)return false;this.setSplitOpen(false);return true;};
-    this.controller.prepare=async()=>{await this.loadItems(true);};
+    this.controller.prepare=async(id:string)=>{await this.loadItems(id);};
     this.controller.anchor=(id:string):GalleryAnchor|null=>{
-      const item=this.items.find((entry:GalleryItem)=>entry.id===id);if(!item?.preview)return null;
+      const item=this.items.find((entry:GalleryItem)=>entry.id===id),state=this.documents.get(id);if(!item?.preview||!state||item.previewSource!==this.previewSource(state))return null;
       try{
         const rect=this.getUIContext().getComponentUtils().getRectangleById('canvasPreview_'+id),ui=this.getUIContext();
         const anchor=new GalleryAnchor();anchor.id=id;anchor.preview=item.preview;anchor.x=ui.px2vp(rect.windowOffset.x);anchor.y=ui.px2vp(rect.windowOffset.y);
@@ -87,6 +97,11 @@ export struct CanvasGallery {
   aboutToDisappear(): void { this.alive = false; this.generation++; }
   private pageVisibilityChanged():void{
     if(!this.pageVisible){this.creating=false;this.sizeMenuOpen=false;this.splitOpen=false;this.renameId='';this.toolsOpen=false;}
+  }
+  private previewWorkAllowed():boolean {return this.alive&&this.pageVisible&&!this.busy&&!this.previewsPaused;}
+  private previewWorkChanged():void {
+    if(this.pageVisible&&!this.busy)this.previewsPaused=false;
+    if(this.previewWorkAllowed())this.visibleIds.forEach((id:string)=>{this.requestPreview(id);});
   }
   private previewTimeChanged():void{
     this.previewTick=Date.now();
@@ -153,10 +168,11 @@ export struct CanvasGallery {
       },(dimension:string)=>dimension)
       Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
         Stack() {
-          Text('+ 新建画布').width(144).maxLines(1).fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.onSelected(this.appDark))
-            .opacity(this.splitOpen?0:1)
+          Text('新建画布').width(88).maxLines(1).fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.onSelected(this.appDark))
+            .translate({x:10}).opacity(this.splitOpen?0:1)
+            .animation({duration:this.splitOpen?90:180,delay:this.splitOpen?0:140,curve:Curve.EaseOut})
           SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([AppDesign.onSelected(this.appDark)])
-            .rotate({angle:this.splitOpen?45:0}).opacity(this.splitOpen?1:0)
+            .translate({x:this.splitOpen?0:-44}).rotate({angle:this.splitOpen?45:0})
         }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
       }.width(this.splitOpen?48:144).height(48).padding(0).backgroundColor(AppDesign.selected(this.appDark))
         .translate({x:this.splitOpen?(this.splitWidth()-48)/2:0})
@@ -165,7 +181,7 @@ export struct CanvasGallery {
     }.width(this.splitWidth()).height(56).margin({bottom:this.safeBottom+12})
       .opacity(this.pageVisible?1:0).hitTestBehavior(this.pageVisible?HitTestMode.Transparent:HitTestMode.None)
   }
-  private async loadItems(warm:boolean=false): Promise<void> {
+  private async loadItems(refreshId:string=''): Promise<void> {
     const generation = ++this.generation;this.previewTick=Date.now();
     const context=this.getUIContext().getHostContext();const cacheDir=context?.cacheDir??'';
     const previous=new Map<string,GalleryItem>();this.items.forEach((item:GalleryItem)=>previous.set(item.id,item));
@@ -187,9 +203,10 @@ export struct CanvasGallery {
       });
     }));
     if(!this.alive||generation!==this.generation)return;
-    if(context){try{this.widgetRects=await widgetRectangles(context);}catch(_){}}
+    if(context&&!this.rectsLoaded){try{this.widgetRects=await widgetRectangles(context);this.rectsLoaded=true;}catch(_){}}
     if(!this.alive||generation!==this.generation)return;
     await Promise.all(this.entries.map(async(entry:CanvasEntry)=>{
+      if(refreshId&&entry.id!==refreshId&&this.documents.has(entry.id))return;
       try {
         const state=await this.onLoad(entry.id);
         if(!this.alive||generation!==this.generation)return;
@@ -199,7 +216,8 @@ export struct CanvasGallery {
           const item=new GalleryItem();item.id=old.id;item.name=old.name;item.dimension=state.canvasDimension;item.aspect=state.canvasAspect;
           item.loaded=true;item.preview=old.preview;item.previewSource=old.previewSource;return item;
         });
-        if(warm||this.visibleIds.has(entry.id))await this.requestPreview(entry.id,warm);
+        // Navigation waits for metadata only. Decode/snapshot visible items once the transition settles.
+        if(this.visibleIds.has(entry.id))this.requestPreview(entry.id);
       }catch(_){
         if(!this.alive||generation!==this.generation)return;
         this.items=this.items.map((item:GalleryItem):GalleryItem=>{
@@ -212,32 +230,36 @@ export struct CanvasGallery {
   }
   private requestPreview(id: string, force:boolean=false): Promise<void> {
     const item=this.items.find((value:GalleryItem)=>value.id===id),state=this.documents.get(id);
-    if(!this.alive||!item?.loaded||!state||(item.preview&&item.previewSource===this.previewSource(state)))return Promise.resolve();
+    if(!this.previewWorkAllowed()||!item?.loaded||!state||(item.preview&&item.previewSource===this.previewSource(state)))return Promise.resolve();
     if(this.pendingIds.has(id))return this.previewQueue.then(()=>{if(this.alive)return this.requestPreview(id,force);return Promise.resolve();});
     this.pendingIds.add(id);
     const generation=this.generation;
     this.previewQueue=this.previewQueue.catch(()=>{}).then(async()=>{
       try {
-        if(!this.alive||generation!==this.generation||(!force&&!this.visibleIds.has(id)))return;
+        if(!this.previewWorkAllowed()||generation!==this.generation||(!force&&!this.visibleIds.has(id)))return;
         const context=this.getUIContext().getHostContext();if(!context)return;
         const source=this.previewSource(state);
-        const relief=JSON.parse(await taskpool.execute(new taskpool.Task(prepareSceneRelief,JSON.stringify(state.cards))) as string) as Record<string,string>;
+        const subjects=state.cards.filter((card:FridgeCard)=>card.shape==='subject'&&card.cutout.startsWith('file://'));
+        const relief:Record<string,string>=subjects.length?JSON.parse(await taskpool.execute(new taskpool.Task(prepareSceneRelief,JSON.stringify(subjects))) as string) as Record<string,string>:{};
         state.cards.forEach((card:FridgeCard)=>{card.reliefSrc=relief[card.id]??card.reliefSrc;});
         await primeRenderContours(state.cards, storageSnapshot(state));
-        if(!this.alive||generation!==this.generation)return;
+        if(!this.previewWorkAllowed()||generation!==this.generation)return;
+        // syncLoad only settles image decoding. Capability labels also measure text and their paper surface
+        // through onSizeChange; forcing delay=0 snapshots the fallback height before those layout passes.
+        const layoutDelay=state.cards.some((card:FridgeCard)=>!card.hidden&&card.capability!==null)?GALLERY_MEASUREMENT_DELAY_MS:0;
         let pixel:image.PixelMap;
-        try{pixel=await this.getUIContext().getComponentSnapshot().createFromBuilder(()=>{this.artwork(state);},0,true,
+        try{pixel=await this.getUIContext().getComponentSnapshot().createFromBuilder(()=>{this.artwork(state);},layoutDelay,true,
           {scale:1,waitUntilRenderFinished:true});}
         catch(_){
           // A missing photo must not suppress every other card in this canvas preview.
-          pixel=await this.getUIContext().getComponentSnapshot().createFromBuilder(()=>{this.artwork(state);},0,false,
+          pixel=await this.getUIContext().getComponentSnapshot().createFromBuilder(()=>{this.artwork(state);},layoutDelay,false,
             {scale:1,waitUntilRenderFinished:true});
         }
         const path=context.cacheDir+'/gallery_v2_'+id+'_'+Date.now()+'.png';
         const packer=image.createImagePacker();let file:fileIo.File|null=null;
         try{file=await fileIo.open(path,fileIo.OpenMode.CREATE|fileIo.OpenMode.READ_WRITE);await packer.packToFile(pixel,file.fd,{format:'image/png',quality:100});}
         finally{try{if(file)fileIo.closeSync(file.fd);}finally{try{await packer.release();}finally{await pixel.release();}}}
-        if(!this.alive||generation!==this.generation){fileIo.unlink(path).catch(()=>{});return;}
+        if(!this.previewWorkAllowed()||generation!==this.generation){fileIo.unlink(path).catch(()=>{});return;}
         const cached=new GalleryThumbnail();cached.source=source;cached.path='file://'+path;
         cached.dimension=state.canvasDimension;cached.aspect=state.canvasAspect;cached.rects=this.widgetRects;
         await saveGalleryPreview(context.cacheDir,id,cached);
@@ -278,7 +300,10 @@ export struct CanvasGallery {
   private previewAspect(state:FridgeState):number {
     const rect=galleryPreviewSize(state.canvasDimension,state.canvasAspect,this.contentWidth(),this.widgetRects);return rect[0]/rect[1];
   }
-  private previewSource(state:FridgeState):string {return 'v9-decoded-artwork:'+storageSnapshot(state)+':hostAspect='+this.previewAspect(state)+':corner='+this.previewFrameCorner(state)+':minute='+(state.cards.some((card:FridgeCard)=>card.capability!==null&&card.capability.k!=='album')?Math.floor(this.previewTick/60000):0);}
+  private previewSource(state:FridgeState):string {
+    let source=this.sourceCache.get(state);if(source===undefined){source=storageSnapshot(state);this.sourceCache.set(state,source);}
+    return 'v11-measured-capability:'+source+':hostAspect='+this.previewAspect(state)+':corner='+this.previewFrameCorner(state)+':ticks='+state.cards.map((card:FridgeCard)=>capabilityRenderTick(card.capability,this.previewTick)).join(',');
+  }
   private artworkCards(state: FridgeState): FridgeCard[] {
     return depthRenderCards(state.cards.filter((card: FridgeCard) => !card.hidden).map((card: FridgeCard) => cardRenderSnapshot(card)))
       .sort((a: FridgeCard, b: FridgeCard) => a.z - b.z);
@@ -288,8 +313,8 @@ export struct CanvasGallery {
     Stack({ alignContent: Alignment.TopStart }) {
       CanvasBackdrop({ snapshot:true, sceneBackground: state.background, showFrame: false }).width('100%').height('100%')
       ForEach(this.artworkCards(state), (card: FridgeCard) => {
-        CardFace({ snapshot:true, card: card, scaleFactor: 1, tick: this.previewTick, widget: true })
-          .width(card.w).height(card.h).position({ x: card.x, y: card.y * (BOARD_W / this.previewAspect(state)) / BOARD_H })
+        CardFace({ snapshot:true, card: card, scaleFactor: 1, tick: capabilityRenderTick(card.capability,this.previewTick), widget: true })
+          .width(card.w).height(card.h).position(sceneRect(card,BOARD_W,BOARD_W/this.previewAspect(state)))
           .rotate({ angle: card.rot, centerX: 0, centerY: '100%' }).zIndex(card.z)
       }, (card: FridgeCard) => card.id)
       if (state.background.frameStyle !== 'none') {

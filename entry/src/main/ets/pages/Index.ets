@@ -405,7 +405,7 @@ struct Index {
   }
   private async openGalleryCanvas(id: string): Promise<void> {
     if (!this.alive || this.galleryTransitioning || this.canvasChanging || this.busy || this.sharing || this.sceneNavigationBusy) return;
-    this.canvasChanging = true;const intentGeneration=this.galleryTransitionGeneration;
+    this.canvasChanging = true;this.galleryController.pausePreviews();const intentGeneration=this.galleryTransitionGeneration;
     this.galleryAnchor=this.galleryController.anchor(id);this.galleryAnchorWidth=this.screenWidth;this.galleryAnchorHeight=this.screenHeight;
     try {
       await this.loadCanvas(id, true);
@@ -432,7 +432,8 @@ struct Index {
         const generation=this.galleryTransitionGeneration;this.galleryMounted=true;
         await this.waitGalleryFrame();if(!this.alive||generation!==this.galleryTransitionGeneration)return;
       }
-      await this.galleryController.prepare();
+      await this.galleryController.prepare(this.store.state.canvasId);
+      this.galleryAnchor=this.galleryController.anchor(this.store.state.canvasId);
       if(!this.alive||intentGeneration!==this.galleryTransitionGeneration)return;
       await this.setGalleryPage(true);
       AppStorage.setOrCreate('launchFromWidget', false);
@@ -486,7 +487,7 @@ struct Index {
       if(!this.alive||generation!==this.galleryTransitionGeneration)return;
       await this.waitGalleryFrame();
       if(!this.alive||generation!==this.galleryTransitionGeneration)return;
-      try{const surface=await this.getUIContext().getComponentSnapshot().get('canvasArtwork',{waitUntilRenderFinished:true});await surface.release();}catch(_){}
+      // Local artwork is decoded on mount; avoid a full-window GPU readback that stalls navigation.
       if(!this.alive||generation!==this.galleryTransitionGeneration)return;
     }
     const anchor=this.galleryAnchor;
@@ -738,7 +739,7 @@ struct Index {
       if(manual){if(!await this.store.selectCanvas(id,false))throw new Error('画布已不存在');}else{await this.store.save(false);if(!await this.store.openCanvas(id))return;await this.store.save(false);}
       await primeRenderContours(this.store.state.cards,storageSnapshot(this.store.state));
       // Derived relief must settle under the gallery, rather than replacing a vector surface mid-entrance.
-      const artwork=this.store.state.cards.filter((card:FridgeCard)=>card.shape==='subject'&&card.cutout.startsWith('file://'));
+      const artwork=this.store.state.cards.filter((card:FridgeCard)=>card.shape==='subject'&&card.cutout.startsWith('file://')&&(!card.reliefSrc||this.reliefKeys.get(card.id)!==this.reliefKey(card)));
       if(artwork.length){try{
         const relief=JSON.parse(await taskpool.execute(new taskpool.Task(prepareSceneRelief,JSON.stringify(artwork))) as string) as Record<string,string>;
         for(const card of artwork){if(relief[card.id]){card.reliefSrc=relief[card.id];this.reliefKeys.set(card.id,this.reliefKey(card));}}
@@ -866,7 +867,11 @@ struct Index {
   // This updates layout only; opening or rotating never clamps saved card positions.
   private syncHostCanvasGeometry():void {
     this.canvasDimension=this.store.state.canvasDimension;
-    this.canvasAspect=this.widgetDimension===this.canvasDimension&&this.widgetAspect>0?this.widgetAspect:(this.store.canvasSpecs[this.canvasDimension]??this.store.state.canvasAspect);
+    this.canvasAspect=this.canvasHostAspect(this.canvasDimension,this.store.state.canvasAspect);
+  }
+  private canvasHostAspect(dimension:string,fallback:number):number {
+    const previous=this.widgetDimension===dimension&&this.widgetAspect>0?this.widgetAspect:(this.store.canvasSpecs[dimension]??fallback);
+    return this.galleryController.aspect(dimension,previous);
   }
   private widgetFrameChanged(): void {
     if(this.ready){this.syncHostCanvasGeometry();this.layoutBoard();}
@@ -1609,7 +1614,7 @@ struct Index {
         if(this.galleryMounted){
           CanvasGallery({ entries: this.canvasEntries, appDark: this.appDark, viewportWidth: this.screenWidth, safeTop: this.safeTop, safeBottom: this.safeBottom,
             busy: this.canvasChanging || this.galleryTransitioning || this.busy || this.sharing, revision: this.galleryRevision, controller:this.galleryController, pageVisible:this.galleryVisible, chromeVisible:this.galleryVisible&&!this.galleryTransitioning, heroId:this.galleryHeroId, previewMinute:this.tick,
-            onLoad: (id: string): Promise<FridgeState> => this.store.canvasSnapshot(id),
+            onLoad: async(id:string):Promise<FridgeState>=>{const state=await this.store.canvasPreviewSnapshot(id);state.canvasAspect=this.canvasHostAspect(state.canvasDimension,state.canvasAspect);return state;},
             onOpen: (id: string) => this.openGalleryCanvas(id), onCreate: (name: string, dimension: string) => this.createGalleryCanvas(name, dimension),
             onRename: (id: string, name: string) => this.renameGalleryCanvas(id, name),
             onDuplicate: (id: string) => this.duplicateGalleryCanvas(id), onShare: (id: string) => this.shareCanvasById(id),

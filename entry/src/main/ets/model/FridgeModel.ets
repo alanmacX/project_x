@@ -93,6 +93,17 @@ export class FridgeStore {
     if (!Array.isArray(raw.cards)) throw new Error('画布数据损坏');
     return normalizeState(raw);
   }
+  /** Gallery uses the editor's hydrated geometry, without normalizing a live document a second time. */
+  async canvasPreviewSnapshot(id:string):Promise<FridgeState> {
+    if(id===this.state.canvasId)return JSON.parse(storageSnapshot(this.state)) as FridgeState;
+    await this.saveQueue;
+    if(!sceneDocumentExists(this.catalog,id)||this.prefs===null)throw new Error('画布不存在');
+    const json=await this.prefs.get(canvasKey(id),'') as string;if(!json)throw new Error('画布记录缺失');
+    const cached=this.documents.find((doc:CanvasDocument)=>doc.id===id);
+    if(cached&&this.savedScenes[id]===json)return JSON.parse(storageSnapshot(cached.state)) as FridgeState;
+    const hydrated=await taskpool.execute(new taskpool.Task(hydrateCanvas,json,id)) as string;
+    const result=JSON.parse(hydrated) as CanvasLoadResult;restoreStartupLayouts(result.layout);return result.state;
+  }
   /** Merge acknowledgements from FormExtension without overwriting editor geometry or history. */
   async reloadSceneAcknowledgements():Promise<void> {
     if(this.prefs===null||this.context===null)return;await this.saveQueue.catch(()=>{});const id=this.state.canvasId;

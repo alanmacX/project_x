@@ -35,7 +35,7 @@ const routeMethods = page.slice(page.indexOf('  private canvasRouteChanged('), p
 const calls = [];
 const motionTimers = new Map(); let motionTimerId = 0;
 const { Fixture } = execute(`class Fixture {
- alive=true;galleryVisible=true;galleryMounted=true;galleryRevision=0;galleryController={prepare:async()=>calls.push("prepare-gallery"),anchor:()=>null};galleryFrameResolve=null;workspaceMounted=false;galleryTransitioning=false;galleryTransitionGeneration=0;galleryTransitionTimer=-1;frameRate={};canvasChanging=false;busy=false;sharing=false;sceneNavigationBusy=false;
+ alive=true;galleryVisible=true;galleryMounted=true;galleryRevision=0;galleryController={pausePreviews(){},prepare:async()=>calls.push("prepare-gallery"),anchor:()=>null};galleryFrameResolve=null;workspaceMounted=false;galleryTransitioning=false;galleryTransitionGeneration=0;galleryTransitionTimer=-1;frameRate={};canvasChanging=false;busy=false;sharing=false;sceneNavigationBusy=false;
  heroActive=false;editing=false;viewing=false;deletionId='';activeBoardId='';sceneEditing=false;selectedId='';
  homeToolsOpen=true;scheduleOpen=true;backgroundOpen=true;groupSelecting=true;groupSelection=['card'];scheduleTimer=-1;scenePanelGeneration=0;
  boardOpacity=0;scatter=1;startupCardCount=4;ready=true;launchFromWidget=false;routeCanvasId='';
@@ -102,17 +102,16 @@ const { Fixture } = execute(`class Fixture {
   assert.equal(motion.galleryTransitioning, false, 'deadline releases the interaction guard if native completion is omitted');
   await motion.setGalleryPage(true); motion.cancelGalleryTransition(); motion.alive = false;
   completions.forEach(finish => finish()); assert.equal(motion.galleryTransitioning, false, 'teardown remains cancelled after stale completions');
-  const preparing = new Fixture(); let layoutFrame, snapshotReady;
+  const preparing = new Fixture(); let layoutFrame,snapshots=0;
   preparing.getUIContext=()=>({
     postFrameCallback:frame=>{layoutFrame=frame;},
-    getComponentSnapshot:()=>({get:()=>new Promise(resolve=>snapshotReady=()=>resolve({release:async()=>{}}))}),
+    getComponentSnapshot:()=>{snapshots++;throw Error('GPU readback must not gate navigation');},
     animateTo:(options,update)=>{update();options.onFinish();}
   });
   const reveal=preparing.setGalleryPage(false);
   assert.equal(preparing.workspaceMounted,true);assert.equal(preparing.galleryVisible,true,'outgoing gallery covers destination construction');
-  layoutFrame.start();await new Promise(resolve=>setImmediate(resolve));layoutFrame.start();await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(preparing.galleryVisible,true,'native render completion gates entrance');
-  snapshotReady();await reveal;assert.equal(preparing.galleryVisible,false);
+  layoutFrame.start();await new Promise(resolve=>setImmediate(resolve));assert.equal(preparing.galleryVisible,true,'first frame measures the destination');
+  layoutFrame.start();await reveal;assert.equal(preparing.galleryVisible,false);assert.equal(snapshots,0,'decoded artwork handoff does not block on a GPU snapshot');
   const cancelled = new Fixture();let staleFrame;
   cancelled.getUIContext=()=>({postFrameCallback:frame=>staleFrame=frame});
   const abandoned=cancelled.setGalleryPage(false);cancelled.cancelGalleryTransition();await abandoned;

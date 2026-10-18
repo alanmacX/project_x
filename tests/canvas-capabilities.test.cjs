@@ -287,6 +287,19 @@ function load(name) {
  }
  assert.equal(sizeStore.createCanvas('非法尺寸',undefined,'invalid').length>0,true);
  assert.equal(sizeStore.state.canvasDimension,'4*4');
+ // Previewing geometry must follow the same hydration as opening, and must preserve live values exactly.
+ const geometryId=sizeStore.createCanvas('几何预览',undefined,'2*4');
+ const geometryCard=new FridgeCard();Object.assign(geometryCard,{id:'geometry-proof',x:900,y:-800,w:63,h:177,rot:27});sizeStore.state.cards=[geometryCard];await sizeStore.save(false);
+ const activePreview=await sizeStore.canvasPreviewSnapshot(geometryId);
+ assert.equal(activePreview.cards[0].h,177);assert.equal(activePreview.cards[0].y,-800,'read-only live preview cannot repair or reposition artwork');
+ activePreview.cards[0].h=1;assert.equal(sizeStore.state.cards[0].h,177,'preview values are detached from editable geometry');
+ const otherId=sizeStore.createCanvas('其他画布');await sizeStore.save(false);
+ const freshGeometry=new FridgeStore();await freshGeometry.init({});
+ const beforeSelection=freshGeometry.state.canvasId,previewGeometry=await freshGeometry.canvasPreviewSnapshot(geometryId);
+ assert.equal(freshGeometry.state.canvasId,beforeSelection,'inactive preview cannot select another canvas');
+ await freshGeometry.openCanvas(geometryId);
+ for(const key of ['x','y','w','h','rot'])assert.equal(previewGeometry.cards[0][key],freshGeometry.state.cards[0][key],key+' matches actual editor hydration');
+ console.log('PASS gallery geometry snapshots: exact live values, detached ownership, inactive hydration and selection isolation.');
  console.log('PASS canvas creation sizes survive persistence, reopening and copying.');
  console.log('PASS independent central-card storage, fallback isolation, one-card capacity, cross-scene replacement, bound desktop ownership and policy-only publishing.');
  console.log('PASS timed delivery: atomic packet, bound-source ownership, target fanout, original geometry during battery updates, persisted acknowledgement and foreground merge, refresh minimum/quota, imported schedule remapping and opt-in.');
