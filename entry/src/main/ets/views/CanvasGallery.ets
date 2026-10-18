@@ -59,6 +59,8 @@ export struct CanvasGallery {
   @State sizeMenuX: number = 0;
   @State sizeMenuY: number = 0;
   @State splitOpen: boolean = false;
+  @State createLabelWidth:number=64;
+  @State createIconWidth:number=22;
   @State draftName: string = '';
   @State draftDimension: string = '4*4';
   @State renameId: string = '';
@@ -168,13 +170,15 @@ export struct CanvasGallery {
       },(dimension:string)=>dimension)
       Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}) {
         Stack() {
-          Text('新建画布').width(88).maxLines(1).fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.onSelected(this.appDark))
-            .translate({x:10}).opacity(this.splitOpen?0:1)
+          Text('新建画布').maxLines(1).fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.onSelected(this.appDark))
+            .translate({x:(this.createIconWidth+8)/2}).opacity(this.splitOpen?0:1)
+            .onSizeChange((_:SizeOptions,size:SizeOptions)=>{const width=Number(size.width);if(width>0&&Math.abs(width-this.createLabelWidth)>.1)this.createLabelWidth=width;})
             .animation({duration:this.splitOpen?90:180,delay:this.splitOpen?0:140,curve:Curve.EaseOut})
           SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([AppDesign.onSelected(this.appDark)])
-            .translate({x:this.splitOpen?0:-44}).rotate({angle:this.splitOpen?45:0})
+            .translate({x:this.splitOpen?0:-(this.createLabelWidth+8)/2}).rotate({angle:this.splitOpen?45:0})
+            .onSizeChange((_:SizeOptions,size:SizeOptions)=>{const width=Number(size.width);if(width>0&&Math.abs(width-this.createIconWidth)>.1)this.createIconWidth=width;})
         }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
-      }.width(this.splitOpen?48:144).height(48).padding(0).backgroundColor(AppDesign.selected(this.appDark))
+      }.width(this.splitOpen?48:Math.min(this.splitWidth(),Math.max(144,this.createLabelWidth+this.createIconWidth+58))).height(48).padding(0).backgroundColor(AppDesign.selected(this.appDark))
         .translate({x:this.splitOpen?(this.splitWidth()-48)/2:0})
         .accessibilityText(this.splitOpen?'收起新建画布':'新建画布，选择尺寸').enabled(!this.busy)
         .onClick(()=>this.setSplitOpen(!this.splitOpen))

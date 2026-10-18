@@ -147,3 +147,16 @@ Build: `output/gallery-capability-build.log`. Regression: `output/gallery-capabi
 
 
 Final native run sampled three additional round trips on the populated timetable canvas (`output/capability-final-enter-*`, `exit-*`) and checked that the course text survives each entrance. The reversible persistent plus/X control and system-Back collapse were exercised again (`output/plus-final-open-*`, `close-*`). The wall times in `capability-native-roundtrips.json` include multiple screenshot commands and layout dumps; they are not animation latency or FPS measurements.
+
+
+## Physical tablet QA · 2026-10-18
+
+Device classified by the user as a tablet, API26, landscape window 2560×1600. Updated the installed app in place; original two canvases were retained and no desktop instance was removed/rebound. The two original canvases contain the real layered photo/timetable composition and a 2×2 clock.
+
+Fixed the bottom creation label's left bias: native text was narrower than the old fixed88vp label box. Measure icon/text independently and centre their combined visible group. `output/real-centered-button-crop.png` captures the result; the white glyph/text bounding box has a 0px centre offset within the344px-wide native capsule. Persistent plus/X forward/reverse splitting and system Back were exercised. Size menu anchoring, 2×2 choice, native keyboard/name input and cancel passed without creating an extra document.
+
+Read-only checks opened the existing course card editor, inspected native wide inspector layout, completed without changing artwork fields, and returned. Existing 2×2 canvas opens correctly; a Home/resume sequence retained the4×4 desktop composition even while2×2 was active (`output/real-desktop-after-small.png`). Three further4×4 round trips were sampled (`output/real-roundtrip-*`). `output/real-preview-board-comparison.png` pairs the real preview and board at matched scale; RGB mean absolute difference is about5/255, including resampling, shadows and updated dynamic content, not a pixel-perfect assertion.
+
+A suspected coordinate-space issue was instrumented and disproved: measured page root window offset was(0,0), initial shared-image pose mapped to exactly the same window offset (`output/real-geometry-before.log`). Temporary diagnostics were removed. Native HDS/resource and system fold-region warnings were observed; no causal visual failure was established from those warnings, so they were not treated as application bugs. No app exception/freeze was found in the filtered error sample. No reliable per-animation FPS measurement or portrait/multiwindow acceptance is claimed.
+
+Final build: `output/real-debug-build.log`. Existing native/material/gallery regressions rerun after the label change. Fullscreen screenshots may contain system notifications and remain local ignored QA files; the cropped button artifact avoids those overlays.
