@@ -7,6 +7,12 @@ export class EditorVisualChoice {
   key:string=''; label:string=''; card:FridgeCard=new FridgeCard(); scale:number=1;
   offsetX:number=0;offsetY:number=0;
 }
+/** Ignore board placement, but invalidate every value that changes candidate artwork. */
+export function editorVisualChoiceSignature(card:FridgeCard,mode:string):string {
+  return JSON.stringify([mode,card.id,card.w,card.h,card.shape,card.cutout,card.subjectVersion,card.subjectPhoto,card.subjectAspect,
+    card.subjectInk,card.subjectBorder,card.frame,card.material,card.paper,card.ink,
+    mode==='shape'?null:card.capability,mode==='shape'?null:card.elements]);
+}
 /** Changing the backing reserves its inset without shrinking the user's readout. */
 export function editorReadingPlacement(card:FridgeCard,blend:string):ElementBox {
   const box=compositionPlacement(card,capabilityPlacement(card),blend);
@@ -35,7 +41,7 @@ export function editorVisualChoices(source:FridgeCard,mode:string):EditorVisualC
     const choice=new EditorVisualChoice(),card=cardStorageShell(detached);if(detached.capability){card.capability=JSON.parse(capabilityJSON) as CapBlock;card.capability.courses=courses;}choice.key=key;card.rot=0;
     if(mode==='material'&&card.capability){card.capability.readingMaterial=key;card.capability.readingMaterialStudy=undefined;choice.label=key==='paper'?'暖白细纸':'轻透磨砂';}
     else if(mode==='album'&&card.capability){card.capability.albumPresentation=key;card.w=key==='row'?300:180;card.h=key==='row'?150:180;choice.label=['纯封面','经典信息','横向信息'][keys.indexOf(key)];}
-    else if(mode==='shape'){card.capability=null;card.capFree=false;card.elements=[];applyEditorShape(card,key);if(key==='round'||key==='pill'){card.w=180;card.h=108;}choice.label=['圆角矩形','椭圆','胶囊','自由边角','照片主体'][keys.indexOf(key)];}
+    else if(mode==='shape'){card.capability=null;card.capFree=false;card.elements=[];applyEditorShape(card,key);choice.label=['圆角矩形','椭圆','胶囊','自由边角','照片主体'][keys.indexOf(key)];}
     else if(card.capability){card.capability.readingBlend=key;card.capability.readingStyle='surface';card.capBox=editorReadingPlacement(card,key);card.capFree=true;card.capability.readingEdge=key==='sticker'?(source.capability?.readingEdge||'left'):'';
       if(key==='sticker'){const attached=edgeAttachment(card,card.capBox,card.capability.readingEdge,card.capability.readingOutside===true);card.capBox=attached.box;card.capBox.rot=0;}
       choice.label=READING_COMPOSITION_LABELS[READING_COMPOSITIONS.indexOf(key)];

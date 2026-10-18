@@ -342,7 +342,7 @@ export struct CanvasGallery {
   }
   private previewSource(state:FridgeState):string {
     let source=this.sourceCache.get(state);if(source===undefined){source=storageSnapshot(state);this.sourceCache.set(state,source);}
-    return 'v11-measured-capability:'+source+':hostAspect='+this.previewAspect(state)+':corner='+this.previewFrameCorner(state)+':ticks='+state.cards.map((card:FridgeCard)=>capabilityRenderTick(card.capability,this.previewTick)).join(',');
+    return 'v12-ellipse-relief:'+source+':hostAspect='+this.previewAspect(state)+':corner='+this.previewFrameCorner(state)+':ticks='+state.cards.map((card:FridgeCard)=>capabilityRenderTick(card.capability,this.previewTick)).join(',');
   }
   private artworkCards(state: FridgeState): FridgeCard[] {
     return depthRenderCards(state.cards.filter((card: FridgeCard) => !card.hidden).map((card: FridgeCard) => cardRenderSnapshot(card)))

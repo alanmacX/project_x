@@ -4,7 +4,7 @@ import { cardOutline } from '../model/RenderContours';
 import { FridgeCard, materialColors, cardCornerRadius } from '../model/CardSchema';
 import { CardCanvas } from './CardCanvas';
 import { subjectSurfaceFactor } from '../model/CanvasLayout';
-import { cardDepthScale, cardEdgeColor, CARD_SIDE, CARD_CAST_RADIUS, CARD_CAST_Y, CARD_CAST_COLOR, CARD_CONTACT_RADIUS, CARD_CONTACT_Y, CARD_CONTACT_COLOR } from '../model/CardDepth';
+import { cardDepthScale, cardEdgeColor, contourReliefBands, ReliefBand, CARD_SIDE, CARD_CAST_RADIUS, CARD_CAST_Y, CARD_CAST_COLOR, CARD_CONTACT_RADIUS, CARD_CONTACT_Y, CARD_CONTACT_COLOR } from '../model/CardDepth';
 /** The same surface, optional frame and depth are used in app, editor, hero and widget. */
 @Component
 export struct CardFace {
@@ -40,11 +40,15 @@ export struct CardFace {
   backing(color: string, offset: number, radius: number, shadowColor: string, shadowY: number) {
     if (this.elliptical()) {
       if(radius>0){
-        // A node shadow follows its rectangular bounds; blur the elliptical silhouette itself.
-        Ellipse().width('100%').height('100%').fill(shadowColor).blur(vp2px(radius))
-          .translate({y:offset+shadowY}).hitTestBehavior(HitTestMode.None)
+        // Concentric silhouettes keep the shadow centered at thumbnail scale;
+        // foreground blur on an Ellipse can leave an asymmetric clipped wedge.
+        ForEach(contourReliefBands(radius),(band:ReliefBand)=>{
+          Ellipse().width(this.card.w*this.scaleFactor+band.extra).height(this.card.h*this.scaleFactor+band.extra)
+            .fill(shadowColor).strokeWidth(0).opacity(band.opacity)
+            .translate({y:offset+shadowY}).hitTestBehavior(HitTestMode.None)
+        })
       }
-      Ellipse().width('100%').height('100%').fill(color)
+      Ellipse().width('100%').height('100%').fill(color).strokeWidth(0)
         .translate({y:offset}).hitTestBehavior(HitTestMode.None)
     } else {
     Column().width('100%').height('100%').backgroundColor(color).borderRadius(cardCornerRadius(this.card,this.scaleFactor))

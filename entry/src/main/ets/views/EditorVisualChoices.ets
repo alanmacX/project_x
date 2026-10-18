@@ -1,5 +1,5 @@
 import { FridgeCard } from '../model/CardSchema';
-import { EditorVisualChoice, editorVisualChoices } from '../model/EditorVisualChoices';
+import { EditorVisualChoice, editorVisualChoices, editorVisualChoiceSignature } from '../model/EditorVisualChoices';
 import { AppDesign } from '../model/AppDesign';
 import { CardFace } from './CardFace';
 /** Actual native artwork, frozen time and cached render groups; no network or screenshot worker. */
@@ -13,12 +13,12 @@ export struct EditorVisualChoices {
   private previewTick:number=Date.now();
   onChoose:(key:string)=>void=()=>{};
   private sourceSignature:string='';
+  private choiceGeneration:number=0;
   aboutToAppear():void {this.sourceChanged();}
   private sourceChanged():void {
-    const cap=this.card.capability;
-    const signature=[this.mode,this.card.id,cap?.k,this.card.w,this.card.h,this.card.cutout,this.card.subjectVersion,this.card.subjectPhoto,this.card.material,this.card.paper,this.card.ink,cap?.readingMaterial,cap?.readingTint,cap?.readingBlend,cap?.readingEdge,cap?.readingOutside,cap?.readingHook,cap?.albumCover,cap?.title,cap?.artist,cap?.courses?.length].join(':');
+    const signature=editorVisualChoiceSignature(this.card,this.mode);
     if(signature===this.sourceSignature)return;
-    this.sourceSignature=signature;this.choices=editorVisualChoices(this.card,this.mode);
+    this.sourceSignature=signature;this.choiceGeneration++;this.choices=editorVisualChoices(this.card,this.mode);
   }
   build() {
     Scroll() {
@@ -36,7 +36,7 @@ export struct EditorVisualChoices {
             .border({width:choice.key===this.selected?2:0,color:this.appDark?'#E6D3A2':'#B29A64'})
             .accessibilityText(choice.label+(choice.key===this.selected?'，已选择':''))
             .onClick(()=>this.onChoose(choice.key))
-        },(choice:EditorVisualChoice)=>choice.key)
+        },(choice:EditorVisualChoice)=>choice.key+':'+this.choiceGeneration)
       }.padding(3)
     }.width('100%').height(146).scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).align(Alignment.Start)
   }

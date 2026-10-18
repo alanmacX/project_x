@@ -36,3 +36,22 @@ for(const key of ['round','pill']){const c=new FridgeCard();c.w=180;c.h=180;appl
 const square=new FridgeCard();square.w=180;square.h=180;
 for(const c of editorVisualChoices(square,'shape').filter(c=>['round','pill'].includes(c.key)))assert.equal(c.card.w/c.card.h,180/108);
 assert.equal(square.h,180,'shape candidates do not resize the artwork');
+
+for(const [w,h] of [[120,240],[300,100],[180,180]]){
+ const source=new FridgeCard();source.w=w;source.h=h;
+ for(const key of ['round','pill']){
+  const live=load('CardViewSnapshot').cardViewSnapshot(source);applyEditorShape(live,key);
+  const candidate=editorVisualChoices(source,'shape').find(c=>c.key===key).card;
+  assert.equal(candidate.w/candidate.h,live.w/live.h,'shape preview preserves applied aspect for '+key+' '+w+'x'+h);
+ }
+}
+const {editorVisualChoiceSignature}=load('EditorVisualChoices');
+const signatureCard=new FridgeCard();let signature=editorVisualChoiceSignature(signatureCard,'shape');
+for(const change of [c=>c.shape='round',c=>c.frame=!c.frame,c=>c.subjectPhoto=!c.subjectPhoto,c=>c.subjectAspect=2,c=>c.paper='#112233']){
+ change(signatureCard);const next=editorVisualChoiceSignature(signatureCard,'shape');assert.notEqual(next,signature);signature=next;
+}
+signatureCard.x+=20;signatureCard.rot+=15;assert.equal(editorVisualChoiceSignature(signatureCard,'shape'),signature,'board placement does not rebuild visual choices');
+signatureCard.capability={k:'timetable',courses:[{name:'before'}]};const readingBefore=editorVisualChoiceSignature(signatureCard,'reading');signatureCard.capability.courses[0].name='after';assert.notEqual(editorVisualChoiceSignature(signatureCard,'reading'),readingBefore,'same-length course changes update real artwork');
+const choicesView=fs.readFileSync('entry/src/main/ets/views/EditorVisualChoices.ets','utf8');
+assert(choicesView.includes("choice.key+':'+this.choiceGeneration"),'replaced plain candidate objects rebuild their ForEach render nodes');
+console.log('PASS shape aspect parity and candidate invalidation for borders, subject geometry and same-length content changes.');
