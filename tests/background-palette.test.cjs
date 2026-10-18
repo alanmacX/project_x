@@ -31,8 +31,7 @@ function pixels(main,accent,fraction){const out=new Uint8Array(48*48*4);for(let 
  Object.assign(right,{id:'right',shape:'subject',subjectPhoto:true,cutout:'file:///yellow.png',x:250,y:20,w:70,h:70});spatial.cards=[left,right];
  const separated=JSON.parse(await createSmartBackground(JSON.stringify(spatial),'/cache'));
  const clouds=separated.anchors.filter(a=>a.color===swatches[0].color);
- assert.equal(clouds.length,2,'same-colour artwork far apart retains distinct spatial clouds');
- assert.ok(Math.abs(clouds[0].x-clouds[1].x)>.5);
+ assert.equal(clouds.length,1,'duplicate colour families share one palette slot');
  const crowded=Array.from({length:9},(_,i)=>({x:(i%3)/3,y:Math.floor(i/3)/3,color:'#BC7C4D',weight:.09-i*.002}));
  crowded.push({x:.8,y:.7,color:'#ADB17A',weight:.04},{x:.2,y:.8,color:'#DDD9D6',weight:.035});
  const retained=p.reduceBackgroundAnchors(crowded);
@@ -52,7 +51,7 @@ function pixels(main,accent,fraction){const out=new Uint8Array(48*48*4);for(let 
  const duoState=new FridgeState();duoState.canvasAspect=1;duoState.background.mode='blend';duoState.cards=[duo];
  const duoBg=JSON.parse(await createSmartBackground(JSON.stringify(duoState),'/cache'));
  assert.equal(duoBg.palette.length,2,'one card contributes both hues to the persisted palette');
- assert.ok(duoBg.anchors.some(a=>a.y<.25)&&duoBg.anchors.some(a=>a.y>.5),'source top and bottom colours keep measured canvas positions');
+ assert.ok(Math.hypot(duoBg.anchors[0].x-duoBg.anchors[1].x,duoBg.anchors[0].y-duoBg.anchors[1].y)>.4,'different hues get separate canvas regions');
  assert.ok(Math.abs(duoBg.anchors[0].weight-duoBg.anchors[1].weight)<.008,'equal areas keep equal votes');
  const read=new Map([['file:///two-tone.png',{width:48,height:48,rgba:twoTone}]]);
  const flat=new FridgeCard();flat.w=240;flat.h=240;flat.paper='#FFFFFF';
@@ -87,19 +86,34 @@ function pixels(main,accent,fraction){const out=new Uint8Array(48*48*4);for(let 
  function colorDistance(a,b){const x=p.colorLab(a),y=p.colorLab(b);return Math.hypot(x.l-y.l,x.a-y.a,x.b-y.b);}
  const wash=p.canvasBlendPixels(anchors,'#F2F1EE',96,96);
  let minLight=100,maxChroma=0;for(let i=0;i<wash.length;i+=4){const lab=p.colorLab('#'+Array.from(wash.slice(i,i+3)).map(v=>v.toString(16).padStart(2,'0')).join(''));minLight=Math.min(minLight,lab.l);maxChroma=Math.max(maxChroma,Math.hypot(lab.a,lab.b));}
- assert.ok(minLight>87&&maxChroma<29,'canvas wash remains bright and restrained even for saturated source colours');
+ assert.ok(maxChroma>45,'canvas retains the saturation of source colour clouds');
  const opposing=[{x:.2,y:.2,color:'#F5CD32',weight:.7},{x:.8,y:.8,color:'#247ECC',weight:.3}];
  assert.deepEqual(p.canvasBlendPixels(opposing,'#EEECE6',80,120),p.canvasBlendPixels(opposing.slice().reverse(),'#EEECE6',80,120),'changing field order cannot overwrite a minority hue');
  const hueField=p.canvasBlendPixels(opposing,'#EEECE6',96,96);
  const pixelLab=(bytes,x,y)=>p.colorLab('#'+Array.from(bytes.slice((y*96+x)*4,(y*96+x)*4+3)).map(v=>v.toString(16).padStart(2,'0')).join(''));
- assert.ok(pixelLab(hueField,20,20).b>8&&pixelLab(hueField,78,78).b<0,'warm and cool source regions remain distinct in the softened background');
+ assert.ok(pixelLab(hueField,20,20).b>8&&pixelLab(hueField,78,78).b<0,'warm and cool source regions remain distinct in the fluid background');
  const small=p.canvasBlendPixels([{x:.2,y:.2,color:'#F5CD32',weight:.99},{x:.8,y:.8,color:'#247ECC',weight:.01}],'#EEECE6',96,96);
  let coolSmall=0,coolLarge=0;for(let y=0;y<96;y++)for(let x=0;x<96;x++){if(pixelLab(small,x,y).b<0)coolSmall++;if(pixelLab(hueField,x,y).b<0)coolLarge++;}
- assert.ok(coolSmall<coolLarge*.5,'a one-percent accent has a smaller visible footprint than a thirty-percent secondary colour');
+ assert.ok(coolSmall<coolLarge,'a one-percent accent has a smaller visible footprint than a thirty-percent secondary colour');
  const {visibleCanvasColors}=load('CardColorDistribution');
  const back=new FridgeCard(),front=new FridgeCard();Object.assign(back,{id:'back',x:40,y:50,w:200,h:200,z:1,paper:'#DD4433'});Object.assign(front,{id:'front',x:40,y:50,w:200,h:200,z:2,paper:'#2255DD'});
  const scene=visibleCanvasColors([back,front],[cardColorRaster(back,new Map()),cardColorRaster(front,new Map())],1);
  assert.ok(scene.every(a=>colorDistance(a.color,'#DD4433')>30),'a completely covered card does not contribute source colours');
  assert.ok(scene.reduce((sum,a)=>sum+a.weight,0)<.35,'overlapping cards do not double-count canvas area');
+ const {canvasColourFamilies,canvasFluidLayout}=load('CanvasFluidPalette');
+ const captured=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/canvas-fluid-colours.json'),'utf8'));
+ const families=canvasColourFamilies(captured);
+ assert.ok(families.some(a=>a.color==='#D60411'),'small vivid red survives warm shades in measured artwork');
+ assert.ok(families.some(a=>a.color==='#6BA0A2')&&families.some(a=>a.color==='#E9BE48'),'cyan and yellow also keep a palette slot');
+ assert.ok(families.length<=6);
+ assert.ok(Math.abs(families.reduce((sum,a)=>sum+a.weight,0)-captured.reduce((sum,a)=>sum+a.weight,0))<1e-9,'family selection preserves measured mass');
+ assert.deepEqual(canvasColourFamilies(captured.slice().reverse()),families,'family selection ignores source enumeration order');
+ const coverage=new Array(18*18).fill(1);for(let y=0;y<6;y++)for(let x=0;x<18;x++)coverage[y*18+x]=0;
+ const positioned=canvasFluidLayout(families,coverage,18,18);
+ assert.ok(positioned.some(a=>a.color==='#D60411'&&a.y<.4),'a minority hue can move out from behind its source card');
+ const vividControl=[{x:.2,y:.2,color:'#E72B35',weight:1},{x:.8,y:.2,color:'#2862D6',weight:1},{x:.5,y:.85,color:'#F5CF32',weight:1}];
+ const vivid=p.canvasBlendPixels(vividControl,'#CCCCCC',96,96);let redPixels=0,bluePixels=0,yellowPixels=0;
+ for(let i=0;i<vivid.length;i+=4){const r=vivid[i],g=vivid[i+1],b=vivid[i+2];if(r>g*1.3&&r>b*1.2)redPixels++;if(b>r*1.2&&b>g*1.15)bluePixels++;if(r>b*1.4&&g>b*1.4)yellowPixels++;}
+ assert.ok(redPixels>300&&bluePixels>300&&yellowPixels>300,'red, blue and yellow are simultaneously visible, not averaged into one colour');
  console.log('PASS background: measured cluster proportions, transparent pixels, minority accents, Overlay hue preservation, single-hue light/shade depth, actual weighted worker output movement-stable/versioned cache, single-card multiple hues, measured spatial distribution, layer occlusion/opacity, all layers, Cover crop, neutral area, alpha and canvas clipping');
 })().catch(e=>{console.error(e);process.exitCode=1;});

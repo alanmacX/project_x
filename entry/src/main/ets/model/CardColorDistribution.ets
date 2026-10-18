@@ -96,3 +96,19 @@ export function visibleCanvasColors(cards:FridgeCard[],rasters:ColorRaster[],asp
   }
   return anchors;
 }
+
+/** Coarse artwork coverage for placing fluid colour clouds in exposed space. */
+export function canvasArtworkCoverage(cards:FridgeCard[],rasters:ColorRaster[],aspect:number,columns:number,rows:number):number[]{
+  const coverage:number[]=new Array<number>(columns*rows).fill(0);
+  for(let at=0;at<cards.length;at++){
+    const card=cards[at],angle=card.rot*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle);
+    for(let y=0;y<rows;y++)for(let x=0;x<columns;x++){
+      const dx=((x+.5)/columns-card.x/BOARD_W)*BOARD_W,dy=((y+.5)/rows-card.y/BOARD_H)*BOARD_W/aspect-card.h;
+      const u=(dx*cos+dy*sin)/card.w,v=1-(dx*sin-dy*cos)/card.h;
+      if(u<0||u>=1||v<0||v>=1)continue;
+      const index=y*columns+x,alpha=sample(rasters[at],u,v,card.w/card.h,false)[3]/255;
+      coverage[index]+=alpha*(1-coverage[index]);
+    }
+  }
+  return coverage;
+}

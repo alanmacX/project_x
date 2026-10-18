@@ -1,4 +1,5 @@
-import { ColorRaster, cardColorRaster, visibleCanvasColors } from './CardColorDistribution';
+import { canvasColourFamilies, canvasFluidLayout } from './CanvasFluidPalette';
+import { ColorRaster, cardColorRaster, visibleCanvasColors, canvasArtworkCoverage } from './CardColorDistribution';
 import { photoFrame } from './PhotoCropGeometry';
 import { image } from '@kit.ImageKit';
 import { fileIo } from '@kit.CoreFileKit';
@@ -30,7 +31,8 @@ export async function createSmartBackground(json:string,filesDir:string):Promise
     if(existing!==undefined){const total=existing.weight+candidate.weight;existing.x=(existing.x*existing.weight+candidate.x*candidate.weight)/total;existing.y=(existing.y*existing.weight+candidate.y*candidate.weight)/total;existing.weight=total;}
     else fields.push({x:candidate.x,y:candidate.y,color:candidate.color,weight:candidate.weight});
   }
-  bg.anchors=reduceBackgroundAnchors(fields);
+  const families=canvasColourFamilies(fields),columns=18,rows=Math.max(9,Math.min(28,Math.round(columns/state.canvasAspect)));
+  bg.anchors=state.background.mode==='blend'?canvasFluidLayout(families,canvasArtworkCoverage(cards,rasters,state.canvasAspect,columns,rows),columns,rows):reduceBackgroundAnchors(fields);
   bg.palette=Array.from(new Set(bg.anchors.map((p:BackgroundAnchor)=>p.color))).slice(0,6);
   if(bg.mode==='smart')return JSON.stringify(bg);
   const width=320,height=Math.max(160,Math.min(512,Math.round(width/state.canvasAspect))),path=filesDir+'/canvas_blend_'+hash(bg.signature+'|'+JSON.stringify(bg.anchors))+'.png';

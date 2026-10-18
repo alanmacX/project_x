@@ -112,26 +112,37 @@ export function reduceBackgroundAnchors(points: BackgroundAnchor[], limit: numbe
  * rendered off-thread so FormKit, preview and exported artwork share identical pixels.
  */
 export function blendPixels(anchors: BackgroundAnchor[], base: string, width: number, height: number): Uint8Array {
+  return renderFluidPixels(anchors,base,width,height,false);
+}
+interface FluidFieldProfile { radius:number; ry:number; opacity:number; hx:number; hy:number; }
+function renderFluidPixels(anchors:BackgroundAnchor[],base:string,width:number,height:number,canvas:boolean):Uint8Array {
   const bytes=new Uint8Array(width*height*4);
   const rgb=(hex:string):number[]=>[parseInt(hex.slice(1,3),16)/255,parseInt(hex.slice(3,5),16)/255,parseInt(hex.slice(5,7),16)/255];
-  const fields=anchors.slice().sort((a:BackgroundAnchor,b:BackgroundAnchor)=>b.weight-a.weight);
-  const neutral=rgb(fields.length>0?fluidBase(fields):base),maxWeight=Math.max(.001,...fields.map((p:BackgroundAnchor)=>p.weight));
+  const fields=anchors.slice().sort((a:BackgroundAnchor,b:BackgroundAnchor)=>{
+    if(canvas){const ca=colorLab(a.color),cb=colorLab(b.color),na=Math.hypot(ca.a,ca.b)<16,nb=Math.hypot(cb.a,cb.b)<16;if(na!==nb)return na?-1:1;}
+    return b.weight-a.weight||(canvas?a.color.localeCompare(b.color):0);
+  });
+  const neutral=rgb(canvas&&fields.length>0?combineColors(fields):fields.length>0?fluidBase(fields):base),maxWeight=Math.max(.001,...fields.map((p:BackgroundAnchor)=>p.weight));
   const colors=fields.map((p:BackgroundAnchor)=>rgb(p.color));
+  const profiles=fields.map((p:BackgroundAnchor,k:number):FluidFieldProfile=>{
+    const relative=p.weight/maxWeight,radius=canvas?.24+.25*Math.pow(relative,.25):.3+.45*((k*7+3)%11)/10;
+    const ry=radius*Math.max(width/height,1)*(canvas?.85+.25*((k*5+1)%7)/6:.65+.9*((k*5+1)%7)/6);
+    const lab=colorLab(p.color),neutralField=canvas&&Math.hypot(lab.a,lab.b)<16;
+    return {radius:radius,ry:ry,opacity:canvas?(neutralField?.38:.55+.4*Math.pow(relative,.3)):.95*Math.pow(relative,.75),hx:Math.max(0,Math.min(1,p.x+.28*Math.sin(k*2.4+1))),hy:Math.max(0,Math.min(1,p.y+.24*Math.cos(k*1.7+1)))};
+  });
   const core=(r:number):number=>r<=.9?1:r>=1?0:1-(r-.9)/.1;
   const overlay=(b:number,h:number):number=>b<.5?2*b*h:1-2*(1-b)*(1-h);
-  // Spatial influences remain attached to card centres. Sizes match the source's
-  // .15–.75 range; a second independently displaced layer supplies luminous folds.
+  // Artwork supplies source positions; the canvas profile moves its colour fields
+  // into exposed space. An independently displaced highlight supplies light folds.
   for(let y=0;y<height;y++)for(let x=0;x<width;x++){
     const nx=x/Math.max(1,width-1),ny=y/Math.max(1,height-1);
     const out=neutral.slice(),high:number[]=[0,0,0];let alpha=0;
     for(let k=0;k<fields.length;k++){
-      const p=fields[k],radius=.3+.45*((k*7+3)%11)/10;
-      const ry=radius*Math.max(width/height,1)*(.65+.9*((k*5+1)%7)/6);
-      const opacity=.95*Math.pow(p.weight/maxWeight,.75);
+      const p=fields[k],profile=profiles[k],radius=profile.radius,ry=profile.ry,opacity=profile.opacity;
       const a=core(Math.hypot((nx-p.x)/radius,(ny-p.y)/ry))*opacity;
       for(let c=0;c<3;c++)out[c]=colors[k][c]*a+out[c]*(1-a);
-      const hx=Math.max(0,Math.min(1,p.x+.28*Math.sin(k*2.4+1))),hy=Math.max(0,Math.min(1,p.y+.24*Math.cos(k*1.7+1)));
-      const ha=core(Math.hypot((nx-hx)/(radius*.85),(ny-hy)/(ry*.85)))*opacity;
+      const hx=profile.hx,hy=profile.hy;
+      const ha=core(Math.hypot((nx-hx)/(radius*.85),(ny-hy)/(ry*.85)))*opacity*(canvas?.55:1);
       for(let c=0;c<3;c++)high[c]=colors[k][c]*ha+high[c]*(1-ha);
       alpha=ha+alpha*(1-ha);
     }
@@ -140,7 +151,7 @@ export function blendPixels(anchors: BackgroundAnchor[], base: string, width: nu
     bytes[i+3]=255;
   }
   // Separable blur on the generated colour field, not on card artwork. O(pixels), off UI thread.
-  const radius=Math.max(2,Math.round(Math.pow(Math.min(width,height),.75))),span=radius*2+1;
+  const radius=Math.max(2,Math.round(canvas?Math.min(width,height)*.09:Math.pow(Math.min(width,height),.75))),span=radius*2+1;
   let input=bytes;
   for(let pass=0;pass<3;pass++){
     const horizontalBytes=new Uint8Array(bytes.length),output=new Uint8Array(bytes.length);
@@ -157,33 +168,8 @@ export function blendPixels(anchors: BackgroundAnchor[], base: string, width: nu
   return input;
 }
 
-/** Canvas washes use a light foundation and commutative perceptual mixing.
- * Source colours remain in the palette; only their background presentation softens. */
+/** Canvas keeps the layered FluidGradient language, with bounded visual support
+ * for minority hues. Album backgrounds continue to use their historical profile. */
 export function canvasBlendPixels(anchors:BackgroundAnchor[],base:string,width:number,height:number):Uint8Array {
-  const bytes=new Uint8Array(width*height*4),foundation=colorLab(base);
-  const chroma=Math.hypot(foundation.a,foundation.b),neutralScale=chroma>0?Math.min(4,chroma*.25)/chroma:0;
-  const neutral:LabColor={l:94,a:foundation.a*neutralScale,b:foundation.b*neutralScale};
-  // Sorting makes the result deterministic even when callers reorder equal fields.
-  const fields=anchors.filter((p:BackgroundAnchor)=>p.weight>0).slice().sort((a:BackgroundAnchor,b:BackgroundAnchor)=>a.x-b.x||a.y-b.y||a.color.localeCompare(b.color)||a.weight-b.weight);
-  const total=fields.reduce((sum:number,p:BackgroundAnchor)=>sum+p.weight,0);
-  const tones=fields.map((p:BackgroundAnchor):LabColor=>{
-    const lab=colorLab(p.color),c=Math.hypot(lab.a,lab.b),scale=c>0?Math.min(36,c*.6)/c:0;
-    const shadow=.45+.55*Math.min(1,lab.l/55);
-    return {l:85+4*lab.l/100,a:lab.a*scale*shadow,b:lab.b*scale*shadow};
-  });
-  const radii=fields.map((p:BackgroundAnchor)=>.13+.48*Math.sqrt(p.weight/Math.max(total,1e-12)));
-  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
-    const nx=x/Math.max(1,width-1),ny=y/Math.max(1,height-1);
-    let mass=.24,l=neutral.l*mass,a=neutral.a*mass,b=neutral.b*mass;
-    for(let k=0;k<fields.length;k++){
-      const p=fields[k],r=radii[k],share=p.weight/Math.max(total,1e-12);
-      const d=((nx-p.x)**2+((ny-p.y)*height/width)**2)/(r*r);
-      // Integrated influence follows area; a tiny accent cannot cover the canvas.
-      const influence=.28*share/(r*r)*Math.exp(-d*1.6);
-      mass+=influence;l+=tones[k].l*influence;a+=tones[k].a*influence;b+=tones[k].b*influence;
-    }
-    const rgb=labRGB({l:l/mass,a:a/mass,b:b/mass}),i=(y*width+x)*4;
-    bytes[i]=rgb[0];bytes[i+1]=rgb[1];bytes[i+2]=rgb[2];bytes[i+3]=255;
-  }
-  return bytes;
+  return renderFluidPixels(anchors,base,width,height,true);
 }
