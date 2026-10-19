@@ -1,3 +1,5 @@
+import lazy { SystemCloudSync } from '../model/SystemCloudSync';
+import { CloudSyncDialog } from '../views/CloudSyncDialog';
 import { prepareSceneImages, trimSceneImages } from '../model/SceneImageCache';
 import { GalleryAnchor, GalleryController } from '../model/CanvasGallery';
 import { primeGalleryPreviews } from '../model/GalleryPreviewCache';
@@ -406,6 +408,19 @@ struct Index {
       this.syncSchedules(); this.updateScheduledScene(true);
       this.repairStoredSubjects(); this.refreshCapabilities();
     }, 1200);
+  }
+  private cloudSync:SystemCloudSync|null=null;
+  private cloudDialog:CustomDialogController|null=null;
+  private openCloudSync():void{
+    if(!this.context||this.busy||!this.galleryVisible)return;
+    if(!this.cloudSync)this.cloudSync=new SystemCloudSync();
+    this.cloudDialog=new CustomDialogController({customStyle:true,autoCancel:false,builder:CloudSyncDialog({appDark:this.appDark,onArchives:async()=>this.context?await this.cloudSync!.archived(this.context):[],onRestore:async(id:string):Promise<string>=>{if(!this.context)throw new Error('应用尚未就绪');const message=await this.cloudSync!.restoreArchive(this.context,this.store,id);this.syncSchedules();return message;},onSync:async(status:(message:string)=>void):Promise<string>=>{
+      if(!this.context)throw new Error('应用尚未就绪');this.busy=true;const before=this.store.state;
+      try{
+        const result=await this.cloudSync!.synchronize(this.context,this.store,status);
+        return '合并 '+result.changed+' 项，保留 '+result.conflicts+' 份冲突数据。'+result.message;
+      }finally{this.busy=false;if(this.store.state!==before){this.canvasBackground=this.store.state.background;this.refreshCanvasList();this.syncSchedules();this.render();this.galleryRevision++;this.galleryController.resumePreviews();}}
+    }})});this.cloudDialog.open();
   }
   private refreshCanvasList(): void {
     this.canvasEntries = this.store.catalog.canvases.map((c: CanvasEntry): CanvasEntry => ({id:c.id,name:c.name}));
@@ -1733,7 +1748,7 @@ struct Index {
             onRename: (id: string, name: string) => this.renameGalleryCanvas(id, name),
             onDuplicate: (id: string) => this.duplicateGalleryCanvas(id), onShare: (id: string) => this.shareCanvasById(id),
             onDelete: (id: string) => this.deleteCanvas(id), onImport: () => this.pickTemplate(),
-            onSkill: (url: string) => this.openSkillRepository(url) })
+            onCloud:()=>this.openCloudSync(), onSkill: (url: string) => this.openSkillRepository(url) })
             .visibility(this.galleryVisible||this.galleryTransitioning?Visibility.Visible:Visibility.Hidden)
             .hitTestBehavior(this.galleryVisible?HitTestMode.Transparent:HitTestMode.None)
             .accessibilityLevel(this.galleryVisible?'auto':'no-hide-descendants')

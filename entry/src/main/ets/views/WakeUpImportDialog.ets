@@ -1,3 +1,4 @@
+import { SchoolImportDialog } from './SchoolImportDialog';
 import { SettingsSegmented } from './SettingsSegmented';
 import { SettingsAction } from './SettingsAction';
 import { WeekTimetable } from './WeekTimetable';
@@ -27,8 +28,13 @@ export struct WakeUpImportDialog {
   @State keepCalendar:boolean=false;
   @State busy:boolean=false;
   @State error:string='';
+  private schoolDialog:CustomDialogController|null=null;
+  private openSchool():void {
+    this.schoolDialog=new CustomDialogController({builder:SchoolImportDialog({appDark:this.appDark,onRead:(json:string)=>{this.calendarFile=false;this.accept(json);}}),customStyle:true,autoCancel:false});
+    this.schoolDialog.open();
+  }
   private alive:boolean=true;
-  aboutToDisappear():void {this.alive=false;}
+  aboutToDisappear():void {this.alive=false;this.schoolDialog?.close();}
   private accept(json:string):void {
     if(!this.alive)return;this.parsed=JSON.parse(json) as WakeImport;this.slots=this.parsed.slots;this.semester=this.parsed.semester;this.stage=true;this.periods=this.slots.some((s)=>!s.start||!s.end);this.error='';this.refreshPreview();
   }
@@ -69,6 +75,7 @@ export struct WakeUpImportDialog {
       Text(this.stage?'确认课程表':'导入课程表').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).width('100%')
       if(!this.stage) {
 
+        SettingsAction({label:'从学校教务导入',onPress:()=>this.openSchool(),appDark:this.appDark,isEnabled:!this.busy,emphasis:true})
         SettingsAction({label:'选择课程日历 .ics',onPress:()=>this.file(),appDark:this.appDark,isEnabled:!this.busy,emphasis:true})
         Column({space:8}) {
           Text('如何从 WakeUp 导入').fontSize(15).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark))

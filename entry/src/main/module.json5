@@ -8,6 +8,7 @@
     "deliveryWithInstall": true,
     "installationFree": false,
     "pages": "$profile:main_pages",
+    "requestPermissions": [{"name":"ohos.permission.INTERNET"}],
     // API 26: native segmented controls, switches and dialogs use the system material.
     // Earlier compatible systems retain their native appearance.
     "metadata": [{ "name": "ohos.arkui.UIMaterial.state", "value": "enable" }],

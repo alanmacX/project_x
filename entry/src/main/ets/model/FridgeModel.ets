@@ -311,6 +311,41 @@ export class FridgeStore {
       hilog.info(0,'WidgetPerf','save snapshot=%{public}d diskQueue=%{public}d delivery=%{public}d total=%{public}d',captured-started,persisted-captured,Date.now()-persisted,Date.now()-started);
     });
   }
+  /** Commit a fully downloaded private library while the gallery owns the UI.
+   * Desktop instance identities stay local. Deleted records remain recoverable on disk. */
+  async applyCloudDocuments(incoming:CanvasDocument[],removed:string[],sceneIds:string[],timetableJson:string,policyJson:string):Promise<void>{
+    await this.save(false);await this.saveQueue;if(!this.prefs)throw new Error('本地存储尚未就绪');
+    const next=readCatalog(JSON.stringify(this.catalog)),states:Record<string,FridgeState>={};
+    for(const doc of incoming){
+      if(!/^[a-zA-Z0-9_-]{1,96}$/.test(doc.id)||!doc.state||!Array.isArray(doc.state.cards))throw new Error('同步画布不正确');
+      const state=normalizeState(doc.state);state.canvasId=doc.id;states[doc.id]=state;
+      const old=next.canvases.concat(next.scenes).find(entry=>entry.id===doc.id);
+      if(old)old.name=doc.name.slice(0,40);
+      else (sceneIds.includes(doc.id)?next.scenes:next.canvases).push({id:doc.id,name:doc.name.slice(0,40)});
+    }
+    next.canvases=next.canvases.filter(entry=>!removed.includes(entry.id));next.scenes=next.scenes.filter(entry=>!removed.includes(entry.id));
+    if(!next.canvases.length)throw new Error('同步将移除最后一张画布，已保留本机作品');
+    if(next.scenes.length>12)throw new Error('云端定时场景超过12个，已保留本机作品');
+    if(policyJson){const policy=JSON.parse(policyJson) as CanvasCatalog;next.rotation=normalizeCanvasRotation(policy.rotation,next.canvases.map(entry=>entry.id));next.sceneRules=policy.sceneRules;}
+    if(timetableJson){const data=JSON.parse(timetableJson) as TimetableData;if(data.version!==1||typeof data.semester!=='string'||!Array.isArray(data.courses)||data.courses.length>128)throw new Error('云端课表格式不正确');}
+    next.activeId=next.canvases.some(entry=>entry.id===this.catalog.activeId)?this.catalog.activeId:next.canvases[0].id;
+    const clean=readCatalog(JSON.stringify(next)),target=states[clean.activeId]??await this.canvasSnapshot(clean.activeId);
+    const before:Record<string,string>={};
+    const values:Record<string,string>={'fridge_canvases_json':JSON.stringify(clean),'fridge_state_json':storageSnapshot(target)};
+    for(const id of Object.keys(states))values[canvasKey(id)]=storageSnapshot(states[id]);
+    if(timetableJson)values['fridge_saved_timetable_v1']=timetableJson;
+    for(const key of Object.keys(values))before[key]=await this.prefs.get(key,'') as string;
+    try{for(const key of Object.keys(values))await this.prefs.put(key,values[key]);await this.prefs.flush();}
+    catch(e){for(const key of Object.keys(before))await this.prefs.put(key,before[key]);await this.prefs.flush();throw e as Error;}
+    this.catalog=clean;this.lastCatalog=JSON.stringify(clean);this.documents=[];this.savedScenes={};this.timetableLibrary=null;
+    for(const id of Object.keys(states)){const doc=new CanvasDocument();doc.id=id;doc.name=clean.canvases.concat(clean.scenes).find(entry=>entry.id===id)?.name??'画布';doc.state=states[id];this.documents.push(doc);this.savedScenes[id]=storageSnapshot(states[id]);}
+    if(!this.documents.some(doc=>doc.id===target.canvasId)){const doc=new CanvasDocument();doc.id=target.canvasId;doc.name=this.activeName;doc.state=target;this.documents.push(doc);}
+    this.state=target;
+    if(this.context)for(const id of removed)await detachDeletedCanvas(this.context,id);
+  }
+  async refreshSyncedWidgets(ids:string[]):Promise<void>{
+    for(const id of Array.from(new Set(ids))){if(!sceneDocumentExists(this.catalog,id))continue;const queue=this.queueFor(id);await queue.waitForIdle();queue.invalidate();await queue.submit(storageSnapshot(await this.canvasSnapshot(id)));}
+  }
   nextZ(): number { return ++this.state.maxZ; }
   bringToFront(card: FridgeCard): void { card.z = this.nextZ(); }
   findCard(id: string): FridgeCard | null { return this.state.cards.find((c: FridgeCard) => c.id === id) ?? null; }

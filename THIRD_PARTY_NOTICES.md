@@ -23,3 +23,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+# School timetable adapters
+
+The optional in-app school import bundles the MIT-licensed qingyu_warehouse / shiguang_warehouse adapter snapshot `42474728fd1d6537c6ece020aa16d117c18d2d2d` from https://github.com/Mutx163/qingyu_warehouse . Copyright (c) 2025 星河欲转. The complete MIT text is included at `entry/src/main/resources/rawfile/schools/LICENSE.txt`, with provenance and exclusions in `SOURCE.txt`. Adapter scripts run only after the user selects a school and requests a read in its academic web page. FridgeMemo supplies the ArkWeb host, limited preview bridge and local timetable validation. The catalogue is a bundled snapshot, not a guarantee that every school's current website can be imported.

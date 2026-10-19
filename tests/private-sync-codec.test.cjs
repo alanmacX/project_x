@@ -1,0 +1,10 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript'),env={exports:{}};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('entry/src/main/ets/model/PrivateSyncCodec.ets','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}}).outputText,env);
+const data={schemaVersion:2,canvasDimension:'2*2',background:{src:'file:///a.png',photo:'file:///original.jpg',signature:'device'},cards:[{cutout:'file:///a.png',elements:[{src:'file:///b.gif',depthForeground:'file:///depth.png'}],capability:{k:'timetable',semester:'2026-09-07',courses:[{name:'数学',firstWeek:1,lastWeek:16}],teachingDays:[{date:'2026-10-18'}]}},{cutout:'',elements:[],capability:{k:'countdown',target:'2027-01-01',title:'考试'}},{cutout:'',elements:[],capability:{k:'battery',percent:80,charging:true}},{cutout:'',elements:[],capability:{k:'agenda',agendaSource:'system',events:[{title:'设备私有日历'}]}}]};
+const raw=JSON.stringify(data),scene=env.exports.privateSyncScene(raw);
+assert.equal(scene.cards[0].capability.courses[0].name,'数学');assert.equal(scene.cards[1].capability.title,'考试','private countdowns survive, unlike public templates');assert.equal(scene.cards[2].capability.percent,-1);assert.equal(scene.cards[3].capability.events.length,0,'system calendar is re-read per device');assert.equal(scene.background.signature,'');assert.equal(JSON.stringify(data),raw,'encoding never mutates authored data');
+assert.equal(env.exports.privateAssetPaths(scene).length,4,'same source is shared across background and cards');
+const replaced=env.exports.replacePrivateAssets(raw,'file:///a.png','sync-asset://hash.png');assert.equal((replaced.match(/sync-asset/g)||[]).length,2);assert(!replaced.includes('file:///a.png'));
+assert.throws(()=>env.exports.privateSyncScene(JSON.stringify({...data,canvasDimension:'wrong'})));
+console.log('PASS private sync: exact course/countdown data, independent device capabilities, complete deduplicated asset references and immutable source.');

@@ -1,0 +1,6 @@
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
+const root='entry/src/main/resources/rawfile',catalog=JSON.parse(fs.readFileSync(root+'/schools/catalog.json','utf8')),ids=new Set();let count=0;
+for(const school of catalog){assert(!ids.has(school.id));ids.add(school.id);assert(school.name&&school.adapters.length);for(const a of school.adapters){assert(a.script==='school-qiangzhi.js'||/^schools\/[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+\.js$/.test(a.script));assert(fs.existsSync(path.join(root,a.script)));new vm.Script(fs.readFileSync(path.join(root,a.script),'utf8'),{filename:a.script});if(a.url)assert(/^https?:\/\//.test(a.url));count++;}}
+assert(catalog.some(s=>s.id==='ZJUT'));assert(catalog.some(s=>s.id==='zhengfang_jiaowu'));assert(fs.readFileSync(root+'/schools/LICENSE.txt','utf8').includes('MIT License'));
+const view=fs.readFileSync('entry/src/main/ets/views/SchoolImportDialog.ets','utf8');assert(view.includes('incognitoMode:true'));assert(view.includes('.fileAccess(false)'));assert(!view.includes('javaScriptProxy'));
+console.log(`PASS bundled school catalog: ${catalog.length} school/system entries, ${count} syntax-valid adapters, attribution, incognito web login and no native JS bridge.`);

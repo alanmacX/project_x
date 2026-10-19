@@ -6,13 +6,13 @@ from pathlib import Path
 from zipfile import ZipFile
 
 STUDIES = ('SketchLab', 'ReadingDemo', 'MicaStudy', 'ReadingEdgeStudy',
-           'CloudAcceptance', 'AlbumStudy', 'FridgePreviewer')
+           'CloudAcceptance', 'AlbumStudy', 'FridgePreviewer', 'NativeV28QA')
 
 
 def audit_hap(data, label):
     with ZipFile(io.BytesIO(data)) as hap:
         pages = json.loads(hap.read('resources/base/profile/main_pages.json'))['src']
-        if pages != ['pages/Index', 'pages/ReceiveTemplate']:
+        if pages != ['pages/Index', 'pages/WidgetBinding', 'pages/ReceiveTemplate']:
             raise ValueError(f'{label}: unexpected registered pages: {pages}')
         abc = hap.read('ets/modules.abc')
         for name in STUDIES:
@@ -22,9 +22,9 @@ def audit_hap(data, label):
         manifest = json.loads(hap.read('module.json'))['module']
         if [a['name'] for a in manifest['abilities']] != ['EntryAbility']:
             raise ValueError(f'{label}: unexpected ability entry')
-        if {a['name'] for a in manifest['extensionAbilities']} != {'TemplateShareAbility', 'FridgeFormAbility'}:
+        if {a['name'] for a in manifest['extensionAbilities']} != {'TemplateShareAbility', 'FridgeFormAbility', 'WidgetConfigAbility'}:
             raise ValueError(f'{label}: production extensions changed')
-        print(f'PASS {label}: production pages/extensions retained; all 7 study page modules absent')
+        print(f'PASS {label}: production pages/extensions retained; all study/temporary QA page modules absent')
 
 
 paths = [Path(p) for p in sys.argv[1:]] or sorted(Path('build/outputs/default').glob('*.app'))

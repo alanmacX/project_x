@@ -4,6 +4,7 @@
   "app": {
     "bundleName": "com.fridgewidget.app",
     "vendor": "fridgememo",
+    "cloudFileSyncEnabled": true,
     "versionCode": 1000000,
     "versionName": "1.0.0",
     "icon": "$media:layered_image",

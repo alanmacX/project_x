@@ -1,0 +1,3 @@
+
+# Preserve the pinned upstream adapter snapshot, including its original whitespace.
+entry/src/main/resources/rawfile/schools/** -whitespace
