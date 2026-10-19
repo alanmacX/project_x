@@ -1,4 +1,23 @@
-> 2026-10-19：用户授权开始实验接入。下文为此前研究原文；实现和实测限制以 RELEASE_CHECKPOINTS.md 为准。已增加系统云能力与显式同步流程，平板当前返回云状态未就绪，尚无真实双机通过结论。
+> 2026-10-19：用户授权开始实验接入。已增加系统云能力与显式同步流程，平板当前返回云状态未就绪，尚无真实双机通过结论。下面先记录本日重新打开官方网页核查的结果，再保留早期研究原文。
+
+## 2026-10-19 官方网页重新核查
+
+通过浏览器实际打开并阅读华为开发者文档正文（搜索工具未能抓取该站页面）：
+
+- [端云文件协同适配指导](https://developer.huawei.com/consumer/cn/doc/doccenter-capabilities/app-cloud-sync-filesync)，页面更新 2026-08-18。环境要求为 HarmonyOS 6.0.0.115+、云空间 6.0.0.300+、DevEco Studio 6.0.1 Release+（文中构建版本 6.0.1.251）、API 21 Release+。安装声明 `app.cloudFileSyncEnabled: true` 的应用后，登录系统账号，在系统设置的云空间中找到并开启开发应用的同步开关。指南明确以调试安装的示例应用说明操作；没有列出先上架、AGC 开通服务、集成应用内 Account Kit 登录页或申请系统级 ACL 权限的步骤。这不等于已经证明所有开发者资质和商业发布场景均无限制。
+- [端云文件协同概述](https://developer.huawei.com/consumer/cn/doc/doccenter-capabilities/cloud-sync-file-overview)，页面更新 2026-04-20。待同步数据放入 `/data/storage/el2/cloud`，系统服务负责上下行；普通 `filesDir` 不会自动迁移。文件写入完成后和目录创建成功后会自动触发同步。应用仍需负责作品协议、素材引用、接收后刷新本地 UI 和组件。
+- [FileSync.start API](https://developer.huawei.com/consumer/cn/doc/doccenter-references/api/js-apis-file-cloudsync#start12)：成功返回只代表启动请求成功，完整进度需看回调；同一实例监听和启动，不能高频调用。官方指南将该 API 用于应用云目录，不应仅因 API 中“云盘”的措辞就误判为只能由系统文件管理器使用。
+- [文件管理错误码](https://developer.huawei.com/consumer/cn/doc/doccenter-references/api/errorcode-filemanagement#section22400001-云端状态未ready)，页面更新 2026-09-14。`22400001` 的官方可能原因为未启用云、应用云同步开关未打开；处理步骤是检查账号登录及同步开关。当前平板确实返回此错误，但还未确定两项中的具体原因，不能据此声称一定缺少开发者后台授权。
+- [云空间云备份和云同步支持数据范围](https://consumer.huawei.com/cn/support/content/zh-cn16019648/) 的消费者说明列出三方应用同步，并注明三方应用支持订阅会员后使用。需核查当前账号实际云空间方案及系统页面；不能承诺该功能对所有用户免费。该页的三方应用支持版本说明与开发适配指南的调试最低版本用途不同，接入验证采用适配指南要求。
+- 官方提供的[示例工程入口](https://gitcode.com/HarmonyOS_Samples/guide-snippets/tree/master/CoreFile/AppCloudSync)来自适配指南的正文链接；本轮未检视其源码，不把它列为已经完成代码对照的证据。
+
+### 当前实现与正式体验的差距
+
+当前 `SystemCloudSync.synchronize` 使用正确的系统 API 和 `context.cloudFileDir`，并在启动失败时拒绝发布作品。然而它仅在用户点击同步时生成云目录中的作品修订，尚非保存后自动发布和接收的正式同步体验。系统只能自动同步已经写入云目录的内容，不能感知仍只存在本地画布库的新修改。
+
+下一步应先只读核查真机系统与云空间版本、系统账号是否就绪、本应用开关是否出现及其状态；如开关不存在，在满足官方版本及安装包声明的前提下继续查系统注册和日志，不能要求用户寻找不存在的开关。开启同步涉及私人数据上云，应由用户明确授权或自行完成。完成实际同账号双设备上传、下载、素材占位下载和账号切换验收后，再接入保存完成后的合并发布与远端修改应用；不能靠模拟测试宣称真实同步通过。
+
+以下保留早期研究原文，其中“尚未实现”等描述仅代表当时状态。
 
 # 华为系统账号与作品同步：官方文档核查
 
