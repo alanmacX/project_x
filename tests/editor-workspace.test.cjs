@@ -10,3 +10,7 @@ for(const [w,h] of [[320,568],[360,640],[390,844],[460,672],[768,1024],[940,665]
  else {assert.equal(v.stageW,w);assert.equal(v.stageH+v.panelH,v.body);assert.ok(v.stageH>=v.body*.59,'default prioritizes preview');assert.ok(v.panelH>=v.body*.39);}
 }
 console.log('PASS embedded editor: preview + layers share height, inspector fills remaining phone/wide space, short-window budgets.');
+for(const w of [240,280,320,390,540,640,780,1024,1400])for(const h of [200,220,240,300,360,540,800,1200])for(const [top,bottom] of [[0,0],[38,24],[52,32]]){
+ const v=env.exports.editorWorkspace(w,h,top,bottom);assert(v.body<=h-top-bottom-60,'short-window editor never invents height');assert(v.stageH<=v.body);assert(v.panelH>=0);assert(v.stageW<=w);assert(v.previewW>0);assert.equal(v.wide?v.stageW+v.panelW:v.stageH+v.panelH,v.wide?w:v.body);
+}
+console.log('PASS editor aspect matrix: 216 phone, square, wide and short-window/safe-area combinations.');

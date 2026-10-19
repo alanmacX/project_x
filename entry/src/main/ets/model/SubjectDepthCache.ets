@@ -19,7 +19,8 @@ export function subjectDepthImage(card: FridgeCard, scale: number): string { ret
 export async function bakeSubjectDepth(json:string, cacheDir:string, density:number, retainedJson:string='[]'):Promise<string> {
   const inputs=JSON.parse(json) as DepthInput[],result:Record<string,string>={};
   for(const input of inputs) {
-    const target=cacheDir+'/depth_v3_'+depthHash(JSON.stringify(input)+':'+density)+'.png';
+    const fingerprint=new DepthInput();fingerprint.key='surface';fingerprint.path=input.path;fingerprint.w=input.w;fingerprint.h=input.h;fingerprint.scale=input.scale;fingerprint.edge=input.edge;fingerprint.surface=input.surface;
+    const target=cacheDir+'/depth_v3_'+depthHash(JSON.stringify(fingerprint)+':'+density)+'.png';
     if(await fileIo.access(target)){result[input.key]='file://'+target;continue;}
     let pixel:image.PixelMap|null=null,packer:image.ImagePacker|null=null,file:fileIo.File|null=null;
     try {

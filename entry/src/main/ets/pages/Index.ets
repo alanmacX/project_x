@@ -1,8 +1,6 @@
-import lazy { SystemCloudSync } from '../model/SystemCloudSync';
-import { CloudSyncDialog } from '../views/CloudSyncDialog';
 import { prepareSceneImages, trimSceneImages } from '../model/SceneImageCache';
 import { GalleryAnchor, GalleryController, galleryReturnTargetVisible } from '../model/CanvasGallery';
-import { primeGalleryPreviews } from '../model/GalleryPreviewCache';
+import { primeGalleryPreviews, pruneGalleryPreviews } from '../model/GalleryPreviewCache';
 import { cardActionAnchor, CardActionAnchor } from '../model/CardActionPlacement';
 import { CANVAS_PAGE_DURATION } from '../model/CanvasPageMotion';
 import { navigationChrome } from '../model/NavigationChrome';
@@ -363,7 +361,9 @@ struct Index {
     this.store.init(this.context,this.routeCanvasId).then(async () => {
       await materialReady; startupMark('material-ready');
       if (this.routeCanvasId && this.routeCanvasId!==this.store.state.canvasId) await this.store.openCanvas(this.routeCanvasId);
-      await prepareSceneImages(this.store.state);
+      const widgetLaunch=AppStorage.get<boolean>('launchFromWidget')===true;
+      const routedLaunch=widgetLaunch||this.routedId.length>0||this.viewRouteId.length>0;
+      if(routedLaunch)await prepareSceneImages(this.store.state);
       this.refreshCanvasList();
       // Refresh host geometry for the next launch without changing the visible arrival aspect.
       // Cached host geometry is enough for first paint. System IPC must not hold the screen blank.
@@ -375,8 +375,6 @@ struct Index {
       this.syncHostCanvasGeometry();
       // The launcher already animates the form into this window. A second cold
       // scatter/prepare sequence underneath it fights quick gesture cancellation.
-      const widgetLaunch=AppStorage.get<boolean>('launchFromWidget')===true;
-      const routedLaunch = widgetLaunch || this.routedId.length > 0 || this.viewRouteId.length > 0;
       this.galleryVisible = !routedLaunch;this.workspaceMounted=routedLaunch;this.galleryMounted=!routedLaunch;this.galleryArtworkOpacity=routedLaunch?1:0;
       if(!routedLaunch)await primeGalleryPreviews(this.context!.cacheDir,this.canvasEntries.map((entry:CanvasEntry)=>entry.id));
       this.canvasBackground = this.store.state.background; this.layoutBoard();
@@ -393,6 +391,7 @@ struct Index {
 
     }).catch((e: Error) => { this.error = e.message; this.getUIContext().postFrameCallback(new PreparedTransition(() => { revealStartup(); })); });
   }
+  private cacheMaintained:boolean=false;
   private scheduleMaintenance(): void {
     if(this.maintenanceTimer>=0)clearTimeout(this.maintenanceTimer);
     this.maintenanceTimer = setTimeout(() => {
@@ -404,23 +403,15 @@ struct Index {
       }
       // Opening an unchanged canvas is not an edit: do not reserialize it or
       // trigger a desktop delivery immediately after the entrance.
+      if(!this.cacheMaintained&&this.context){
+        this.cacheMaintained=true;
+        const ids=this.store.catalog.canvases.concat(this.store.catalog.scenes).map(entry=>entry.id);
+        pruneGalleryPreviews(this.context.cacheDir,ids,ids.map(id=>this.galleryController.preview(id))).then(result=>console.info('GalleryCache removed='+result.removed+' reclaimedBytes='+result.bytes)).catch(()=>{});
+      }
       this.store.repairDesktopSelection().catch((e:Error):void=>{console.warn('Desktop binding migration: '+e.message);});
       this.syncSchedules(); this.updateScheduledScene(true);
       this.repairStoredSubjects(); this.refreshCapabilities();
     }, 1200);
-  }
-  private cloudSync:SystemCloudSync|null=null;
-  private cloudDialog:CustomDialogController|null=null;
-  private openCloudSync():void{
-    if(!this.context||this.busy||!this.galleryVisible)return;
-    if(!this.cloudSync)this.cloudSync=new SystemCloudSync();
-    this.cloudDialog=new CustomDialogController({customStyle:true,autoCancel:false,builder:CloudSyncDialog({appDark:this.appDark,onCheck:async()=>await this.cloudSync!.checkAvailability(),onArchives:async()=>this.context?await this.cloudSync!.archived(this.context):[],onRestore:async(id:string):Promise<string>=>{if(!this.context)throw new Error('应用尚未就绪');const message=await this.cloudSync!.restoreArchive(this.context,this.store,id);this.syncSchedules();return message;},onSync:async(status:(message:string)=>void):Promise<string>=>{
-      if(!this.context)throw new Error('应用尚未就绪');this.busy=true;const before=this.store.state;
-      try{
-        const result=await this.cloudSync!.synchronize(this.context,this.store,status);
-        return '合并 '+result.changed+' 项，保留 '+result.conflicts+' 份冲突数据。'+result.message;
-      }finally{this.busy=false;if(this.store.state!==before){this.canvasBackground=this.store.state.background;this.refreshCanvasList();this.syncSchedules();this.render();this.galleryRevision++;this.galleryController.resumePreviews();}}
-    }})});this.cloudDialog.open();
   }
   private refreshCanvasList(): void {
     this.canvasEntries = this.store.catalog.canvases.map((c: CanvasEntry): CanvasEntry => ({id:c.id,name:c.name}));
@@ -1215,6 +1206,8 @@ struct Index {
     try {
       // A desktop tap is navigation, not an instruction to rebuild the same canvas.
       if(!id && !this.routedId && (!canvas||canvas===this.store.state.canvasId)){
+        await prepareSceneImages(this.store.state);
+        if(!this.alive||request!==this.widgetRouteRequest)return;
         this.presentWidgetWorkspace();published=true;
         AppStorage.setOrCreate('routeCanvasId','');this.scheduleForegroundRefresh();return;
       }
@@ -1760,7 +1753,7 @@ struct Index {
             onRename: (id: string, name: string) => this.renameGalleryCanvas(id, name),
             onDuplicate: (id: string) => this.duplicateGalleryCanvas(id), onShare: (id: string) => this.shareCanvasById(id),
             onDelete: (id: string) => this.deleteCanvas(id), onImport: () => this.pickTemplate(),
-            onCloud:()=>this.openCloudSync(), onSkill: (url: string) => this.openSkillRepository(url) })
+            onSkill: (url: string) => this.openSkillRepository(url) })
             .visibility(this.galleryVisible||this.galleryTransitioning?Visibility.Visible:Visibility.Hidden)
             .hitTestBehavior(this.galleryVisible?HitTestMode.Transparent:HitTestMode.None)
             .accessibilityLevel(this.galleryVisible?'auto':'no-hide-descendants')

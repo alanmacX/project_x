@@ -55,7 +55,6 @@ export struct CanvasGallery {
   onDelete: (id: string) => void = () => {};
   onImport: () => void = () => {};
   onSkill: (url: string) => void = () => {};
-  onCloud:()=>void=()=>{};
   @State items: GalleryItem[] = [];
   @State widgetRects:Record<string,number[]>={};
   @State toolsOpen: boolean = false;
@@ -512,7 +511,7 @@ export struct CanvasGallery {
         .hideTitleBar(false).visibility(this.chromeVisible?Visibility.Visible:Visibility.Hidden)
         .hitTestBehavior(HitTestMode.Transparent).clip(false).backgroundColor(Color.Transparent)
       Column().width(1).height(1).position({ x: this.viewportWidth - 24, y: this.safeTop + 60 }).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
-        .bindMenu(this.toolsOpen, [{value:'华为云空间同步',action:()=>{this.toolsOpen=false;this.onCloud();}},{ value: '创作 Skill · Gitee', action: () => { this.toolsOpen = false; this.onSkill('https://gitee.com/alanmac/fridge-signing-system'); } },
+        .bindMenu(this.toolsOpen, [{ value: '创作 Skill · Gitee', action: () => { this.toolsOpen = false; this.onSkill('https://gitee.com/alanmac/fridge-signing-system'); } },
           { value: '创作 Skill · GitHub', action: () => { this.toolsOpen = false; this.onSkill('https://github.com/alanmacX/fridge-creating-skill'); } }],
           { systemMaterial: chromeMaterial(this.appDark), backgroundColor: AppDesign.popup(this.appDark), onDisappear: () => this.toolsOpen = false })
       Column().width(1).height(1).position({x:this.sizeMenuX,y:this.sizeMenuY}).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
