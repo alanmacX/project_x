@@ -8,6 +8,15 @@ MatePad Mini, HarmonyOS/API 26, landscape 2560×1600. All installations used `hd
 
 ## Actual device checks
 
+### Single-tablet test build follow-up
+
+- Read-only check of the actual system cloud UI found this app registered as **冰箱贴桌面小组件**, listed under 使用云空间的应用 after expanding 更多, with **未开启** status. The installed cloud-space package is **7.0.0.303**. The account has a basic-service plan. No subscription, trial, cloud toggle, account or privacy setting was changed.
+- Added **检查系统同步** to the production dialog. It requests native FileSync startup without initializing a cloud vault, writing a cursor or publishing new local documents. It does not prove an upload completed or prevent the system from processing previously queued cloud files.
+- On the actual tablet, the probe returns **22400001** and displays the setup path. The action re-enables after failure, repeated probing works, and 完成 returns to the gallery. Evidence: ignored `output/cloud-probe-native-result.png`, `output/system-cloud-toggle-disabled.png`, and `output/cloud-probe-gallery-return.png`.
+- The panel identifies this as a **manual-sync test version** and explains that edits need another explicit sync. Network, low-battery and IPC errors have distinct messages. Mock tests additionally prove the probe does not publish artwork or create account cursors and rejects concurrent check/sync operations.
+- Updated native build and production-package audit pass; **94/94** suites pass. Installed with `hdc install -r`; no reset or uninstall. The signed debug test package is `output/releases/cloud-single-tablet-2026-10-19/entry-default-signed.hap`, SHA256 `863f09ea0b059ca0d8d4d1b3113b9e91be53a4c8d658b3e5f95ee32feee89a27`.
+- With the system app toggle disabled, successful native upload/download remains blocked. A second device is unavailable by the user's confirmation. Neither situation is represented as a successful cloud round trip.
+
 - Production gallery More → Huawei cloud panel opens with scope/consent text, native controls and clear local/remote completion distinctions.
 - FileSync.start is actually invoked. On this tablet it returns **22400001 / Cloud status not ready**. The app shows the system-account/cloud-toggle instruction and re-enables the action. No cloud directory initialization, asset publication or incoming merge occurs after that error.
 - Production existing course card → Edit → Data → Timetable → Import → School catalogue. School search and selection work; ZJUT's actual academic login page loaded inside incognito ArkWeb. No credentials were entered, no import was confirmed. The bundled ZJUT login URL was cleaned of the upstream `kickout=1` presentation flag after seeing its confusing forced-logout message in the unauthenticated page.

@@ -414,7 +414,7 @@ struct Index {
   private openCloudSync():void{
     if(!this.context||this.busy||!this.galleryVisible)return;
     if(!this.cloudSync)this.cloudSync=new SystemCloudSync();
-    this.cloudDialog=new CustomDialogController({customStyle:true,autoCancel:false,builder:CloudSyncDialog({appDark:this.appDark,onArchives:async()=>this.context?await this.cloudSync!.archived(this.context):[],onRestore:async(id:string):Promise<string>=>{if(!this.context)throw new Error('应用尚未就绪');const message=await this.cloudSync!.restoreArchive(this.context,this.store,id);this.syncSchedules();return message;},onSync:async(status:(message:string)=>void):Promise<string>=>{
+    this.cloudDialog=new CustomDialogController({customStyle:true,autoCancel:false,builder:CloudSyncDialog({appDark:this.appDark,onCheck:async()=>await this.cloudSync!.checkAvailability(),onArchives:async()=>this.context?await this.cloudSync!.archived(this.context):[],onRestore:async(id:string):Promise<string>=>{if(!this.context)throw new Error('应用尚未就绪');const message=await this.cloudSync!.restoreArchive(this.context,this.store,id);this.syncSchedules();return message;},onSync:async(status:(message:string)=>void):Promise<string>=>{
       if(!this.context)throw new Error('应用尚未就绪');this.busy=true;const before=this.store.state;
       try{
         const result=await this.cloudSync!.synchronize(this.context,this.store,status);

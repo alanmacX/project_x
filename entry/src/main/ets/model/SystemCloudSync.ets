@@ -14,11 +14,28 @@ export interface CloudSyncResult {changed:number;conflicts:number;published:numb
 function emptyRecord(entity:string,kind:string,name:string,data:string,assets:string[],deleted:boolean=false):CloudRevision{
   return {version:1,entity,kind,name,revision:'r_'+util.generateRandomUUID().replace(/-/g,''),clock:{},deleted,data,assets,digest:''};
 }
+function cloudFailure(error:BusinessError):Error{
+  if(error.code===22400001)return new Error('系统云空间尚未就绪（22400001）。请检查华为账号登录状态，并在系统设置 → 云空间 → 使用云空间的应用中开启本应用；列表未展开时点“更多”。');
+  if(error.code===801)return new Error('当前设备暂不支持系统云文件同步');
+  if(error.code===13600001)return new Error('暂时无法连接系统云空间（13600001），请稍后重试');
+  if(error.code===22400002)return new Error('当前网络不可用（22400002），请联网后重试');
+  if(error.code===22400003)return new Error('电量过低，系统暂缓同步（22400003），请充电后重试');
+  return error as Error;
+}
 /** Explicit one-shot sync. Each invocation is user consent for the current system account.
  * No background publishing across an account switch, private server, login token or Form-ID sync. */
 export class SystemCloudSync {
   private running:boolean=false;
   private scope:string='';
+  /** Probe only the native service; never initialize a vault or publish local documents. */
+  async checkAvailability():Promise<string>{
+    if(this.running)throw new Error('同步正在进行');this.running=true;
+    try{
+      const session=new cloudSync.FileSync();await session.start();
+      return '系统已接受同步请求。此次检查没有发布新的画布；点击“立即同步”可同步作品。';
+    }catch(e){throw cloudFailure(e as BusinessError);}
+    finally{this.running=false;}
+  }
   async archived(context:Context):Promise<CloudRevision[]>{
     const prefs=await preferences.getPreferences(context,'fridge_cloud_sync_v1');if(!this.scope)this.scope=await prefs.get('lastVault','') as string;if(!this.scope)return [];const all=await prefs.getAll(),records:CloudRevision[]=[];
     for(const key of Object.keys(all))if(key.startsWith(this.scope+'_conflict_')){const json=await prefs.get(key,'') as string;const record=validateCloudRevision(JSON.parse(json) as CloudRevision);if(!records.some(item=>item.revision===record.revision))records.push(record);}return records;
@@ -111,7 +128,7 @@ export class SystemCloudSync {
       await prefs.put(cursorKey,JSON.stringify({version:1,device:cursor.device,records:resolved}));await prefs.flush();
       let widgetWarning='';try{await store.refreshSyncedWidgets(incoming.map(doc=>doc.id));}catch(_){widgetWarning=' 部分桌面预览稍后重试。';}
       return {changed,conflicts,published:outgoing.length,message:widgetWarning+(pullComplete?'本机已合并；上传和其他设备下载由系统云空间继续完成。':'已合并当前可用版本；系统仍在拉取，请稍后再同步一次。')};
-    }catch(e){const code=(e as BusinessError).code;if(code===22400001)throw new Error('请先登录华为账号，并在系统设置 → 云空间中开启本应用同步');if(code===801)throw new Error('当前设备暂不支持系统云文件同步');if(code===13600001)throw new Error('暂时无法连接系统云空间，请确认系统开关后重试');if(code===22400002)throw new Error('当前网络不可用，本机作品已保留');throw e as Error;}
+    }catch(e){throw cloudFailure(e as BusinessError);}
     finally{if(pullTimer>=0)clearTimeout(pullTimer);if(listening&&session)try{session.off('progress',progress);}catch(_){}this.running=false;}
   }
 }
