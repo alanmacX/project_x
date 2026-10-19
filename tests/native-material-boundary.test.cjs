@@ -14,7 +14,7 @@ assert((navigation.match(/await this.waitGalleryFrame\(\)/g)||[]).length>=2,'des
 assert(!/get\('(canvasWorkspace|editorMotionChrome)'/.test(page),'native material must stay outside snapshots');
 assert.match(gallery,/ignoreLayoutSafeArea\(\[LayoutSafeAreaType.SYSTEM\], \[LayoutSafeAreaEdge.TOP\]\)/,'native component safe area owns scroll origin');
 assert.match(gallery,/HdsNavigation\(\) \{\s*Scroll\(this.scroller\)/,'native navigation owns scrolling content, avoiding a full-page hit-test overlay');
-assert.match(gallery,/hideTitleBar\(!this.chromeVisible\)/,'native chrome only participates in settled page');
+assert.match(gallery,/hideTitleBar\(false\)\.visibility\(this.chromeVisible\?Visibility.Visible:Visibility.Hidden\)/,'hidden native navigation retains title/scroll geometry without fading its material sampler');
 assert.match(gallery,/opacity\(this.pageVisible\?1:0\)/,'fade pure content rather than native title sampler');
 const nativeBar=gallery.slice(gallery.indexOf('      HdsNavigation() {'),gallery.indexOf('      Column().width(1).height(1).position'));
 assert(!/\.scale\(|\.renderGroup\(/.test(nativeBar));

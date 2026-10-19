@@ -1,7 +1,7 @@
 import lazy { SystemCloudSync } from '../model/SystemCloudSync';
 import { CloudSyncDialog } from '../views/CloudSyncDialog';
 import { prepareSceneImages, trimSceneImages } from '../model/SceneImageCache';
-import { GalleryAnchor, GalleryController } from '../model/CanvasGallery';
+import { GalleryAnchor, GalleryController, galleryReturnTargetVisible } from '../model/CanvasGallery';
 import { primeGalleryPreviews } from '../model/GalleryPreviewCache';
 import { cardActionAnchor, CardActionAnchor } from '../model/CardActionPlacement';
 import { CANVAS_PAGE_DURATION } from '../model/CanvasPageMotion';
@@ -512,11 +512,14 @@ struct Index {
   }
   private animateReturnPreview():void {
     const anchor=this.galleryAnchor;
-    if(!anchor?.preview||anchor.id!==this.store.state.canvasId||this.galleryAnchorWidth!==this.screenWidth||this.galleryAnchorHeight!==this.screenHeight||anchor.y+anchor.h<=this.safeTop||anchor.y>=this.screenHeight-this.safeBottom)return;
+    const matching=anchor?.id===this.store.state.canvasId;
+    const shared=matching&&this.galleryAnchorWidth===this.screenWidth&&this.galleryAnchorHeight===this.screenHeight&&galleryReturnTargetVisible(anchor,this.screenWidth,this.screenHeight,this.safeTop,this.safeBottom);
+    const preview=matching&&anchor?.preview?anchor.preview:this.galleryController.preview(this.store.state.canvasId);
+    if(!preview)return;
     const generation=this.galleryTransitionGeneration;
     // One cached image is decorative only. The real gallery is already clickable
     // underneath. Only the matching tile image is covered while it moves.
-    this.galleryReturnAnimating=true;this.galleryHeroId=anchor.id;this.galleryHeroSource=anchor.preview;this.galleryHeroOpacity=1;
+    this.galleryReturnAnimating=true;this.galleryHeroId=shared&&anchor?anchor.id:'';this.galleryHeroSource=preview;this.galleryHeroOpacity=1;
     this.galleryHeroX=this.boardLeft;this.galleryHeroY=this.boardTop;
     this.galleryHeroW=BOARD_W*this.boardScale;this.galleryHeroH=this.boardHeight;
     const finish=():void=>{
@@ -527,7 +530,16 @@ struct Index {
     this.galleryTransitionTimer=setTimeout(finish,CANVAS_PAGE_DURATION+160);
     this.getUIContext().postFrameCallback(new PreparedTransition(()=>{
       if(!this.alive||generation!==this.galleryTransitionGeneration||!this.galleryVisible)return;
-      this.animateGalleryPreview(true,finish);
+      if(shared){this.animateGalleryPreview(true,finish);}
+      else{
+        // Never fly toward an offscreen/clipped tile or scroll the homepage.
+        // The cached image dissolves locally; gallery interaction stays enabled.
+        this.getUIContext().animateTo({duration:180,curve:Curve.Friction,expectedFrameRateRange:this.frameRate,onFinish:finish},()=>{
+          this.galleryHeroOpacity=0;
+          this.galleryHeroX=this.boardLeft+BOARD_W*this.boardScale*.01;this.galleryHeroY=this.boardTop+this.boardHeight*.01;
+          this.galleryHeroW=BOARD_W*this.boardScale*.98;this.galleryHeroH=this.boardHeight*.98;
+        });
+      }
     }));
   }
   private async setGalleryPage(library: boolean): Promise<void> {

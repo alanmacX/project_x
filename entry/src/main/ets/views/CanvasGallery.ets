@@ -59,7 +59,7 @@ export struct CanvasGallery {
   @State items: GalleryItem[] = [];
   @State widgetRects:Record<string,number[]>={};
   @State toolsOpen: boolean = false;
-  @State filter: string = '';
+  @State @Watch('anchorViewportChanged') filter: string = '';
   @State creating: boolean = false;
   @State sizeMenuOpen: boolean = false;
   @State sizeMenuX: number = 0;
@@ -98,6 +98,7 @@ export struct CanvasGallery {
     this.controller.warmPreview=(id:string)=>{this.warmPreview(id).catch(()=>{});};
     this.controller.prepare=async(id:string)=>{await this.prepareReturn(id);};
     this.controller.previewReady=(id:string):boolean=>this.isPreviewReady(id);
+    this.controller.preview=(id:string):string=>this.items.find((item:GalleryItem)=>item.id===id)?.preview??'';
     this.controller.anchor=(id:string,requireFresh:boolean=true):GalleryAnchor|null=>{
       const item=this.items.find((entry:GalleryItem)=>entry.id===id),state=this.documents.get(id);if(!item||(requireFresh&&(!state||!item.preview||item.previewSource!==this.previewSource(state))))return null;
       if(!this.pageVisible){
@@ -488,6 +489,7 @@ export struct CanvasGallery {
           }
         }.width(this.contentWidth()).padding({ top: 76 + this.safeTop, bottom: this.safeBottom + 104 }).alignItems(HorizontalAlign.Start)
       }.width('100%').height('100%')
+        .onDidScroll(()=>{if(this.pageVisible)this.visibleAnchors.clear();})
         .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
         .opacity(this.pageVisible?1:0).align(Alignment.Top).clip(false).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       }.titleMode(HdsNavigationTitleMode.MINI)
@@ -504,7 +506,9 @@ export struct CanvasGallery {
         .bindToScrollable([this.scroller]).hideBackButton(true).hideToolBar(true).mode(NavigationMode.Stack)
         .width('100%').height('100%').align(Alignment.Top)
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
-        .hideTitleBar(!this.chromeVisible)
+        // Removing the native title changes the retained scroll viewport and
+        // clamps its offset. Hidden keeps geometry without fading HDS material.
+        .hideTitleBar(false).visibility(this.chromeVisible?Visibility.Visible:Visibility.Hidden)
         .hitTestBehavior(HitTestMode.Transparent).clip(false).backgroundColor(Color.Transparent)
       Column().width(1).height(1).position({ x: this.viewportWidth - 24, y: this.safeTop + 60 }).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
         .bindMenu(this.toolsOpen, [{value:'华为云空间同步',action:()=>{this.toolsOpen=false;this.onCloud();}},{ value: '创作 Skill · Gitee', action: () => { this.toolsOpen = false; this.onSkill('https://gitee.com/alanmac/fridge-signing-system'); } },

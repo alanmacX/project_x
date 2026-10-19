@@ -35,7 +35,7 @@ const routeMethods = page.slice(page.indexOf('  private canvasRouteChanged('), p
 const calls = [];
 const motionTimers = new Map(); let motionTimerId = 0;
 const { Fixture } = execute(`class Fixture {
- alive=true;galleryVisible=true;galleryMounted=true;galleryRevision=0;galleryController={pausePreviews(){},prepare:async()=>calls.push("prepare-gallery"),anchor:()=>null,previewReady:()=>false,resumePreviews(){}};galleryFrameResolve=null;workspaceMounted=false;galleryTransitioning=false;galleryTransitionGeneration=0;galleryTransitionTimer=-1;frameRate={};canvasChanging=false;busy=false;sharing=false;sceneNavigationBusy=false;
+ alive=true;galleryVisible=true;galleryMounted=true;galleryRevision=0;galleryController={pausePreviews(){},prepare:async()=>calls.push("prepare-gallery"),anchor:()=>null,previewReady:()=>false,preview:()=>'',resumePreviews(){}};galleryFrameResolve=null;workspaceMounted=false;galleryTransitioning=false;galleryTransitionGeneration=0;galleryTransitionTimer=-1;frameRate={};canvasChanging=false;busy=false;sharing=false;sceneNavigationBusy=false;
  heroActive=false;editing=false;viewing=false;deletionId='';activeBoardId='';sceneEditing=false;selectedId='';
  homeToolsOpen=true;scheduleOpen=true;backgroundOpen=true;groupSelecting=true;groupSelection=['card'];scheduleTimer=-1;scenePanelGeneration=0;
  boardOpacity=0;scatter=1;startupCardCount=4;ready=true;launchFromWidget=false;routeCanvasId='';
@@ -49,7 +49,7 @@ const { Fixture } = execute(`class Fixture {
  getUIContext(){return {postFrameCallback:frame=>frame.start(),getComponentSnapshot:()=>({get:async()=>({release:async()=>{}})}),animateTo:(options,update)=>{update();options.onFinish();}};}
  ${methods}
  ${routeMethods}
-}exports.Fixture=Fixture;`, { calls, rememberedGalleryPreview:()=>null,BOARD_W:344,PreparedTransition:class{constructor(start){this.start=start;}}, CANVAS_PAGE_DURATION:execute(fs.readFileSync('entry/src/main/ets/model/CanvasPageMotion.ets','utf8')).CANVAS_PAGE_DURATION, Curve:{Friction:0}, setTimeout:fn=>{motionTimers.set(++motionTimerId,fn);return motionTimerId;}, clearTimeout:id=>motionTimers.delete(id), AppStorage: { setOrCreate: (key, value) => calls.push([key, value]) } });
+}exports.Fixture=Fixture;`, { calls, galleryReturnTargetVisible:model.galleryReturnTargetVisible, rememberedGalleryPreview:()=>null,BOARD_W:344,PreparedTransition:class{constructor(start){this.start=start;}}, CANVAS_PAGE_DURATION:execute(fs.readFileSync('entry/src/main/ets/model/CanvasPageMotion.ets','utf8')).CANVAS_PAGE_DURATION, Curve:{Friction:0}, setTimeout:fn=>{motionTimers.set(++motionTimerId,fn);return motionTimerId;}, clearTimeout:id=>motionTimers.delete(id), AppStorage: { setOrCreate: (key, value) => calls.push([key, value]) } });
 
 (async () => {
   const f = new Fixture();
@@ -137,6 +137,14 @@ const { Fixture } = execute(`class Fixture {
   interrupted.getUIContext=()=>({postFrameCallback:frame=>returnFrame=frame,animateTo:(options,update)=>{update();lateReturn=options.onFinish;}});
   await interrupted.setGalleryPage(true);assert.equal(interrupted.galleryVisible,true);assert.equal(interrupted.galleryTransitioning,false);assert.equal(interrupted.galleryHeroId,'a');assert.equal(interrupted.galleryHeroW,344);
   returnFrame.start();assert.equal(interrupted.galleryHeroW,172);interrupted.cancelGalleryTransition();interrupted.galleryHeroSource='next.png';lateReturn();assert.equal(interrupted.galleryHeroSource,'next.png','late decorative animation cannot clear a subsequent navigation');
+  // A widget route may point to an offscreen or clipped gallery tile. Keep
+  // return nonblocking and dissolve in place rather than flying into chrome.
+  for(const rect of [{x:16,y:-200,w:172,h:172},{x:16,y:90,w:172,h:172},{x:16,y:600,w:172,h:172},{x:400,y:120,w:172,h:172}]){
+    const offscreen=new Fixture();Object.assign(offscreen,{screenWidth:390,screenHeight:800,galleryAnchorWidth:390,galleryAnchorHeight:800,safeTop:36,safeBottom:24,boardLeft:23,boardTop:160,boardScale:1,boardHeight:344,galleryVisible:false,galleryAnchor:{id:'a',preview:'cached.png',...rect}});
+    let completed;offscreen.getUIContext=()=>({postFrameCallback:frame=>frame.start(),animateTo:(options,change)=>{change();completed=options.onFinish;}});
+    await offscreen.setGalleryPage(true);assert.equal(offscreen.galleryVisible,true);assert.equal(offscreen.galleryTransitioning,false);assert.equal(offscreen.galleryHeroId,'','offscreen tile must not be hidden for a hero flight');assert.equal(offscreen.galleryHeroOpacity,0);assert.equal(offscreen.galleryHeroX,26.44);assert.equal(offscreen.galleryHeroY,163.44);assert.equal(offscreen.galleryHeroW,337.12);completed();assert.equal(offscreen.galleryHeroSource,'');
+  }
+  const noAnchor=new Fixture();Object.assign(noAnchor,{galleryVisible:false,boardLeft:23,boardTop:160,boardScale:1,boardHeight:344});noAnchor.galleryController.preview=()=>'widget-cache.png';await noAnchor.setGalleryPage(true);assert.equal(noAnchor.galleryVisible,true);assert.equal(noAnchor.galleryHeroSource,'','widget-only return also completes a local dissolve without an old anchor');
   const blockedIO=new Fixture();blockedIO.galleryVisible=false;
   blockedIO.store.save=()=>new Promise(()=>{});blockedIO.galleryController.prepare=()=>new Promise(()=>{});
   await Promise.race([blockedIO.showGallery(),new Promise((_,reject)=>setTimeout(()=>reject(Error('return waited for persistence/preview')),100))]);

@@ -1,5 +1,10 @@
 /** Retained gallery refreshes behind the workspace before returning to it. */
 export class GalleryAnchor { id:string='';preview:string='';x:number=0;y:number=0;w:number=0;h:number=0; }
+/** Match the gallery's title/content inset and floating creation dock, in vp. */
+export function galleryReturnTargetVisible(anchor:GalleryAnchor|null,width:number,height:number,safeTop:number,safeBottom:number):boolean{
+  if(!anchor||![anchor.x,anchor.y,anchor.w,anchor.h,width,height,safeTop,safeBottom].every((value:number)=>Number.isFinite(value)))return false;
+  return anchor.w>0&&anchor.h>0&&anchor.x>=0&&anchor.x+anchor.w<=width&&anchor.y>=safeTop+76&&anchor.y+anchor.h<=height-safeBottom-104;
+}
 export class GalleryController {
   resumePreviews: () => void = () => {};
   pausePreviews: () => void = () => {};
@@ -10,6 +15,7 @@ export class GalleryController {
   prepare: (id:string) => Promise<void> = async () => {};
   anchor: (id:string,requireFresh?:boolean) => GalleryAnchor|null = () => null;
   previewReady: (id:string) => boolean = () => false;
+  preview: (id:string) => string = () => '';
 }
 /** Gallery metadata is detached from the editor and never selects a canvas. */
 export class GalleryItem {
