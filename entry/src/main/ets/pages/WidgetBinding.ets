@@ -71,6 +71,8 @@ struct WidgetBinding {
       .onClick(()=>this.choose(item.id)).accessibilityText('绑定 '+item.name+(item.id===this.selectedId?'，已选中':''))
   }
   build(){
+    // The extension surface is opaque on the launcher. Only the rounded corner
+    // cutouts use an approximate host-color backing; no inset strip surrounds the panel.
     Column(){
     Column({space:8}){
       Row(){
@@ -91,6 +93,6 @@ struct WidgetBinding {
       if(this.error){Text(this.error).fontColor('#D3423C').fontSize(12).maxLines(2).width('100%')}
     }.width('100%').layoutWeight(1).padding({left:16,right:16,top:12,bottom:8})
       .backgroundColor($r('sys.color.comp_background_secondary')).borderRadius(20).clip(true)
-    }.width('100%').height('100%').padding(8).backgroundColor(this.appDark?'#2F3032':'#F4F5F7')
+    }.width('100%').height('100%').backgroundColor(this.appDark?'#303338':'#F4F5F7')
   }
 }
