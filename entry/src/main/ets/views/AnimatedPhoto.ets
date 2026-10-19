@@ -1,3 +1,4 @@
+import { sceneImage } from '../model/SceneImageCache';
 import { AnimatedDrawableDescriptor } from '@kit.ArkUI';
 import { localImageSource } from '../model/CardSchema';
 
@@ -24,7 +25,7 @@ export struct AnimatedPhoto {
           const controller = this.animatedDrawable?.getAnimationController(); if (visible) controller?.start(); else controller?.stop();
         })
     } else {
-      Image(localImageSource(this.src)).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Cover).draggable(false)
+      Image(this.animated?localImageSource(this.src):sceneImage(localImageSource(this.src))).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Cover).draggable(false)
     }
   }
 }

@@ -106,7 +106,7 @@ export class FridgeStore {
   }
   /** Merge acknowledgements from FormExtension without overwriting editor geometry or history. */
   async reloadSceneAcknowledgements():Promise<void> {
-    if(this.prefs===null||this.context===null)return;await this.saveQueue.catch(()=>{});const id=this.state.canvasId;
+    if(this.prefs===null||this.context===null||(!this.catalog.sceneRules.length&&!this.state.sceneRules.length))return;await this.saveQueue.catch(()=>{});const id=this.state.canvasId;
     await preferences.removePreferencesFromCache(this.context,'fridge_store');this.prefs=await preferences.getPreferences(this.context,'fridge_store');
     const catalog=readCatalog(await this.prefs.get('fridge_canvases_json','') as string);for(const rule of this.catalog.sceneRules){const other=catalog.sceneRules.find(r=>r.id===rule.id);if(other&&other.createdAt===rule.createdAt&&other.start===rule.start&&other.timeoutMinutes===rule.timeoutMinutes)rule.dismissed=other.dismissed;}
     const json=await this.prefs.get(canvasKey(id),'') as string;if(!json||this.state.canvasId!==id)return;
@@ -211,7 +211,7 @@ export class FridgeStore {
     }
   }
   canvasSpecs: Record<string, number> = {};
-  async init(context: Context): Promise<void> {
+  async init(context: Context,preferredCanvasId:string=''): Promise<void> {
     await this.timetableLibrary?.settled();this.timetableLibrary=null;
     this.context = context;
     await this.saveQueue.catch(() => {});
@@ -223,7 +223,8 @@ export class FridgeStore {
       this.catalog = readCatalog(catalogJson);this.selectionMigrationPending=false; this.lastCatalog = catalogJson; this.documents = []; this.savedScenes = {};
       await importLegacyWidgets(context);
 
-      for (const entry of this.catalog.canvases.filter((c)=>c.id===this.catalog.activeId)) {
+      const target=this.catalog.canvases.concat(this.catalog.scenes).some(c=>c.id===preferredCanvasId)?preferredCanvasId:this.catalog.activeId;
+      for (const entry of this.catalog.canvases.concat(this.catalog.scenes).filter((c)=>c.id===target)) {
         let json = await this.prefs.get(canvasKey(entry.id), '') as string;
         if (!catalogJson) json = await this.prefs.get('fridge_state_json', '') as string;
         if(catalogJson && !json)throw new Error('画布记录缺失');
@@ -234,7 +235,7 @@ export class FridgeStore {
         this.documents.push(doc);
         this.savedScenes[entry.id] = catalogJson ? json : '';
       }
-      this.switchCanvas(this.catalog.activeId); startupMark('storage-read');
+      this.switchCanvas(target); startupMark('storage-read');
       await this.restoreContours(this.state);
       await primeRenderContours(this.state.cards, storageSnapshot(this.state)); startupMark('contours-ready');
       this.cacheContours().catch(()=>{});

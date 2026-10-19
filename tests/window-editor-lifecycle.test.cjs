@@ -8,9 +8,10 @@ const context={exports:{},AppStorage:{setOrCreate:(key,value)=>routes.push([key,
 const fixture=`class Fixture {
  alive=true;ready=true;context={};appBackgrounded=false;editing=false;viewing=false;pageVisible=true;appWindowFocused=true;foregroundGeneration=0;
  editorSheetOpen=true;editorBackPending=false;arriving=false;heroActive=false;activeBoardId='';layerDrag='';gestureGroup='';refreshingCapabilities=false;
+ widgetRouteRequest=0;widgetRouteRunning=false;widgetRoutePending=false;galleryVisible=true;galleryArtworkOpacity=0;workspaceMounted=false;canvasChanging=false;
  routeCanvasId='canvas_a';viewRouteId='';routedId='';closed=0;collapsed=0;refreshes=0;renders=0;
- store={state:{canvasId:'canvas_a',cards:[{id:'a',capability:{k:'battery',percent:30}},{id:'b',capability:{k:'battery',percent:40}}]},init(){throw Error('unexpected full reload');},findCard(id){return this.state.cards.find(c=>c.id===id);}};
- cancelGalleryTransition(){}closeEditor(){this.closed++;}expandEditor(){this.collapsed++;}scheduleForegroundRefresh(){this.refreshes++;}
+ store={catalog:{activeId:'canvas_a'},state:{canvasId:'canvas_a',cards:[{id:'a',capability:{k:'battery',percent:30}},{id:'b',capability:{k:'battery',percent:40}}]},init(){throw Error('unexpected full reload');},findCard(id){return this.state.cards.find(c=>c.id===id);}};
+ presentWidgetWorkspace(){this.galleryVisible=false;this.galleryArtworkOpacity=1;this.workspaceMounted=true;}cancelGalleryWarm(){}cancelForegroundRefresh(){}cancelGalleryTransition(){}closeEditor(){this.closed++;}expandEditor(){this.collapsed++;}scheduleForegroundRefresh(){this.refreshes++;}
  render(){this.renders++;}persist(){saves.push(this.store.state.cards.map(c=>c.capability.percent));}updateScheduledScene(){}
  ${method('  private dismissEditorSheet(', '  private expandEditor(')}
  ${method('  private async reloadWidgetRoute(', '  private calendarAction(')}

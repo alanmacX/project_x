@@ -8,10 +8,11 @@ const root = path.resolve(__dirname, '../entry/src/main/ets/model');
 const disk = new Map();
 const rdb=require('./helpers/widget-rdb.cjs').createWidgetRdb();
 const originalClear=disk.clear.bind(disk);disk.clear=()=>{originalClear();try{rdb.reset();}catch(_){}};
+const reads = [];
 const writes = [], updates = [], closed = [], opened = [], schedules = [];
 let failWrite = false, failForm = false, removedForm = '';
 const prefs = {
-  get: async (key, fallback) => disk.has(key) ? disk.get(key) : fallback,
+  get: async (key, fallback) => {reads.push(key);return disk.has(key) ? disk.get(key) : fallback;},
   put: async (key, value) => {
     if (failWrite) { failWrite = false; throw Error('disk failure'); }
     await new Promise(resolve => setTimeout(resolve, 2));
@@ -82,6 +83,11 @@ function load(name) {
  disk.set('fridge_form_dims_json',JSON.stringify({home:'4*4',second:'4*4'}));disk.set('fridge_form_bindings_json',JSON.stringify({home:'canvas_main',second}));
  store.state.cards[0].paper='#ABCDEF';await store.save();assert.equal(updates.at(-1).id,'second');
  const reloaded=new FridgeStore();await reloaded.init({});assert.equal(reloaded.state.canvasId,second);assert.equal(reloaded.documents.length,1,'cold start loads only active artwork');
+ const jobsBeforeWidget=jobs.filter(job=>job==='hydrateCanvas').length,widgetCold=new FridgeStore();await widgetCold.init({},'canvas_main');
+ assert.equal(widgetCold.state.canvasId,'canvas_main');assert.equal(widgetCold.documents.length,1);assert.equal(widgetCold.documents[0].id,'canvas_main');
+ assert.equal(jobs.filter(job=>job==='hydrateCanvas').length-jobsBeforeWidget,1,'cold widget loads only bound canvas, without first hydrating last active document');
+ const fallbackCold=new FridgeStore();await fallbackCold.init({},'deleted-canvas');assert.equal(fallbackCold.state.canvasId,second,'invalid widget target safely retains catalog fallback');
+ const readsBeforeResume=reads.length;await widgetCold.reloadSceneAcknowledgements();assert.equal(reads.length,readsBeforeResume,'no scene rules means no acknowledgement storage IPC');
  await reloaded.openCanvas('canvas_main');assert.equal(reloaded.state.cards[0].id,'original');
  reloaded.renameCanvas('旧画布');await reloaded.save(false);assert.equal(readCatalog(disk.get('fridge_canvases_json')).canvases[0].name,'旧画布');
  reloaded.renameCanvas('非当前画布改名',second);await reloaded.save(false);assert.equal(reloaded.catalog.activeId,'canvas_main');assert.equal(readCatalog(disk.get('fridge_canvases_json')).canvases.find(c=>c.id===second).name,'非当前画布改名');
@@ -131,7 +137,7 @@ function load(name) {
  const jobsBefore=jobs.filter(name=>name==='prepareContours').length,cold=new FridgeStore();await cold.init({});await cold.openCanvas('canvas_main');await contours.primeRenderContours(cold.state.cards,JSON.stringify(cold.state));assert.equal(jobs.filter(name=>name==='prepareContours').length,jobsBefore,'both cold load and switching reuse derived geometry');
  const getPrefs=prefs.get;prefs.get=async(key,fallback)=>{if(key.startsWith('fridge_render_contours_v1_'))throw Error('cache unavailable');return getPrefs(key,fallback);};await new FridgeStore().init({});prefs.get=getPrefs;
  await cold.deleteCanvas(cachedSecond);assert.ok(!disk.has('fridge_render_contours_v1_'+cachedSecond),'canvas deletion removes its derived cache');disk.clear();
- const bg=defaultState();bg.background.mode='blend';bg.cards=[card];const before=backgroundSignature(bg);card.x+=90;card.y-=80;card.w+=10;card.rot+=15;card.z+=10;assert.equal(backgroundSignature(bg),before,'drag/resize/rotate/layer order never triggers palette extraction');card.paper='#FF4422';assert.notEqual(backgroundSignature(bg),before,'artwork colour triggers re-extraction');
+ const bg=defaultState();bg.background.mode='blend';bg.cards=[card];const before=backgroundSignature(bg);card.x+=90;card.y-=80;card.w*=1.25;card.h*=1.25;card.rot+=15;card.z+=10;assert.equal(backgroundSignature(bg),before,'drag/uniform resize/rotate/layer order never triggers palette extraction');card.w+=10;assert.notEqual(backgroundSignature(bg),before,'aspect change invalidates Cover crop colours');card.w-=10;card.paper='#FF4422';assert.notEqual(backgroundSignature(bg),before,'artwork colour triggers re-extraction');
  const ctx={applicationInfo:{accessTokenId:1}},battery=await readCapability({k:'battery'},ctx);assert.equal(battery.percent,72);assert.equal(battery.charging,true);
  assert.equal(data.needsDataRefresh({k:'fetch',url:'https://example.org',sourceConfigured:true},Date.now()),false,'retired URL capabilities never schedule a request');
  const merged=data.mergeCapabilityResult({...battery,title:'My battery'},{...battery,percent:15});assert.equal(merged.percent,15);assert.equal(merged.title,'My battery');

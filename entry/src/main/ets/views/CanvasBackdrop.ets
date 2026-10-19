@@ -1,3 +1,4 @@
+import { sceneImage } from '../model/SceneImageCache';
 import { CanvasFrame } from './CanvasFrame';
 import { CanvasBackground } from '../model/CardSchema';
 /** Display the generated, blurred light-fold pose unchanged in App, FormKit and export. */
@@ -11,7 +12,7 @@ export struct CanvasBackdrop {
       if(this.sceneBackground.mode!=='transparent'){
       Column().width('100%').height('100%').backgroundColor(this.sceneBackground.color)
       if (this.sceneBackground.src.length > 0 && this.sceneBackground.mode !== 'solid' && this.sceneBackground.mode !== 'smart') {
-        Image(this.sceneBackground.src).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Cover).draggable(false)
+        Image(sceneImage(this.sceneBackground.src)).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Cover).draggable(false)
       }
       }
       if(this.showFrame&&this.sceneBackground.frameStyle!=='none'){CanvasFrame({material:this.sceneBackground.frameMaterial,style:this.sceneBackground.frameStyle}).width('100%').height('100%')}

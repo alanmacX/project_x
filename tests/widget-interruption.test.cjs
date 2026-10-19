@@ -12,7 +12,7 @@ const fixture=`class Fixture {
  store={reloadSceneAcknowledgements:()=>asyncRead,repairDesktopSelection:()=>Promise.resolve()};
  persist(){this.saves++;this.saveTimer=-1;}flushPreview(){this.flushes++;this.previewTimer=-1;this.gestureGroup='';this.saveTimer=2;}
  scheduleMaintenance(){}syncSchedules(){}refreshCapabilities(){this.refreshes++;}updateScheduledScene(){this.scenes++;}
- cancelGalleryTransition(){}queueRelief(){}queueReadingTints(){}scheduleBackground(){}
+ cancelGalleryWarm(){}cancelGalleryTransition(){}queueRelief(){}queueReadingTints(){}scheduleBackground(){}
  ${method('  private flushPendingEdits(', "\n  @StorageLink('appWindowFocused')")}
  ${method('  private windowFocusChanged(', '  private foregroundGeneration:')}
  ${method('  private cancelForegroundRefresh(', '\n\n  @State repairingSubjects')}

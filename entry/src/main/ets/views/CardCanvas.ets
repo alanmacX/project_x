@@ -1,3 +1,4 @@
+import { sceneImage } from '../model/SceneImageCache';
 import { EllipseShape } from '@kit.ArkUI';
 import { depthElement, internalDepth } from '../model/DepthComposition';
 import { DepthForeground } from './DepthForeground';
@@ -118,7 +119,7 @@ export struct CardCanvas {
         this.depthContents()
       }else {
       if(this.photoOnly()){
-        Image(this.card.cutout).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
+        Image(sceneImage(this.card.cutout)).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
       }else{
       Stack({ alignContent: Alignment.TopStart }) {
       if(this.card.capability?.k==='album') {
@@ -126,14 +127,14 @@ export struct CardCanvas {
       } else {
       Column().width('100%').height('100%').backgroundColor(materialColors(this.card.material, this.card.paper, this.card.ink)[0])
       if (this.card.depthPass!=='base' && this.card.shape === 'subject' && this.card.subjectPhoto && this.card.cutout.length > 0) {
-        Image(this.card.cutout).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
+        Image(sceneImage(this.card.cutout)).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
       }
       this.canvasElements(true)
       if (!(this.card.depthPass==='base'&&this.card.depthCapabilityFront) && !this.freeCapability() && !this.hideContent && this.card.capability !== null && !capabilityObstructed(this.card)) { CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}).transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY) }
       if (!this.hideContent) {Stack({alignContent:Alignment.TopStart}){this.canvasElements(false)}.width('100%').height('100%').transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY)}
       if (!(this.card.depthPass==='base'&&this.card.depthCapabilityFront) && !this.freeCapability() && !this.hideContent && this.card.capability !== null && capabilityObstructed(this.card)) { CapabilityContentLayer({motion:this.layerMotion,card:this.card,scaleFactor:this.scaleFactor,tick:this.tick}).transition(this.animateContent?settingsReveal():TransitionEffect.IDENTITY) }
       if (this.card.shape === 'subject' && this.card.cutout.length > 0) {
-        Image(this.card.cutout).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
+        Image(sceneImage(this.card.cutout)).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
           .blendMode(BlendMode.DST_IN, BlendApplyType.OFFSCREEN)
       }
       }
@@ -158,7 +159,7 @@ export struct CardCanvas {
   depthContents(){
     Stack({alignContent:Alignment.TopStart}){
       if(this.card.shape==='subject'){
-        Image(this.card.cutout).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
+        Image(sceneImage(this.card.cutout)).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false)
       }else {Column().width('100%').height('100%').backgroundColor(materialColors(this.card.material,this.card.paper,this.card.ink)[0])}
       if(depthElement(this.card)!==undefined){CanvasElementLayer({snapshot:this.snapshot,motion:this.layerMotion,element:depthElement(this.card)!,ink:materialColors(this.card.material,this.card.paper,this.card.ink)[1],scaleFactor:this.scaleFactor,widget:this.widget})}
       this.depthElements(false,true)

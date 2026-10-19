@@ -1,3 +1,4 @@
+import { sceneImage } from '../model/SceneImageCache';
 import { AlbumCover, CapBlock } from '../model/CardSchema';
 import { albumCoverSize, albumCoverRadius, albumInfoGeometry } from '../model/AlbumLayout';
 import { activeAlbum } from '../model/AlbumRotation';
@@ -37,9 +38,9 @@ export struct AlbumCapability {
   private style():string {return this.presentation||this.cap.albumPresentation||'cover';}
   @Builder private artwork(album:AlbumCover,incoming:boolean) {
     Stack() {
-      if(album.background) {Image(album.background).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false).onComplete(()=>{if(incoming)this.ready(album.cover,true)}).onError(()=>{if(incoming)this.ready(album.cover,true)})}
+      if(album.background) {Image(sceneImage(album.background)).syncLoad(this.snapshot).width('100%').height('100%').objectFit(ImageFit.Fill).draggable(false).onComplete(()=>{if(incoming)this.ready(album.cover,true)}).onError(()=>{if(incoming)this.ready(album.cover,true)})}
       if(album.cover && this.style()==='cover') {
-        Image(album.cover).syncLoad(this.snapshot).width(albumCoverSize(this.cardWidth,this.cardHeight)*this.scaleFactor).height(albumCoverSize(this.cardWidth,this.cardHeight)*this.scaleFactor)
+        Image(sceneImage(album.cover)).syncLoad(this.snapshot).width(albumCoverSize(this.cardWidth,this.cardHeight)*this.scaleFactor).height(albumCoverSize(this.cardWidth,this.cardHeight)*this.scaleFactor)
           .objectFit(ImageFit.Contain).borderRadius(albumCoverRadius(this.cardWidth,this.cardHeight)*this.scaleFactor).draggable(false)
           .shadow({radius:12*this.scaleFactor,color:'#35000000',offsetY:5*this.scaleFactor})
           .accessibilityText((album.title||'专辑')+' · '+album.artist)
@@ -47,7 +48,7 @@ export struct AlbumCapability {
       }
       if(album.cover && this.style()!=='cover') {
         Column().width('100%').height('100%').backgroundColor('#38000000')
-        Image(album.cover).syncLoad(this.snapshot)
+        Image(sceneImage(album.cover)).syncLoad(this.snapshot)
           .width(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).coverSize*this.scaleFactor)
           .height(albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).coverSize*this.scaleFactor)
           .position({x:albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).coverX*this.scaleFactor,y:albumInfoGeometry(this.cardWidth,this.cardHeight,this.style()).coverY*this.scaleFactor})

@@ -1,3 +1,4 @@
+import { sceneImage } from '../model/SceneImageCache';
 import { EditorLayerMotion } from '../model/EditorLayerMotion';
 import { contourPath } from '../model/ContourPath';
 import { cardOutline } from '../model/RenderContours';
@@ -65,7 +66,7 @@ export struct CardFace {
       // The cached face owns these layers; pan/rotation only transform its texture.
       if(this.card.shape==='subject'&&(this.card.reliefSrc.length>0||this.commands().length>0)){
         if(this.card.reliefSrc){
-          Image(this.card.reliefSrc).syncLoad(this.snapshot).width((this.card.w+48)*this.scaleFactor).height((this.card.h+48)*this.scaleFactor)
+          Image(sceneImage(this.card.reliefSrc)).syncLoad(this.snapshot).width((this.card.w+48)*this.scaleFactor).height((this.card.h+48)*this.scaleFactor)
             .position({x:-24*this.scaleFactor,y:-24*this.scaleFactor}).objectFit(ImageFit.Fill).draggable(false).hitTestBehavior(HitTestMode.None)
         }else{
           // Visible fallback while an off-thread cache is prepared: no shadow nodes.

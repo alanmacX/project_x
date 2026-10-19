@@ -1,3 +1,4 @@
+import { prepareSceneImages, trimSceneImages } from '../model/SceneImageCache';
 import { GalleryAnchor, GalleryController } from '../model/CanvasGallery';
 import { primeGalleryPreviews } from '../model/GalleryPreviewCache';
 import { cardActionAnchor, CardActionAnchor } from '../model/CardActionPlacement';
@@ -124,6 +125,9 @@ struct Index {
   private batteryObserver:BatteryObserver=new BatteryObserver();
   private refreshingCapabilities:boolean=false;
   private widgetRouteTimer:number=-1;
+  private widgetRouteRunning:boolean=false;
+  private widgetRoutePending:boolean=false;
+  private widgetRouteRequest:number=0;
   @State deletionId:string='';
   @State deletionBitmap:image.PixelMap|undefined=undefined;
   private deletionX:number=0;private deletionY:number=0;
@@ -354,9 +358,10 @@ struct Index {
   private initialize(): void {
     if (this.context === null) return;
     const materialReady=prepareChromeMaterial();
-    this.store.init(this.context).then(async () => {
+    this.store.init(this.context,this.routeCanvasId).then(async () => {
       await materialReady; startupMark('material-ready');
       if (this.routeCanvasId && this.routeCanvasId!==this.store.state.canvasId) await this.store.openCanvas(this.routeCanvasId);
+      await prepareSceneImages(this.store.state);
       this.refreshCanvasList();
       // Refresh host geometry for the next launch without changing the visible arrival aspect.
       // Cached host geometry is enough for first paint. System IPC must not hold the screen blank.
@@ -370,22 +375,24 @@ struct Index {
       // scatter/prepare sequence underneath it fights quick gesture cancellation.
       const widgetLaunch=AppStorage.get<boolean>('launchFromWidget')===true;
       const routedLaunch = widgetLaunch || this.routedId.length > 0 || this.viewRouteId.length > 0;
-      this.galleryVisible = !routedLaunch;this.workspaceMounted=routedLaunch;this.galleryMounted=!routedLaunch;
+      this.galleryVisible = !routedLaunch;this.workspaceMounted=routedLaunch;this.galleryMounted=!routedLaunch;this.galleryArtworkOpacity=routedLaunch?1:0;
       if(!routedLaunch)await primeGalleryPreviews(this.context!.cacheDir,this.canvasEntries.map((entry:CanvasEntry)=>entry.id));
       this.canvasBackground = this.store.state.background; this.layoutBoard();
       startupMark('geometry-ready');
       if(!this.alive)return;
-      this.ready = true; this.render(); this.queueReadingTints();this.queueRelief(); startupMark('scene-ready');
+      this.ready = true; this.render(); this.retainCanvasImages(); this.queueReadingTints();this.queueRelief(); startupMark('scene-ready');
       this.getUIContext().postFrameCallback(new PreparedTransition(()=>startupMark('scene-idle'),true));
       this.scheduleBackground(); this.routeChanged(); this.viewRouteChanged(); this.incomingTemplateChanged();
       if(!this.viewRouteId && this.routeCanvasId===this.store.state.canvasId)AppStorage.setOrCreate('routeCanvasId','');
       if(widgetLaunch && !this.editing && !this.viewing && this.cardIds.length>0)this.prepareWidgetScene();
       else this.getUIContext().postFrameCallback(new PreparedTransition(() => { revealStartup(); }));
       this.scheduleMaintenance();
+      if(this.routeCanvasId&&this.routeCanvasId!==this.store.state.canvasId)this.scheduleWidgetRoute();
 
     }).catch((e: Error) => { this.error = e.message; this.getUIContext().postFrameCallback(new PreparedTransition(() => { revealStartup(); })); });
   }
   private scheduleMaintenance(): void {
+    if(this.maintenanceTimer>=0)clearTimeout(this.maintenanceTimer);
     this.maintenanceTimer = setTimeout(() => {
       this.maintenanceTimer = -1;
       if (!this.alive) return;
@@ -861,12 +868,13 @@ struct Index {
         const relief=JSON.parse(await taskpool.execute(new taskpool.Task(prepareSceneRelief,JSON.stringify(artwork))) as string) as Record<string,string>;
         for(const card of artwork){if(relief[card.id]){card.reliefSrc=relief[card.id];this.reliefKeys.set(card.id,this.reliefKey(card));}}
       }catch(_){}}
+      await prepareSceneImages(this.store.state);
       if(beforeReveal!==null){await beforeReveal();if(!this.alive)return;}
       this.sceneEditing=this.store.catalog.scenes.some(c=>c.id===this.store.state.canvasId);this.scheduleGeneration++;this.timedScene=null;this.scheduleOverride=null;this.scheduledName='';this.scheduledFocusId='';this.syncSchedules();
       this.selectedId = ''; this.activeBoardId = ''; this.groupSelection = []; this.groupSelecting = false;
       this.syncHostCanvasGeometry();this.layoutBoard();
       this.canvasBackground = this.store.state.background; this.refreshCanvasList();
-      this.render(); if(!manual)this.persist(true); this.scheduleBackground();
+      this.render();this.retainCanvasImages(); if(!manual)this.persist(true); this.scheduleBackground();
       this.refreshCapabilities();this.updateScheduledScene(true);
     } catch (e) { throw e as Error; }
   }
@@ -1153,37 +1161,71 @@ struct Index {
   }
   private routeChanged(): void {
     if (!this.ready || this.routedId.length === 0) return;
-    if(this.routeCanvasId&&this.routeCanvasId!==this.store.state.canvasId){this.scheduleWidgetRoute();return;}
+    if(this.galleryVisible||(this.routeCanvasId&&this.routeCanvasId!==this.store.state.canvasId)){this.scheduleWidgetRoute();return;}
     if (this.store.findCard(this.routedId) !== null) { this.openEditor(this.routedId); }
     AppStorage.setOrCreate('editCardId', '');
   }
   private viewRouteChanged(): void { if(this.ready&&this.viewRouteId) this.scheduleWidgetRoute(); }
   private scheduleWidgetRoute():void {
+    this.widgetRouteRequest++;
     if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer);
-    this.widgetRouteTimer=setTimeout(()=>{this.widgetRouteTimer=-1;this.reloadWidgetRoute();},0);
+    this.widgetRouteTimer=setTimeout(()=>{this.widgetRouteTimer=-1;this.reloadWidgetRoute();},32);
+  }
+  private presentWidgetWorkspace():void {
+    // A launcher entrance owns its animation. Restore the retained artwork even
+    // when the previous page was the gallery (whose artwork opacity is zero).
+    this.galleryVisible=false;this.workspaceMounted=true;this.cancelGalleryTransition();
+    this.galleryArtworkOpacity=1;this.galleryController.pausePreviews();
   }
   private async reloadWidgetRoute():Promise<void> {
     if(!this.context || !this.alive)return;
-    this.cancelGalleryTransition();this.galleryVisible=false;
-    const canvas=this.routeCanvasId,id=this.viewRouteId;
+    if(this.widgetRouteRunning){this.widgetRoutePending=true;return;}
+    if(this.canvasChanging||this.galleryTransitioning||this.heroActive||this.arriving||this.activeBoardId){this.scheduleWidgetRoute();return;}
+    this.widgetRouteRunning=true;this.widgetRoutePending=false;
+    const request=this.widgetRouteRequest,canvas=this.routeCanvasId,id=this.viewRouteId;
+    const previousCanvas=this.store.state.canvasId,previousActive=this.store.catalog.activeId;let published=false;
+    this.cancelGalleryWarm();this.cancelForegroundRefresh();
     try {
       // A desktop tap is navigation, not an instruction to rebuild the same canvas.
       if(!id && !this.routedId && (!canvas||canvas===this.store.state.canvasId)){
+        this.presentWidgetWorkspace();published=true;
         AppStorage.setOrCreate('routeCanvasId','');this.scheduleForegroundRefresh();return;
       }
+      this.canvasChanging=true;this.flushPendingEdits();
       this.backgroundGeneration++;
-      await this.store.init(this.context);if(canvas)await this.store.openCanvas(canvas);
+      // Keep hydrated documents/contours and load only the requested record.
+      // Reinitializing the whole store discards those caches and loads the old
+      // active canvas before loading the widget's bound canvas a second time.
+      if(!await this.store.openCanvas(canvas||this.store.state.canvasId))throw new Error('画布已不存在');
+      if(!this.alive||request!==this.widgetRouteRequest)return;
       await primeRenderContours(this.store.state.cards,storageSnapshot(this.store.state));
-      if(!this.alive)return;
+      if(!this.alive||request!==this.widgetRouteRequest)return;
+      await prepareSceneImages(this.store.state);
+      if(!this.alive||request!==this.widgetRouteRequest)return;
+      this.scenePanelGeneration++;this.cancelScheduledTransition();this.timedScene=null;this.scheduleOverride=null;this.sceneEditing=this.store.catalog.scenes.some(c=>c.id===this.store.state.canvasId);this.scheduledName='';this.scheduledFocusId='';this.syncSchedules();
       this.refreshCanvasList();this.syncHostCanvasGeometry();this.canvasBackground=this.store.state.background;
-      this.editing=false;this.heroActive=false;this.viewing=false;this.selectedId='';this.activeBoardId='';this.boardOpacity=1;this.render();this.layoutBoard();
+      this.editorMountGeneration++;this.editorSheetOpen=false;this.editorMounted=false;this.editorReady=false;
+      this.editing=false;this.heroActive=false;this.viewing=false;this.selectedId='';this.activeBoardId='';this.boardOpacity=1;this.scatter=0;this.render();this.layoutBoard();this.retainCanvasImages();
+      this.presentWidgetWorkspace();published=true;
       AppStorage.setOrCreate('viewCardId','');
       if(this.routeCanvasId===canvas)AppStorage.setOrCreate('routeCanvasId','');
       if(id&&this.store.findCard(id)){this.select(id);this.viewing=true;}
-      this.routeChanged();this.scheduleBackground();this.refreshCapabilities();
-      // Persist only the selection metadata. Replaying stale UI state could undo a widget-side action.
+      this.routeChanged();this.scheduleBackground();this.scheduleForegroundRefresh();
       this.store.save(false).catch(()=>{});
-    }catch(_){this.error='画布读取失败，请重试';}
+    }catch(_){if(request===this.widgetRouteRequest)this.error='画布读取失败，请重试';}
+    finally{
+      // openCanvas selects its hydrated document before the asynchronous contour/image work.
+      // A superseded/failed route must not leave the visible page editing that hidden target.
+      if(!published&&this.store.state.canvasId!==previousCanvas&&this.store.switchCanvas(previousCanvas))this.store.catalog.activeId=previousActive;
+      this.canvasChanging=false;this.widgetRouteRunning=false;
+      if(this.alive&&(this.widgetRoutePending||request!==this.widgetRouteRequest))this.scheduleWidgetRoute();
+    }
+  }
+  private retainCanvasImages():void {
+    const state=this.store.state;
+    this.getUIContext().postFrameCallback(new PreparedTransition(()=>{
+      if(this.alive&&this.store.state===state)trimSceneImages(state);
+    }));
   }
   private calendarAction(operation: string): void {
     const card = this.current(); if (card !== null && applyCalendarAction(card, operation)) { this.render(); this.persist(); }

@@ -543,7 +543,7 @@ function normalizeState(raw) {
     state.canvasId = typeof raw.canvasId === 'string' && /^[a-zA-Z0-9_-]{1,96}$/.test(raw.canvasId) ? raw.canvasId : 'canvas_main';
     state.background = normalizeBackground(raw.background);
     state.door = raw.door ?? new DoorState();
-    state.canvasDimension = ['2*4', '4*4', '6*4'].includes(raw.canvasDimension) ? raw.canvasDimension : '4*4';
+    state.canvasDimension = ['2*2', '2*4', '4*4', '6*4'].includes(raw.canvasDimension) ? raw.canvasDimension : '4*4';
     state.canvasAspect = bounded(raw.canvasAspect, .3, 3, 1);
     state.sceneLayouts = (0, SceneScheduleSchema_1.normalizeSceneLayouts)(raw.sceneLayouts);
     state.sceneRules = (0, SceneScheduleSchema_1.normalizeSceneRules)(raw.sceneRules);
@@ -3546,7 +3546,7 @@ exports.traceMask = traceMask;
 "EditorVisualChoices":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.editorVisualChoices = exports.editorReadingPlacement = exports.EditorVisualChoice = void 0;
+exports.editorVisualChoices = exports.applyEditorShape = exports.editorReadingPlacement = exports.editorVisualChoiceSignature = exports.EditorVisualChoice = void 0;
 const CardSchema_1 = require("./CardSchema");
 const CardViewSnapshot_1 = require("./CardViewSnapshot");
 const CanvasLayout_1 = require("./CanvasLayout");
@@ -3563,6 +3563,13 @@ class EditorVisualChoice {
     }
 }
 exports.EditorVisualChoice = EditorVisualChoice;
+/** Ignore board placement, but invalidate every value that changes candidate artwork. */
+function editorVisualChoiceSignature(card, mode) {
+    return JSON.stringify([mode, card.id, card.w, card.h, card.shape, card.cutout, card.subjectVersion, card.subjectPhoto, card.subjectAspect,
+        card.subjectInk, card.subjectBorder, card.frame, card.material, card.paper, card.ink,
+        mode === 'shape' ? null : card.capability, mode === 'shape' ? null : card.elements]);
+}
+exports.editorVisualChoiceSignature = editorVisualChoiceSignature;
 /** Changing the backing reserves its inset without shrinking the user's readout. */
 function editorReadingPlacement(card, blend) {
     const box = (0, ReadingComposition_1.compositionPlacement)(card, (0, CanvasLayout_1.capabilityPlacement)(card), blend);
@@ -3574,6 +3581,15 @@ function editorReadingPlacement(card, blend) {
     return box;
 }
 exports.editorReadingPlacement = editorReadingPlacement;
+/** A square collapses both an ellipse and a capsule to a circle. Preserve existing non-square art. */
+function applyEditorShape(card, key) {
+    card.shape = key;
+    if (key === 'subject')
+        card.h = card.w / card.subjectAspect;
+    else if ((key === 'round' || key === 'pill') && Math.abs(card.w - card.h) < .5)
+        card.h = card.w * .6;
+}
+exports.applyEditorShape = applyEditorShape;
 /** Build detached candidates once per inspector session, never during a gesture or clock tick. */
 function editorVisualChoices(source, mode) {
     const keys = mode === 'material' ? ['paper', 'matte'] : mode === 'album' ? ['cover', 'classic', 'row'] : mode === 'shape' ? ['rect', 'round', 'pill', 'blob'].concat(source.cutout ? ['subject'] : []) : (0, ReadingComposition_1.readingStyles)(source.capability?.k ?? '');
@@ -3609,9 +3625,7 @@ function editorVisualChoices(source, mode) {
             card.capability = null;
             card.capFree = false;
             card.elements = [];
-            card.shape = key;
-            if (key === 'subject')
-                card.h = card.w / card.subjectAspect;
+            applyEditorShape(card, key);
             choice.label = ['圆角矩形', '椭圆', '胶囊', '自由边角', '照片主体'][keys.indexOf(key)];
         }
         else if (card.capability) {
@@ -4141,7 +4155,7 @@ class CanvasEntry {
 exports.CanvasEntry = CanvasEntry;
 class CanvasCatalog {
     constructor() {
-        this.desktopFollowsSelection = true;
+        this.desktopFollowsSelection = false;
         this.scenes = [];
         this.sceneRules = [];
         this.rotation = new CanvasRotation_1.CanvasRotation();
@@ -4178,15 +4192,16 @@ function readCatalog(json) {
     out.sceneRules = (0, SceneScheduleSchema_1.normalizeSceneRules)(source.sceneRules).filter(r => r.centralOnly && out.scenes.some(c => c.id === r.targetId));
     out.rotation = (0, CanvasRotation_1.normalizeCanvasRotation)(source.rotation, out.canvases.map(c => c.id));
     out.scenePolicyVersion = source.scenePolicyVersion === 2 ? 2 : 1;
-    out.desktopFollowsSelection = true; // Migrate obsolete per-form bindings, including explicitly false legacy catalogs.
+    out.desktopFollowsSelection = false;
     out.activeId = out.canvases.some((c) => c.id === source.activeId) ? source.activeId : out.canvases[0].id;
     return out;
 }
 exports.readCatalog = readCatalog;
 function boundCanvas(bindings, formId, catalog) {
-    // Selection is catalog-owned. Old form IDs may point at valid but empty canvases;
-    // retaining those bindings silently disagrees with the visible App canvas.
-    return catalog.activeId;
+    const id = bindings[formId];
+    if (id === '')
+        return '';
+    return catalog.canvases.some(c => c.id === id) ? id : ''; // An absent binding is never the foreground document.
 }
 exports.boundCanvas = boundCanvas;
 function cloneCanvas(state, id) {
@@ -4312,4 +4327,4 @@ function depthRenderCards(cards) {
 }
 exports.depthRenderCards = depthRenderCards;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"fe69d985877acfdcc798a61d52e2dfd8b27bc3e29af349f155e7a1932630e073"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"3d0286074dca4fff0936995899b489bc2ed81f649f59960eb9cc1d005d3a9904"};})(globalThis);
