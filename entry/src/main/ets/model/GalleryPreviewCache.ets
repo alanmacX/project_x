@@ -14,7 +14,15 @@ function indexPath(dir:string,id:string):string{return dir+'/gallery_v2_'+id+'.j
 export async function cachedGalleryPreview(dir:string,id:string):Promise<GalleryThumbnail|null>{
   const cached=memory.get(memoryKey(dir,id));if(cached)return cached;
   try {const item=JSON.parse(await fileIo.readText(indexPath(dir,id))) as GalleryThumbnail;
-    if(!item.path.startsWith('file://'+dir+'/gallery_v2_')||!await fileIo.access(item.path.slice(7)))return null;
+    const prefix='file://'+dir+'/gallery_v2_';
+    if(!item||typeof item.path!=='string'||!item.path.startsWith(prefix)||item.path.slice(prefix.length).includes('/')||
+      typeof item.source!=='string'||!['2*2','2*4','4*4','6*4'].includes(item.dimension)||!Number.isFinite(item.aspect)||item.aspect<.3||item.aspect>3||
+      !await fileIo.access(item.path.slice(7)))return null;
+    const rects:Record<string,number[]>={};
+    if(item.rects&&typeof item.rects==='object')for(const dimension of ['2*2','2*4','4*4','6*4']){
+      const rect=item.rects[dimension];if(Array.isArray(rect)&&rect.length===2&&rect.every(value=>Number.isFinite(value)&&value>0))rects[dimension]=rect;
+    }
+    item.rects=rects;
     memory.set(memoryKey(dir,id),item);return item;
   }catch(_){return null;}
 }

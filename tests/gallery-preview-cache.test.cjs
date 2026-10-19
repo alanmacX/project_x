@@ -13,6 +13,8 @@ function load(){const context={exports:{},require:()=>({fileIo})};vm.runInNewCon
  assert(!files.has('/cache/gallery_v2_a_1.png'),'replaced image is reclaimed after metadata is committed');
  cache=load();assert.equal((await cache.cachedGalleryPreview('/cache','a')).source,'updated-revision');
  files.delete('/cache/gallery_v2_a_2.png');assert.equal(await load().cachedGalleryPreview('/cache','a'),null,'evicted image triggers regeneration');
+ for(const invalid of [{...item,path:'file:///cache/gallery_v2_../outside.png'},{...item,aspect:0},{...item,dimension:'bad'},{...item,source:null}]){files.set('/cache/gallery_v2_bad.json',JSON.stringify(invalid));assert.equal(await load().cachedGalleryPreview('/cache','bad'),null,'invalid cache metadata cannot distort gallery geometry');}
+ files.set('/cache/gallery_v2_a_1.png','image');files.set('/cache/gallery_v2_bad.json',JSON.stringify({...item,rects:{'2*2':[-1,170],'4*4':[100,100]}}));assert.deepEqual(Object.keys((await load().cachedGalleryPreview('/cache','bad')).rects),['4*4'],'discard corrupt host rectangles independently of usable artwork');
  files.set('/cache/gallery_v2_bad.json','{broken');assert.equal(await cache.cachedGalleryPreview('/cache','bad'),null,'damaged cache never damages artwork');
  console.log('PASS gallery disk cache: cold restore, atomic replacement, stale-image cleanup, missing images and malformed metadata.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

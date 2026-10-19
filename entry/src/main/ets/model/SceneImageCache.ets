@@ -7,6 +7,15 @@ const decoded:Map<string,DecodedSceneImage>=new Map();
 const pending:Map<string,Promise<void>>=new Map();
 const IDLE_CACHE_BYTES:number=48*1024*1024;
 const MAX_CACHED_SOURCES:number=32;
+let activeDecoders:number=0;
+const decoderWaiters:Array<()=>void>=[];
+async function acquireDecoder():Promise<void>{
+  if(activeDecoders<2){activeDecoders++;return;}
+  await new Promise<void>((resolve:()=>void)=>decoderWaiters.push(resolve));
+}
+function releaseDecoder():void{
+  const next=decoderWaiters.shift();if(next)next();else activeDecoders--;
+}
 
 /** File assets are immutable/versioned. Forms and cache misses retain their normal source. */
 export function sceneImage(src:string):string|image.PixelMap {
@@ -31,6 +40,7 @@ async function decode(src:string):Promise<void> {
   if(decoded.has(src))return;
   const existing=pending.get(src);if(existing){await existing;return;}
   const work=(async():Promise<void>=>{
+    await acquireDecoder();
     let source:image.ImageSource|null=null,pixel:image.PixelMap|null=null;
     try{
       source=image.createImageSource(src.slice(7));
@@ -39,7 +49,7 @@ async function decode(src:string):Promise<void> {
       const info=await pixel.getImageInfo();
       decoded.set(src,{pixel:pixel,bytes:pixel.getBytesNumberPerRow()*info.size.height});pixel=null;
     }catch(_){/* A missing/corrupt asset uses the existing Image error/fallback path. */}
-    finally{try{if(pixel)await pixel.release().catch(()=>{});}finally{if(source)await source.release().catch(()=>{});}}
+    finally{try{try{if(pixel)await pixel.release().catch(()=>{});}finally{if(source)await source.release().catch(()=>{});}}finally{releaseDecoder();}}
   })();
   pending.set(src,work);try{await work;}finally{pending.delete(src);}
 }
