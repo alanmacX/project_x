@@ -28,42 +28,41 @@ export class GalleryItem {
   loaded: boolean = false;
   failed: boolean = false;
 }
-export class GalleryRow {
-  id: string = '';
-  wide: boolean = false;
-  items: GalleryItem[] = [];
+export class GalleryPlacement {
+  item:GalleryItem=new GalleryItem();
+  x:number=0;y:number=0;w:number=0;h:number=0;
 }
-/** ArkUI retains keyed builder arguments; replace a row when its async preview data settles. */
-export function galleryRowKey(row: GalleryRow): string {
-  return JSON.stringify([row.id, row.wide, row.items.map((item: GalleryItem): string =>
-    JSON.stringify([item.id, item.name, item.dimension, item.aspect, item.preview ? false : item.loaded, item.preview ? false : item.failed, item.preview]))]);
+/** Grid cells keep small canvases half the width of large ones, with a shared gutter. */
+export function galleryColumns(width:number):number{return width>=1000?6:width>=600?4:width>=260?3:2;}
+function galleryUnit(available:number,rects:Record<string,number[]>):number{
+  const columns=galleryColumns(available),nativeFull=rects['4*4']?.[0]??344;
+  return Math.max(1,Math.min((nativeFull-16)/2,(available-(columns-1)*16)/columns));
 }
-export function galleryColumns(width: number): number {
-  return width < 360 ? 1 : width >= 1100 ? 4 : width >= 720 ? 3 : 2;
-}
-export function galleryRows(items: GalleryItem[], filter: string, columns: number): GalleryRow[] {
-  const rows: GalleryRow[] = [];
-  let pending = new GalleryRow();
-  for (const item of items) {
-    if (filter && item.dimension !== filter) continue;
-    if (item.dimension !== '2*2' && (item.dimension || item.aspect > 1.45) && columns > 1) {
-      if (pending.items.length) { rows.push(pending); pending = new GalleryRow(); }
-      const row = new GalleryRow(); row.id = item.id; row.wide = true; row.items = [item]; rows.push(row);
-    } else {
-      if (!pending.items.length) pending.id = item.id;
-      pending.items.push(item);
-      if (pending.items.length === columns) { rows.push(pending); pending = new GalleryRow(); }
-    }
-  }
-  if (pending.items.length) rows.push(pending);
-  return rows;
-}
-
-/** Use measured launcher rectangles; before a host exists use its usual 4-column grid. */
 export function galleryPreviewSize(dimension:string,aspect:number,available:number,rects:Record<string,number[]>):number[]{
-  const full=Math.min(available,rects['4*4']?.[0]??344),small=(full-16)/2;
-  const measured=rects[dimension];
-  const width=Math.min(available,measured?.[0]??(dimension==='2*2'?small:full));
-  const ratio=measured&&measured[1]>0?measured[0]/measured[1]:Math.max(.3,aspect);
+  const unit=galleryUnit(available,rects),width=dimension==='2*2'?unit:unit*2+16;
+  const measured=rects[dimension],ratio=measured&&measured[0]>0&&measured[1]>0?measured[0]/measured[1]:Math.max(.3,aspect);
   return [width,width/ratio];
+}
+/** Lowest contiguous skyline slot: O(items × columns), stable ties read left to right. */
+export function galleryLayout(items:GalleryItem[],filter:string,available:number,rects:Record<string,number[]>,renameId:string=''):GalleryPlacement[]{
+  const columns=galleryColumns(available),unit=galleryUnit(available,rects),lanes:number[]=Array(columns).fill(0),out:GalleryPlacement[]=[];
+  for(const item of items){
+    if(filter&&item.dimension!==filter)continue;
+    const span=item.dimension==='2*2'?1:2,size=galleryPreviewSize(item.dimension,item.aspect,available,rects);
+    let best=0,y=Number.POSITIVE_INFINITY;
+    for(let col=0;col<=columns-span;col++){
+      let top=0;for(let slot=col;slot<col+span;slot++)top=Math.max(top,lanes[slot]);
+      if(top<y){best=col;y=top;}
+    }
+    const placement=new GalleryPlacement();placement.item=item;placement.x=best*(unit+16);placement.y=y;placement.w=size[0];placement.h=size[1]+(item.id===renameId?108:60);out.push(placement);
+    for(let col=best;col<best+span;col++)lanes[col]=y+placement.h+20;
+  }
+  const right=Math.max(0,...out.map((entry:GalleryPlacement)=>entry.x+entry.w)),inset=Math.max(0,(available-right)/2);
+  for(const entry of out)entry.x+=inset;
+  return out;
+}
+/** Refresh captured ArkUI builder inputs only when their pixels, label or geometry change. */
+export function galleryPlacementKey(value:GalleryPlacement):string{
+  const item=value.item;
+  return JSON.stringify([item.id,item.name,item.dimension,item.aspect,item.preview,item.preview?false:item.loaded,item.preview?false:item.failed,value.x,value.y,value.w,value.h]);
 }

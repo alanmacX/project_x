@@ -14,7 +14,7 @@ import { settingsDialogOpen, settingsDialogClose } from '../model/SettingsMotion
 import { taskpool } from '@kit.ArkTS';
 import { picker } from '@kit.CoreFileKit';
 import { CourseEditor } from './CourseEditor';
-import { WakeUpImportDialog } from './WakeUpImportDialog';
+import { TimetableImportSheet } from './TimetableImportSheet';
 @Component
 export struct CapabilitySettings {
   @Prop @Watch('inputChanged') cap:CapBlock={k:'battery'};
@@ -24,6 +24,9 @@ export struct CapabilitySettings {
   @Prop tick:number=0;
   onUpdate:(id:string,cap:CapBlock)=>void=()=>{};
   onReuseTimetable:(id:string)=>void=()=>{};
+  @StorageProp('workspaceWidth') private viewportWidth:number=390;
+  @State timetableImportOpen:boolean=false;
+  private timetableImportCardId:string='';
   @State busy:boolean=false;
   @State wholeCalendarAccess:boolean=false;
   @State message:string='';
@@ -33,7 +36,7 @@ export struct CapabilitySettings {
   private inputKey:string='';
   private inputChanged():void {
     const key=this.cardId+'|'+this.cap.k;
-    if(key===this.inputKey)return;this.inputKey=key;this.generation++;this.busy=false;this.message='';
+    if(key===this.inputKey)return;this.inputKey=key;this.timetableImportOpen=false;this.generation++;this.busy=false;this.message='';
   }
   aboutToAppear():void {
     this.alive=true;this.inputChanged();const context=this.getUIContext().getHostContext();
@@ -86,12 +89,13 @@ export struct CapabilitySettings {
       this.onUpdate(id,cap);this.message='已导入，请检查预览';
     }catch(e){if(this.alive)this.message=(e as Error).message;}finally{if(token===this.generation)this.busy=false;}
   }
-  private importTimetable():void {
-    const id=this.cardId;
-    this.dialog=new CustomDialogController({builder:WakeUpImportDialog({appDark:this.appDark,existingCount:(this.cap.courses??[]).length,onImport:(semester:string,courses:CourseItem[],replace:boolean,keepCalendar:boolean)=>{
-      if(!this.alive||this.cardId!==id||this.cap.k!=='timetable')return;
+  private importTimetable():void {this.timetableImportCardId=this.cardId;this.timetableImportOpen=true;}
+  @Builder
+  timetableImportSheet(){
+    TimetableImportSheet({appDark:this.appDark,existingCount:(this.cap.courses??[]).length,onClose:()=>this.timetableImportOpen=false,onImport:(semester:string,courses:CourseItem[],replace:boolean,keepCalendar:boolean)=>{
+      if(!this.alive||this.cardId!==this.timetableImportCardId||this.cap.k!=='timetable')return;
       this.change(applyTimetableImport(this.cap,semester,courses,replace,keepCalendar));
-    }}),customStyle:true,openAnimation:settingsDialogOpen(),closeAnimation:settingsDialogClose(),alignment:DialogAlignment.Center,autoCancel:true});this.dialog.open();
+    }})
   }
   private showTimetable():void {
     const id=this.cardId;
@@ -127,7 +131,7 @@ export struct CapabilitySettings {
         SettingsAction({label:'使用已保存课表',onPress:()=>this.onReuseTimetable(this.cardId),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
         SettingsAction({label:'查看周课表 · '+(this.cap.courses??[]).length+' 条安排',onPress:()=>this.showTimetable(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
         Row({space:8}) {
-          Button('导入课表',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).fontSize(14).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.importTimetable())
+          Button('导入课程',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).fontSize(14).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.importTimetable())
           if(this.section==='all') {Button('假期与调课',{type:ButtonType.Capsule, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}).height(44).layoutWeight(1).fontSize(14).fontColor(this.text()).backgroundColor(this.control()).onClick(()=>this.calendarRules())}
         }.width('100%')
         }
@@ -137,6 +141,6 @@ export struct CapabilitySettings {
         }
       }
       if(this.message || this.cap.refreshState==='failed') {Text(this.message||this.cap.desc||'更新失败，保留上次结果').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
-    }.width('100%')
+    }.width('100%').bindSheet($$this.timetableImportOpen,this.timetableImportSheet,{height:'92%',preferType:this.viewportWidth>=600?SheetType.CENTER:SheetType.BOTTOM,width:Math.min(960,this.viewportWidth-24),showClose:false,dragBar:false,keyboardAvoidMode:SheetKeyboardAvoidMode.TRANSLATE_AND_RESIZE,backgroundColor:AppDesign.surface(this.appDark),onDisappear:()=>this.timetableImportOpen=false})
   }
 }

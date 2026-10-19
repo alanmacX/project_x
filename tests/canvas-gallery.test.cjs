@@ -15,19 +15,19 @@ const entries = [
   { id: 'portrait', dimension: '4*4', aspect: .8 },
   { id: 'second-strip', dimension: '2*4', aspect: 2.1 }
 ];
-for (const width of [320, 360, 390, 600, 720, 960, 1100, 1440]) {
-  const columns = model.galleryColumns(width), rows = model.galleryRows(entries, '', columns);
-  assert.deepEqual(Array.from(rows.flatMap(row => row.items).map(item => item.id)), entries.map(item => item.id), 'mixed sizes keep catalog order without duplicates');
-  assert(rows.every(row => row.wide ? row.items.length === 1 : row.items.length <= columns));
-  assert.deepEqual(Array.from(model.galleryRows(entries, '2*4', columns).flatMap(row => row.items).map(item => item.id)), ['strip', 'second-strip']);
-  assert.equal(model.galleryRows(entries, 'unknown', columns).length, 0);
+for(const width of [240,288,320,360,390,600,624,720,960,1028,1100,1440]){
+ const populated=Array.from({length:35},(_,i)=>({...entries[i%entries.length],id:'item_'+i}));
+ const layout=model.galleryLayout(populated,'',width,{});
+ assert.deepEqual(Array.from(layout.map(p=>p.item.id)),populated.map(i=>i.id),'packing preserves catalog traversal');
+ for(const p of layout){assert(p.x>=0&&p.y>=0&&p.x+p.w<=width+.001);for(const q of layout){if(p===q)continue;assert(p.x+p.w<=q.x+.001||q.x+q.w<=p.x+.001||p.y+p.h<=q.y+.001||q.y+q.h<=p.y+.001,'mixed sizes cannot overlap');}}
+ assert.deepEqual(Array.from(model.galleryLayout(entries,'2*4',width,{}).map(p=>p.item.id)),['strip','second-strip']);
+ assert.equal(model.galleryLayout(entries,'unknown',width,{}).length,0);
+ if(width>=600){const pair=model.galleryLayout([{...entries[0],id:'a'},{...entries[0],id:'b'}],'',width,{});assert.equal(pair[0].y,pair[1].y,'tablet fits multiple large canvases on one row');}
 }
-assert.equal(model.galleryColumns(320), 1, 'short narrow windows retain usable previews');
-assert.equal(model.galleryRows([], '', 2).length, 0);
-const pendingRow = model.galleryRows([{id:'preview', name:'A', dimension:'', aspect:1, loaded:false, failed:false, preview:''}], '', 2)[0];
-const pendingKey = model.galleryRowKey(pendingRow);
-pendingRow.items[0].loaded = true; pendingRow.items[0].preview = 'file://preview.png';
-assert.notEqual(model.galleryRowKey(pendingRow), pendingKey, 'settled async previews must replace ArkUI builders that captured a loading row');
+assert.equal(model.galleryLayout([], '', 390,{}).length,0);
+const pending=model.galleryLayout([{id:'preview',name:'A',dimension:'',aspect:1,loaded:false,failed:false,preview:''}],'',390,{})[0],pendingKey=model.galleryPlacementKey(pending);
+pending.item.loaded=true;pending.item.preview='file://preview.png';assert.notEqual(model.galleryPlacementKey(pending),pendingKey,'settled preview refreshes captured ArkUI builder arguments');
+const renamed=model.galleryLayout(entries,'',624,{},'square');assert.equal(renamed[0].h,model.galleryLayout(entries,'',624,{})[0].h+48,'inline rename reserves room without overlapping the next tile');
 
 const page = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 const methods = page.slice(page.indexOf('  private async openGalleryCanvas('), page.indexOf('  @Builder\n  canvasWorkspaceContent('));
@@ -230,7 +230,7 @@ for(const available of [288,358,700]){
  const small=model.galleryPreviewSize('2*2',1,available,{}),large=model.galleryPreviewSize('4*4',1,available,{}),strip=model.galleryPreviewSize('2*4',2,available,{});
  assert(large[0]>small[0]*1.9,'large and small squares cannot have identical preview sizes');assert.equal(strip[0],large[0]);assert.equal(strip[1],strip[0]/2);
 }
-const measured=model.galleryPreviewSize('2*2',1,600,{'2*2':[190,170]});assert.equal(measured[0],190);assert.equal(measured[1],170,'native vp rectangle wins over nominal square ratio');
+const measured=model.galleryPreviewSize('2*2',1,600,{'2*2':[190,170]});assert(measured[0]<=190);assert.equal(measured[0]/measured[1],190/170,'compact preview keeps the measured launcher aspect');
 
 const visibilityStart=galleryView.indexOf('  private pageVisibilityChanged():');
 const visibilityEnd=galleryView.indexOf('  private previewTimeChanged():',visibilityStart);

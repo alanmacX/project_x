@@ -1783,7 +1783,7 @@ struct Index {
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_: Area, area: Area) => {
         const width = Number(area.width), height = Number(area.height);
-        if (width > 0 && height > 0 && (width!==this.screenWidth || height!==this.screenHeight)) { if(this.galleryTransitioning||this.galleryReturnAnimating)this.cancelGalleryTransition();this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height);if(this.editing&&!this.heroActive)this.editorSheetOpen=!this.editorLandscape(); this.layoutBoard(); }
+        if (width > 0 && height > 0 && (width!==this.screenWidth || height!==this.screenHeight)) { if(this.galleryTransitioning||this.galleryReturnAnimating)this.cancelGalleryTransition();this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height);AppStorage.setOrCreate('workspaceWidth',width);if(this.editing&&!this.heroActive)this.editorSheetOpen=!this.editorLandscape(); this.layoutBoard(); }
       })
   }
   private showCardActions(): boolean {

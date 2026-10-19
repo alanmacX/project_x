@@ -13,7 +13,7 @@ import { taskpool } from '@kit.ArkTS';
 import lazy { prepareSceneRelief } from '../model/SceneRelief';
 import { CanvasEntry } from '../model/CanvasLibrary';
 import { FridgeState, FridgeCard, BOARD_W, BOARD_H } from '../model/CardSchema';
-import { GalleryAnchor, GalleryController, GalleryItem, GalleryRow, galleryRows, galleryRowKey, galleryPreviewSize } from '../model/CanvasGallery';
+import { GalleryAnchor, GalleryController, GalleryItem, GalleryPlacement, galleryLayout, galleryPlacementKey, galleryPreviewSize } from '../model/CanvasGallery';
 import { AppDesign } from '../model/AppDesign';
 import { immersiveChrome, chromeMaterial } from '../model/ChromeMaterial';
 import { storageSnapshot } from '../model/StorageSnapshot';
@@ -392,7 +392,8 @@ export struct CanvasGallery {
       }
     }.width(BOARD_W).height(BOARD_W / this.previewAspect(state)).borderRadius(this.previewRadius(state)).clip(true)
   }
-  private columns(): number { const small=galleryPreviewSize('2*2',1,this.contentWidth(),this.widgetRects)[0];return Math.max(1,Math.min(4,Math.floor((this.contentWidth()+16)/(small+16)))); }
+  private placements():GalleryPlacement[]{return galleryLayout(this.items,this.filter,this.contentWidth(),this.widgetRects,this.renameId);}
+  private layoutHeight():number{return Math.max(0,...this.placements().map((entry:GalleryPlacement)=>entry.y+entry.h));}
   private contentWidth(): number { return Math.min(1120, this.viewportWidth - (this.viewportWidth >= 720 ? 48 : 32)); }
   private tileWidth(item:GalleryItem):number {return galleryPreviewSize(item.dimension,item.aspect,this.contentWidth(),this.widgetRects)[0];}
   private previewHeight(item: GalleryItem, wide: boolean): number { return galleryPreviewSize(item.dimension,item.aspect,this.contentWidth(),this.widgetRects)[1]; }
@@ -476,12 +477,12 @@ export struct CanvasGallery {
               }, (dimension: string) => dimension || 'all')
             }
           }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
-          ForEach(galleryRows(this.items, this.filter, this.columns()), (row: GalleryRow) => {
-            Row({ space: 16 }) {
-              ForEach(row.items, (item: GalleryItem) => { this.tile(item, row.wide) }, (item: GalleryItem) => item.id)
-            }.width('100%').alignItems(VerticalAlign.Top)
-          }, (row: GalleryRow) => galleryRowKey(row))
-          if (!galleryRows(this.items, this.filter, this.columns()).length) {
+          Stack({alignContent:Alignment.TopStart}){
+            ForEach(this.placements(),(entry:GalleryPlacement)=>{
+              Column(){this.tile(entry.item,false)}.width(entry.w).position({x:entry.x,y:entry.y})
+            },(entry:GalleryPlacement)=>galleryPlacementKey(entry))
+          }.width('100%').height(this.layoutHeight())
+          if (!this.placements().length) {
             Column({ space: 12 }) {
               Text(this.filter ? '还没有这个尺寸的画布' : '从第一张画布开始').fontSize(18).fontColor(AppDesign.text(this.appDark))
               Text(this.filter ? '可以先查看全部作品' : '添加照片、文字或实用卡片，创作自己的桌面作品').fontSize(14).fontColor(AppDesign.muted(this.appDark))

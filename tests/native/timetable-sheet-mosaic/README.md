@@ -1,0 +1,12 @@
+# One timetable sheet and mixed-size gallery — 2026-10-19
+
+MatePad tablet; signed debug production package installed in place with `hdc install -r`. No account changes, subscription changes, application reset, artwork deletion or widget rebinding.
+
+- Landscape: all three existing mixed-size canvases occupy the same top band, with the composition centered. Large canvases occupy two grid cells, small ones one. Additional canvases use contiguous lowest skyline slots. Preview aspect ratios follow host measurements; rendering uses existing cached images.
+- One 导入课程 action opens the native sheet directly at the school list. No WakeUp tutorial, timetable file/calendar or paste entries remain. School search with the keyboard and selecting 浙江工业大学 proceed into the web stage in the same sheet. No credentials or actual user timetable import were submitted.
+- Sheet adapts to measured application window width: bottom on narrow windows, wide centered sheet on tablet. Necessary course confirmation, semester date, period times and append/replace controls are preserved; import only commits after confirmation. Agenda-card calendar import is a separate feature and remains.
+- A temporary local-only EntryAbility orientation hook requested portrait for visual QA. The native system accepted the orientation hint but kept the tablet landscape. Consequently **portrait is covered by responsive geometry tests, not claimed as native visual acceptance**. The hook was removed, normal automatic orientation restored by reinstalling the final production package, and its marker checked absent from packaged ABC.
+
+Automated: 95/95 suites, native assembleHap, production package page audit and whitespace check. Layout regression exercises widths 240–1440, 35 mixed tiles, no overlaps/overflow, tablet large tiles sharing a row, filtering, inline rename height and refreshing captured image builders. Confirmation regression executes actual methods with production school decoding: read does not save, missing real period times prevent commit, and failed saves leave the sheet open.
+
+Ignored evidence: output/gallery-mosaic-landscape.png, output/timetable-single-sheet-schools.png, output/timetable-single-sheet-keyboard.png, output/timetable-single-sheet-web.png. Some intermediate screenshots include transient system notifications; they are not product UI or instructions. Package also explicitly checked to exclude WakeUpImportDialog and its former tutorial/paste labels.
