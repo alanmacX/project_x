@@ -6,8 +6,9 @@ const vm = require('node:vm');
 const ts = require(process.env.FRIDGE_TYPESCRIPT || '/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
 const root = path.resolve(__dirname, '../entry/src/main/ets/model');
 const disk = new Map();
+const rdb=require('./helpers/widget-rdb.cjs').createWidgetRdb(),nativeDims=new Map();
 const writes = [], updates = [], closed = [], opened = [];
-let failWrite = false, failForm = false;
+let failWrite = false, failForm = false;const editorEntrances=[];
 const prefs = {
   get: async (key, fallback) => disk.has(key) ? disk.get(key) : fallback,
   put: async (key, value) => {
@@ -19,6 +20,7 @@ const prefs = {
   delete: async key => disk.delete(key),
 };
 const kits = {
+  '@kit.ArkData':rdb,
   '@kit.BasicServicesKit':{batteryInfo:{batterySOC:60,chargingStatus:0,BatteryChargeState:{ENABLE:1}}},
   '@kit.CalendarKit':{calendarManager:{}},
   '@kit.AbilityKit':{abilityAccessCtrl:{GrantStatus:{PERMISSION_GRANTED:0},createAtManager:()=>({checkAccessToken:async()=>-1})}},
@@ -27,7 +29,7 @@ const kits = {
   '@kit.FormKit': {
     formInfo: {VisibilityType:{FORM_VISIBLE:1}},
     formBindingData: { createFormBindingData: data => data },
-    formProvider: { setFormNextRefreshTime: async()=>{}, updateForm: async (id, data) => {
+    formProvider: {openFormEditAbility:(...args)=>editorEntrances.push(args), getPublishedRunningFormInfoById:async id=>{if(!nativeDims.has(id))throw Error('not published');return {dimension:nativeDims.get(id)};},setFormNextRefreshTime: async()=>{}, updateForm: async (id, data) => {
       if (failForm) { failForm = false; throw Error('removed form'); }
       updates.push({id, data});
     } },
@@ -339,7 +341,10 @@ function load(name) {
   photo.elements[0].src='file:///private/missing.jpg';
   await updateWidget('123',JSON.stringify({schemaVersion:2,cards:[photo]}),'4*4');
   assert.equal(JSON.parse(JSON.parse(updates.at(-1).data.scenePacket).cards)[0].elements[0].src,'');
-  disk.set('fridge_form_dims_json', JSON.stringify({removed:'4*4',working:'2*4'})); failForm=true; await pushWidgets({},snapshot);
+  const delivery=normalizeState(JSON.parse(snapshot));delivery.canvasId='delivery';delivery.canvasDimension='4*4';
+  disk.set('fridge_canvases_json',JSON.stringify({version:1,activeId:'delivery',canvases:[{id:'delivery',name:'Delivery'}]}));disk.set('fridge_canvas_delivery',JSON.stringify(delivery));
+  disk.set('fridge_form_dims_json', JSON.stringify({removed:'4*4',working:'4*4'}));disk.set('fridge_form_bindings_json',JSON.stringify({removed:'delivery',working:'delivery'}));nativeDims.set('removed',4);nativeDims.set('working',4);
+  failForm=true; await pushWidgets({},JSON.stringify(delivery));
   assert.ok(updates.some(u=>u.id==='working')); assert.equal(updates.at(-1).id,'removed','failed instance retries without blocking healthy instance');
   assert.throws(() => traceMask(new Int32Array(2),2,2),/尺寸/);
   assert.throws(() => traceMask(new Int32Array(4),2,2),/未检测/);
@@ -494,7 +499,7 @@ function load(name) {
   cal.capability.calendarOffset=120;applyCalendarAction(cal,'nextMonth');assert.equal(cal.capability.calendarOffset,120);
   applyCalendarAction(cal,'currentMonth');assert.equal(cal.capability.calendarOffset,0);assert.equal(applyCalendarAction(bird,'nextMonth'),false);
   const formConfig=JSON.parse(fs.readFileSync(path.join(root,'../../resources/base/profile/form_config.json'),'utf8'));
-  assert.deepEqual(formConfig.forms[0].supportDimensions,['4*4'],'one shared phone/tablet desktop size; 6*4 is device-dependent');
+  assert.deepEqual(formConfig.forms[0].supportDimensions,['4*4','2*4','2*2'],'three supported phone/tablet desktop sizes; 6*4 stays legacy-only');
   assert.equal(formConfig.forms[0].defaultDimension,'4*4');
   assert.equal(normalizeState({cards:[]}).canvasDimension,'4*4');
   assert.equal(normalizeState({cards:[]}).canvasAspect,1);
@@ -520,19 +525,23 @@ function load(name) {
   kits['@kit.FormKit'].formProvider.setFormNextRefreshTime=scheduler;
   assert.equal(formConfig.forms[0].updateDuration,2,'hourly fallback reserves quota for actual content boundaries');
   const FormAbility=load('../form/FridgeFormAbility').default, formAbility=new FormAbility();
+  formAbility.onFormEvent('new-unbound','{"operation":"configure"}');await formAbility.actionQueue;assert.deepEqual(editorEntrances,[[formConfig.forms[0].formConfigAbility,'new-unbound',true]],'blank widget uses the same full editor URI as the system long-press menu');
   cal.id='action-calendar';custom.id='untouched';custom.elements[0].text='preserved';
-  disk.set('fridge_state_json',JSON.stringify({schemaVersion:2,cards:[cal,custom]}));disk.set('fridge_form_dims_json',JSON.stringify({native:'6*4'}));
+  const nativeKey='fridge_canvas_native-source',nativeSnapshot=cards=>JSON.stringify({schemaVersion:2,canvasId:'native-source',canvasDimension:'6*4',canvasAspect:1.5,cards});
+  disk.set('fridge_canvases_json',JSON.stringify({version:1,activeId:'native-source',canvases:[{id:'native-source',name:'Native'}]}));
+  disk.set(nativeKey,nativeSnapshot([cal,custom]));disk.set('fridge_form_dims_json',JSON.stringify({native:'6*4'}));nativeDims.set('native',7);
+  const registry=load('WidgetRegistry');await registry.registerWidget({},'native','6*4');await registry.selectWidgetCanvas({},'native','native-source','6*4');
   formAbility.onFormEvent('native','{"cardId":"action-calendar","operation":"nextMonth"}');
   formAbility.onFormEvent('native','{"cardId":"action-calendar","operation":"nextMonth"}');await formAbility.actionQueue;
   const b1=new FridgeCard(),b2=new FridgeCard();b1.id='battery1';b2.id='battery2';b1.capability={k:'battery'};b2.capability={k:'battery'};
-  disk.set('fridge_state_json',JSON.stringify({schemaVersion:2,cards:[b1,b2]}));
+  disk.set(nativeKey,nativeSnapshot([b1,b2]));
   const refreshBefore=updates.length;formAbility.onUpdateForm('native');await formAbility.actionQueue;
   assert.equal(updates.length-refreshBefore,1,'multiple local capability results publish one complete frame');
-  assert.equal(JSON.parse(disk.get('fridge_state_json')).cards[1].capability.percent,60);
-  disk.set('fridge_state_json',JSON.stringify({schemaVersion:2,cards:[cal,custom]}));
+  assert.equal(JSON.parse(disk.get(nativeKey)).cards[1].capability.percent,60);
+  disk.set(nativeKey,nativeSnapshot([cal,custom]));
   formAbility.onFormEvent('native','{"cardId":"action-calendar","operation":"nextMonth"}');
   formAbility.onFormEvent('native','{"cardId":"action-calendar","operation":"nextMonth"}');await formAbility.actionQueue;
-  let actionState=JSON.parse(disk.get('fridge_state_json'));assert.equal(actionState.cards[0].capability.calendarOffset,2,'serialized native message actions do not lose increments');
+  let actionState=JSON.parse(disk.get(nativeKey));assert.equal(actionState.cards[0].capability.calendarOffset,2,'serialized native message actions do not lose increments');
   assert.equal(actionState.cards[1].elements[0].text,'preserved');
   for (const retired of ['parcel']) {
     const oldCard={...custom,capability:{k:retired,city:'杭州',parcels:[{id:'p',code:'1234'}]}};
@@ -581,5 +590,5 @@ function load(name) {
   await updateWidget('123',JSON.stringify({schemaVersion:2,cards:[albumCard]}),'4*4');
   const albumTransfer=JSON.parse(JSON.parse(updates.at(-1).data.scenePacket).cards)[0].capability;
   assert.equal(albumTransfer.albumCover,'memory://'+widgetImageKey('album_albumCover',albumCard.capability.albumCover));assert.equal(albumTransfer.albumBackground,'memory://'+widgetImageKey('album_albumBackground',albumCard.capability.albumBackground));assert.equal(closed.length,closedBeforeAlbum+2,'album descriptors released');
-  console.log('PASS: compact/full capability layouts and substantially smaller subject date minimum; isolated noise/spur cleanup with preserved interior/thin subject; subject white-edge safe bounds; serialized FormExtension calendar actions and retired-capability migration; one widget size; app/widget geometry parity across four viewports, preserved card aspect and off-canvas positions, actual FormKit dimensions; TaskPool dispatch and failure cleanup, 1024px decode limit, optimized/reference Gaussian equality; smoothing alpha, tight crop, coordinate preservation, 32 capability minima, thin-shape refusal; safe layout, non-overlap, cropped bounds, resize projection, full-foreground overlay; v2 zero/one capability, legacy migration, canvas content/captions, box constraints, save queue/retry/reload, corrupt-data preservation, image+subject form transfer/cleanup, mask contours/holes/disconnected parts, native segmentation cleanup/failures');
+  console.log('PASS: compact/full capability layouts and substantially smaller subject date minimum; isolated noise/spur cleanup with preserved interior/thin subject; subject white-edge safe bounds; serialized FormExtension calendar actions and retired-capability migration; three advertised widget sizes and legacy native size; app/widget geometry parity across four viewports, preserved card aspect and off-canvas positions, actual FormKit dimensions; TaskPool dispatch and failure cleanup, 1024px decode limit, optimized/reference Gaussian equality; smoothing alpha, tight crop, coordinate preservation, 32 capability minima, thin-shape refusal; safe layout, non-overlap, cropped bounds, resize projection, full-foreground overlay; v2 zero/one capability, legacy migration, canvas content/captions, box constraints, save queue/retry/reload, corrupt-data preservation, image+subject form transfer/cleanup, mask contours/holes/disconnected parts, native segmentation cleanup/failures');
 })().catch(error => { console.error(error); process.exitCode=1; });

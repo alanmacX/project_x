@@ -32,3 +32,6 @@ local.properties
 /output/
 /tmp/
 /previewer/material-study-local.js
+
+# Node test dependencies
+/node_modules/

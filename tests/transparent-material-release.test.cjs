@@ -18,7 +18,7 @@ for(const k of schema.CAPABILITIES.filter(k=>k!=='album')){
  choices[0].card.capability.readingMaterial='matte';assert.equal(card.capability.readingMaterial,undefined);
 }
 const forms=JSON.parse(fs.readFileSync('entry/src/main/resources/base/profile/form_config.json','utf8')).forms;
-assert.equal(forms[0].transparencyEnabled,true);assert.deepEqual(forms[0].supportDimensions,['4*4']);
+assert.equal(forms[0].transparencyEnabled,true);assert.deepEqual(forms[0].supportDimensions,['4*4','2*4','2*2']);
 vm.runInThisContext(fs.readFileSync('previewer/shared-materials.js','utf8'));
 vm.runInThisContext(fs.readFileSync('previewer/capabilities.js','utf8'));
 const c=new schema.FridgeCard();c.capability={k:'clock',readingBlend:'cloud',readingStyle:'surface'};c.capFree=true;

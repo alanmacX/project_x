@@ -63,21 +63,18 @@ struct WidgetBinding {
           Text(item.name).fontSize(15).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).width('100%')
           Text(item.cardCount+' 张卡片').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-        Stack(){
-          if(item.id===this.selectedId){SymbolGlyph($r('sys.symbol.checkmark')).fontSize(13).fontColor([AppDesign.onSelected(this.appDark)])}
-        }.width(22).height(22).borderRadius(11)
-          .backgroundColor(item.id===this.selectedId?AppDesign.selected(this.appDark):Color.Transparent)
-          .border({width:item.id===this.selectedId?0:1,color:AppDesign.muted(this.appDark)})
+        Radio({value:item.id,group:'canvasBinding'}).checked(item.id===this.selectedId)
+          .width(22).height(22).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
       }.width('100%').padding({left:12,right:12,top:8,bottom:8})
     }.width('100%').height(60).padding(0).borderRadius(14)
-      .backgroundColor(item.id===this.selectedId?AppDesign.control(this.appDark):Color.Transparent).enabled(!this.busy)
+      .backgroundColor(Color.Transparent).enabled(!this.busy)
       .onClick(()=>this.choose(item.id)).accessibilityText('绑定 '+item.name+(item.id===this.selectedId?'，已选中':''))
   }
   build(){
     Column({space:8}){
       Row(){
         Text('选择画布').fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).layoutWeight(1)
-        if(this.dimension){Text(this.dimension.replace('*','×')).fontSize(12).fontColor(AppDesign.muted(this.appDark)).padding({left:8,right:8,top:3,bottom:3}).borderRadius(8).backgroundColor(AppDesign.surface(this.appDark))}
+        if(this.dimension){Text(this.dimension.replace('*','×')).fontSize(12).fontColor(AppDesign.muted(this.appDark)).padding({left:8,right:8,top:3,bottom:3})}
       }.width('100%')
 
       if(!this.ready&&!this.error){LoadingProgress().width(28).height(28).layoutWeight(1)}
@@ -91,6 +88,6 @@ struct WidgetBinding {
           .width('100%').layoutWeight(1).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.None).fadingEdge(true,{fadingEdgeLength:LengthMetrics.vp(8)})
       }
       if(this.error){Text(this.error).fontColor('#D3423C').fontSize(12).maxLines(2).width('100%')}
-    }.width('100%').height('100%').padding({left:16,right:16,top:12,bottom:8}).backgroundColor(this.appDark?'#2F3032':'#F4F5F7')
+    }.width('100%').height('100%').padding({left:16,right:16,top:12,bottom:8}).backgroundColor($r('sys.color.comp_background_secondary'))
   }
 }

@@ -137,7 +137,7 @@ export default class FridgeFormAbility extends FormExtensionAbility {
   onFormEvent(formId: string, event: string): void {
     this.actionQueue = this.actionQueue.catch(() => {}).then(async () => {
       let message:Record<string,string>|null=null;try{message=JSON.parse(event) as Record<string,string>;}catch(_){}
-      if(message?.operation==='configure'){formProvider.openFormEditAbility('WidgetConfigAbility',formId,true);return;}
+      if(message?.operation==='configure'){formProvider.openFormEditAbility('ability://WidgetConfigAbility',formId,true);return;}
       if(message?.operation==='dismissScene') {
         const base=await this.loadState(formId);
         if(dismissScene(base,message.ruleId??'',message.occurrence??'',Date.now())){if(!base.scenePolicyV2){await this.saveStateAndWidgets(base);await this.scheduleForm(formId);return;}const prefs=await preferences.getPreferences(this.context,STORE_NAME),catalog=readCatalog(await prefs.get('fridge_canvases_json','') as string);catalog.sceneRules=base.sceneRules;await prefs.put('fridge_canvases_json',JSON.stringify(catalog));await prefs.flush();await this.pushForm(formId);await this.scheduleForm(formId);}return;

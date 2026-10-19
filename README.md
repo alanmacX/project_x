@@ -27,7 +27,14 @@ cp build-profile.example.json5 build-profile.json5
 
 在 DevEco 中打开项目并配置自己的自动签名。`build-profile.json5` 是本地文件，禁止提交；示例配置不带签名。通过 DevEco / hvigor 编译 `entry` 模块。
 
-测试运行实际模型和服务代码，平台接口使用模拟实现：
+使用 Node.js 22.13 或更新版本，先安装测试依赖，再运行全部测试。测试运行实际模型和服务代码，平台接口使用模拟实现；绑定注册表使用真正的 SQLite：
+
+```sh
+npm ci
+npm test
+```
+
+也可以单独运行：
 
 ```sh
 node tests/model.test.cjs

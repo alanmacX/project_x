@@ -1,0 +1,13 @@
+{
+  "name": "fridge-memo-checks",
+  "private": true,
+  "scripts": {
+    "test": "node scripts/test.cjs"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.5"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}
