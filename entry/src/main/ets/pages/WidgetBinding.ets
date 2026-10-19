@@ -71,6 +71,7 @@ struct WidgetBinding {
       .onClick(()=>this.choose(item.id)).accessibilityText('绑定 '+item.name+(item.id===this.selectedId?'，已选中':''))
   }
   build(){
+    Column(){
     Column({space:8}){
       Row(){
         Text('选择画布').fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).layoutWeight(1)
@@ -88,6 +89,8 @@ struct WidgetBinding {
           .width('100%').layoutWeight(1).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.None).fadingEdge(true,{fadingEdgeLength:LengthMetrics.vp(8)})
       }
       if(this.error){Text(this.error).fontColor('#D3423C').fontSize(12).maxLines(2).width('100%')}
-    }.width('100%').height('100%').padding({left:16,right:16,top:12,bottom:8}).backgroundColor($r('sys.color.comp_background_secondary'))
+    }.width('100%').layoutWeight(1).padding({left:16,right:16,top:12,bottom:8})
+      .backgroundColor($r('sys.color.comp_background_secondary')).borderRadius(20).clip(true)
+    }.width('100%').height('100%').padding(8).backgroundColor(this.appDark?'#2F3032':'#F4F5F7')
   }
 }
