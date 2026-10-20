@@ -2,6 +2,7 @@ import { batteryInfo } from '@kit.BasicServicesKit';
 import { calendarManager } from '@kit.CalendarKit';
 import { abilityAccessCtrl } from '@kit.AbilityKit';
 import { CapBlock, AgendaItem } from './CardSchema';
+import { capabilityRequestKey, mergeCapabilityResult } from './CapabilityData';
 export async function hasWholeCalendarAccess(context:Context):Promise<boolean> {
   return await abilityAccessCtrl.createAtManager().checkAccessToken(context.applicationInfo.accessTokenId,'ohos.permission.READ_WHOLE_CALENDAR')===abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED;
 }
@@ -16,7 +17,7 @@ export async function systemAgenda(context: Context): Promise<AgendaItem[]> {
   }
   return out.filter((e)=>e.end>now).sort((a,b)=>a.start-b.start).slice(0,128);
 }
-export async function readCapability(cap: CapBlock,context: Context): Promise<CapBlock> {
+async function readProvider(cap: CapBlock,context: Context): Promise<CapBlock> {
   const next=JSON.parse(JSON.stringify(cap)) as CapBlock; next.attemptedAt=Date.now();
   try {
     if(cap.k==='battery') { const level=batteryInfo.batterySOC;if(level<0||level>100)throw new Error('设备暂未提供电量');next.percent=level;next.charging=batteryInfo.chargingStatus===batteryInfo.BatteryChargeState.ENABLE;next.chargeState=batteryInfo.chargingStatus===batteryInfo.BatteryChargeState.FULL?'full':next.charging?'charging':'idle'; }
@@ -24,4 +25,26 @@ export async function readCapability(cap: CapBlock,context: Context): Promise<Ca
     next.updatedAt=Date.now();next.refreshState='done';next.desc='';
   } catch(e) {next.refreshState='failed';next.desc=(e as Error).message;}
   return next;
+}
+
+interface ProviderSnapshot {value:CapBlock;expires:number;}
+const snapshots:Map<string,ProviderSnapshot>=new Map();
+const pendingReads:Map<string,Promise<CapBlock>>=new Map();
+/** One provider read for all canvases/cards. Only provider fields travel between appearances. */
+export async function readCapability(cap:CapBlock,context:Context):Promise<CapBlock>{
+  if(cap.k!=='battery'&&!(cap.k==='agenda'&&cap.agendaSource==='system'))return readProvider(cap,context);
+  const key=String(context.applicationInfo?.accessTokenId??0)+':'+capabilityRequestKey(cap),now=Date.now();
+  const cached=snapshots.get(key);if(cached&&cached.expires>now)return mergeCapabilityResult(cap,cached.value);
+  let pending=pendingReads.get(key);
+  if(!pending){
+    pending=readProvider(cap,context).then((value:CapBlock):CapBlock=>{
+      const ttl=value.refreshState==='failed'?30000:cap.k==='battery'?1000:60000;
+      snapshots.set(key,{value:value,expires:Date.now()+ttl});return value;
+    });pendingReads.set(key,pending);
+  }
+  try{return mergeCapabilityResult(cap,await pending);}finally{if(pendingReads.get(key)===pending)pendingReads.delete(key);}
+}
+
+export function invalidateCapabilityRead(kind:string):void {
+  for(const key of snapshots.keys())if(key.endsWith(':'+kind+'|'))snapshots.delete(key);
 }

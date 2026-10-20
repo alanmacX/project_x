@@ -1,3 +1,4 @@
+import { projectCapabilityData } from '../model/CapabilityProjection';
 import { registerWidget, removeWidget, promoteWidget, widgetInstance, widgetInstances, WidgetGuard } from '../model/WidgetRegistry';
 import { widgetDimension } from '../model/WidgetBinding';
 import { canvasRotationEnabled } from '../model/CanvasRotation';
@@ -77,7 +78,7 @@ export default class FridgeFormAbility extends FormExtensionAbility {
   private async pushForm(formId:string):Promise<void>{
     const instance=await widgetInstance(this.context,formId);if(!instance||instance.removed||!instance.canvasId)return; // Unknown/unbound restoration cannot clear cached desktop artwork.
     const scene=await this.displayedScene(formId);
-    await updateWidget(formId,JSON.stringify(scene.state),instance.dimension,sceneWidgetContext(scene),await this.contourCache(scene.state.canvasId),new WidgetGuard(this.context,instance));
+    await updateWidget(formId,JSON.stringify(await projectCapabilityData(scene.state,this.context)),instance.dimension,sceneWidgetContext(scene),await this.contourCache(scene.state.canvasId),new WidgetGuard(this.context,instance));
   }
   private async scheduleForm(formId:string):Promise<void> {
     const base=await this.loadState(formId);

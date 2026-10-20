@@ -80,7 +80,7 @@ export class FridgeStore {
   async refreshWidgets():Promise<void> {
     await this.save(false);
     const queue=this.queueFor(this.state.canvasId);await queue.waitForIdle();queue.invalidate();
-    await queue.submit(storageSnapshot(this.state));
+    await pushWidgets(this.context!,storageSnapshot(this.state),true);
   }
   /** Export a detached snapshot; sharing an inactive canvas never changes widget bindings. */
   async canvasSnapshot(id: string): Promise<FridgeState> {

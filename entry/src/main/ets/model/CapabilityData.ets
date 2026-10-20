@@ -119,8 +119,10 @@ export function nextDataBoundary(cap: CapBlock, now:number):number {
 
 export function mergeCapabilityResult(current:CapBlock,result:CapBlock):CapBlock {
   const next=JSON.parse(JSON.stringify(current)) as CapBlock;
-  next.attemptedAt=result.attemptedAt;next.updatedAt=result.updatedAt;next.refreshState=result.refreshState;next.desc=result.desc;
+  next.attemptedAt=result.attemptedAt;next.refreshState=result.refreshState;next.desc=result.desc;
+  if(result.refreshState!=='done')return next;
+  next.updatedAt=result.updatedAt;
   if(current.k==='battery'){next.percent=result.percent;next.charging=result.charging;next.chargeState=result.chargeState;}
-  if(current.k==='agenda')next.events=result.events;
+  if(current.k==='agenda')next.events=JSON.parse(JSON.stringify(result.events??[])) as AgendaItem[];
   return next;
 }

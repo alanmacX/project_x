@@ -94,8 +94,12 @@ struct FridgeWidgetCard {
   @LocalStorageProp('rev') @Watch('syncRenderClock') rev: number = 0;
   @State renderTick:number=Math.floor(Date.now()/60000)*60000;
   private syncRenderClock():void {
-    const tick=Math.floor((this.rev>0?this.rev:Date.now())/60000)*60000;
+    // The packet timestamp is not a clock: a restored packet can be hours old.
+    const tick=Math.floor(Date.now()/60000)*60000;
     if(tick!==this.renderTick)this.renderTick=tick;
+  }
+  private hasLocalClock():boolean {
+    return this.cardIds.some((id:string)=>capabilityRenderTick(this.cardMap[id]?.capability??null,Date.now())>0);
   }
   @LocalStorageProp('canvasId') canvasId: string = '';
   @LocalStorageProp('formId') formId:string='';
@@ -128,6 +132,12 @@ struct FridgeWidgetCard {
   }
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
+      if(this.hasLocalClock()){
+        // One native minute clock drives local calendar/course/progress projections.
+        // No per-card JS timer, provider wake-up, image decode or widget IPC.
+        TextClock().format('HH:mm').fontSize(1).fontColor(Color.Transparent).width(1).height(1)
+          .hitTestBehavior(HitTestMode.None).accessibilityLevel('no').onDateChange(()=>this.syncRenderClock())
+      }
       // Restore the original full-host layout: normalized centres adapt to the
       // launcher rectangle; each card retains its width/height proportion.
       Stack() {

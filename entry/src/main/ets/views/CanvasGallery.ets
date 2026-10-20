@@ -90,6 +90,7 @@ export struct CanvasGallery {
     this.alive = true;
     this.widgetRects=rememberedGalleryRects(this.getUIContext().getHostContext()?.cacheDir??'',this.entries.map((entry:CanvasEntry)=>entry.id));
     this.controller.resumePreviews=()=>this.previewWorkChanged();
+    this.controller.refreshVisible=()=>this.previewTimeChanged();
     this.controller.pausePreviews=()=>{this.previewsPaused=true;};
     this.controller.aspect=(dimension:string,fallback:number):number=>{const rect=this.widgetRects[dimension];return rect&&rect[0]>0&&rect[1]>0?rect[0]/rect[1]:fallback;};
     this.controller.dismiss=()=>{if(!this.splitOpen)return false;this.setSplitOpen(false);return true;};
@@ -144,7 +145,7 @@ export struct CanvasGallery {
   private previewWorkAllowed(warmId:string=''):boolean {return this.alive&&!this.busy&&((this.pageVisible&&!this.previewsPaused)||(!this.pageVisible&&this.warmAllowed&&this.warmingIds.has(warmId)));}
   private previewWorkChanged():void {
     if(this.pageVisible&&!this.busy)this.previewsPaused=false;
-    if(this.previewWorkAllowed())this.visibleIds.forEach((id:string)=>{this.requestPreview(id);});
+    if(this.previewWorkAllowed())this.previewTimeChanged();
   }
   private previewTimeChanged():void{
     this.previewTick=Math.floor(Date.now()/60000)*60000;
@@ -430,7 +431,7 @@ export struct CanvasGallery {
           .opacity(this.heroId===item.id ? .001 : 1)
       }.id('canvasPreview_'+item.id).width('100%').height(this.previewHeight(item, wide)).padding(0).borderRadius(widgetFrameMetrics(this.tileWidth(item),this.previewHeight(item,wide)).radius).clip(true).backgroundColor(Color.Transparent)
         .accessibilityText('打开画布 ' + item.name).onClick(() => { if(!this.busy){this.controller.anchor(item.id,false);this.onOpen(item.id);} })
-        .onVisibleAreaChange([0], (visible: boolean) => { if (visible) { this.visibleIds.add(item.id); this.requestPreview(item.id); } else this.visibleIds.delete(item.id); })
+        .onVisibleAreaChange([0], (visible: boolean) => { if (visible) { this.visibleIds.add(item.id); this.prepareReturn(item.id).then(()=>this.requestPreview(item.id)).catch(()=>{}); } else this.visibleIds.delete(item.id); })
       if (this.renameId === item.id) {
         Column({ space: 4 }) {
           TextInput({ text: this.renameName, placeholder: '画布名称' }).height(44).width('100%').maxLength(40)

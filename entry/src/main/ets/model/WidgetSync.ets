@@ -1,3 +1,5 @@
+import { capabilityRenderTick } from './CapabilityClock';
+import { projectCapabilityData } from './CapabilityProjection';
 import { widgetInstances, widgetInstance, WidgetGuard, acquireWidgetDelivery, releaseWidgetDelivery, widgetGuardCurrent } from './WidgetRegistry';
 import { canvasRotationEnabled } from './CanvasRotation';
 import { systemIsDark } from './SystemAppearance';
@@ -43,20 +45,28 @@ export async function updateWidget(formId: string, json: string, dim: string, sc
   try {await pending;}finally{if(deliveryQueues.get(formId)===pending)deliveryQueues.delete(formId);}
 }
 
-export async function pushWidgets(context: Context, json: string): Promise<void> {
+const liveDeliveries:Map<string,string>=new Map();
+const latestPush:Map<string,number>=new Map();
+let pushSequence:number=0;
+export async function pushWidgets(context: Context, json: string, refreshAll:boolean=false): Promise<void> {
+  const sequence=++pushSequence;
   await preferences.removePreferencesFromCache(context, 'fridge_store');
   const prefs = await preferences.getPreferences(context, 'fridge_store');
   const instances=await widgetInstances(context);
   const catalogJson = await prefs.get('fridge_canvases_json','') as string;
   const catalog = readCatalog(catalogJson);
   const canvasId = (JSON.parse(json) as FridgeState).canvasId ?? 'canvas_main';
+  const sources:Map<string,Promise<string>>=new Map();
+  const sourceFor=(id:string):Promise<string>=>{
+    let pending=sources.get(id);if(!pending){pending=id===canvasId?Promise.resolve(json):prefs.get(canvasKey(id),'') as Promise<string>;sources.set(id,pending);}return pending;
+  };
   const failures:string[]=[];
   await Promise.all(instances.map(async (instance) => {
     const id=instance.id,baseId=instance.canvasId;
     if(!baseId)return;
     let base:FridgeState;
     try {
-      const source=baseId===canvasId?json:await prefs.get(canvasKey(baseId),'') as string;
+      const source=await sourceFor(baseId);
       const raw=JSON.parse(source) as FridgeState;
       if(!Array.isArray(raw.cards)||raw.canvasDimension!==instance.dimension)throw new Error('画布损坏或尺寸与绑定不符');
       base=withScenePolicy(normalizeState(raw),catalog,systemIsDark(context));
@@ -66,20 +76,25 @@ export async function pushWidgets(context: Context, json: string): Promise<void>
       if(baseId!==canvasId){hilog.warn(0,'WidgetSync','skipping unreadable bound canvas');return;}
       throw e as Error;
     }
-    if(baseId!==canvasId && catalog.sceneRules.length===0 && !canvasRotationEnabled(catalog.rotation) && !catalog.scenes.some(c=>c.id===canvasId)){const legacy=activeSceneRule(base,Date.now());if(legacy?.rule.kind!=='canvas'||legacy.rule.targetId!==canvasId)return;}
+    if(!refreshAll && baseId!==canvasId && catalog.sceneRules.length===0 && !canvasRotationEnabled(catalog.rotation) && !catalog.scenes.some(c=>c.id===canvasId)){const legacy=activeSceneRule(base,Date.now());if(legacy?.rule.kind!=='canvas'||legacy.rule.targetId!==canvasId)return;}
+    latestPush.set(id,Math.max(sequence,latestPush.get(id)??0));
     const scene=await resolveScheduledScene(base,Date.now(),async(targetId:string):Promise<FridgeState|null>=>{
       if(!sceneDocumentExists(catalog,targetId))return null;
-      const targetJson=targetId===canvasId?json:await prefs.get(canvasKey(targetId),'') as string;if(!targetJson)return null;const target=normalizeState(JSON.parse(targetJson) as FridgeState);return target.canvasDimension===instance.dimension?target:null;
+      const targetJson=await sourceFor(targetId);if(!targetJson)return null;const target=normalizeState(JSON.parse(targetJson) as FridgeState);return target.canvasDimension===instance.dimension?target:null;
     });
-    const sceneJson=JSON.stringify(scene.state);
+    const projected=await projectCapabilityData(scene.state,context);
+    const sceneJson=JSON.stringify(projected);
+    const liveKey=instance.revision+':'+projected.cards.map(card=>capabilityRenderTick(card.capability,Math.floor(Date.now()/60000)*60000)).join(',')+':'+sceneJson+':'+sceneWidgetContext(scene);
+    if(refreshAll&&liveDeliveries.get(id)===liveKey)return;
     const now=Date.now();
     const deadline=Math.min(widgetBoundary(base,now),widgetBoundary(scene.state,now));
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const latest=await widgetInstance(context,id);
-        if(!latest||latest.revision!==instance.revision||latest.removed)return;
+        if(!latest||latest.revision!==instance.revision||latest.removed||latestPush.get(id)!==sequence)return;
         await updateWidget(id, sceneJson, instance.dimension,sceneWidgetContext(scene),await prefs.get('fridge_render_contours_v1_'+scene.state.canvasId,'') as string,new WidgetGuard(context,instance));
         await scheduleWidget(prefs,id,deadline,now);
+        if(latestPush.get(id)===sequence)liveDeliveries.set(id,liveKey);
         return;
       }
       catch (e) {

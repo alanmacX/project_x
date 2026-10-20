@@ -1,3 +1,4 @@
+import { projectCapabilityData } from '../model/CapabilityProjection';
 import { prepareSceneImages, trimSceneImages } from '../model/SceneImageCache';
 import { GalleryAnchor, GalleryController, galleryReturnTargetVisible } from '../model/CanvasGallery';
 import { primeGalleryPreviews, pruneGalleryPreviews } from '../model/GalleryPreviewCache';
@@ -51,7 +52,7 @@ import { capabilityDescriptor } from '../model/CapabilityCatalog';
 import { capabilityPreset } from '../model/CanvasLayout';
 import { BatteryObserver } from '../model/BatteryObserver';
 import { needsDataRefresh, capabilityRequestKey } from '../model/CapabilityData';
-import { readCapability } from '../model/CapabilityService';
+import { readCapability, invalidateCapabilityRead } from '../model/CapabilityService';
 import lazy { CapabilitySettings } from '../views/CapabilitySettings';
 import { primeRenderContours } from '../model/RenderContours';
 import { storageSnapshot } from '../model/StorageSnapshot';
@@ -352,8 +353,8 @@ struct Index {
     this.alive = true;
     this.context = this.getUIContext().getHostContext() ?? null;
     this.initialize();
-    this.clockTimer = setInterval(() => { if(!this.alive||!this.ready||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||this.galleryTransitioning||this.canvasChanging||this.deletionId || this.readingComparisonOpen || this.gestureGroup || this.activeBoardId || this.heroActive || this.arriving)return;this.tick = Math.floor(Date.now()/60000)*60000;this.refreshCapabilities();this.updateScheduledScene(true); }, 60000);
-    this.batteryObserver.start(()=>this.refreshCapabilities());
+    this.clockTimer = setInterval(() => { if(!this.alive||!this.ready||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded)return;if(this.galleryTransitioning||this.canvasChanging||this.deletionId||this.readingComparisonOpen||this.gestureGroup||this.activeBoardId||this.heroActive||this.arriving){this.scheduleForegroundRefresh();return;}this.tick = Math.floor(Date.now()/60000)*60000;this.refreshLiveData();this.updateScheduledScene(true); }, 60000);
+    this.batteryObserver.start(()=>{invalidateCapabilityRead('battery');this.refreshLiveData();});
   }
   private initialize(): void {
     if (this.context === null) return;
@@ -692,7 +693,7 @@ struct Index {
   private widgetLaunchChanged(): void { if (this.ready && this.launchFromWidget) this.scheduleWidgetRoute(); }
   private async foregroundSchedules(generation:number):Promise<void> {
     try{await this.store.reloadSceneAcknowledgements();}catch(_){}
-    if(!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||generation!==this.foregroundGeneration)return;this.syncSchedules();this.refreshCapabilities();this.updateScheduledScene();this.scheduleMaintenance();this.queueRelief();this.queueReadingTints();this.scheduleBackground();
+    if(!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||generation!==this.foregroundGeneration)return;this.syncSchedules();this.refreshLiveData();this.updateScheduledScene();this.scheduleMaintenance();this.queueRelief();this.queueReadingTints();this.scheduleBackground();
   }
   private scheduleForegroundRefresh():void {
     this.cancelForegroundRefresh();
@@ -1703,6 +1704,25 @@ struct Index {
       this.updateExtraCapability(id,useSavedTimetable(previous,saved));
     }catch(e){if(this.alive)this.getUIContext().getPromptAction().showToast({message:(e as Error).message});}
   }
+  private liveDataRefresh:Promise<void>|null=null;
+  private liveDataPending:boolean=false;
+  private refreshLiveData():void {
+    if(!this.ready||!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded)return;
+    if(this.canvasChanging||this.galleryTransitioning||this.arriving||this.heroActive||this.activeBoardId||this.layerDrag||this.gestureGroup){this.scheduleForegroundRefresh();return;}
+    if(this.liveDataRefresh){this.liveDataPending=true;return;}
+    const job=(async():Promise<void>=>{
+      await this.refreshCapabilities();
+      if(!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded)return;
+      if(this.canvasChanging||this.galleryTransitioning||this.arriving||this.heroActive||this.activeBoardId||this.layerDrag||this.gestureGroup){this.scheduleForegroundRefresh();return;}
+      this.galleryController.refreshVisible();
+      // Independent bindings all receive shared live data, even if the open canvas has none.
+      await this.store.refreshWidgets();
+    })();this.liveDataRefresh=job;
+    job.catch((e:Error)=>console.warn('Live data refresh: '+e.message)).finally(()=>{
+      if(this.liveDataRefresh===job)this.liveDataRefresh=null;
+      if(this.liveDataPending){this.liveDataPending=false;this.refreshLiveData();}
+    });
+  }
   private async refreshCapabilities():Promise<void> {
     if(!this.ready||!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||this.canvasChanging||this.galleryTransitioning||this.arriving||this.heroActive||this.activeBoardId||this.layerDrag||this.gestureGroup.length>0||this.refreshingCapabilities||!this.context)return;
     this.refreshingCapabilities=true;const canvasId=this.store.state.canvasId,generation=this.foregroundGeneration;
@@ -1748,7 +1768,7 @@ struct Index {
         if(this.galleryMounted){
           CanvasGallery({ entries: this.canvasEntries, appDark: this.appDark, viewportWidth: this.screenWidth, viewportHeight:this.screenHeight, safeTop: this.safeTop, safeBottom: this.safeBottom,
             busy: this.canvasChanging || this.galleryTransitioning || this.busy || this.sharing, warmAllowed:this.galleryWarmAllowed(), revision: this.galleryRevision, controller:this.galleryController, pageVisible:this.galleryVisible, chromeVisible:this.galleryVisible, heroId:this.galleryHeroId, previewMinute:this.tick,
-            onLoad: async(id:string):Promise<FridgeState>=>{const state=await this.store.canvasPreviewSnapshot(id);state.canvasAspect=this.canvasHostAspect(state.canvasDimension,state.canvasAspect);return state;},
+            onLoad: async(id:string):Promise<FridgeState>=>{const source=await this.store.canvasPreviewSnapshot(id);const state=this.context?await projectCapabilityData(source,this.context):source;state.canvasAspect=this.canvasHostAspect(state.canvasDimension,state.canvasAspect);return state;},
             onOpen: (id: string) => this.openGalleryCanvas(id), onCreate: (name: string, dimension: string) => this.createGalleryCanvas(name, dimension),
             onRename: (id: string, name: string) => this.renameGalleryCanvas(id, name),
             onDuplicate: (id: string) => this.duplicateGalleryCanvas(id), onShare: (id: string) => this.shareCanvasById(id),

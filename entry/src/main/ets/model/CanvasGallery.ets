@@ -6,6 +6,7 @@ export function galleryReturnTargetVisible(anchor:GalleryAnchor|null,width:numbe
   return anchor.w>0&&anchor.h>0&&anchor.x>=0&&anchor.x+anchor.w<=width&&anchor.y>=safeTop+76&&anchor.y+anchor.h<=height-safeBottom-104;
 }
 export class GalleryController {
+  refreshVisible: () => void = () => {};
   resumePreviews: () => void = () => {};
   pausePreviews: () => void = () => {};
   aspect: (dimension:string,fallback:number) => number = (_dimension:string,fallback:number) => fallback;

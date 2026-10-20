@@ -11,7 +11,7 @@ const fixture=`class Fixture {
  tick=Math.floor(Date.now()/60000)*60000;saves=0;flushes=0;refreshes=0;scenes=0;
  store={reloadSceneAcknowledgements:()=>asyncRead,repairDesktopSelection:()=>Promise.resolve()};
  persist(){this.saves++;this.saveTimer=-1;}flushPreview(){this.flushes++;this.previewTimer=-1;this.gestureGroup='';this.saveTimer=2;}
- scheduleMaintenance(){}syncSchedules(){}refreshCapabilities(){this.refreshes++;}updateScheduledScene(){this.scenes++;}
+ scheduleMaintenance(){}syncSchedules(){}refreshCapabilities(){this.refreshes++;}refreshLiveData(){this.refreshes++;}updateScheduledScene(){this.scenes++;}
  cancelGalleryWarm(){}cancelGalleryTransition(){}queueRelief(){}queueReadingTints(){}scheduleBackground(){}
  ${method('  private flushPendingEdits(', "\n  @StorageLink('appWindowFocused')")}
  ${method('  private windowFocusChanged(', '  private foregroundGeneration:')}
