@@ -2,10 +2,13 @@
   "name": "fridge-memo-checks",
   "private": true,
   "scripts": {
-    "test": "node scripts/test.cjs"
+    "test": "node scripts/test.cjs",
+    "test:storage": "node scripts/test-library-integrity.cjs",
+    "release:check": "python3 scripts/audit-release-pages.py"
   },
   "devDependencies": {
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "typescript": "4.9.5"
   },
   "engines": {
     "node": ">=22.13.0"

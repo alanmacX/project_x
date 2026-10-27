@@ -1,5 +1,5 @@
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{DatabaseSync}=require('node:sqlite');
-const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
+const ts=require('./typescript.cjs');
 const cache=new Map(),databases=new Map();const root=path.resolve('entry/src/main/ets/model');let killedPoint=false;
 function wrap(db){const api={executeSql:async(sql,args=[])=>db.prepare(sql).run(...args),execute:async(sql,args=[])=>{
  const out=db.prepare(sql).run(...args);if(process.env.POINT==='mid'&&!killedPoint&&sql.startsWith('INSERT OR REPLACE INTO library_values')&&args[0]==='fridge_canvas_a'){killedPoint=true;process.send({point:'mid'});await new Promise(()=>{});}return out.changes;

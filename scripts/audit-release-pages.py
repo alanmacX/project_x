@@ -34,7 +34,10 @@ def audit_hap(data, label):
         print(f'PASS {label}: production pages/extensions retained; all study/temporary QA page modules absent')
 
 
-paths = [Path(p) for p in sys.argv[1:]] or sorted(Path('build/outputs/default').glob('*.app'))
+paths = [Path(p) for p in sys.argv[1:]] or [Path('build/outputs/default/FridgeMemo-default-signed.app')]
+missing = [str(path) for path in paths if not path.exists()]
+if missing:
+    raise SystemExit('Package not found: ' + ', '.join(missing))
 if not paths:
     raise SystemExit('No .app found. Build release first or pass a .hap/.app path.')
 for path in paths:

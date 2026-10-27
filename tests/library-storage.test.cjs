@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-const {DatabaseSync}=require('node:sqlite'),ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
+const {DatabaseSync}=require('node:sqlite'),ts=require('./helpers/typescript.cjs');
 const source=fs.readFileSync('entry/src/main/ets/model/LibraryStorage.ets','utf8'),databases=new Map();let failKey='',broken=false,imports=0;const backups=[];
 const validationEnv={exports:{},require:()=>({readCatalog:json=>{const c=JSON.parse(json);if(c.version!==1||!Array.isArray(c.canvases)||!c.canvases.length)throw Error('bad catalog');return {...c,scenes:c.scenes??[]};}})};vm.runInNewContext(ts.transpileModule(fs.readFileSync('entry/src/main/ets/model/LibraryValidation.ets','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,validationEnv);const validation=validationEnv.exports;
 const edited=JSON.stringify({canvasId:'a',cards:[{id:'edited'}]});

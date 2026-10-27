@@ -1,0 +1,13 @@
+PASS native legacy XML seed, ready for package upgrade
+PASS native package upgrade retained exact legacy canvas and catalog
+PASS native transaction, stale-writer draft, invalid-directory rollback
+PASS native SHA256, encoding, fsync, atomic backup and checked readback
+READY crashBefore safe to kill test process
+PASS verifyCrashBefore complete old pair
+READY crashAfter safe to kill test process
+PASS verifyCrashAfter complete new pair
+PASS native transaction, stale-writer draft, invalid-directory rollback
+PASS native SHA256, encoding, fsync, atomic backup and checked readback
+PASS native transaction, stale-writer draft, invalid-directory rollback
+PASS native SHA256, encoding, fsync, atomic backup and checked readback
+PASS native corrupt-latest fallback sequence=2 latest=3
