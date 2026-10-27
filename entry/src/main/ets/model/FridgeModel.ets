@@ -1,3 +1,4 @@
+import { getLibraryPreferences, LibraryPreferences } from './LibraryStorage';
 import { importLegacyWidgets, widgetInstances, detachDeletedCanvas } from './WidgetRegistry';
 import { normalizeCanvasRotation } from './CanvasRotation';
 import { creationDimension, creationAspect } from './CanvasSize';
@@ -14,7 +15,6 @@ import { clampCanvasGroups, cleanGroups } from './CardGroups';
 import { LatestWidgetQueue } from './LatestWidgetQueue';
 import { primeRenderContours, restoreContourCache, serializeContourCache } from './RenderContours';
 import { storageSnapshot } from './StorageSnapshot';
-import preferences from '@ohos.data.preferences';
 import { formProvider } from '@kit.FormKit';
 import { pushWidgets } from './WidgetSync';
 import { FridgeState, FridgeCard, CapBlock, defaultState, normalizeState, BOARD_W, BOARD_H } from './CardSchema';
@@ -22,7 +22,7 @@ export { FridgeState, FridgeCard, CapBlock, CapType, CanvasElement, ElementBox, 
   CAPABILITIES, materialColors, shapeRadius, typeLabel, defaultState, normalizeState, serializeFaceCards, serializeDoorCards } from './CardSchema';
 
 export class FridgeStore {
-  private prefs: preferences.Preferences | null = null;
+  private prefs: LibraryPreferences | null = null;
   private context: Context | null = null;
   private saveQueue: Promise<void> = Promise.resolve();
   private sequence: number = 0;
@@ -48,7 +48,7 @@ export class FridgeStore {
   async openCanvas(id:string):Promise<boolean> {
     const entry=this.catalog.canvases.concat(this.catalog.scenes).find((c)=>c.id===id);if(!entry||this.prefs===null)return false;
     await this.saveQueue.catch(()=>{});
-    if(this.context!==null){await preferences.removePreferencesFromCache(this.context,'fridge_store');this.prefs=await preferences.getPreferences(this.context,'fridge_store');}
+    if(this.context!==null){this.prefs=await getLibraryPreferences(this.context);}
     const json=await this.prefs.get(canvasKey(id),'') as string;if(!json)throw new Error('画布记录缺失，已保留目录');
     const cached=this.documents.find((c)=>c.id===id);
     if(cached!==undefined&&this.savedScenes[id]===json)return this.switchCanvas(id);
@@ -107,7 +107,7 @@ export class FridgeStore {
   /** Merge acknowledgements from FormExtension without overwriting editor geometry or history. */
   async reloadSceneAcknowledgements():Promise<void> {
     if(this.prefs===null||this.context===null||(!this.catalog.sceneRules.length&&!this.state.sceneRules.length))return;await this.saveQueue.catch(()=>{});const id=this.state.canvasId;
-    await preferences.removePreferencesFromCache(this.context,'fridge_store');this.prefs=await preferences.getPreferences(this.context,'fridge_store');
+    this.prefs=await getLibraryPreferences(this.context);
     const catalog=readCatalog(await this.prefs.get('fridge_canvases_json','') as string);for(const rule of this.catalog.sceneRules){const other=catalog.sceneRules.find(r=>r.id===rule.id);if(other&&other.createdAt===rule.createdAt&&other.start===rule.start&&other.timeoutMinutes===rule.timeoutMinutes)rule.dismissed=other.dismissed;}
     const json=await this.prefs.get(canvasKey(id),'') as string;if(!json||this.state.canvasId!==id)return;
     const stored=JSON.parse(json) as FridgeState;
@@ -215,8 +215,8 @@ export class FridgeStore {
     await this.timetableLibrary?.settled();this.timetableLibrary=null;
     this.context = context;
     await this.saveQueue.catch(() => {});
-    await preferences.removePreferencesFromCache(context, 'fridge_store');
-    this.prefs = await preferences.getPreferences(context, 'fridge_store');
+
+    this.prefs = await getLibraryPreferences(context);
     try { this.canvasSpecs = JSON.parse(await this.prefs.get('fridge_canvas_specs_json', '{}') as string) as Record<string, number>; } catch (_) { this.canvasSpecs = {}; }
     try {
       const catalogJson = await this.prefs.get('fridge_canvases_json', '') as string;

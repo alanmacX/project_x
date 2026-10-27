@@ -2,7 +2,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const ts=require('/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
 const {createWidgetRdb}=require('./helpers/widget-rdb.cjs'),rdb=createWidgetRdb(),disk=new Map(),nativeDims=new Map(),root=path.resolve('entry/src/main/ets/model');
 const prefs={get:async(k,f)=>disk.get(k)??f,put:async(k,v)=>disk.set(k,v),flush:async()=>{},delete:async k=>disk.delete(k)};
-function processLoader(){const cache=new Map();return function load(name){if(cache.has(name))return cache.get(name);const module={exports:{}};cache.set(name,module.exports);const code=ts.transpileModule(fs.readFileSync(path.join(root,name+'.ets'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
+function processLoader(){const cache=new Map();return function load(name){if(name==='LibraryStorage')return {getLibraryPreferences:async()=>prefs};if(cache.has(name))return cache.get(name);const module={exports:{}};cache.set(name,module.exports);const code=ts.transpileModule(fs.readFileSync(path.join(root,name+'.ets'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
  const kits={'@kit.ArkData':rdb,'@ohos.data.preferences':{default:{getPreferences:async()=>prefs,removePreferencesFromCache:async()=>{}}},'@kit.FormKit':{formProvider:{getPublishedRunningFormInfoById:async id=>{if(!nativeDims.has(id))throw Error('not published');return {dimension:nativeDims.get(id)};}}}};
  vm.runInThisContext('(function(require,module,exports){'+code+'\n})')(s=>kits[s]||load(s.replace('./','')),module,module.exports);return module.exports;};}
 (async()=>{

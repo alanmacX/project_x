@@ -1,6 +1,6 @@
+import { getLibraryPreferences } from './LibraryStorage';
 import { relationalStore } from '@kit.ArkData';
 import { formProvider } from '@kit.FormKit';
-import preferences from '@ohos.data.preferences';
 import { canvasKey, readCatalog } from './CanvasLibrary';
 import { FridgeState } from './CardSchema';
 
@@ -41,8 +41,8 @@ export async function widgetInstances(context:Context,includePreviews:boolean=fa
 }
 /** INSERT OR IGNORE is idempotent across processes; never rewrite an existing choice. */
 export async function importLegacyWidgets(context:Context):Promise<void>{
-  const db=await database(context);await preferences.removePreferencesFromCache(context,'fridge_store');
-  const prefs=await preferences.getPreferences(context,'fridge_store');
+  const db=await database(context);
+  const prefs=await getLibraryPreferences(context);
   const dims=JSON.parse(await prefs.get('fridge_form_dims_json','{}') as string) as Record<string,string>;
   const bindings=JSON.parse(await prefs.get('fridge_form_bindings_json','{}') as string) as Record<string,string>;
   const raw=await prefs.get('fridge_canvases_json','') as string,catalog=readCatalog(raw);
@@ -90,7 +90,7 @@ export async function removeWidget(context:Context,id:string):Promise<void>{
 export async function selectWidgetCanvas(context:Context,id:string,canvasId:string,dimension:string):Promise<WidgetInstance>{
   validId(id);const item=await widgetInstance(context,id);if(!item||item.removed)throw new Error('小组件已移除或尚未就绪');
   if(item.dimension!==dimension)throw new Error('小组件尺寸已变化，请重新打开设置');
-  await preferences.removePreferencesFromCache(context,'fridge_store');const prefs=await preferences.getPreferences(context,'fridge_store');
+  const prefs=await getLibraryPreferences(context);
   const catalog=readCatalog(await prefs.get('fridge_canvases_json','') as string);
   if(!catalog.canvases.some(c=>c.id===canvasId))throw new Error('画布已不存在');
   const json=await prefs.get(canvasKey(canvasId),'') as string;

@@ -1,12 +1,12 @@
+import { getLibraryPreferences } from './LibraryStorage';
 import { selectWidgetCanvas, WidgetGuard } from './WidgetRegistry';
-import preferences from '@ohos.data.preferences';
 import { readCatalog, canvasKey, CanvasEntry } from './CanvasLibrary';
 import { normalizeState, FridgeState } from './CardSchema';
 import { updateWidget } from './WidgetSync';
 export { widgetDimension } from './WidgetRegistry';
 export class BindableCanvas extends CanvasEntry {dimension:string='';aspect:number=1;cardCount:number=0;}
 export async function bindingCanvases(context:Context):Promise<BindableCanvas[]>{
-  await preferences.removePreferencesFromCache(context,'fridge_store');const prefs=await preferences.getPreferences(context,'fridge_store');
+  const prefs=await getLibraryPreferences(context);
   const catalog=readCatalog(await prefs.get('fridge_canvases_json','') as string),items:BindableCanvas[]=[];
   for(const entry of catalog.canvases){try{
     const raw=await prefs.get(canvasKey(entry.id),'') as string;if(!raw)continue;
@@ -17,7 +17,7 @@ export async function bindingCanvases(context:Context):Promise<BindableCanvas[]>
 }
 export async function bindWidget(context:Context,formId:string,canvasId:string,dimension:string):Promise<void>{
   const instance=await selectWidgetCanvas(context,formId,canvasId,dimension);
-  const prefs=await preferences.getPreferences(context,'fridge_store');
+  const prefs=await getLibraryPreferences(context);
   const json=await prefs.get(canvasKey(canvasId),'') as string;
   if(!json)throw new Error('画布读取失败，已保留桌面内容');
   await updateWidget(formId,json,dimension,'',await prefs.get('fridge_render_contours_v1_'+canvasId,'') as string,new WidgetGuard(context,instance));

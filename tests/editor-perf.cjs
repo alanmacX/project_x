@@ -39,6 +39,7 @@ kits['@kit.ArkGraphics2D']={drawing:{}};
 kits['@kit.ImageKit']={image:{}};
 const cache = new Map();
 function load(name) {
+  if(name==='LibraryStorage')return {getLibraryPreferences:async()=>prefs};
   const file = path.resolve(root, name + '.ets');
   if (cache.has(file)) return cache.get(file).exports;
   const module = {exports: {}}; cache.set(file, module);

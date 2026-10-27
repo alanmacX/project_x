@@ -1,3 +1,4 @@
+import { getLibraryPreferences } from './LibraryStorage';
 import { capabilityRenderTick } from './CapabilityClock';
 import { projectCapabilityData } from './CapabilityProjection';
 import { widgetInstances, widgetInstance, WidgetGuard, acquireWidgetDelivery, releaseWidgetDelivery, widgetGuardCurrent } from './WidgetRegistry';
@@ -10,7 +11,6 @@ import { canvasKey } from './CanvasLibrary';
 import { readCatalog, withScenePolicy, sceneDocumentExists } from './CanvasLibrary';
 import { FridgeState } from './CardSchema';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import preferences from '@ohos.data.preferences';
 
 import { taskpool } from '@kit.ArkTS';
 import { deliverWidget } from './WidgetDelivery';
@@ -50,8 +50,8 @@ const latestPush:Map<string,number>=new Map();
 let pushSequence:number=0;
 /** Broadcast delivery uses saved documents, including while the editor is hidden. */
 export async function refreshStoredWidgets(context:Context):Promise<void> {
-  await preferences.removePreferencesFromCache(context,'fridge_store');
-  const prefs=await preferences.getPreferences(context,'fridge_store');
+
+  const prefs=await getLibraryPreferences(context);
   for(const instance of await widgetInstances(context)) {
     if(!instance.canvasId)continue;
     const json=await prefs.get(canvasKey(instance.canvasId),'') as string;
@@ -62,8 +62,8 @@ export async function refreshStoredWidgets(context:Context):Promise<void> {
 }
 export async function pushWidgets(context: Context, json: string, refreshAll:boolean=false): Promise<void> {
   const sequence=++pushSequence;
-  await preferences.removePreferencesFromCache(context, 'fridge_store');
-  const prefs = await preferences.getPreferences(context, 'fridge_store');
+
+  const prefs = await getLibraryPreferences(context);
   const instances=await widgetInstances(context);
   const catalogJson = await prefs.get('fridge_canvases_json','') as string;
   const catalog = readCatalog(catalogJson);

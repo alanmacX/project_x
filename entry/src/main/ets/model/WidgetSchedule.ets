@@ -1,5 +1,5 @@
 import { formProvider } from '@kit.FormKit';
-import preferences from '@ohos.data.preferences';
+import { LibraryPreferences } from './LibraryStorage';
 import { FridgeState } from './CardSchema';
 import { nextSceneBoundary } from './SceneSchedule';
 import { nextDataBoundary } from './CapabilityData';
@@ -24,7 +24,7 @@ export function widgetBoundary(state:FridgeState,now:number):number {
 const requests:Map<string,Promise<void>>=new Map();
 /** Share acknowledgement across App/FormExtension. Edits must not postpone an already
  * requested boundary; the persisted timestamp also deduplicates process restarts. */
-export async function scheduleWidget(prefs:preferences.Preferences,formId:string,deadline:number,now:number=Date.now()):Promise<void> {
+export async function scheduleWidget(prefs:LibraryPreferences,formId:string,deadline:number,now:number=Date.now()):Promise<void> {
   const pending=(requests.get(formId)??Promise.resolve()).catch(()=>{}).then(async()=>{
     if(!Number.isFinite(deadline)||deadline<=now)return;
     const key='fridge_next_refresh_'+formId;

@@ -50,6 +50,7 @@ const cache = new Map();
 kits['@kit.ArkTS'].util={TextEncoder:class {encodeInto(text){return new TextEncoder().encode(text);}}};
 
 function load(name) {
+  if(name==='LibraryStorage')return {getLibraryPreferences:async()=>prefs};
   const file = path.resolve(root, name + '.ets');
   if (cache.has(file)) return cache.get(file).exports;
   const module = {exports: {}}; cache.set(file, module);
