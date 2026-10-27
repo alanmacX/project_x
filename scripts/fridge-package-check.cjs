@@ -25,6 +25,8 @@ function validate(json) {
   known(raw, new Set(['format','version','kind','state','assets']), 'package');
   const source = ''; // Field whitelist is the generated release contract.
   known(raw.state, fields(source, 'export class FridgeState {'), 'state');
+  if(raw.state.canvasDimension!==undefined&&!contract.canvasSizes.some(size=>size.dimension===raw.state.canvasDimension))throw Error('Unsupported canvasDimension: '+raw.state.canvasDimension);
+  if(raw.state.canvasAspect!==undefined&&(!Number.isFinite(raw.state.canvasAspect)||raw.state.canvasAspect<.3||raw.state.canvasAspect>3))throw Error('canvasAspect must be between 0.3 and 3');
   const schema = load('CardSchema');
   if(raw.state.background){
     const bg=raw.state.background;

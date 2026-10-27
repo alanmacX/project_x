@@ -1,0 +1,17 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),crypto=require('node:crypto');
+const ts=require(process.env.FRIDGE_TYPESCRIPT||'/Applications/DevEco-Studio.app/Contents/tools/hvigor/hvigor/node_modules/typescript');
+function execute(source,globals={}){const env={exports:{},...globals};vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}}).outputText,env);return env.exports;}
+const {widgetProviderPeriod}=execute(fs.readFileSync('entry/src/main/ets/model/WidgetProviderRefresh.ets','utf8'));
+const battery={id:'battery',capability:{k:'battery'}},agenda={id:'agenda',capability:{k:'agenda',agendaSource:'system'}};
+assert.equal(widgetProviderPeriod([battery]),2000);assert.equal(widgetProviderPeriod([agenda]),900000);assert.equal(widgetProviderPeriod([agenda,battery]),2000);
+assert.equal(widgetProviderPeriod([{...battery,hidden:true}]),0);assert.equal(widgetProviderPeriod([{capability:{k:'agenda',agendaSource:'imported'}}]),0);assert.equal(widgetProviderPeriod([{capability:{k:'clock'}}]),0);
+let now=1800000000000;class Clock extends Date {static now(){return now;}}
+const source=fs.readFileSync('entry/src/main/ets/widget/pages/FridgeWidgetCard.ets','utf8'),methods=source.slice(source.indexOf('  private syncRenderClock():'),source.indexOf("  @LocalStorageProp('canvasId')")),requests=[];
+const {Widget}=execute('export class Widget {alive=true;sceneReady=true;displayCanvasId="work";canvasId="work";formId="desktop";lastProviderRequest=0;renderTick=0;cardIds=["battery"];cardMap={battery:fixture};'+methods+'}',{Date:Clock,fixture:battery,widgetProviderPeriod,capabilityRenderTick:()=>0,postCardAction:(_,action)=>requests.push(action),console:{info(){}}});
+const widget=new Widget();assert.equal(widget.hasLocalClock(),true,'battery-only Forms still own the native timer');widget.onWidgetClock();assert.equal(requests.length,1);assert.equal(requests[0].action,'message');assert.equal(requests[0].params.operation,'refreshProvider');
+for(let i=0;i<1;i++){now+=1000;widget.onWidgetClock();}assert.equal(requests.length,1,'second callbacks do not produce one IPC per second');now+=1000;widget.onWidgetClock();assert.equal(requests.length,2);
+widget.alive=false;now+=2000;widget.onWidgetClock();assert.equal(requests.length,2,'unmounted widgets stop requests');widget.alive=true;widget.cardMap.battery={...battery,hidden:true};now+=2000;widget.onWidgetClock();assert.equal(requests.length,2);
+widget.cardMap.battery=agenda;now+=900000;widget.onWidgetClock();assert.equal(requests.length,3);now+=2000;widget.onWidgetClock();assert.equal(requests.length,3,'system agenda retains its slower cadence');
+const {widgetRefreshDigest}=execute(fs.readFileSync('entry/src/main/ets/model/WidgetRefreshDigest.ets','utf8'),{require:name=>name==='@kit.CryptoArchitectureKit'?{cryptoFramework:{createMd:()=>{const h=crypto.createHash('sha256');return {updateSync:({data})=>h.update(data),digestSync:()=>({data:h.digest()})};}}}:{util:{TextEncoder:class{encodeInto(text){return new TextEncoder().encode(text);}}}}});
+assert.equal(widgetRefreshDigest('原生桌面数据'),crypto.createHash('sha256').update('原生桌面数据').digest('hex'));assert.notEqual(widgetRefreshDigest('charging'),widgetRefreshDigest('idle'));
+console.log('PASS native Form provider pulse: battery-only timer, two-second throttle, no router action, hidden/unmounted suppression, agenda cadence and stable SHA-256 receipts.');

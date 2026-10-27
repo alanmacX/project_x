@@ -9,7 +9,7 @@ export async function hasWholeCalendarAccess(context:Context):Promise<boolean> {
 export async function systemAgenda(context: Context): Promise<AgendaItem[]> {
   const access=abilityAccessCtrl.createAtManager();
   if(await access.checkAccessToken(context.applicationInfo.accessTokenId,'ohos.permission.READ_WHOLE_CALENDAR')!==abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED)
-    throw new Error('全量系统日历需要华为受限权限资格；此安装包未开通。可先导入日历 .ics 文件。');
+    throw new Error('此安装包没有读取全部系统日历的受限权限。请导入 .ics 日历文件。');
   const manager=calendarManager.getCalendarManager(context),calendars=await manager.getAllCalendars(),now=Date.now(),out:AgendaItem[]=[];
   for(const calendar of calendars) {
     const events=await calendar.queryEventInstances(now,now+14*86400000);

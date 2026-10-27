@@ -44,7 +44,7 @@ export function readingWarning(card:FridgeCard):string {
   if(card.capability===null || readingSurface(card.capability,card.shape==='subject'&&card.subjectPhoto,false))return '';
   if(card.shape==='subject'&&card.subjectPhoto)return '照片上文字可能不易辨认，可开启阅读衬底';
   const colors=materialColors(card.material,card.paper,card.ink);
-  return textContrast(colors[1],colors[0])<4.5?'文字对比度偏低，可启用阅读衬底或调整内容颜色':'';
+  return textContrast(colors[1],colors[0])<4.5?'文字不够清楚，打开衬底或更换文字颜色':'';
 }
 
 /** A transparent field, not a panel. Glyph halos supply local contrast without

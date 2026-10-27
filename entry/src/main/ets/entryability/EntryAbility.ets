@@ -7,10 +7,30 @@ import { deviceInfo } from '@kit.BasicServicesKit';
 import { lockPhonePortrait } from '../model/DevicePolicy';
 import { taskpool } from '@kit.ArkTS';
 import { incomingTemplateUri, stageIncomingTemplate, removeStagedTemplate } from '../model/IncomingTemplate';
+import { BatteryObserver } from '../model/BatteryObserver';
 
 const TAG: string = 'EntryAbility';
 
 export default class EntryAbility extends UIAbility {
+  private backgroundBattery:BatteryObserver=new BatteryObserver();
+  private backgroundActive:boolean=false;
+  private backgroundRefresh:Promise<void>|null=null;
+  private backgroundRefreshPending:boolean=false;
+  private refreshBackgroundWidgets():void {
+    if(!this.backgroundActive)return;
+    if(this.backgroundRefresh){this.backgroundRefreshPending=true;return;}
+    const job=(async():Promise<void>=>{
+      hilog.info(0,'BatteryRefresh','background refresh started');
+      const service=await import('../model/CapabilityService');service.invalidateCapabilityRead('battery');
+      if(!this.backgroundActive||AppStorage.get<boolean>('appBackgrounded')!==true)return;
+      const widgets=await import('../model/WidgetSync');
+      if(this.backgroundActive&&AppStorage.get<boolean>('appBackgrounded')===true){await widgets.refreshStoredWidgets(this.context);hilog.info(0,'BatteryRefresh','background refresh completed');}
+    })();this.backgroundRefresh=job;
+    job.catch((e:Error)=>hilog.warn(0,TAG,'battery widgets %{public}s',e.message)).finally(()=>{
+      if(this.backgroundRefresh===job)this.backgroundRefresh=null;
+      if(this.backgroundRefreshPending){this.backgroundRefreshPending=false;this.refreshBackgroundWidgets();}
+    });
+  }
   private launchPage: string = 'pages/Index';
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     startStartupTrace(); startupMark('ability');
@@ -126,6 +146,8 @@ export default class EntryAbility extends UIAbility {
   }
 
   onDestroy(): void {
+    this.backgroundActive=false;
+    this.backgroundBattery.stop();
     this.stopOrientation();
     hilog.info(0x0000, TAG, 'onDestroy');
   }
@@ -165,7 +187,13 @@ export default class EntryAbility extends UIAbility {
 
   onWindowStageDestroy(): void { this.stopOrientation();cancelStartupReveal(); this.appliedAppearance=null;this.windowReady = false; this.mainWindow = null; }
 
-  onForeground(): void { AppStorage.setOrCreate('appBackgrounded', false); this.updateAppearance(this.context.config.colorMode);this.watchOrientation();this.updateOrientation(); }
+  onForeground(): void {this.backgroundActive=false;this.backgroundBattery.stop(); AppStorage.setOrCreate('appBackgrounded', false); this.updateAppearance(this.context.config.colorMode);this.watchOrientation();this.updateOrientation(); }
 
-  onBackground(): void { AppStorage.setOrCreate('appBackgrounded', true); }
+  onBackground(): void {
+    hilog.info(0,'BatteryRefresh','ability background');
+    this.backgroundActive=true;
+    AppStorage.setOrCreate('appBackgrounded', true);
+    this.backgroundBattery.start(()=>this.refreshBackgroundWidgets());
+    this.refreshBackgroundWidgets();
+  }
 }

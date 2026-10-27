@@ -20,6 +20,7 @@ const devicePolicy = {exports:{}};
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('entry/src/main/ets/model/DevicePolicy.ets','utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,
   {exports:devicePolicy.exports,module:devicePolicy});
 const kits = {
+ '../model/BatteryObserver':{BatteryObserver:class {start(){}stop(){}}},
  '../model/StartupPresentation':{deferStartupReveal(){},revealStartup(){},cancelStartupReveal(){}},
  '../model/StartupTrace':{startStartupTrace(){},startupMark(){}},
  '../model/IncomingTemplate':{incomingTemplateUri:u=>u?.startsWith('file://')?u:'',stageIncomingTemplate:async()=>'',removeStagedTemplate:(u)=>{if(u)removed.push(u);}},

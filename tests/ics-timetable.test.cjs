@@ -13,7 +13,7 @@ assert.deepEqual(gaps.courses.map(c=>[c.firstWeek,c.lastWeek]),[[1,1],[3,4]]);
 assert.throws(()=>importCourseCalendar(ics(event('20260907T230000','20260908T010000')),offset),/跨天/);
 assert.throws(()=>importCourseCalendar('BEGIN:VCALENDAR\nBEGIN:VEVENT\nDTSTART;VALUE=DATE:20260907\nEND:VEVENT\nEND:VCALENDAR'),/全天/);
 assert.throws(()=>importCourseCalendar(ics(event('20260907T080000','20260907T094000','RECURRENCE-ID:20260907T000000Z\r\n')),offset),/单次重复/);
-assert.throws(()=>importCourseCalendar(ics(event('20260907T080000','20260907T094000','RRULE:FREQ=MONTHLY\r\n')),offset),/复杂重复/);
+assert.throws(()=>importCourseCalendar(ics(event('20260907T080000','20260907T094000','RRULE:FREQ=MONTHLY\r\n')),offset),/重复规则/);
 console.log('PASS offline ICS timetable: semester recurrence, named timezone, excluded weeks, exact dates, VTIMEZONE isolation and unsupported data rejection');
 const {mergeCourseCalendars}=load('ScheduleImport');
 const second=importCourseCalendar(ics(event('20260922T140000','20260922T150000')),offset),merged=mergeCourseCalendars([gaps,second,gaps]);

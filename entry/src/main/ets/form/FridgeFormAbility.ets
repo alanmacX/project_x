@@ -1,4 +1,6 @@
 import { projectCapabilityData } from '../model/CapabilityProjection';
+import { widgetRefreshDigest } from '../model/WidgetRefreshDigest';
+import { capabilityRenderTick } from '../model/CapabilityClock';
 import { registerWidget, removeWidget, promoteWidget, widgetInstance, widgetInstances, WidgetGuard } from '../model/WidgetRegistry';
 import { widgetDimension } from '../model/WidgetBinding';
 import { canvasRotationEnabled } from '../model/CanvasRotation';
@@ -75,10 +77,23 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     const prefs=await preferences.getPreferences(this.context,STORE_NAME);
     return await prefs.get('fridge_render_contours_v1_'+canvasId,'') as string;
   }
-  private async pushForm(formId:string):Promise<void>{
+  private async pushForm(formId:string,onlyChanged:boolean=false):Promise<void>{
+    const started=Date.now();
     const instance=await widgetInstance(this.context,formId);if(!instance||instance.removed||!instance.canvasId)return; // Unknown/unbound restoration cannot clear cached desktop artwork.
     const scene=await this.displayedScene(formId);
-    await updateWidget(formId,JSON.stringify(await projectCapabilityData(scene.state,this.context)),instance.dimension,sceneWidgetContext(scene),await this.contourCache(scene.state.canvasId),new WidgetGuard(this.context,instance));
+    const projected=await projectCapabilityData(scene.state,this.context),json=JSON.stringify(projected),sceneContext=sceneWidgetContext(scene);
+    if(onlyChanged&&projected.cards.some(card=>card.capability?.k==='battery'&&card.capability.refreshState==='failed')){
+      // A display-only poll must not replace a newer desktop reading with an old saved value.
+      hilog.warn(0,'BatteryRefresh','form=%{public}s battery unavailable; retain displayed packet',formId);return;
+    }
+    const albumTicks=projected.cards.map(card=>card.capability?.k==='album'?capabilityRenderTick(card.capability,Date.now()):0);
+    const signature=widgetRefreshDigest(instance.revision+':'+instance.dimension+':'+sceneContext+':'+JSON.stringify(albumTicks)+':'+json);
+    await preferences.removePreferencesFromCache(this.context,'fridge_widget_live');
+    const receipts=await preferences.getPreferences(this.context,'fridge_widget_live'),key='delivery_'+formId;
+    if(onlyChanged&&await receipts.get(key,'')===signature){hilog.info(0,'BatteryRefresh','form=%{public}s provider unchanged check=%{public}dms',formId,Date.now()-started);return;}
+    await updateWidget(formId,json,instance.dimension,sceneContext,await this.contourCache(scene.state.canvasId),new WidgetGuard(this.context,instance));
+    await receipts.put(key,signature);await receipts.flush();
+    for(const card of projected.cards)if(card.capability?.k==='battery')hilog.info(0,'BatteryRefresh','form=%{public}s delivered soc=%{public}d charging=%{public}s total=%{public}dms',formId,card.capability.percent??-1,String(card.capability.charging===true),Date.now()-started);
   }
   private async scheduleForm(formId:string):Promise<void> {
     const base=await this.loadState(formId);
@@ -135,9 +150,16 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     return changed;
   }
   private actionQueue: Promise<void> = Promise.resolve();
+  private providerPulses:Set<string>=new Set();
   onFormEvent(formId: string, event: string): void {
+    let providerPulse=false;try{providerPulse=(JSON.parse(event) as Record<string,string>).operation==='refreshProvider';}catch(_){}
+    if(providerPulse){if(this.providerPulses.has(formId))return;this.providerPulses.add(formId);}
     this.actionQueue = this.actionQueue.catch(() => {}).then(async () => {
       let message:Record<string,string>|null=null;try{message=JSON.parse(event) as Record<string,string>;}catch(_){}
+      if(message?.operation==='refreshProvider') {
+        hilog.info(0,'BatteryRefresh','Form received provider pulse form=%{public}s',formId);
+        await this.pushForm(formId,true);await this.scheduleForm(formId);return;
+      }
       if(message?.operation==='configure'){formProvider.openFormEditAbility('ability://WidgetConfigAbility',formId,true);return;}
       if(message?.operation==='dismissScene') {
         const base=await this.loadState(formId);
@@ -150,7 +172,7 @@ export default class FridgeFormAbility extends FormExtensionAbility {
       if (card === undefined) return;
       if (!applyCalendarAction(card, action.operation)) return;
       await this.saveStateAndWidgets(state);
-    }).catch((e: Error) => hilog.error(0x0000, 'FridgeForm', 'action %{public}s', e.message));
+    }).catch((e: Error) => hilog.error(0x0000, 'FridgeForm', 'action %{public}s', e.message)).finally(()=>{if(providerPulse)this.providerPulses.delete(formId);});
   }
 
 

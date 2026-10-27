@@ -8,5 +8,10 @@ try{
  fs.writeFileSync(path.join(temp,'private.fridge'),JSON.stringify(privateCopy));const manifest={canvasAspect:1,background:{mode:'transparent',frameStyle:'light',frameMaterial:'oak'},cards:[{file:path.resolve(fixture),x:20,y:30,w:200,h:140,groupId:'pair'},{file:'private.fridge',x:100,y:250,w:200,h:140,groupId:'pair'}]};
  fs.writeFileSync(path.join(temp,'manifest.json'),JSON.stringify(manifest));const out=path.join(temp,'canvas.fridge');cp.execFileSync(process.execPath,['scripts/fridge-compose.cjs',path.join(temp,'manifest.json'),out]);const combined=JSON.parse(fs.readFileSync(out,'utf8'));core.load('TemplatePackage').readPackage(JSON.stringify(combined));
  assert.equal(combined.state.background.frameMaterial,'oak');assert.equal(combined.state.cards.length,2);assert.equal(combined.assets.length,2);assert.notEqual(combined.state.cards[0].id,combined.state.cards[1].id);assert.notEqual(combined.state.cards[0].html.previewElementId,combined.state.cards[1].html.previewElementId);assert.notEqual(combined.state.cards[0].elements[0].src,combined.state.cards[1].elements[0].src);assert.equal(combined.state.cards[1].capability.events.length,0);assert(!JSON.stringify(combined).includes('Private'));assert.equal(combined.state.cards[0].groupId,'pair');
+ for(const [dimension,aspect] of [['2*4',2],['2*2',1],['4*4',1]]){
+  fs.writeFileSync(path.join(temp,'manifest.json'),JSON.stringify({...manifest,canvasAspect:undefined,canvasDimension:dimension}));
+  cp.execFileSync(process.execPath,['scripts/fridge-compose.cjs',path.join(temp,'manifest.json'),out]);
+  const sized=JSON.parse(fs.readFileSync(out,'utf8'));assert.equal(sized.state.canvasDimension,dimension);assert.equal(sized.state.canvasAspect,aspect);const read=core.load('TemplatePackage').readPackage(JSON.stringify(sized));assert.equal(read.state.canvasDimension,dimension,'size survives the actual reader');
+ }
  console.log('PASS static source/mask/cache, editable composition, independent IDs/assets/groups, current frame materials and recipient-data sanitization');
 }finally{fs.rmSync(temp,{recursive:true,force:true});}

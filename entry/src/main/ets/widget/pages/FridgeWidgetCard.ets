@@ -1,6 +1,7 @@
 import { widgetFrameMetrics } from '../../model/WidgetFrameGeometry';
 import { depthRenderCards } from '../../model/DepthComposition';
 import { capabilityRenderTick } from '../../model/CapabilityClock';
+import { widgetProviderPeriod } from '../../model/WidgetProviderRefresh';
 import { cardRenderSnapshot } from '../../model/CardViewSnapshot';
 import { FridgeCard, CanvasBackground, normalizeBackground, BOARD_W } from '../../model/CardSchema';
 import { scenePercent } from '../../model/SceneLayout';
@@ -28,6 +29,8 @@ struct FridgeWidgetCard {
   private alive:boolean=false;
   private context:WidgetSceneContext|null=null;
   private hasArtwork:boolean=false;
+  private lastProviderRequest:number=0;
+  private providerTimer:TextTimerController=new TextTimerController();
   @State displayed:CanvasBackground=initialFormBackground();
   @State incoming:CanvasBackground|null=null;
   @State mix:number=0;
@@ -99,7 +102,17 @@ struct FridgeWidgetCard {
     if(tick!==this.renderTick)this.renderTick=tick;
   }
   private hasLocalClock():boolean {
-    return this.cardIds.some((id:string)=>capabilityRenderTick(this.cardMap[id]?.capability??null,Date.now())>0);
+    return this.providerPeriod()>0||this.cardIds.some((id:string)=>capabilityRenderTick(this.cardMap[id]?.capability??null,Date.now())>0);
+  }
+  private providerPeriod():number {return widgetProviderPeriod(this.cardIds.map((id:string)=>this.cardMap[id]));}
+  private onWidgetClock():void {
+    this.syncRenderClock();
+    if(!this.alive||!this.sceneReady||!(this.displayCanvasId||this.canvasId))return;
+    const period=this.providerPeriod(),now=Date.now();
+    if(period<=0||this.lastProviderRequest>0&&Math.floor(now/period)===Math.floor(this.lastProviderRequest/period))return;
+    this.lastProviderRequest=now;
+    console.info('[FridgeProviderPulse] request '+this.formId);
+    postCardAction(this,{action:'message',params:{operation:'refreshProvider'}});
   }
   @LocalStorageProp('canvasId') canvasId: string = '';
   @LocalStorageProp('formId') formId:string='';
@@ -114,7 +127,7 @@ struct FridgeWidgetCard {
   private parse(json: string): FridgeCard[] {
     try { return JSON.parse(json) as FridgeCard[]; } catch (_) { return []; }
   }
-  aboutToAppear(): void {this.alive=true;this.syncRenderClock(); this.syncPacket();this.syncBackground(); this.syncCards(); }
+  aboutToAppear(): void {this.alive=true;this.syncRenderClock(); this.syncPacket();this.syncBackground(); this.syncCards();this.onWidgetClock(); }
   aboutToDisappear():void {this.alive=false;this.sceneGeneration++;this.sceneAnimating=false;this.appliedPacket='';this.scenePhase=0;this.generation++;this.blending=false;this.incoming=null;this.mix=0;this.hasArtwork=false;}
   private syncLegacyCards(): void { if (this.cardsJson.length === 0) this.syncCards(); }
   private syncCards(): void {
@@ -132,9 +145,15 @@ struct FridgeWidgetCard {
   }
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
-      if(this.hasLocalClock()){
-        // One native minute clock drives local calendar/course/progress projections.
-        // No per-card JS timer, provider wake-up, image decode or widget IPC.
+      if(this.providerPeriod()>0){
+        // Form TextClock is minute-only. Native TextTimer supports seconds and pauses
+        // when its host is backgrounded/locked; one timer serves the whole widget.
+        TextTimer({isCountDown:false,controller:this.providerTimer}).format('ss')
+          .fontSize(1).fontColor(Color.Transparent).width(1).height(1)
+          .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
+          .onTimer(()=>this.onWidgetClock())
+          .onAppear(()=>this.providerTimer.start()).onDisAppear(()=>this.providerTimer.pause())
+      }else if(this.hasLocalClock()){
         TextClock().format('HH:mm').fontSize(1).fontColor(Color.Transparent).width(1).height(1)
           .hitTestBehavior(HitTestMode.None).accessibilityLevel('no').onDateChange(()=>this.syncRenderClock())
       }
@@ -169,13 +188,13 @@ struct FridgeWidgetCard {
           Stack(){
             SymbolGlyph($r('sys.symbol.square_stack_3d')).fontSize(this.widthValue()<240||this.heightValue()<220?26:36).fontColor(['#69604F'])
           }.width(this.widthValue()<240||this.heightValue()<220?48:64).height(this.widthValue()<240||this.heightValue()<220?48:64).borderRadius(16).backgroundColor('#E9E3D7')
-          Text('选择你的画布').fontSize(this.widthValue()<240||this.heightValue()<220?16:22).fontWeight(FontWeight.Medium).fontColor('#302D23').maxLines(1)
-          Text('轻点此处，开始绑定').fontSize(this.widthValue()<240||this.heightValue()<220?11:14).fontColor('#77705F').maxLines(1)
+          Text('选择画布').fontSize(this.widthValue()<240||this.heightValue()<220?16:22).fontWeight(FontWeight.Medium).fontColor('#302D23').maxLines(1)
+          Text('点按选择要显示的画布').fontSize(this.widthValue()<240||this.heightValue()<220?11:14).fontColor('#77705F').maxLines(1)
           Row({space:4}){Text('选择画布').fontSize(12).fontWeight(FontWeight.Medium).fontColor('#514A3F');SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(11).fontColor(['#514A3F'])}
             .padding({left:14,right:14,top:7,bottom:7}).borderRadius(18).backgroundColor('#E9E3D7')
         }.width('100%').height('100%').justifyContent(FlexAlign.Center).padding(12).backgroundColor('#F8F5EE').hitTestBehavior(HitTestMode.None)
       }else if(this.cardIds.length===0){
-        Column({space:8}){Text('这张画布还没有卡片').fontSize(16).fontWeight(FontWeight.Medium).fontColor('#302D23');Text('轻点打开 App，继续创作').fontSize(12).fontColor('#696459')}
+        Column({space:8}){Text('画布里还没有卡片').fontSize(16).fontWeight(FontWeight.Medium).fontColor('#302D23');Text('点按打开 App 添加卡片').fontSize(12).fontColor('#696459')}
           .width('100%').height('100%').justifyContent(FlexAlign.Center).backgroundColor('#F2FAF8EF').hitTestBehavior(HitTestMode.None)
       }
       ForEach(this.cardIds.filter((id:string)=>!this.cardMap[id].hidden), (id: string) => {

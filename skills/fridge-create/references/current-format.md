@@ -1,6 +1,6 @@
 # Current .fridge authoring contract
 
-Verified against FridgeMemo TemplatePackage.ets/CardSchema.ets on 2026-10-11. The generated design-contract.json is the release snapshot for fields, capabilities and design tokens. This prose explains semantics. When working in the app repo, production source files are authoritative: run previewer/build.cjs --check and update this reference if semantics changed.
+Verified against FridgeMemo TemplatePackage.ets/CardSchema.ets for the 1.1 multi-size baseline on 2026-10-21. The generated design-contract.json is the release snapshot for fields, capabilities and design tokens. This prose explains semantics. When working in the app repo, production source files are authoritative: run previewer/build.cjs --check and update this reference if semantics changed.
 
 ## Container
 
@@ -12,9 +12,23 @@ UTF-8 JSON, not ZIP:
 
 `kind=card` requires exactly one card and no external group membership; `canvas` has at most 16 cards. Use schema 2. The actual example is complete and passes the reader; snippets here are explanatory.
 
-`state`: canvasId (local placeholder), canvasAspect (>0), canvasDimension `4*4`, background, maxZ, cards, sceneLayouts, sceneRules, sceneBaseLayoutId. Start without schedules. Reader handles remapping IDs on import. Do not create undocumented scheduled transitions or cross-canvas references.
+`state`: canvasId (local placeholder), canvasAspect (>0), canvasDimension `4*4` / `2*4` / `2*2`, background, maxZ, cards, sceneLayouts, sceneRules, sceneBaseLayoutId. Start without schedules. Reader handles remapping IDs on import. Do not create undocumented scheduled transitions or cross-canvas references.
 
 Background: solid color (`#RRGGBB`) is easiest. A transparent canvas uses mode `transparent`: the host omits the canvas fill/image and preserves card artwork; do not write a transparent color hex. Other current modes are smart/blend/photo/preset but they require host-generated images/palettes for faithful output; do not claim a hand-written list of colors reproduces the app gradient. Photo background references must be embedded asset keys.
+
+## Multi-size canvases (App 1.1)
+
+| Desktop size | `canvasDimension` | Default `canvasAspect` | QA width |
+| --- | --- | --- | --- |
+| 4×4 | `4*4` | 1 | 300 and 420 px |
+| 2×4 (wide) | `2*4` | 2 | 300 px, half-height |
+| 2×2 | `2*2` | 1 | 180 px |
+
+Persist both dimension and aspect. These are creation defaults; a real desktop host can have a different measured rectangle. Preserve an explicitly requested aspect between 0.3 and 3. The host fits artwork as one composition rather than stretching each card. `6*4` remains readable for old works but is not offered for new canvases or desktop widgets.
+
+A widget chooses among canvases with the same dimension through the system edit page. Each instance retains its own binding across app navigation, restart and update. An unbound widget opens this picker. Importing a whole canvas creates a separate work with its size; importing a single card fits it into the selected work. Author alternate sizes as separate `.fridge` files. Changing only `canvasDimension` does not rearrange artwork: compose and inspect every target separately.
+
+`fridge-compose.cjs` takes `canvasDimension` and optional `canvasAspect` in its manifest. For example, `{"canvasDimension":"2*4","cards":[...]}` defaults to aspect 2. See `examples/native-2x4.fridge` and `examples/native-2x2.fridge` for editable size examples.
 
 ## Coordinates
 

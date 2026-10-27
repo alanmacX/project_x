@@ -4,7 +4,11 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const [manifestPath,out]=process.argv.slice(2);if(!manifestPath||!out)throw Error('fridge-compose.cjs manifest.json output.fridge');
 const ctx=vm.createContext({});vm.runInContext(fs.readFileSync(path.resolve(__dirname,'../previewer/shared-models.js'),'utf8'),ctx);
 const core=ctx.FridgeCore,schema=core.load('CardSchema'),manifest=JSON.parse(fs.readFileSync(manifestPath,'utf8')),state=new schema.FridgeState(),assets=[];
-state.canvasAspect=manifest.canvasAspect??1;state.background=schema.normalizeBackground(manifest.background??{});
+const dimension=manifest.canvasDimension??'4*4';
+if(!['4*4','2*4','2*2'].includes(dimension))throw Error('Use canvasDimension 4*4, 2*4 or 2*2');
+state.canvasDimension=dimension;state.canvasAspect=manifest.canvasAspect??(dimension==='2*4'?2:1);
+if(!Number.isFinite(state.canvasAspect)||state.canvasAspect<.3||state.canvasAspect>3)throw Error('canvasAspect must be between 0.3 and 3');
+state.background=schema.normalizeBackground(manifest.background??{});
 if(manifest.backgroundImage){const file=path.resolve(path.dirname(manifestPath),manifest.backgroundImage),extension=path.extname(file).toLowerCase();if(!['.png','.jpg','.jpeg','.webp'].includes(extension))throw Error('Use a supported static background image');assets.push({key:'asset://0',extension,data:fs.readFileSync(file).toString('base64')});state.background.mode='photo';state.background.photo='asset://0';state.background.src='asset://0';}
 
 for(const [index,entry] of (manifest.cards??[]).entries()){

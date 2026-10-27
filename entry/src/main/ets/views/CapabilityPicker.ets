@@ -38,7 +38,7 @@ export struct CapabilityPicker {
               }.width('100%').padding({left:12,right:12,top:10,bottom:10})
             }.width('100%').constraintSize({minHeight:72}).backgroundColor(AppDesign.surface(this.appDark)).borderRadius(AppDesign.sectionRadius).onClick(()=>this.choose(item.key))}.width('100%')
           },(item:CapabilityDescriptor)=>item.key)
-          if(this.items().length===0) {ListItem(){Text('没有匹配的能力，试试其他关键词').fontSize(14).fontColor(AppDesign.muted(this.appDark)).padding(24).width('100%').textAlign(TextAlign.Center)}}
+          if(this.items().length===0) {ListItem(){Text('未找到能力，换个关键词').fontSize(14).fontColor(AppDesign.muted(this.appDark)).padding(24).width('100%').textAlign(TextAlign.Center)}}
       }.width('100%').layoutWeight(1).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring).fadingEdge(true,{fadingEdgeLength:LengthMetrics.vp(12)}).onWillScroll((_offset:number,_state:ScrollState,source:ScrollSource)=>{if(source===ScrollSource.DRAG)this.dismissSearch();})
     }.padding({left:20,right:20,top:16,bottom:16}).width('100%').height('100%').backgroundColor(AppDesign.background(this.appDark))
   }

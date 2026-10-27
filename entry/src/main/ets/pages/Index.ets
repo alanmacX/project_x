@@ -908,7 +908,7 @@ struct Index {
   }
   private deleteCanvas(id: string): void {
     if(this.canvasEntries.length <= 1 || this.canvasChanging||this.sceneNavigationBusy) return;
-    this.getUIContext().showAlertDialog({title:'删除“'+this.canvasTitle(id)+'”？',message:'卡片和背景会一起删除。删除当前画布后，将切换到剩余画布。',primaryButton:{value:'取消',action:()=>{}},secondaryButton:{value:'删除',fontColor:'#C43A35',action:()=>{
+    this.getUIContext().showAlertDialog({title:'删除“'+this.canvasTitle(id)+'”？',message:'画布里的卡片和背景也会删除。',primaryButton:{value:'取消',action:()=>{}},secondaryButton:{value:'删除',fontColor:'#C43A35',action:()=>{
       if(this.canvasChanging||this.sceneNavigationBusy)return;const active=this.store.state.canvasId===id;this.canvasChanging=true;this.cancelScheduledTransition();
       this.store.deleteCanvas(id).then(async()=>{if(active){await this.loadCanvas(this.store.catalog.activeId);}else this.refreshCanvasList();this.galleryRevision++;}).catch((e:Error)=>this.templateError('未能删除',e)).finally(()=>{this.canvasChanging=false;this.armScheduleTimer();this.updateScheduledScene(true);});
     }}});
@@ -1521,7 +1521,7 @@ struct Index {
   }
   private async copyInto(id:string,replace:boolean=false):Promise<void> {
     const card=this.current();if(!card||this.busy)return;this.busy=true;
-    try{await this.store.save(false);if(!replace&&this.store.catalog.scenes.some(c=>c.id===id)&&(await this.store.canvasSnapshot(id)).cards.length>0){this.getUIContext().showAlertDialog({title:'替换中央卡片？',message:'目标场景只能保存一张卡片，原来的中央卡片会被替换。',primaryButton:{value:'取消',action:()=>{}},secondaryButton:{value:'替换',action:()=>this.copyInto(id,true)}});return;}await this.store.copyCardTo(card,id,replace);this.copyTargetOpen=false;this.getUIContext().getPromptAction().showToast({message:'已复制；原卡片保留'});}catch(e){this.templateError('复制未完成',e as Error);}finally{this.busy=false;}
+    try{await this.store.save(false);if(!replace&&this.store.catalog.scenes.some(c=>c.id===id)&&(await this.store.canvasSnapshot(id)).cards.length>0){this.getUIContext().showAlertDialog({title:'替换中央卡片？',message:'这会替换目标场景中的中央卡片。',primaryButton:{value:'取消',action:()=>{}},secondaryButton:{value:'替换',action:()=>this.copyInto(id,true)}});return;}await this.store.copyCardTo(card,id,replace);this.copyTargetOpen=false;this.getUIContext().getPromptAction().showToast({message:'已复制；原卡片保留'});}catch(e){this.templateError('复制未完成',e as Error);}finally{this.busy=false;}
   }
   private duplicate(): void {
     if (this.busy || this.canvasChanging || !this.canAddCards(1)) return;
@@ -1692,7 +1692,7 @@ struct Index {
       if(next.albumPresentation==='row')card.h=card.w/2;else card.h=card.w;
     }
     card.capability=next;this.syncFields();this.change();
-    if(courseDataChanged&&this.store.findCard(id)?.capability===next)this.store.rememberTimetable(next).catch(()=>{if(this.alive)this.getUIContext().getPromptAction().showToast({message:'课表未能保存，请重试修改；现有本地课表已保留'});});
+    if(courseDataChanged&&this.store.findCard(id)?.capability===next)this.store.rememberTimetable(next).catch(()=>{if(this.alive)this.getUIContext().getPromptAction().showToast({message:'课表保存失败，原课表已保留。请重试'});});
   }
   private async reuseTimetable(id:string):Promise<void> {
     const card=this.store.findCard(id);if(card?.capability?.k!=='timetable')return;
@@ -1700,7 +1700,7 @@ struct Index {
     try {
       const saved=await this.store.savedTimetable();
       if(!this.alive||this.store.findCard(id)!==card||card.capability!==previous)return;
-      if(!saved){this.getUIContext().getPromptAction().showToast({message:'还没有已保存的课表，请先导入或添加课程'});return;}
+      if(!saved){this.getUIContext().getPromptAction().showToast({message:'没有已保存的课表，请导入或添加课程'});return;}
       this.updateExtraCapability(id,useSavedTimetable(previous,saved));
     }catch(e){if(this.alive)this.getUIContext().getPromptAction().showToast({message:(e as Error).message});}
   }
@@ -1891,7 +1891,7 @@ struct Index {
         CanvasBackdrop({ snapshot:true, sceneBackground: this.canvasBackground,showFrame:false }).width('100%').height('100%')
         Column().width('100%').height('100%').onClick(() => { this.selectedId = ''; })
         if (this.cards.length === 0) {
-          Text('放一张自己的卡片').fontSize(16).fontColor('#989898').width('100%').height('100%').textAlign(TextAlign.Center).hitTestBehavior(HitTestMode.None)
+          Text('添加卡片').fontSize(16).fontColor('#989898').width('100%').height('100%').textAlign(TextAlign.Center).hitTestBehavior(HitTestMode.None)
         }
       }.width(BOARD_W * this.boardScale).height(this.boardHeight).borderRadius(this.canvasBackground.frameStyle==='none'?24:BOARD_W*this.boardScale*31/600).clip(true).backgroundColor(this.canvasBackground.mode==='transparent'?Color.Transparent:Color.White)
         .border({ width: this.canvasBackground.frameStyle==='none'?.5:0, color: '#E9E9E9' }).id('homeCanvasSurface')
@@ -2434,7 +2434,7 @@ struct Index {
       if(!this.alive){if(this.context)removeStagedTemplate(uri,this.context.cacheDir);return;}
       this.templateReviewOpen=true;
       const finish=():void=>{if(this.context)removeStagedTemplate(uri,this.context.cacheDir);this.templateReviewOpen=false;this.incomingTemplateChanged();};
-      this.getUIContext().showAlertDialog({cancel:finish,title:summary.kind==='card'?'导入卡片':'导入画布',message:summary.count+' 张卡片，'+summary.images+' 个图片资源。只导入设计，能力使用你的本机数据。'+(summary.kind==='canvas'?'保存为独立画布，保留现有作品。':'添加到“'+this.canvasName+'”。'),primaryButton:{value:'取消',action:finish},secondaryButton:{value:summary.kind==='canvas'?'保存新画布':'添加到画布',action:()=>{this.importTemplate(uri,summary.kind).finally(finish);}}});
+      this.getUIContext().showAlertDialog({cancel:finish,title:summary.kind==='card'?'导入卡片':'导入画布',message:summary.count+' 张卡片，'+summary.images+' 张图片。时间、电量等读取本机数据；课表、日程和日期需在本机设置。'+(summary.kind==='canvas'?'保存为独立画布，保留现有作品。':'添加到“'+this.canvasName+'”。'),primaryButton:{value:'取消',action:finish},secondaryButton:{value:summary.kind==='canvas'?'保存新画布':'添加到画布',action:()=>{this.importTemplate(uri,summary.kind).finally(finish);}}});
     }catch(e){if(this.context)removeStagedTemplate(uri,this.context.cacheDir);this.templateReviewOpen=false;this.templateError('无法导入',e as Error);}
   }
   private async importTemplate(uri:string,kind:string):Promise<void>{

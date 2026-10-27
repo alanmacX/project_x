@@ -8,13 +8,15 @@ import { nextDataBoundary } from './CapabilityData';
 export function widgetBoundary(state:FridgeState,now:number):number {
   let next=nextSceneBoundary(state,now);
   for(const card of state.cards) {
-    const cap=card.capability;if(!cap)continue;
+    const cap=card.capability;if(card.hidden||!cap)continue;
     if(['album','worldclock','lunar','timetable','agenda'].includes(cap.k)) {
       let candidate=nextDataBoundary(cap,now);
       if(cap.k==='agenda'&&candidate===now+30*60000)candidate=Math.floor(now/(30*60000))*30*60000+30*60000;
+      if(cap.k==='agenda'&&cap.agendaSource==='system')candidate=Math.min(candidate,now+15*60000);
       next=Math.min(next,candidate);
     }
-    else if(['battery','dayprogress','yearprogress'].includes(cap.k))next=Math.min(next,Math.floor(now/(30*60000))*30*60000+30*60000);
+    else if(cap.k==='battery')next=Math.min(next,now+5*60000);
+    else if(['dayprogress','yearprogress'].includes(cap.k))next=Math.min(next,Math.floor(now/(30*60000))*30*60000+30*60000);
     else if(['date','calendar','countdown','anniversary'].includes(cap.k)) {const midnight=new Date(now);midnight.setHours(24,0,0,0);next=Math.min(next,midnight.getTime());}
   }
   return next;
@@ -33,7 +35,7 @@ export async function scheduleWidget(prefs:preferences.Preferences,formId:string
     // Later edits reuse an earlier pending request rather than spending quota and
     // resetting the timer before that wake-up has happened.
     if(previous>now&&previous<=requestedAt)return;
-    try {await formProvider.setFormNextRefreshTime(formId,minutes);await prefs.put(key,requestedAt);await prefs.flush();}catch(_){ /* The hourly fallback survives rejected/quota-limited requests. */ }
+    try {await formProvider.setFormNextRefreshTime(formId,minutes);await prefs.put(key,requestedAt);await prefs.flush();}catch(_){ /* The half-hour fallback survives rejected/quota-limited requests. */ }
   });
   requests.set(formId,pending);
   try{await pending;}finally{if(requests.get(formId)===pending)requests.delete(formId);}

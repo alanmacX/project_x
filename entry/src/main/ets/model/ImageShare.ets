@@ -19,6 +19,6 @@ export async function sharePixelMap(context: common.UIAbilityContext, pixel: ima
 }
 
 export async function shareTemplateFile(context: common.UIAbilityContext, path: string, anchor: string): Promise<void> {
-  const data=new systemShare.SharedData({utd:TEMPLATE_UTD,uri:fileUri.getUriFromPath(path),title:path.includes('/卡片_')?'可编辑卡片':'可编辑画布',description:'包含完整素材，可用冰箱贴桌面小组件打开并添加到自己的画布'});
+  const data=new systemShare.SharedData({utd:TEMPLATE_UTD,uri:fileUri.getUriFromPath(path),title:path.includes('/卡片_')?'可编辑卡片':'可编辑画布',description:'用冰箱贴打开，可继续编辑'});
   await new systemShare.ShareController(data).show(context,{anchor:anchor,previewMode:systemShare.SharePreviewMode.DETAIL});
 }

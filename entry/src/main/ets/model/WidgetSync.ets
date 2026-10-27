@@ -48,6 +48,18 @@ export async function updateWidget(formId: string, json: string, dim: string, sc
 const liveDeliveries:Map<string,string>=new Map();
 const latestPush:Map<string,number>=new Map();
 let pushSequence:number=0;
+/** Broadcast delivery uses saved documents, including while the editor is hidden. */
+export async function refreshStoredWidgets(context:Context):Promise<void> {
+  await preferences.removePreferencesFromCache(context,'fridge_store');
+  const prefs=await preferences.getPreferences(context,'fridge_store');
+  for(const instance of await widgetInstances(context)) {
+    if(!instance.canvasId)continue;
+    const json=await prefs.get(canvasKey(instance.canvasId),'') as string;
+    if(!json)continue;
+    try{const state=JSON.parse(json) as FridgeState;if(!Array.isArray(state.cards)||state.canvasDimension!==instance.dimension)continue;}catch(_){continue;}
+    await pushWidgets(context,json,true);return;
+  }
+}
 export async function pushWidgets(context: Context, json: string, refreshAll:boolean=false): Promise<void> {
   const sequence=++pushSequence;
   await preferences.removePreferencesFromCache(context, 'fridge_store');
@@ -83,6 +95,7 @@ export async function pushWidgets(context: Context, json: string, refreshAll:boo
       const targetJson=await sourceFor(targetId);if(!targetJson)return null;const target=normalizeState(JSON.parse(targetJson) as FridgeState);return target.canvasDimension===instance.dimension?target:null;
     });
     const projected=await projectCapabilityData(scene.state,context);
+    for(const card of projected.cards)if(card.capability?.k==='battery')hilog.info(0,'BatteryRefresh','form=%{public}s soc=%{public}d charging=%{public}s result=%{public}s',id,card.capability.percent??-1,String(card.capability.charging===true),card.capability.refreshState??'');
     const sceneJson=JSON.stringify(projected);
     const liveKey=instance.revision+':'+projected.cards.map(card=>capabilityRenderTick(card.capability,Math.floor(Date.now()/60000)*60000)).join(',')+':'+sceneJson+':'+sceneWidgetContext(scene);
     if(refreshAll&&liveDeliveries.get(id)===liveKey)return;

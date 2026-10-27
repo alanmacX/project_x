@@ -20,6 +20,7 @@ const prefs = {
   delete: async key => disk.delete(key),
 };
 const kits = {
+  '@kit.CryptoArchitectureKit': {cryptoFramework:{createMd:()=>{const hash=require('node:crypto').createHash('sha256');return {updateSync:({data})=>hash.update(data),digestSync:()=>({data:hash.digest()})};}}},
   '@kit.ArkData':rdb,
   '@kit.BasicServicesKit':{batteryInfo:{batterySOC:60,chargingStatus:0,BatteryChargeState:{ENABLE:1}}},
   '@kit.CalendarKit':{calendarManager:{}},
@@ -46,6 +47,8 @@ kits['@kit.ArkTS'] = { taskpool: { Task: class { constructor(fn,...args){this.fn
 kits['@kit.ArkGraphics2D']={drawing:{}};
 kits['@kit.ImageKit']={image:{}};
 const cache = new Map();
+kits['@kit.ArkTS'].util={TextEncoder:class {encodeInto(text){return new TextEncoder().encode(text);}}};
+
 function load(name) {
   const file = path.resolve(root, name + '.ets');
   if (cache.has(file)) return cache.get(file).exports;
@@ -523,7 +526,7 @@ function load(name) {
   let longMinutes=0;kits['@kit.FormKit'].formProvider.setFormNextRefreshTime=async(id,minutes)=>{longMinutes=minutes;};
   await scheduleWidget(prefs,'schedule-long-test',boundaryNow+120*60000,boundaryNow);assert.equal(longMinutes,120,'far future scene is armed immediately instead of depending on hourly refresh');
   kits['@kit.FormKit'].formProvider.setFormNextRefreshTime=scheduler;
-  assert.equal(formConfig.forms[0].updateDuration,2,'hourly fallback reserves quota for actual content boundaries');
+  assert.equal(formConfig.forms[0].updateDuration,1,'half-hour fallback recovers when one-shot quota is exhausted');
   const FormAbility=load('../form/FridgeFormAbility').default, formAbility=new FormAbility();
   formAbility.onFormEvent('new-unbound','{"operation":"configure"}');await formAbility.actionQueue;assert.deepEqual(editorEntrances,[[formConfig.forms[0].formConfigAbility,'new-unbound',true]],'blank widget uses the same full editor URI as the system long-press menu');
   cal.id='action-calendar';custom.id='untouched';custom.elements[0].text='preserved';
@@ -538,6 +541,19 @@ function load(name) {
   const refreshBefore=updates.length;formAbility.onUpdateForm('native');await formAbility.actionQueue;
   assert.equal(updates.length-refreshBefore,1,'multiple local capability results publish one complete frame');
   assert.equal(JSON.parse(disk.get(nativeKey)).cards[1].capability.percent,60);
+  const unchangedCount=updates.length;
+  formAbility.onFormEvent('native','{"operation":"refreshProvider"}');await formAbility.actionQueue;
+  assert.equal(updates.length,unchangedCount,'unchanged desktop pulse does not prepare or send an image packet');
+  kits['@kit.BasicServicesKit'].batteryInfo.batterySOC=61;load('CapabilityService').invalidateCapabilityRead('battery');
+  formAbility.onFormEvent('native','{"operation":"refreshProvider"}');await formAbility.actionQueue;
+  assert.equal(updates.length,unchangedCount+1);assert.equal(JSON.parse(updates.at(-1).data.scenePacket).cards.includes('61'),true);
+  assert.equal(JSON.parse(disk.get(nativeKey)).cards[0].capability.percent,60,'desktop pulse never saves over the source document');
+  kits['@kit.BasicServicesKit'].batteryInfo.batterySOC=62;load('CapabilityService').invalidateCapabilityRead('battery');failForm=true;
+  formAbility.onFormEvent('native','{"operation":"refreshProvider"}');await formAbility.actionQueue;assert.equal(updates.length,unchangedCount+1,'failed delivery is not acknowledged');
+  formAbility.onFormEvent('native','{"operation":"refreshProvider"}');await formAbility.actionQueue;assert.equal(updates.length,unchangedCount+2,'next pulse retries an unacknowledged battery reading');
+  const beforeUnavailable=updates.length;kits['@kit.BasicServicesKit'].batteryInfo.batterySOC=-1;load('CapabilityService').invalidateCapabilityRead('battery');
+  formAbility.onFormEvent('native','{"operation":"refreshProvider"}');await formAbility.actionQueue;assert.equal(updates.length,beforeUnavailable,'failed provider reads retain the newer displayed reading');
+  kits['@kit.BasicServicesKit'].batteryInfo.batterySOC=60;load('CapabilityService').invalidateCapabilityRead('battery');
   disk.set(nativeKey,nativeSnapshot([cal,custom]));
   formAbility.onFormEvent('native','{"cardId":"action-calendar","operation":"nextMonth"}');
   formAbility.onFormEvent('native','{"cardId":"action-calendar","operation":"nextMonth"}');await formAbility.actionQueue;

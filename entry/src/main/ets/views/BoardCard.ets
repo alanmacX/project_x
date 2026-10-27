@@ -335,7 +335,7 @@ export struct BoardCard {
         .position(this.controlPosition(false, true))
         .hitTestBehavior(this.shown() ? HitTestMode.Block : HitTestMode.BLOCK_DESCENDANTS)
         .accessibilityLevel(this.shown() ? 'yes' : 'no-hide-descendants').accessibilityText('旋转整张卡片')
-        .onClick(() => this.getUIContext().getPromptAction().showToast({ message: '沿卡片中心绕动旋转，靠近水平或竖直时自动吸附' }))
+        .onClick(() => this.getUIContext().getPromptAction().showToast({ message: '绕卡片中心拖动可旋转，水平和竖直方向自动吸附' }))
         .gesture(PanGesture({ distance: 2 }).onActionStart((e: GestureEvent) => this.startRotation(e))
           .onActionUpdate((e: GestureEvent) => this.updateRotation(e))
           .onActionEnd((e: GestureEvent) => { this.updateRotation(e); this.finishRotation(); })

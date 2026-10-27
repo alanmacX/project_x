@@ -113,7 +113,7 @@ export struct CapabilitySettings {
       if(this.cap.k==='agenda') {
         if(this.wholeCalendarAccess) {SettingsAction({label:'读取系统日历',onPress:()=>this.readSystemAgenda(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})}
         SettingsAction({label:'导入日历文件 .ics',onPress:()=>this.importSchedule(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
-        if(this.cap.agendaSource==='imported'){Text('本地日历副本；原文件修改后需要重新导入').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
+        if(this.cap.agendaSource==='imported'){Text('日历文件修改后，需重新导入').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
       }
       if(this.cap.k==='timetable') {
         if(this.section==='all'||this.section==='display') {
@@ -140,7 +140,7 @@ export struct CapabilitySettings {
         SettingsAction({label:'第一周周一  '+(this.cap.semester??'选择开学日期'),onPress:()=>this.semesterDate(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
         }
       }
-      if(this.message || this.cap.refreshState==='failed') {Text(this.message||this.cap.desc||'更新失败，保留上次结果').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
+      if(this.message || this.cap.refreshState==='failed') {Text(this.message||this.cap.desc||'更新失败，显示上次数据').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
     }.width('100%').bindSheet($$this.timetableImportOpen,this.timetableImportSheet,{height:'92%',preferType:this.viewportWidth>=600?SheetType.CENTER:SheetType.BOTTOM,width:Math.min(960,this.viewportWidth-24),showClose:false,dragBar:false,keyboardAvoidMode:SheetKeyboardAvoidMode.TRANSLATE_AND_RESIZE,backgroundColor:AppDesign.surface(this.appDark),onDisappear:()=>this.timetableImportOpen=false})
   }
 }

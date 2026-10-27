@@ -15,7 +15,7 @@
       ],
       "defaultDimension": "4*4",
       "updateEnabled": true,
-      "updateDuration": 2,
+      "updateDuration": 1,
       "formConfigAbility": "ability://WidgetConfigAbility",
       "transparencyEnabled": true
     }

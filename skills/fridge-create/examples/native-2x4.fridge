@@ -1,0 +1,121 @@
+{
+  "format": "fridgememo-template",
+  "version": 1,
+  "kind": "canvas",
+  "state": {
+    "sceneLayouts": [],
+    "sceneRules": [],
+    "sceneBaseLayoutId": "",
+    "schemaVersion": 2,
+    "canvasId": "canvas_main",
+    "background": {
+      "mode": "solid",
+      "color": "#F6F2E9",
+      "src": "",
+      "photo": "",
+      "transparentFrame": "auto",
+      "frameStyle": "none",
+      "frameMaterial": "stone",
+      "palette": [],
+      "anchors": [],
+      "signature": ""
+    },
+    "canvasAspect": 2,
+    "canvasDimension": "2*4",
+    "fridge": "board",
+    "door": {
+      "reveal": "07:30",
+      "open": false
+    },
+    "maxZ": 2,
+    "cards": [
+      {
+        "subjectDepth": false,
+        "depthCapabilityFront": false,
+        "depthGroup": false,
+        "groupId": "",
+        "hidden": false,
+        "id": "example-2x4-clock",
+        "x": 16,
+        "y": 81.97674418604652,
+        "w": 192,
+        "h": 112,
+        "rot": 0,
+        "z": 1,
+        "shape": "rect",
+        "frame": false,
+        "material": "cream",
+        "paper": "",
+        "ink": "",
+        "capability": {
+          "k": "clock",
+          "readingBlend": "cloud",
+          "readingStyle": "auto"
+        },
+        "capBox": {
+          "x": 0.1,
+          "y": 0.12,
+          "w": 0.8,
+          "h": 0.7,
+          "rot": 0,
+          "opacity": 1
+        },
+        "capFree": false,
+        "elements": [],
+        "subjectPhoto": false,
+        "subjectBorder": true,
+        "subjectAspect": 1,
+        "subjectInk": "#262824",
+        "subjectVersion": 0,
+        "cutout": "",
+        "outline": [],
+        "inDoor": false
+      },
+      {
+        "subjectDepth": false,
+        "depthCapabilityFront": false,
+        "depthGroup": false,
+        "groupId": "",
+        "hidden": false,
+        "id": "example-2x4-battery",
+        "x": 232,
+        "y": 103.83720930232559,
+        "w": 96,
+        "h": 96,
+        "rot": 0,
+        "z": 2,
+        "shape": "rect",
+        "frame": false,
+        "material": "cream",
+        "paper": "",
+        "ink": "",
+        "capability": {
+          "k": "battery",
+          "readingBlend": "badge",
+          "readingStyle": "auto",
+          "percent": -1,
+          "charging": false
+        },
+        "capBox": {
+          "x": 0.1,
+          "y": 0.12,
+          "w": 0.8,
+          "h": 0.7,
+          "rot": 0,
+          "opacity": 1
+        },
+        "capFree": false,
+        "elements": [],
+        "subjectPhoto": false,
+        "subjectBorder": true,
+        "subjectAspect": 1,
+        "subjectInk": "#262824",
+        "subjectVersion": 0,
+        "cutout": "",
+        "outline": [],
+        "inDoor": false
+      }
+    ]
+  },
+  "assets": []
+}

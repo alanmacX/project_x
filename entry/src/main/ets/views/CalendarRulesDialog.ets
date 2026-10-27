@@ -63,8 +63,8 @@ export struct CalendarRulesDialog {
       Scroll() {Column({space:20}) {
         Column({space:12}) {
           Row() {Text('国内假期停课').fontSize(15).fontColor(AppDesign.text(this.appDark));Blank();Toggle({type:ToggleType.Switch,isOn:this.draft.skipHolidays!==false}).onChange((value:boolean)=>{this.draft.skipHolidays=value;this.update();})}.width('100%').height(44)
-          Text(holidayDataLabel()+'。无需每年导入；全国补班不等于学校调课，按学校校历设置。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
-          if(this.missingYears().length>0){Text('本学期缺少 '+this.missingYears().join('、')+' 年官方安排。请在新安排发布后更新 App；对应年份暂按原课表展示，假期需核对校历。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
+          Text(holidayDataLabel()+'。学校补课请另设调课日期。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')
+          if(this.missingYears().length>0){Text('本学期缺少 '+this.missingYears().join('、')+' 年假期数据。更新 App 或导入学校校历前，这些年份按原课表上课。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')}
           SettingsAction({label:this.busy?'读取中':'导入学校假期日历 .ics（可选）',onPress:()=>this.importDays(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})
           if((this.draft.holidayDates??[]).length) {
             Text('已导入 '+this.draft.holidayDates!.length+' 个假期日期；保存后生效。').fontSize(12).fontColor(AppDesign.muted(this.appDark)).width('100%')

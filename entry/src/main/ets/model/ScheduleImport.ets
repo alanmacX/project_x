@@ -33,7 +33,7 @@ export function importAgenda(text:string,now:number=Date.now(),offset?:((zone:st
     const candidates:number[]=[start.wall];
     if(ruleLine) {
       const rule:Record<string,string>={};for(const field of ruleLine.slice(6).split(';')){const at=field.indexOf('=');rule[field.slice(0,at)]=field.slice(at+1);}
-      if(!['DAILY','WEEKLY'].includes(rule['FREQ'])||Object.keys(rule).some((k)=>!['FREQ','INTERVAL','COUNT','UNTIL','BYDAY','WKST'].includes(k)))throw new Error('目前日历导入支持每日 / 每周重复；复杂重复请导出展开后的日程');
+      if(!['DAILY','WEEKLY'].includes(rule['FREQ'])||Object.keys(rule).some((k)=>!['FREQ','INTERVAL','COUNT','UNTIL','BYDAY','WKST'].includes(k)))throw new Error('支持每日或每周重复。其他重复规则请展开成单次日程后导出');
       const interval=Number(rule['INTERVAL']??1),count=Number(rule['COUNT']??100000),weekStart=rule['WKST']??'MO';
       if(!Number.isInteger(interval)||interval<1||interval>366||!Number.isInteger(count)||count<1||count>100000||!['MO','SU'].includes(weekStart))throw new Error('日历重复参数不正确');
       const byDay=(rule['BYDAY']??'').split(',').filter((v)=>v.length>0),days=['SU','MO','TU','WE','TH','FR','SA'];
@@ -80,7 +80,7 @@ export function importCourseCalendar(text:string,offset?:((zone:string,time:numb
   const day=new Date(first);day.setHours(0,0,0,0);
   const events=importAgenda(text,day.getTime()-1,offset,420,4097);
   if(events.length>4096)throw new Error('课程次数超过 4096，请只导出本学期');
-  if(!events.length||events.some((e:AgendaItem)=>e.allDay))throw new Error('请选择包含上课起止时间的课程日历，不是全天日程');
+  if(!events.length||events.some((e:AgendaItem)=>e.allDay))throw new Error('课程日历需包含上课起止时间，不能只有全天事件');
   const origin=new Date(events[0].start);origin.setHours(12,0,0,0);origin.setDate(origin.getDate()-((origin.getDay()+6)%7));
   const semester=origin.getFullYear()+'-'+('0'+(origin.getMonth()+1)).slice(-2)+'-'+('0'+origin.getDate()).slice(-2);
   const base=Date.UTC(origin.getFullYear(),origin.getMonth(),origin.getDate()),out:CourseItem[]=[];

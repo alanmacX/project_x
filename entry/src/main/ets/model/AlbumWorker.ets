@@ -13,7 +13,7 @@ export async function importAlbumCover(uri:string,json:string,filesDir:string):P
     input=await fileIo.open(uri.startsWith('file:///')?uri.slice(7):uri,fileIo.OpenMode.READ_ONLY);
     const size=(await fileIo.stat(input.fd)).size;if(size<=0||size>24*1024*1024)throw new Error('封面文件须小于 24 MB');
     source=image.createImageSource(input.fd);const info=await source.getImageInfo();
-    if(!isSquareAlbumCover(info.size.width,info.size.height))throw new Error('请选择正方形专辑封面（1:1），可先在相册中裁剪');
+    if(!isSquareAlbumCover(info.size.width,info.size.height))throw new Error('请选择正方形封面，可先在相册中裁剪');
     const ratio=Math.min(1,500/Math.max(info.size.width,info.size.height));pixel=await source.createPixelMap({desiredSize:{width:Math.max(1,Math.round(info.size.width*ratio)),height:Math.max(1,Math.round(info.size.height*ratio))}});
     packer=image.createImagePacker();created.push(cover);file=await fileIo.open(cover,fileIo.OpenMode.CREATE|fileIo.OpenMode.READ_WRITE);await packer.packToFile(pixel,file.fd,{format:'image/jpeg',quality:94});fileIo.closeSync(file.fd);file=null;await pixel.release();pixel=null;
     const palette=await imagePalette('file://'+cover),rgba=blendPixels(albumAnchors(palette),palette[0],320,320);

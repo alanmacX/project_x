@@ -85,7 +85,7 @@ export struct SchoolImportDialog {
       if(data.done){const parsed=await taskpool.execute(new taskpool.Task(parseSchoolText,JSON.stringify(data),this.schoolName)) as string;if(!this.alive||this.token!==token)return;this.stop();this.onRead(parsed);return;}
       if(data.request){if(this.request?.id!==data.request.id){this.request=data.request;this.input=data.request.value;}return;}
       if(data.message)this.message=data.message;
-      if(++this.elapsed>360)throw new Error('读取超时，请确认已登录并打开个人课表；部分学校需要校园网');
+      if(++this.elapsed>360)throw new Error('读取超时。登录后打开个人课表；学校要求校园网时，请先连接校园网');
       this.timer=setTimeout(()=>this.poll(token),250);
     }catch(e){if(this.alive&&this.token===token){this.stop();this.error=(e as Error).message;}}
   }
@@ -113,7 +113,7 @@ export struct SchoolImportDialog {
                 Button({type:ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL}){Row(){Text(s.name).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontSize(15).fontColor(AppDesign.text(this.appDark)).layoutWeight(1).textAlign(TextAlign.Start);Text(s.id).fontSize(12).fontColor(AppDesign.muted(this.appDark))}.padding(14).width('100%')}.width('100%').backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.choose(s))
               }},(s:ImportSchool)=>s.id)
               if(this.visible.length===this.limit){ListItem(){SettingsAction({label:'显示更多学校',onPress:()=>this.more(),appDark:this.appDark,isEnabled:true,fillWidth:true})}}
-              if(!this.visible.length){ListItem(){Text('目录中没有匹配项，可选择通用教务并输入学校网址。').fontColor(AppDesign.muted(this.appDark)).fontSize(13)}}
+              if(!this.visible.length){ListItem(){Text('未找到学校，选择通用教务并输入学校网址。').fontColor(AppDesign.muted(this.appDark)).fontSize(13)}}
               ListItem(){
                 Flex({wrap:FlexWrap.Wrap}) {
                   ForEach(['qiangzhi_general','zhengfang_jiaowu','urp_jiaowu','qingguo_jiaowu','chaoxing_jiaowu'],(id:string,i:number)=>{

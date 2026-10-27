@@ -485,7 +485,7 @@ export struct CanvasGallery {
           if (!this.placements().length) {
             Column({ space: 12 }) {
               Text(this.filter ? '还没有这个尺寸的画布' : '从第一张画布开始').fontSize(18).fontColor(AppDesign.text(this.appDark))
-              Text(this.filter ? '可以先查看全部作品' : '添加照片、文字或实用卡片，创作自己的桌面作品').fontSize(14).fontColor(AppDesign.muted(this.appDark))
+              Text(this.filter ? '可以先查看全部作品' : '添加照片、文字或卡片').fontSize(14).fontColor(AppDesign.muted(this.appDark))
             }.width('100%').padding({ top: 64, bottom: 64 })
           }
         }.width(this.contentWidth()).padding({ top: 76 + this.safeTop, bottom: this.safeBottom + 104 }).alignItems(HorizontalAlign.Start)

@@ -2548,16 +2548,18 @@ exports.nextDataBoundary = nextDataBoundary;
 function mergeCapabilityResult(current, result) {
     const next = JSON.parse(JSON.stringify(current));
     next.attemptedAt = result.attemptedAt;
-    next.updatedAt = result.updatedAt;
     next.refreshState = result.refreshState;
     next.desc = result.desc;
+    if (result.refreshState !== 'done')
+        return next;
+    next.updatedAt = result.updatedAt;
     if (current.k === 'battery') {
         next.percent = result.percent;
         next.charging = result.charging;
         next.chargeState = result.chargeState;
     }
     if (current.k === 'agenda')
-        next.events = result.events;
+        next.events = JSON.parse(JSON.stringify(result.events ?? []));
     return next;
 }
 exports.mergeCapabilityResult = mergeCapabilityResult;
@@ -2680,7 +2682,7 @@ function readingWarning(card) {
     if (card.shape === 'subject' && card.subjectPhoto)
         return '照片上文字可能不易辨认，可开启阅读衬底';
     const colors = (0, CardSchema_1.materialColors)(card.material, card.paper, card.ink);
-    return textContrast(colors[1], colors[0]) < 4.5 ? '文字对比度偏低，可启用阅读衬底或调整内容颜色' : '';
+    return textContrast(colors[1], colors[0]) < 4.5 ? '文字不够清楚，打开衬底或更换文字颜色' : '';
 }
 exports.readingWarning = readingWarning;
 /** A transparent field, not a panel. Glyph halos supply local contrast without
@@ -4327,4 +4329,18 @@ function depthRenderCards(cards) {
 }
 exports.depthRenderCards = depthRenderCards;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"3d0286074dca4fff0936995899b489bc2ed81f649f59960eb9cc1d005d3a9904"};})(globalThis);
+},
+"CanvasSize":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.creationAspect = exports.creationDimension = exports.CREATION_DIMENSIONS = void 0;
+exports.CREATION_DIMENSIONS = ['4*4', '2*4', '2*2'];
+function creationDimension(value) {
+    return exports.CREATION_DIMENSIONS.includes(value) ? value : '4*4';
+}
+exports.creationDimension = creationDimension;
+/** Authored defaults; a host rectangle is a separate runtime measurement. */
+function creationAspect(dimension) { return dimension === '2*4' ? 2 : 1; }
+exports.creationAspect = creationAspect;
+
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed"};})(globalThis);
