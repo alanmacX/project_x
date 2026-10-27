@@ -1352,6 +1352,7 @@ struct Index {
     const a = card.elements.indexOf(element), b = card.elements.indexOf(peers[next]);
     card.elements[a] = peers[next]; card.elements[b] = element; this.change();
   }
+  private saveErrorNoticeAt:number=0;
   private persist(syncWidgets: boolean = true): void {
     if (!this.ready || this.activeBoardId.length > 0) return;
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer); this.saveTimer = -1;
@@ -1359,7 +1360,10 @@ struct Index {
     this.normalLayoutId=this.store.state.sceneBaseLayoutId;
     this.store.state.canvasAspect = this.canvasAspect; this.store.state.canvasDimension = this.canvasDimension;
     this.queueReadingTints();this.queueRelief();
-    this.store.save(syncWidgets).catch((e: Error) => { this.error = e.message === '桌面组件同步未完成' ? '桌面同步暂未完成，点此重试' : '保存失败，点此重试'; });
+    this.store.save(syncWidgets).catch((e: Error) => {
+      this.error=e.message==='桌面组件同步未完成'?'桌面同步未完成':'保存未完成：'+e.message;
+      if(this.alive&&Date.now()-this.saveErrorNoticeAt>3500){this.saveErrorNoticeAt=Date.now();this.templateError(e.message==='桌面组件同步未完成'?'桌面同步未完成':'当前画布保存未完成',e);}
+    });
     this.refreshGalleryDocument();
     this.scheduleGalleryWarm();
   }

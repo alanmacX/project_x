@@ -1,4 +1,4 @@
-import { getLibraryPreferences } from '../model/LibraryStorage';
+import { getLibraryPreferences, LibraryPreferences } from '../model/LibraryStorage';
 import { projectCapabilityData } from '../model/CapabilityProjection';
 import { widgetRefreshDigest } from '../model/WidgetRefreshDigest';
 import { capabilityRenderTick } from '../model/CapabilityClock';
@@ -146,7 +146,7 @@ export default class FridgeFormAbility extends FormExtensionAbility {
       const prefs=await getLibraryPreferences(this.context);const sourceId=original.id===visibleScene.focusId?visibleScene.focusSourceId||canvasId:canvasId;const raw=await prefs.get(canvasKey(sourceId),'') as string;
       const originalState=raw?normalizeState(JSON.parse(raw) as FridgeState):await this.loadState(formId);const stored=originalState.cards.find(c=>c.id===original.id);
       if(!stored?.capability||capabilityRequestKey(stored.capability)!==key||(stored.capability.attemptedAt??0)!==attempted)continue;
-      stored.capability=mergeCapabilityResult(stored.capability,next);await this.saveState(originalState);changed=true;
+      stored.capability=mergeCapabilityResult(stored.capability,next);await prefs.put(canvasKey(originalState.canvasId),JSON.stringify(originalState));await prefs.flush();changed=true;
     }
     return changed;
   }
@@ -172,20 +172,20 @@ export default class FridgeFormAbility extends FormExtensionAbility {
       let state=json?normalizeState(JSON.parse(json) as FridgeState):await this.loadState(formId),card=state.cards.find((item)=>item.id===action.cardId);
       if (card === undefined) return;
       if (!applyCalendarAction(card, action.operation)) return;
-      await this.saveStateAndWidgets(state);
+      await this.saveStateAndWidgets(state,prefs);
     }).catch((e: Error) => hilog.error(0x0000, 'FridgeForm', 'action %{public}s', e.message)).finally(()=>{if(providerPulse)this.providerPulses.delete(formId);});
   }
 
 
 
-  private async saveState(state: FridgeState): Promise<void> {
-    const prefs = await getLibraryPreferences(this.context);
+  private async saveState(state: FridgeState,source:LibraryPreferences|undefined=undefined): Promise<void> {
+    const prefs = source??await getLibraryPreferences(this.context);
     const catalogJson = await prefs.get('fridge_canvases_json','') as string;
     if (catalogJson) await prefs.put(canvasKey(state.canvasId),JSON.stringify(state));
     else await prefs.put(KEY_STATE, JSON.stringify(state)); await prefs.flush();
   }
-  private async saveStateAndWidgets(state: FridgeState): Promise<void> {
-    await this.saveState(state);
+  private async saveStateAndWidgets(state: FridgeState,source:LibraryPreferences|undefined=undefined): Promise<void> {
+    await this.saveState(state,source);
     await pushWidgets(this.context,JSON.stringify(state));
   }
 

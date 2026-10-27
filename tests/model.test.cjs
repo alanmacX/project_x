@@ -281,7 +281,7 @@ function load(name) {
   assert.equal(normalizeState({schemaVersion:2,cards:[custom]}).cards[0].capability, null);
   const store = new FridgeStore(); await store.init({});
   const {CANVAS_CARD_LIMIT,canvasCapacityHint}=load('CanvasCapacity');
-  const boundedStore=new FridgeStore();
+  const boundedStore=new FridgeStore();await assert.rejects(boundedStore.save(false),/尚未成功读取/,'uninitialized defaults must never be saved over a library');
   const batch=Array.from({length:CANVAS_CARD_LIMIT},(_,i)=>Object.assign(new FridgeCard(),{id:'limit_'+i}));
   boundedStore.addCards(batch);const originalZ=boundedStore.state.maxZ;
   assert.throws(()=>boundedStore.addCard(new FridgeCard()),/最多 16/);
@@ -316,7 +316,7 @@ function load(name) {
   store.removeCard(custom.id); await store.save(); const empty = new FridgeStore(); await empty.init({});
   assert.equal(empty.state.cards.length, 0);
   disk.delete('fridge_canvases_json');disk.delete('fridge_canvas_canvas_main');
-  disk.set('fridge_state_json','{broken'); await assert.rejects(new FridgeStore().init({}), /本地卡片数据无法读取/);
+  disk.set('fridge_state_json','{broken'); const damagedStore=new FridgeStore();await assert.rejects(damagedStore.init({}), /本地卡片数据无法读取/);await assert.rejects(damagedStore.save(false),/尚未成功读取/,'failed initialization cannot turn default state into a saved library');
   assert.equal(disk.get('fridge_state_json'),'{broken');
   const photo = new FridgeCard(); photo.id='photo'; photo.paper='#234567'; photo.shape='subject'; photo.cutout='file:///private/subject.png';
   const img = new CanvasElement(); img.id='image'; img.kind='image'; img.src='file:///private/photo.gif'; img.animated=true; photo.elements.push(img);

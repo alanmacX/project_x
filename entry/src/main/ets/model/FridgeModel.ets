@@ -23,6 +23,7 @@ export { FridgeState, FridgeCard, CapBlock, CapType, CanvasElement, ElementBox, 
 
 export class FridgeStore {
   private prefs: LibraryPreferences | null = null;
+  private initialized:boolean=false;
   private context: Context | null = null;
   private saveQueue: Promise<void> = Promise.resolve();
   private sequence: number = 0;
@@ -212,6 +213,7 @@ export class FridgeStore {
   }
   canvasSpecs: Record<string, number> = {};
   async init(context: Context,preferredCanvasId:string=''): Promise<void> {
+    this.initialized=false;
     await this.timetableLibrary?.settled();this.timetableLibrary=null;
     this.context = context;
     await this.saveQueue.catch(() => {});
@@ -238,7 +240,7 @@ export class FridgeStore {
       this.switchCanvas(target); startupMark('storage-read');
       await this.restoreContours(this.state);
       await primeRenderContours(this.state.cards, storageSnapshot(this.state)); startupMark('contours-ready');
-      this.cacheContours().catch(()=>{});
+      this.initialized=true;this.cacheContours().catch(()=>{});
     } catch (e) { throw new Error('本地卡片数据无法读取，已保留原始记录'); }
   }
   private timetableLibrary:TimetableLibrary|null=null;
@@ -289,6 +291,7 @@ export class FridgeStore {
     await this.prefs.put('fridge_canvas_specs_json', JSON.stringify(this.canvasSpecs)); await this.prefs.flush();
   }
   save(syncWidgets: boolean = true): Promise<void> {
+    if(!this.initialized)return Promise.reject(new Error('画布尚未成功读取，已停止保存'));
     const started=Date.now();
     const snapshot = storageSnapshot(this.state), id = this.state.canvasId, catalogJson = JSON.stringify(this.catalog);
     const captured=Date.now();

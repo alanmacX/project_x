@@ -234,7 +234,7 @@ function load(name) {
  disk.clear();
  const legacyStore=new FridgeStore(),legacy=defaultState(),legacyCard=new FridgeCard();
  legacyCard.capability={k:'timetable',semester:'2026-09-07',courses:[{id:'legacy',name:'旧课表',room:'A',day:1,start:'08:00',end:'09:00',firstWeek:1,lastWeek:16,parity:0}]};legacy.cards=[legacyCard];legacy.canvasId='legacy';
- legacyStore.state=defaultState();legacyStore.prefs=prefs;
+ legacyStore.state=defaultState();legacyStore.prefs=prefs;legacyStore.initialized=true; // This fixture injects an already loaded library.
  legacyStore.catalog={version:1,activeId:legacyStore.state.canvasId,canvases:[{id:legacyStore.state.canvasId,name:'Empty'},{id:'broken',name:'Broken'},{id:'legacy',name:'Legacy'}]};
  disk.set(canvasKey('broken'),'{broken');disk.set(canvasKey('legacy'),JSON.stringify(legacy));
  assert.equal((await legacyStore.savedTimetable()).courses[0].name,'旧课表','damaged unrelated canvas cannot hide an intact saved timetable');
