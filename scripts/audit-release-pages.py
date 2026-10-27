@@ -19,7 +19,14 @@ def audit_hap(data, label):
             for token in (f'ets/pages/{name}', f'pages/{name}'):
                 if token.encode() in abc:
                     raise ValueError(f'{label}: experimental page remains in ABC: {name}')
-        manifest = json.loads(hap.read('module.json'))['module']
+        packaged = json.loads(hap.read('module.json'))
+        for capability in ('cloudFileSyncEnabled', 'cloudStructuredDataSyncEnabled'):
+            if packaged['app'].get(capability, False):
+                raise ValueError(f'{label}: unverified cloud capability remains enabled: {capability}')
+        for token in ('ets/model/SystemCloudSync', 'ets/model/CloudSyncFiles', 'ets/views/CloudSyncDialog'):
+            if token.encode() in abc:
+                raise ValueError(f'{label}: experimental cloud coordinator remains linked: {token}')
+        manifest = packaged['module']
         if [a['name'] for a in manifest['abilities']] != ['EntryAbility']:
             raise ValueError(f'{label}: unexpected ability entry')
         if {a['name'] for a in manifest['extensionAbilities']} != {'TemplateShareAbility', 'FridgeFormAbility', 'WidgetConfigAbility'}:

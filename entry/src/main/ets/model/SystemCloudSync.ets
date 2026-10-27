@@ -65,6 +65,7 @@ export class SystemCloudSync {
       const cursor:SyncCursor=old?JSON.parse(old) as SyncCursor:{version:1,device:'d_'+util.generateRandomUUID().replace(/-/g,''),records:[]};
       if(cursor.version!==1||!Array.isArray(cursor.records))throw new Error('同步游标无法读取，未修改本机作品');
       const local:CloudRevision[]=[],all=store.catalog.canvases.concat(store.catalog.scenes);
+      if(cursor.records.some(record=>!record.deleted&&(record.kind==='canvas'||record.kind==='scene')&&!all.some(entry=>entry.id===record.entity)))throw new Error('本地画布目录存在缺项，已停止同步；不能将缺失记录推断为删除');
       onStatus('读取其他设备的修改');const remote=await readCloudRevisions(root);
       onStatus('准备画布和原始素材');
       for(const entry of all){
@@ -75,7 +76,8 @@ export class SystemCloudSync {
       }
       const timetable=await store.savedTimetable();if(timetable)local.push(emptyRecord('shared_timetable','timetable','已保存的课表',JSON.stringify(timetable),[]));
       if(old||store.catalog.sceneRules.length||store.catalog.rotation.enabled||!remote.some(record=>record.entity==='library_policy'&&!record.deleted))local.push(emptyRecord('library_policy','policy','画布定时设置',JSON.stringify({rotation:store.catalog.rotation,sceneRules:store.catalog.sceneRules}),[]));
-      for(const previous of cursor.records)if(!local.some(record=>record.entity===previous.entity))local.push(previous.kind==='archive'?previous:emptyRecord(previous.entity,previous.kind,previous.name,'',[],true));
+      // Missing local data is not an explicit deletion. A future deletion journal must record user intent.
+      for(const previous of cursor.records)if(!local.some(record=>record.entity===previous.entity))local.push(previous);
       const outgoing:CloudRevision[]=[];
       for(const record of local){
         record.digest=revisionDigest(record);const previous=cursor.records.find(item=>item.entity===record.entity);
