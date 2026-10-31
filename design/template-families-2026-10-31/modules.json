@@ -1,0 +1,44 @@
+[
+  {
+    "id": "instrument-4x4",
+    "family": "instrument",
+    "name": "仪表",
+    "dimension": "4*4",
+    "canvas": "canvases/instrument-4x4.fridge"
+  },
+  {
+    "id": "instrument-2x2",
+    "family": "instrument",
+    "name": "仪表",
+    "dimension": "2*2",
+    "canvas": "canvases/instrument-2x2.fridge"
+  },
+  {
+    "id": "paper-4x4",
+    "family": "paper",
+    "name": "纸本",
+    "dimension": "4*4",
+    "canvas": "canvases/paper-4x4.fridge"
+  },
+  {
+    "id": "paper-2x2",
+    "family": "paper",
+    "name": "纸本",
+    "dimension": "2*2",
+    "canvas": "canvases/paper-2x2.fridge"
+  },
+  {
+    "id": "pop-4x4",
+    "family": "pop",
+    "name": "色块拼贴",
+    "dimension": "4*4",
+    "canvas": "canvases/pop-4x4.fridge"
+  },
+  {
+    "id": "pop-2x2",
+    "family": "pop",
+    "name": "色块拼贴",
+    "dimension": "2*2",
+    "canvas": "canvases/pop-2x2.fridge"
+  }
+]

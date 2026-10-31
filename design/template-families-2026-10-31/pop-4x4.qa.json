@@ -1,0 +1,862 @@
+{
+  "sha256": "e407da9d65b455116c5e2d8db9c39ab604e4bc29d1b6ffbea1a5946c7792a13c",
+  "dimension": "4*4",
+  "tick": "2026-11-02T09:10:00+08:00",
+  "contract": {
+    "models": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+    "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
+    "browserAdapter": "39aaca0185ae7433b9c6921e802bf03c85278a5ddb260837c7a3f9bb0bd2ac65",
+    "nativeViews": "2b66939ac2d027f4f0df0ab906b78fd3926f440bb3eefc5ee90e8e2cb397a726"
+  },
+  "structureValidated": true,
+  "visualReview": "reviewed-browser",
+  "actualFormVerified": false,
+  "checks": [
+    {
+      "mode": "demo",
+      "size": 300,
+      "metrics": [
+        {
+          "id": "time",
+          "minimumCardSize": {
+            "w": 70.4,
+            "h": 41.6
+          },
+          "requestedBox": {
+            "x": 0.08,
+            "y": 0.1,
+            "w": 0.84,
+            "h": 0.8,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.08,
+            "y": 0.1,
+            "w": 0.84,
+            "h": 0.8,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 239.35999999999999,
+          "contentHeight": 76.80000000000001,
+          "compact": false,
+          "contentScale": 1.324137931034483,
+          "readableMinimum": {
+            "w": 112,
+            "h": 58
+          },
+          "fits": true
+        },
+        {
+          "id": "date",
+          "minimumCardSize": {
+            "w": 67.2,
+            "h": 54.400000000000006
+          },
+          "requestedBox": {
+            "x": 0.2,
+            "y": 0.23,
+            "w": 0.6,
+            "h": 0.54,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.2,
+            "y": 0.23,
+            "w": 0.6,
+            "h": 0.54,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 101.6,
+          "contentHeight": 83.36000000000001,
+          "compact": true,
+          "contentScale": 1.5875,
+          "readableMinimum": {
+            "w": 64,
+            "h": 48
+          },
+          "fits": true
+        },
+        {
+          "id": "power",
+          "minimumCardSize": {
+            "w": 67.2,
+            "h": 60.800000000000004
+          },
+          "requestedBox": {
+            "x": 0.13,
+            "y": 0.13,
+            "w": 0.74,
+            "h": 0.74,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.13,
+            "y": 0.13,
+            "w": 0.74,
+            "h": 0.74,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 66.88,
+          "contentHeight": 66.88,
+          "compact": true,
+          "contentScale": 1.045,
+          "readableMinimum": {
+            "w": 64,
+            "h": 56
+          },
+          "fits": true
+        }
+      ],
+      "report": {
+        "previewVersion": 2,
+        "adapter": "browser-svg-v2",
+        "sourceFingerprint": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+        "designContract": {
+          "contractVersion": 1,
+          "skillContractVersion": 8,
+          "identity": {
+            "models": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+            "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
+            "browserAdapter": "39aaca0185ae7433b9c6921e802bf03c85278a5ddb260837c7a3f9bb0bd2ac65",
+            "nativeViews": "2b66939ac2d027f4f0df0ab906b78fd3926f440bb3eefc5ee90e8e2cb397a726"
+          },
+          "appVersion": "1.2.0"
+        },
+        "packageVersion": 1,
+        "schemaVersion": 2,
+        "width": 300,
+        "height": 300,
+        "tick": 1793581800000,
+        "timeZone": "Asia/Shanghai",
+        "cards": 3,
+        "previewData": {
+          "mode": "demo",
+          "synthetic": true,
+          "appliedCards": [
+            "power"
+          ],
+          "portablePackageUnchanged": true
+        },
+        "status": "ready-for-review",
+        "issues": [],
+        "actualFormVerified": false,
+        "pixelParityVerified": false
+      }
+    },
+    {
+      "mode": "demo",
+      "size": 420,
+      "metrics": [
+        {
+          "id": "time",
+          "minimumCardSize": {
+            "w": 70.4,
+            "h": 41.6
+          },
+          "requestedBox": {
+            "x": 0.08,
+            "y": 0.1,
+            "w": 0.84,
+            "h": 0.8,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.08,
+            "y": 0.1,
+            "w": 0.84,
+            "h": 0.8,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 239.35999999999999,
+          "contentHeight": 76.80000000000001,
+          "compact": false,
+          "contentScale": 1.324137931034483,
+          "readableMinimum": {
+            "w": 112,
+            "h": 58
+          },
+          "fits": true
+        },
+        {
+          "id": "date",
+          "minimumCardSize": {
+            "w": 67.2,
+            "h": 54.400000000000006
+          },
+          "requestedBox": {
+            "x": 0.2,
+            "y": 0.23,
+            "w": 0.6,
+            "h": 0.54,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.2,
+            "y": 0.23,
+            "w": 0.6,
+            "h": 0.54,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 101.6,
+          "contentHeight": 83.36000000000001,
+          "compact": true,
+          "contentScale": 1.5875,
+          "readableMinimum": {
+            "w": 64,
+            "h": 48
+          },
+          "fits": true
+        },
+        {
+          "id": "power",
+          "minimumCardSize": {
+            "w": 67.2,
+            "h": 60.800000000000004
+          },
+          "requestedBox": {
+            "x": 0.13,
+            "y": 0.13,
+            "w": 0.74,
+            "h": 0.74,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.13,
+            "y": 0.13,
+            "w": 0.74,
+            "h": 0.74,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 66.88,
+          "contentHeight": 66.88,
+          "compact": true,
+          "contentScale": 1.045,
+          "readableMinimum": {
+            "w": 64,
+            "h": 56
+          },
+          "fits": true
+        }
+      ],
+      "report": {
+        "previewVersion": 2,
+        "adapter": "browser-svg-v2",
+        "sourceFingerprint": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+        "designContract": {
+          "contractVersion": 1,
+          "skillContractVersion": 8,
+          "identity": {
+            "models": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+            "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
+            "browserAdapter": "39aaca0185ae7433b9c6921e802bf03c85278a5ddb260837c7a3f9bb0bd2ac65",
+            "nativeViews": "2b66939ac2d027f4f0df0ab906b78fd3926f440bb3eefc5ee90e8e2cb397a726"
+          },
+          "appVersion": "1.2.0"
+        },
+        "packageVersion": 1,
+        "schemaVersion": 2,
+        "width": 420,
+        "height": 420,
+        "tick": 1793581800000,
+        "timeZone": "Asia/Shanghai",
+        "cards": 3,
+        "previewData": {
+          "mode": "demo",
+          "synthetic": true,
+          "appliedCards": [
+            "power"
+          ],
+          "portablePackageUnchanged": true
+        },
+        "status": "ready-for-review",
+        "issues": [],
+        "actualFormVerified": false,
+        "pixelParityVerified": false
+      }
+    },
+    {
+      "mode": "empty",
+      "size": 300,
+      "metrics": [
+        {
+          "id": "time",
+          "minimumCardSize": {
+            "w": 70.4,
+            "h": 41.6
+          },
+          "requestedBox": {
+            "x": 0.08,
+            "y": 0.1,
+            "w": 0.84,
+            "h": 0.8,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.08,
+            "y": 0.1,
+            "w": 0.84,
+            "h": 0.8,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 239.35999999999999,
+          "contentHeight": 76.80000000000001,
+          "compact": false,
+          "contentScale": 1.324137931034483,
+          "readableMinimum": {
+            "w": 112,
+            "h": 58
+          },
+          "fits": true
+        },
+        {
+          "id": "date",
+          "minimumCardSize": {
+            "w": 67.2,
+            "h": 54.400000000000006
+          },
+          "requestedBox": {
+            "x": 0.2,
+            "y": 0.23,
+            "w": 0.6,
+            "h": 0.54,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.2,
+            "y": 0.23,
+            "w": 0.6,
+            "h": 0.54,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 101.6,
+          "contentHeight": 83.36000000000001,
+          "compact": true,
+          "contentScale": 1.5875,
+          "readableMinimum": {
+            "w": 64,
+            "h": 48
+          },
+          "fits": true
+        },
+        {
+          "id": "power",
+          "minimumCardSize": {
+            "w": 67.2,
+            "h": 60.800000000000004
+          },
+          "requestedBox": {
+            "x": 0.13,
+            "y": 0.13,
+            "w": 0.74,
+            "h": 0.74,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.13,
+            "y": 0.13,
+            "w": 0.74,
+            "h": 0.74,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 66.88,
+          "contentHeight": 66.88,
+          "compact": true,
+          "contentScale": 1.045,
+          "readableMinimum": {
+            "w": 64,
+            "h": 56
+          },
+          "fits": true
+        }
+      ],
+      "report": {
+        "previewVersion": 2,
+        "adapter": "browser-svg-v2",
+        "sourceFingerprint": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+        "designContract": {
+          "contractVersion": 1,
+          "skillContractVersion": 8,
+          "identity": {
+            "models": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+            "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
+            "browserAdapter": "39aaca0185ae7433b9c6921e802bf03c85278a5ddb260837c7a3f9bb0bd2ac65",
+            "nativeViews": "2b66939ac2d027f4f0df0ab906b78fd3926f440bb3eefc5ee90e8e2cb397a726"
+          },
+          "appVersion": "1.2.0"
+        },
+        "packageVersion": 1,
+        "schemaVersion": 2,
+        "width": 300,
+        "height": 300,
+        "tick": 1793581800000,
+        "timeZone": "Asia/Shanghai",
+        "cards": 3,
+        "previewData": {
+          "mode": "empty",
+          "synthetic": true,
+          "appliedCards": [
+            "power"
+          ],
+          "portablePackageUnchanged": true
+        },
+        "status": "ready-for-review",
+        "issues": [],
+        "actualFormVerified": false,
+        "pixelParityVerified": false
+      }
+    },
+    {
+      "mode": "empty",
+      "size": 420,
+      "metrics": [
+        {
+          "id": "time",
+          "minimumCardSize": {
+            "w": 70.4,
+            "h": 41.6
+          },
+          "requestedBox": {
+            "x": 0.08,
+            "y": 0.1,
+            "w": 0.84,
+            "h": 0.8,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.08,
+            "y": 0.1,
+            "w": 0.84,
+            "h": 0.8,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 239.35999999999999,
+          "contentHeight": 76.80000000000001,
+          "compact": false,
+          "contentScale": 1.324137931034483,
+          "readableMinimum": {
+            "w": 112,
+            "h": 58
+          },
+          "fits": true
+        },
+        {
+          "id": "date",
+          "minimumCardSize": {
+            "w": 67.2,
+            "h": 54.400000000000006
+          },
+          "requestedBox": {
+            "x": 0.2,
+            "y": 0.23,
+            "w": 0.6,
+            "h": 0.54,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.2,
+            "y": 0.23,
+            "w": 0.6,
+            "h": 0.54,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 101.6,
+          "contentHeight": 83.36000000000001,
+          "compact": true,
+          "contentScale": 1.5875,
+          "readableMinimum": {
+            "w": 64,
+            "h": 48
+          },
+          "fits": true
+        },
+        {
+          "id": "power",
+          "minimumCardSize": {
+            "w": 67.2,
+            "h": 60.800000000000004
+          },
+          "requestedBox": {
+            "x": 0.13,
+            "y": 0.13,
+            "w": 0.74,
+            "h": 0.74,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.13,
+            "y": 0.13,
+            "w": 0.74,
+            "h": 0.74,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 66.88,
+          "contentHeight": 66.88,
+          "compact": true,
+          "contentScale": 1.045,
+          "readableMinimum": {
+            "w": 64,
+            "h": 56
+          },
+          "fits": true
+        }
+      ],
+      "report": {
+        "previewVersion": 2,
+        "adapter": "browser-svg-v2",
+        "sourceFingerprint": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+        "designContract": {
+          "contractVersion": 1,
+          "skillContractVersion": 8,
+          "identity": {
+            "models": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+            "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
+            "browserAdapter": "39aaca0185ae7433b9c6921e802bf03c85278a5ddb260837c7a3f9bb0bd2ac65",
+            "nativeViews": "2b66939ac2d027f4f0df0ab906b78fd3926f440bb3eefc5ee90e8e2cb397a726"
+          },
+          "appVersion": "1.2.0"
+        },
+        "packageVersion": 1,
+        "schemaVersion": 2,
+        "width": 420,
+        "height": 420,
+        "tick": 1793581800000,
+        "timeZone": "Asia/Shanghai",
+        "cards": 3,
+        "previewData": {
+          "mode": "empty",
+          "synthetic": true,
+          "appliedCards": [
+            "power"
+          ],
+          "portablePackageUnchanged": true
+        },
+        "status": "ready-for-review",
+        "issues": [],
+        "actualFormVerified": false,
+        "pixelParityVerified": false
+      }
+    },
+    {
+      "mode": "long",
+      "size": 300,
+      "metrics": [
+        {
+          "id": "time",
+          "minimumCardSize": {
+            "w": 70.4,
+            "h": 41.6
+          },
+          "requestedBox": {
+            "x": 0.08,
+            "y": 0.1,
+            "w": 0.84,
+            "h": 0.8,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.08,
+            "y": 0.1,
+            "w": 0.84,
+            "h": 0.8,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 239.35999999999999,
+          "contentHeight": 76.80000000000001,
+          "compact": false,
+          "contentScale": 1.324137931034483,
+          "readableMinimum": {
+            "w": 112,
+            "h": 58
+          },
+          "fits": true
+        },
+        {
+          "id": "date",
+          "minimumCardSize": {
+            "w": 67.2,
+            "h": 54.400000000000006
+          },
+          "requestedBox": {
+            "x": 0.2,
+            "y": 0.23,
+            "w": 0.6,
+            "h": 0.54,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.2,
+            "y": 0.23,
+            "w": 0.6,
+            "h": 0.54,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 101.6,
+          "contentHeight": 83.36000000000001,
+          "compact": true,
+          "contentScale": 1.5875,
+          "readableMinimum": {
+            "w": 64,
+            "h": 48
+          },
+          "fits": true
+        },
+        {
+          "id": "power",
+          "minimumCardSize": {
+            "w": 67.2,
+            "h": 60.800000000000004
+          },
+          "requestedBox": {
+            "x": 0.13,
+            "y": 0.13,
+            "w": 0.74,
+            "h": 0.74,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.13,
+            "y": 0.13,
+            "w": 0.74,
+            "h": 0.74,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 66.88,
+          "contentHeight": 66.88,
+          "compact": true,
+          "contentScale": 1.045,
+          "readableMinimum": {
+            "w": 64,
+            "h": 56
+          },
+          "fits": true
+        }
+      ],
+      "report": {
+        "previewVersion": 2,
+        "adapter": "browser-svg-v2",
+        "sourceFingerprint": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+        "designContract": {
+          "contractVersion": 1,
+          "skillContractVersion": 8,
+          "identity": {
+            "models": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+            "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
+            "browserAdapter": "39aaca0185ae7433b9c6921e802bf03c85278a5ddb260837c7a3f9bb0bd2ac65",
+            "nativeViews": "2b66939ac2d027f4f0df0ab906b78fd3926f440bb3eefc5ee90e8e2cb397a726"
+          },
+          "appVersion": "1.2.0"
+        },
+        "packageVersion": 1,
+        "schemaVersion": 2,
+        "width": 300,
+        "height": 300,
+        "tick": 1793581800000,
+        "timeZone": "Asia/Shanghai",
+        "cards": 3,
+        "previewData": {
+          "mode": "long",
+          "synthetic": true,
+          "appliedCards": [
+            "power"
+          ],
+          "portablePackageUnchanged": true
+        },
+        "status": "ready-for-review",
+        "issues": [],
+        "actualFormVerified": false,
+        "pixelParityVerified": false
+      }
+    },
+    {
+      "mode": "long",
+      "size": 420,
+      "metrics": [
+        {
+          "id": "time",
+          "minimumCardSize": {
+            "w": 70.4,
+            "h": 41.6
+          },
+          "requestedBox": {
+            "x": 0.08,
+            "y": 0.1,
+            "w": 0.84,
+            "h": 0.8,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.08,
+            "y": 0.1,
+            "w": 0.84,
+            "h": 0.8,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 239.35999999999999,
+          "contentHeight": 76.80000000000001,
+          "compact": false,
+          "contentScale": 1.324137931034483,
+          "readableMinimum": {
+            "w": 112,
+            "h": 58
+          },
+          "fits": true
+        },
+        {
+          "id": "date",
+          "minimumCardSize": {
+            "w": 67.2,
+            "h": 54.400000000000006
+          },
+          "requestedBox": {
+            "x": 0.2,
+            "y": 0.23,
+            "w": 0.6,
+            "h": 0.54,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.2,
+            "y": 0.23,
+            "w": 0.6,
+            "h": 0.54,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 101.6,
+          "contentHeight": 83.36000000000001,
+          "compact": true,
+          "contentScale": 1.5875,
+          "readableMinimum": {
+            "w": 64,
+            "h": 48
+          },
+          "fits": true
+        },
+        {
+          "id": "power",
+          "minimumCardSize": {
+            "w": 67.2,
+            "h": 60.800000000000004
+          },
+          "requestedBox": {
+            "x": 0.13,
+            "y": 0.13,
+            "w": 0.74,
+            "h": 0.74,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.13,
+            "y": 0.13,
+            "w": 0.74,
+            "h": 0.74,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 66.88,
+          "contentHeight": 66.88,
+          "compact": true,
+          "contentScale": 1.045,
+          "readableMinimum": {
+            "w": 64,
+            "h": 56
+          },
+          "fits": true
+        }
+      ],
+      "report": {
+        "previewVersion": 2,
+        "adapter": "browser-svg-v2",
+        "sourceFingerprint": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+        "designContract": {
+          "contractVersion": 1,
+          "skillContractVersion": 8,
+          "identity": {
+            "models": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+            "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
+            "browserAdapter": "39aaca0185ae7433b9c6921e802bf03c85278a5ddb260837c7a3f9bb0bd2ac65",
+            "nativeViews": "2b66939ac2d027f4f0df0ab906b78fd3926f440bb3eefc5ee90e8e2cb397a726"
+          },
+          "appVersion": "1.2.0"
+        },
+        "packageVersion": 1,
+        "schemaVersion": 2,
+        "width": 420,
+        "height": 420,
+        "tick": 1793581800000,
+        "timeZone": "Asia/Shanghai",
+        "cards": 3,
+        "previewData": {
+          "mode": "long",
+          "synthetic": true,
+          "appliedCards": [
+            "power"
+          ],
+          "portablePackageUnchanged": true
+        },
+        "status": "ready-for-review",
+        "issues": [],
+        "actualFormVerified": false,
+        "pixelParityVerified": false
+      }
+    }
+  ],
+  "mediaCheck": {
+    "passed": true,
+    "cutouts": [
+      {
+        "card": "date",
+        "role": "subject",
+        "key": "asset://0",
+        "width": 640,
+        "height": 640,
+        "transparentPixels": 139682,
+        "visiblePixels": 269918,
+        "partialPixels": 2699,
+        "sha256": "d9b96727bc22fc6511f22d03b6d10eb003640ae7fa7109f9c2c26ccf0b63022e"
+      }
+    ],
+    "errors": []
+  },
+  "visualEvidence": [
+    "qa-contact.png",
+    "overview.png",
+    "mobile.png",
+    "mobile-long.png"
+  ],
+  "visualNotes": "Reviewed all six designs in demo/empty/long contact sheet, representative full-size images, desktop and narrow prototype. Native/Form verification not performed."
+}

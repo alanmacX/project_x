@@ -1,0 +1,21 @@
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),cp=require('node:child_process');
+const pw=require(process.env.FRIDGE_PLAYWRIGHT||path.resolve(__dirname,'../../../parcel-prototype/node_modules/playwright'));
+(async()=>{const b=await pw.chromium.launch({channel:'chrome',headless:true});try{
+ const context=await b.newContext({viewport:{width:1140,height:1180},timezoneId:'Asia/Shanghai'}),p=await context.newPage(),errors=[];p.on('pageerror',e=>errors.push(e.message));
+ await p.goto('http://127.0.0.1:8766/design/template-families-2026-10-31/');await p.waitForSelector('.stage svg');await p.evaluate(()=>Promise.all([...document.images].map(i=>i.decode())));
+ await p.screenshot({path:path.join(__dirname,'overview.png'),fullPage:true});
+ let checks=0;for(const f of ['instrument','paper','pop'])for(const size of ['4*4','2*2']){await p.locator(`[data-family="${f}"]`).click();await p.selectOption('#size',size);await p.waitForFunction(({f,size})=>!!drafts.get(f+'-'+size.replace('*','x')),{f,size});
+  for(const content of ['clock','worldclock']){await p.selectOption('#content',content);for(const mode of ['demo','empty','long']){await p.selectOption('#data',mode);const metrics=await p.evaluate(()=>{const pack=drafts.get(key()),projected=FridgePreviewData.project(pack,FridgePreviewData.profile(pack,tick,$('data').value)).pack;return projected.state.cards.map(FridgeReadouts.inspectCard);});assert.ok(!metrics.some(m=>m.fits===false),JSON.stringify({f,size,content,mode,metrics}));checks++;}}
+ }
+ await p.locator('[data-family="instrument"]').click();await p.selectOption('#size','4*4');await p.selectOption('#content','clock');await p.selectOption('#data','demo');await p.locator('#mode').click();
+ const before=await p.evaluate(()=>structuredClone(drafts.get(key()).state.cards.find(c=>c.id==='time'))),rect=await p.locator('.stage [data-fridge-card="time"]').boundingBox();
+ await p.mouse.move(rect.x+rect.width/2,rect.y+rect.height/2);await p.mouse.down();await p.mouse.move(rect.x+rect.width/2+8,rect.y+rect.height/2+14,{steps:3});await p.mouse.up();
+ const moved=await p.evaluate(()=>structuredClone(drafts.get(key()).state.cards.find(c=>c.id==='time')));assert.notEqual(before.y,moved.y);
+ await p.selectOption('#palette','alternate');const themed=await p.evaluate(()=>structuredClone(drafts.get(key()).state.cards.find(c=>c.id==='time')));assert.equal(themed.x,moved.x);assert.equal(themed.y,moved.y);assert.notEqual(themed.ink,moved.ink);
+ await p.locator('#undo').click();const undone=await p.evaluate(()=>structuredClone(drafts.get(key()).state.cards.find(c=>c.id==='time')));assert.equal(undone.ink,moved.ink);assert.equal(undone.y,moved.y);
+ const downloadPromise=p.waitForEvent('download');await p.locator('#download').click();const download=await downloadPromise,tmp=path.join(__dirname,'export-check.fridge');await download.saveAs(tmp);cp.execFileSync('node',[path.resolve(__dirname,'../../scripts/fridge-package-check.cjs'),tmp],{stdio:'pipe'});const exported=JSON.parse(fs.readFileSync(tmp));assert.equal(exported.assetDimensions,undefined);assert.equal(exported.state.cards.find(c=>c.id==='power').capability.percent,-1);fs.unlinkSync(tmp);
+ await p.locator('#undo').click();assert.equal(await p.evaluate(()=>drafts.get(key()).state.cards.find(c=>c.id==='time').y),before.y);
+ await p.locator('#mode').click();await p.setViewportSize({width:390,height:844});await p.screenshot({path:path.join(__dirname,'mobile.png')});assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ await p.locator('[data-family="paper"]').click();await p.locator('.stage').scrollIntoViewIfNeeded();await p.selectOption('#data','long');await p.screenshot({path:path.join(__dirname,'mobile-long.png')});assert.equal(errors.length,0,errors.join('\n'));
+ fs.writeFileSync(path.join(__dirname,'prototype-qa.json'),JSON.stringify({at:new Date().toISOString(),capabilityChecks:checks,browserErrors:errors,drag:true,palettePreservesPosition:true,undo:true,exportReader:true,privateFixtureExcluded:true,narrowOverflow:false,actualFormVerified:false},null,2)+'\n');console.log('PASS prototype: '+checks+' combinations; drag / palette / undo / export / narrow viewport');
+ }finally{await b.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
