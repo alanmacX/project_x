@@ -4,6 +4,10 @@ Read this for a themed or visually ambitious canvas. The native example demonstr
 
 ## Start from the user's world
 
+### Single-capability presets
+
+When the user asks for a capability/card template, author one ordinary `kind:card` package with one capability. Start from a finished, distinctive card appearance that the user could recreate with the same editor: shape, material, element layers, ink and capability box. Do not substitute a whole-canvas dashboard or fixed arrangement of several capabilities. Multiple looks for the same capability are useful. Materials may be supplied as importable image layers; preserve their sources and keep live data native. Template-only hidden renderer branches, flattened readouts and invented fields defeat the editable-preset premise.
+
 Identify what makes the theme recognizable beyond its name: silhouette, object/material, composition, typography, color relationship, imagery or a distinctive recurring motif. Research factual themes using primary sources before depicting characters or quoting text. Choose a coherent visual thesis and translate it into the canvas rather than reproducing a generic dashboard with theme labels.
 
 For open-ended requests, briefly explore competing directions in your working notes, then develop the strongest. A game fan might want a collected desktop of artifacts, a cinematic subject with floating data, or an editorial cover with a restrained utility strip. These are possibilities, not required presets. Let a visual anchor earn its space; remove decorative pieces that only repeat the theme. Preserve useful information and the user's editing freedom.

@@ -1,0 +1,80 @@
+{
+  "at": "2026-10-31T08:06:04.519Z",
+  "checks": [
+    {
+      "id": "clock-lcd",
+      "singleCapability": true,
+      "editableElementsAndMaterials": true,
+      "layerToggles": true,
+      "materialOpacity": true,
+      "colors": true,
+      "capabilityPosition": true,
+      "exportReader": true,
+      "fixtureExcluded": true,
+      "reset": true
+    },
+    {
+      "id": "clock-record",
+      "singleCapability": true,
+      "editableElementsAndMaterials": true,
+      "layerToggles": true,
+      "materialOpacity": true,
+      "colors": true,
+      "capabilityPosition": true,
+      "exportReader": true,
+      "fixtureExcluded": true,
+      "reset": true
+    },
+    {
+      "id": "clock-signal",
+      "singleCapability": true,
+      "editableElementsAndMaterials": true,
+      "layerToggles": true,
+      "materialOpacity": true,
+      "colors": true,
+      "capabilityPosition": true,
+      "exportReader": true,
+      "fixtureExcluded": true,
+      "reset": true
+    },
+    {
+      "id": "date-leaf",
+      "singleCapability": true,
+      "editableElementsAndMaterials": true,
+      "layerToggles": true,
+      "materialOpacity": true,
+      "colors": true,
+      "capabilityPosition": true,
+      "exportReader": true,
+      "fixtureExcluded": true,
+      "reset": true
+    },
+    {
+      "id": "countdown-pass",
+      "singleCapability": true,
+      "editableElementsAndMaterials": true,
+      "layerToggles": true,
+      "materialOpacity": true,
+      "colors": true,
+      "capabilityPosition": true,
+      "exportReader": true,
+      "fixtureExcluded": true,
+      "reset": true
+    },
+    {
+      "id": "battery-tag",
+      "singleCapability": true,
+      "editableElementsAndMaterials": true,
+      "layerToggles": true,
+      "materialOpacity": true,
+      "colors": true,
+      "capabilityPosition": true,
+      "exportReader": true,
+      "fixtureExcluded": true,
+      "reset": true
+    }
+  ],
+  "browserErrors": [],
+  "narrowOverflow": false,
+  "actualFormVerified": false
+}

@@ -1,0 +1,123 @@
+{
+  "format": "fridgememo-template",
+  "version": 1,
+  "kind": "card",
+  "state": {
+    "schemaVersion": 2,
+    "canvasId": "canvas_main",
+    "canvasDimension": "2*2",
+    "canvasAspect": 1,
+    "background": {
+      "mode": "transparent",
+      "color": "#E9E5DE",
+      "src": "",
+      "photo": "",
+      "frameStyle": "none",
+      "frameMaterial": "stone",
+      "palette": [],
+      "anchors": [],
+      "signature": ""
+    },
+    "maxZ": 1,
+    "cards": [
+      {
+        "id": "date-leaf",
+        "x": 50,
+        "y": 35.52325581395348,
+        "w": 244,
+        "h": 292,
+        "rot": 0,
+        "z": 1,
+        "shape": "rect",
+        "frame": false,
+        "material": "white",
+        "paper": "#FFF9ED",
+        "ink": "#453F38",
+        "capability": {
+          "k": "date",
+          "readingStyle": "plain",
+          "readingBlend": "bare",
+          "readingOpacity": 0
+        },
+        "capBox": {
+          "x": 0.12,
+          "y": 0.3,
+          "w": 0.76,
+          "h": 0.6,
+          "rot": 0,
+          "opacity": 1
+        },
+        "capFree": true,
+        "elements": [
+          {
+            "id": "red-top",
+            "kind": "shape",
+            "primitive": "rect",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 0.22,
+            "color": "#BC493B",
+            "rot": 0,
+            "opacity": 1,
+            "text": "",
+            "src": "",
+            "fs": 16,
+            "bold": false,
+            "align": "left",
+            "behindCapability": true
+          },
+          {
+            "id": "hole-left",
+            "kind": "shape",
+            "primitive": "circle",
+            "x": 0.24,
+            "y": 0.06,
+            "w": 0.12,
+            "h": 0.1,
+            "color": "#762E2B",
+            "rot": 0,
+            "opacity": 1,
+            "text": "",
+            "src": "",
+            "fs": 16,
+            "bold": false,
+            "align": "left",
+            "behindCapability": true
+          },
+          {
+            "id": "hole-right",
+            "kind": "shape",
+            "primitive": "circle",
+            "x": 0.64,
+            "y": 0.06,
+            "w": 0.12,
+            "h": 0.1,
+            "color": "#762E2B",
+            "rot": 0,
+            "opacity": 1,
+            "text": "",
+            "src": "",
+            "fs": 16,
+            "bold": false,
+            "align": "left",
+            "behindCapability": true
+          }
+        ],
+        "cutout": "",
+        "outline": [],
+        "groupId": "",
+        "subjectPhoto": false,
+        "subjectBorder": true,
+        "subjectAspect": 1,
+        "subjectInk": "#453F38",
+        "subjectVersion": 0,
+        "inDoor": false
+      }
+    ],
+    "sceneLayouts": [],
+    "sceneRules": [],
+    "sceneBaseLayoutId": ""
+  },
+  "assets": []
+}

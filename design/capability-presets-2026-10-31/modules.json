@@ -1,0 +1,91 @@
+[
+  {
+    "id": "clock-lcd",
+    "name": "液晶",
+    "capability": "时钟",
+    "tone": "#DDE2D9",
+    "recipe": [
+      "矩形卡片，浅灰色纸张",
+      "叠放深绿、浅绿两个矩形，做屏幕边框",
+      "时钟放入屏幕区域，深绿色墨色",
+      "底部两条短线作为机身细节"
+    ],
+    "dimension": "2*2",
+    "canvas": "cards/clock-lcd.fridge",
+    "elements": 4
+  },
+  {
+    "id": "clock-record",
+    "name": "唱片",
+    "capability": "时钟",
+    "tone": "#C6B8AC",
+    "recipe": [
+      "圆形深色卡片",
+      "依次叠放大小不同的圆形，画出唱片沟槽",
+      "中心加一张奶油色圆形标签",
+      "时钟放在标签中间"
+    ],
+    "dimension": "2*2",
+    "canvas": "cards/clock-record.fridge",
+    "elements": 5
+  },
+  {
+    "id": "clock-signal",
+    "name": "信号",
+    "capability": "时钟",
+    "tone": "#D9DAE1",
+    "recipe": [
+      "横向椭圆卡片，深蓝纸张",
+      "左侧添加三条斜线，调成荧光黄",
+      "把时钟移到右侧，使用浅色墨色"
+    ],
+    "dimension": "2*2",
+    "canvas": "cards/clock-signal.fridge",
+    "elements": 3
+  },
+  {
+    "id": "date-leaf",
+    "name": "日历纸",
+    "capability": "日期",
+    "tone": "#D9CFBC",
+    "recipe": [
+      "竖向白色矩形卡片",
+      "顶部铺红色矩形",
+      "添加两个深色小圆作为装订孔",
+      "日期能力放在下方，保留原生月份与星期"
+    ],
+    "dimension": "2*2",
+    "canvas": "cards/date-leaf.fridge",
+    "elements": 3
+  },
+  {
+    "id": "countdown-pass",
+    "name": "倒计票",
+    "capability": "倒计日",
+    "tone": "#E1D9C9",
+    "recipe": [
+      "横向浅色矩形卡片",
+      "右侧叠放一条橘红色矩形",
+      "沿竖向放五个圆形作为票据纹样",
+      "倒计日放在左边，标题、天数和日期由能力提供"
+    ],
+    "dimension": "2*2",
+    "canvas": "cards/countdown-pass.fridge",
+    "elements": 6
+  },
+  {
+    "id": "battery-tag",
+    "name": "电量吊牌",
+    "capability": "电量",
+    "tone": "#C4D2D8",
+    "recipe": [
+      "窄长椭圆卡片，亮黄色纸张",
+      "顶部叠放深色、浅色两个圆形形成环形装饰",
+      "电量能力移到下半部，使用深蓝墨色",
+      "纸张、装饰和电量位置都可单独改"
+    ],
+    "dimension": "2*2",
+    "canvas": "cards/battery-tag.fridge",
+    "elements": 2
+  }
+]

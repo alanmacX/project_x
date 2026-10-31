@@ -1,0 +1,123 @@
+{
+  "format": "fridgememo-template",
+  "version": 1,
+  "kind": "card",
+  "state": {
+    "schemaVersion": 2,
+    "canvasId": "canvas_main",
+    "canvasDimension": "2*2",
+    "canvasAspect": 1,
+    "background": {
+      "mode": "transparent",
+      "color": "#E9E5DE",
+      "src": "",
+      "photo": "",
+      "frameStyle": "none",
+      "frameMaterial": "stone",
+      "palette": [],
+      "anchors": [],
+      "signature": ""
+    },
+    "maxZ": 1,
+    "cards": [
+      {
+        "id": "clock-signal",
+        "x": 18,
+        "y": 132.52906976744185,
+        "w": 308,
+        "h": 150,
+        "rot": 0,
+        "z": 1,
+        "shape": "round",
+        "frame": false,
+        "material": "white",
+        "paper": "#273B9B",
+        "ink": "#F4F4EB",
+        "capability": {
+          "k": "clock",
+          "readingStyle": "plain",
+          "readingBlend": "bare",
+          "readingOpacity": 0
+        },
+        "capBox": {
+          "x": 0.245,
+          "y": 0.19,
+          "w": 0.655,
+          "h": 0.62,
+          "rot": 0,
+          "opacity": 1
+        },
+        "capFree": true,
+        "elements": [
+          {
+            "id": "mark-1",
+            "kind": "shape",
+            "primitive": "line",
+            "x": 0.11,
+            "y": 0.32,
+            "w": 0.1,
+            "h": 0.08,
+            "color": "#DEEF6D",
+            "rot": -48,
+            "opacity": 1,
+            "text": "",
+            "src": "",
+            "fs": 16,
+            "bold": false,
+            "align": "left",
+            "behindCapability": true
+          },
+          {
+            "id": "mark-2",
+            "kind": "shape",
+            "primitive": "line",
+            "x": 0.11,
+            "y": 0.48,
+            "w": 0.1,
+            "h": 0.08,
+            "color": "#DEEF6D",
+            "rot": -48,
+            "opacity": 1,
+            "text": "",
+            "src": "",
+            "fs": 16,
+            "bold": false,
+            "align": "left",
+            "behindCapability": true
+          },
+          {
+            "id": "mark-3",
+            "kind": "shape",
+            "primitive": "line",
+            "x": 0.11,
+            "y": 0.64,
+            "w": 0.1,
+            "h": 0.08,
+            "color": "#DEEF6D",
+            "rot": -48,
+            "opacity": 1,
+            "text": "",
+            "src": "",
+            "fs": 16,
+            "bold": false,
+            "align": "left",
+            "behindCapability": true
+          }
+        ],
+        "cutout": "",
+        "outline": [],
+        "groupId": "",
+        "subjectPhoto": false,
+        "subjectBorder": true,
+        "subjectAspect": 1,
+        "subjectInk": "#F4F4EB",
+        "subjectVersion": 0,
+        "inDoor": false
+      }
+    ],
+    "sceneLayouts": [],
+    "sceneRules": [],
+    "sceneBaseLayoutId": ""
+  },
+  "assets": []
+}

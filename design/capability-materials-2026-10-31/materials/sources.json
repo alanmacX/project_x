@@ -1,0 +1,53 @@
+[
+  {
+    "name": "paper",
+    "prompt": "Use case: photorealistic-natural. Asset type: editable card material texture, not a finished UI. Generate one full-bleed square macro scan of premium warm ivory uncoated paper, soft cotton fibers, fine pressed grain, tiny natural density variations and subtle shallow paper relief. Real tangible stationery material, elegant and pristine, not distressed or dirty. Orthographic perfectly flat front-facing surface, even diffuse raking light making fibers perceptible. All four edges continue the material; no object boundary, no perspective, no drop shadow, no vignette, no text, no digits, no logos, no layout, no borders, no other objects. Empty low-contrast center suitable for live native text added separately. Warm cream palette near #F4E8D0. High quality realistic material, visible physical texture at widget scale.",
+    "tool": "built-in image_gen",
+    "sourceFile": "sources/paper.png",
+    "runtimeFile": "paper.webp",
+    "generatedPath": "/Users/macalan/.codex/generated_images/01a14571-51e7-7dd0-be35-3c5240a7d8d3/exec-e7336621-07c4-4e28-ac44-e51331d745f6.png",
+    "sourceSha256": "62de18e5ba1a6f287fe810a451b5a57ccc39baace7da176310271a7a5a170d23",
+    "runtimeSha256": "a61d142b6436628eca8324bf84f02d6e28dfcbe5f5a8f9d0769198f062782570",
+    "runtimeWidth": 512,
+    "runtimeHeight": 512,
+    "runtimeBytes": 33860,
+    "transforms": [
+      "uniform downsample",
+      "WebP quality 85"
+    ]
+  },
+  {
+    "name": "vinyl",
+    "prompt": "Use case: product-mockup. Asset type: flat material texture for a circular clock card, not a finished clock. A square extreme-close-up orthographic straight-on view of a luxurious deep charcoal black vinyl record surface with very fine concentric pressed grooves centered exactly in image center, nuanced dark silver reflections under broad soft studio light from top left. The vinyl fills every pixel and continues beyond the square edges. Center is also blank black vinyl; NO paper label, NO spindle hole, NO time, NO digits, NO letters, NO hands, NO logos, NO device, NO table, NO outer record boundary, NO cast shadow, NO perspective. Rich tactile realistic black grooves with restrained broad specular modulation, legible dark material rather than bright metallic rings. Designed as a cropable surface texture; native editable cream center label and live time will be overlaid later.",
+    "tool": "built-in image_gen",
+    "sourceFile": "sources/vinyl.png",
+    "runtimeFile": "vinyl.webp",
+    "generatedPath": "/Users/macalan/.codex/generated_images/01a14571-51e7-7dd0-be35-3c5240a7d8d3/exec-991f3182-d845-4fa9-8c18-7408ad22a18b.png",
+    "sourceSha256": "62dcd51629572a8f0e0b7bbbe01de5b5012dcfb270e712481379c9fab5072bb5",
+    "runtimeSha256": "e2696ff274d932315ddacd96d4ff7a7dcc1fb4574ce5a4d61b26c1109c4cb9cb",
+    "runtimeWidth": 768,
+    "runtimeHeight": 768,
+    "runtimeBytes": 108162,
+    "transforms": [
+      "uniform downsample",
+      "WebP quality 85"
+    ]
+  },
+  {
+    "name": "plastic",
+    "prompt": "Use case: product-mockup. Asset type: full-bleed square reusable material texture for editable UI card surfaces. Extreme macro tactile light warm gray injection-molded ABS plastic, refined fine bead-blasted matte grain with extremely subtle pearlescent microhighlights and gentle broad soft grazing light from upper left. A continuous planar surface reaching all image edges, orthographic straight-on flat scan. Visible high-quality physical surface grain at small scale; quiet clean center. No object silhouette, no borders, no device, no buttons, no seams, no embossed text, no letters, no digits, no logo, no watermark, no cast shadow, no perspective, no graphic layout. Neutral warm gray near #C9CCC5, not white. This image will be blended over editable colored shapes, so keep luminance even and texture softly detailed.",
+    "tool": "built-in image_gen",
+    "sourceFile": "sources/plastic.png",
+    "runtimeFile": "plastic.webp",
+    "generatedPath": "/Users/macalan/.codex/generated_images/01a14571-51e7-7dd0-be35-3c5240a7d8d3/exec-1b6ad9be-697e-4cce-a81f-f096afe60195.png",
+    "sourceSha256": "d4891e3632bf08d33915b2f712643b259c51031712363e1d6c80e96734cd040a",
+    "runtimeSha256": "12cbb3037ae1b9c841122f9c7e9744fc067ddf949226f178903eb655a47225b0",
+    "runtimeWidth": 512,
+    "runtimeHeight": 512,
+    "runtimeBytes": 64172,
+    "transforms": [
+      "uniform downsample",
+      "WebP quality 85"
+    ]
+  }
+]

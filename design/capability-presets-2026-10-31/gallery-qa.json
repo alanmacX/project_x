@@ -1,0 +1,74 @@
+{
+  "at": "2026-10-31T08:07:49.405Z",
+  "checks": [
+    {
+      "id": "clock-lcd",
+      "singleCapability": true,
+      "nativeElementsOnly": true,
+      "layerToggles": true,
+      "colors": true,
+      "capabilityPosition": true,
+      "exportReader": true,
+      "fixtureExcluded": true,
+      "reset": true
+    },
+    {
+      "id": "clock-record",
+      "singleCapability": true,
+      "nativeElementsOnly": true,
+      "layerToggles": true,
+      "colors": true,
+      "capabilityPosition": true,
+      "exportReader": true,
+      "fixtureExcluded": true,
+      "reset": true
+    },
+    {
+      "id": "clock-signal",
+      "singleCapability": true,
+      "nativeElementsOnly": true,
+      "layerToggles": true,
+      "colors": true,
+      "capabilityPosition": true,
+      "exportReader": true,
+      "fixtureExcluded": true,
+      "reset": true
+    },
+    {
+      "id": "date-leaf",
+      "singleCapability": true,
+      "nativeElementsOnly": true,
+      "layerToggles": true,
+      "colors": true,
+      "capabilityPosition": true,
+      "exportReader": true,
+      "fixtureExcluded": true,
+      "reset": true
+    },
+    {
+      "id": "countdown-pass",
+      "singleCapability": true,
+      "nativeElementsOnly": true,
+      "layerToggles": true,
+      "colors": true,
+      "capabilityPosition": true,
+      "exportReader": true,
+      "fixtureExcluded": true,
+      "reset": true
+    },
+    {
+      "id": "battery-tag",
+      "singleCapability": true,
+      "nativeElementsOnly": true,
+      "layerToggles": true,
+      "colors": true,
+      "capabilityPosition": true,
+      "exportReader": true,
+      "fixtureExcluded": true,
+      "reset": true
+    }
+  ],
+  "browserErrors": [],
+  "narrowOverflow": false,
+  "actualFormVerified": false
+}

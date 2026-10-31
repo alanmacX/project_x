@@ -1,0 +1,109 @@
+{
+  "format": "fridgememo-template",
+  "version": 1,
+  "kind": "card",
+  "state": {
+    "schemaVersion": 2,
+    "canvasId": "canvas_main",
+    "canvasDimension": "2*2",
+    "canvasAspect": 1,
+    "background": {
+      "mode": "transparent",
+      "color": "#E9E5DE",
+      "src": "",
+      "photo": "",
+      "frameStyle": "none",
+      "frameMaterial": "stone",
+      "palette": [],
+      "anchors": [],
+      "signature": ""
+    },
+    "maxZ": 1,
+    "cards": [
+      {
+        "id": "battery-tag",
+        "x": 89,
+        "y": 30.058139534883722,
+        "w": 166,
+        "h": 300,
+        "rot": 0,
+        "z": 1,
+        "shape": "round",
+        "frame": false,
+        "material": "white",
+        "paper": "#F1CE58",
+        "ink": "#30495A",
+        "capability": {
+          "k": "battery",
+          "percent": -1,
+          "charging": false,
+          "updatedAt": 0,
+          "attemptedAt": 0,
+          "readingStyle": "plain",
+          "readingBlend": "bare",
+          "readingOpacity": 0
+        },
+        "capBox": {
+          "x": 0.12,
+          "y": 0.33,
+          "w": 0.76,
+          "h": 0.53,
+          "rot": 0,
+          "opacity": 1
+        },
+        "capFree": true,
+        "elements": [
+          {
+            "id": "eye-edge",
+            "kind": "shape",
+            "primitive": "circle",
+            "x": 0.31,
+            "y": 0.075,
+            "w": 0.38,
+            "h": 0.21,
+            "color": "#A88931",
+            "rot": 0,
+            "opacity": 1,
+            "text": "",
+            "src": "",
+            "fs": 16,
+            "bold": false,
+            "align": "left",
+            "behindCapability": true
+          },
+          {
+            "id": "eye-centre",
+            "kind": "shape",
+            "primitive": "circle",
+            "x": 0.365,
+            "y": 0.105,
+            "w": 0.27,
+            "h": 0.15,
+            "color": "#E9DDAC",
+            "rot": 0,
+            "opacity": 1,
+            "text": "",
+            "src": "",
+            "fs": 16,
+            "bold": false,
+            "align": "left",
+            "behindCapability": true
+          }
+        ],
+        "cutout": "",
+        "outline": [],
+        "groupId": "",
+        "subjectPhoto": false,
+        "subjectBorder": true,
+        "subjectAspect": 1,
+        "subjectInk": "#30495A",
+        "subjectVersion": 0,
+        "inDoor": false
+      }
+    ],
+    "sceneLayouts": [],
+    "sceneRules": [],
+    "sceneBaseLayoutId": ""
+  },
+  "assets": []
+}

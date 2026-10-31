@@ -1,0 +1,101 @@
+[
+  {
+    "id": "clock-lcd",
+    "name": "液晶",
+    "capability": "时钟",
+    "tone": "#DDE2D9",
+    "recipe": [
+      "浅灰矩形卡片上叠一层磨砂材质，调透明度",
+      "深浅绿色矩形组成液晶屏幕边框",
+      "屏幕再叠一层低透明度细纹",
+      "时钟仍用原生能力，放在屏幕中央"
+    ],
+    "dimension": "2*2",
+    "canvas": "cards/clock-lcd.fridge",
+    "elements": 6,
+    "assetBytes": 64172
+  },
+  {
+    "id": "clock-record",
+    "name": "唱片",
+    "capability": "时钟",
+    "tone": "#C6B8AC",
+    "recipe": [
+      "圆形深色卡片",
+      "添加黑胶材质图片，铺满卡片",
+      "中心叠奶油色圆形标签",
+      "把原生时钟放入标签，独立调整位置"
+    ],
+    "dimension": "2*2",
+    "canvas": "cards/clock-record.fridge",
+    "elements": 2,
+    "assetBytes": 108162
+  },
+  {
+    "id": "clock-signal",
+    "name": "信号",
+    "capability": "时钟",
+    "tone": "#D9DAE1",
+    "recipe": [
+      "蓝色纸张上叠低透明度磨砂材质",
+      "横向椭圆卡片，深蓝纸张",
+      "左侧添加三条斜线，调成荧光黄",
+      "把时钟移到右侧，使用浅色墨色"
+    ],
+    "dimension": "2*2",
+    "canvas": "cards/clock-signal.fridge",
+    "elements": 4,
+    "assetBytes": 64172
+  },
+  {
+    "id": "date-leaf",
+    "name": "日历纸",
+    "capability": "日期",
+    "tone": "#D9CFBC",
+    "recipe": [
+      "白色卡片上叠一层纸纤维图片",
+      "竖向白色矩形卡片",
+      "顶部铺红色矩形",
+      "添加两个深色小圆作为装订孔",
+      "日期能力放在下方，保留原生月份与星期"
+    ],
+    "dimension": "2*2",
+    "canvas": "cards/date-leaf.fridge",
+    "elements": 4,
+    "assetBytes": 33860
+  },
+  {
+    "id": "countdown-pass",
+    "name": "倒计票",
+    "capability": "倒计日",
+    "tone": "#E1D9C9",
+    "recipe": [
+      "橘红、浅色图形上叠纸纤维，形成印刷纸感",
+      "横向浅色矩形卡片",
+      "右侧叠放一条橘红色矩形",
+      "沿竖向放五个圆形作为票据纹样",
+      "倒计日放在左边，标题、天数和日期由能力提供"
+    ],
+    "dimension": "2*2",
+    "canvas": "cards/countdown-pass.fridge",
+    "elements": 7,
+    "assetBytes": 33860
+  },
+  {
+    "id": "battery-tag",
+    "name": "电量吊牌",
+    "capability": "电量",
+    "tone": "#C4D2D8",
+    "recipe": [
+      "黄色卡片上叠低透明度磨砂材质",
+      "窄长椭圆卡片，亮黄色纸张",
+      "顶部叠放深色、浅色两个圆形形成环形装饰",
+      "电量能力移到下半部，使用深蓝墨色",
+      "纸张、装饰和电量位置都可单独改"
+    ],
+    "dimension": "2*2",
+    "canvas": "cards/battery-tag.fridge",
+    "elements": 3,
+    "assetBytes": 64172
+  }
+]
