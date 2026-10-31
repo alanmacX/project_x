@@ -1,9 +1,9 @@
 {
-  "at": "2026-10-31T17:38:33.971Z",
-  "templates": 45,
-  "singleCards": 40,
+  "at": "2026-10-31T17:54:29.006Z",
+  "templates": 44,
+  "singleCards": 39,
   "ensembles": 5,
-  "renderedStates": 405,
+  "renderedStates": 396,
   "sizes": [
     180,
     300,
@@ -27,7 +27,7 @@
   },
   "hostFrame": "actual FridgeWeb renderer, production shared-materials",
   "nativeAppModified": false,
-  "paletteLayers": 3,
+  "paletteLayers": 2,
   "paletteTimeAndDraftVerified": true,
   "weeklyGridUsesProductionLessonTimes": true
 }

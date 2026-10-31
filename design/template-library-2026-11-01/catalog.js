@@ -3,7 +3,7 @@ const categories=[['clock','时间'],['date','日期'],['calendar','台历'],['c
 // Stable design IDs; schemes are preview definitions, not native package fields.
 const rows=[
 ['clock','standby','浮字','StandBy','薄字、横向留白、远距离读数',['配色','12/24 小时制','日期']],
-['clock','dial','色盘','Watch Palette / Simple','三层叠色随指针位置变化，白描边指针',['光谱/海蓝/暖光/暮紫','时间']],
+['clock','dial','色盘','Watch Palette / Simple','两张半透明色片随时、分针转动，交叠混色',['光谱/海蓝/暖光/暮紫','时间']],
 ['clock','flip','翻页','物件 / 热门翻页钟','数字面与机械接缝',['深浅色','12/24 小时制']],
 ['clock','portrait','景深照片','Watch Photos','个人抠图与大数字前后遮挡',['照片','景深','位置','配色']],
 ['date','date-poster','日历海报','StandBy 日期','大日期与竖向星期分工',['强调色','星期']],
@@ -17,7 +17,6 @@ const rows=[
 ['countdown','countdown-paper','撕页','纸本','独立数字面与目标日期',['标题','目标日期','纸色']],
 ['anniversary','anniversary-photo','相遇','照片 / 个性内容','照片与共同经历的天数',['照片','标题','起始日期']],
 ['anniversary','anniversary-type','记忆','编辑排版','高反差大数字与日期刻印',['标题','起始日期','配色']],
-['anniversary','anniversary-stamp','纪念章','纸本印刷','印章式信息与拱形日期',['标题','起始日期','印色']],
 ['dayprogress','day-dial','一天','Watch 环形信息','24 小时刻度与时间经过比例',['配色','数字开关']],
 ['dayprogress','day-timeline','日线','StandBy / 时间线','一日时段条与当前位置',['配色','时间标记']],
 ['dayprogress','day-blocks','时块','图形信息','24 格对应一天 24 小时',['配色','数字开关']],
@@ -49,6 +48,6 @@ const rows=[
 ['ensemble','mix-memory','相片日历','照片 + 纸本','纪念日照片 + 日期 + 农历',['照片','起始日期','配色']]
 ];
 const sourceMap={'mix-standby':['clock','calendar'],'mix-modular':['clock','agenda','battery'],'mix-study':['clock','timetable','dayprogress'],'mix-travel':['worldclock','countdown'],'mix-memory':['anniversary','date','lunar']};
-const catalog=rows.map(([kind,id,name,reference,intent,customize])=>({kind,id,name,reference,intent,customize,sources:sourceMap[id]||[kind],scope:kind==='ensemble'?'group':'card',aspect:id==='mix-standby'?2:1,revision:['dial','countdown-orbit','day-dial','year-arc','course-week','anniversary-stamp','calendar-ledger','battery-segments'].includes(id)?2:1}));
+const catalog=rows.map(([kind,id,name,reference,intent,customize])=>({kind,id,name,reference,intent,customize,sources:sourceMap[id]||[kind],scope:kind==='ensemble'?'group':'card',aspect:id==='mix-standby'?2:1,revision:id==='dial'?3:['dial','countdown-orbit','day-dial','year-arc','course-week','calendar-ledger','battery-segments'].includes(id)?2:1}));
 g.TemplateCatalog={categories,catalog};if(typeof module!=='undefined')module.exports=g.TemplateCatalog;
 })(globalThis);
