@@ -18,6 +18,8 @@ Do not automatically default to six equal rounded rectangles, cream everywhere, 
 
 ## Actively source assets
 
+For this product's template work, the user's current preference is to avoid generative AI imagery. Source verified free commercially usable photos/materials and preserve author, license, source and modification records. Cropping, masking, resizing and compression of real images are appropriate. Only create generative assets if the user explicitly requests them again.
+
 When real imagery would improve the work, search before choosing a zero-asset fallback. User-provided originals → creator/publisher media or press pages → licensed libraries/open archives → credible original fan-art sources with stated terms are useful starting points. Use image search to discover candidates, then open the actual source page. Search separately for key art, isolated subject/render, prop/weapon/object, texture or pattern; a whole screenshot is rarely the best cutout. Prefer recognizable silhouettes, coherent light direction and adequate resolution at final size. Inspect shortlisted files, not only thumbnails or search descriptions.
 
 Example discovery for a Control Resonant fan: Remedy's official [media page](https://www.remedygames.com/media-and-influencers) links release-specific media kits, while the [game page](https://www.remedygames.com/games/control-2) supplies factual context. These are source leads, not a blanket license to redistribute or use commercially. Do not contact a rights holder, log into an unrelated account or publish a work merely to obtain material.

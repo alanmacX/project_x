@@ -1,0 +1,85 @@
+{
+  "date": "2026-11-01",
+  "assets": [
+    {
+      "id": "pipi",
+      "sourceFile": "sources/cat-pipi.png",
+      "runtimeFile": "assets/cat-pipi.webp",
+      "source": "https://commons.wikimedia.org/wiki/File:Cat_named_Pipi_(2).png",
+      "download": "https://upload.wikimedia.org/wikipedia/commons/9/9e/Cat_named_Pipi_%282%29.png",
+      "author": "Painjet",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "transforms": [
+        "trim transparent margins",
+        "proportional resize within 900×900",
+        "WebP quality 88, alpha quality 100"
+      ],
+      "aiGenerated": false,
+      "sourceSha256": "696bef414b6769ec02139789e2636c5e421492e9584cd85550d3ccb1fdbb0d1f",
+      "runtimeSha256": "1630693185c5f552d033b0c073176376ba4d7a645f104410e572d429259fdb8f",
+      "runtimeBytes": 143166,
+      "width": 879,
+      "height": 900,
+      "hasAlpha": true
+    },
+    {
+      "id": "tabby",
+      "sourceFile": "sources/cat-tabby.png",
+      "runtimeFile": "assets/cat-tabby.webp",
+      "source": "https://commons.wikimedia.org/wiki/File:Asian_tabby_cat_transparent.png",
+      "download": "https://upload.wikimedia.org/wikipedia/commons/f/f8/Asian_tabby_cat_transparent.png",
+      "author": "Matt Buck; background removal by YukiKoKo",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "derivativeLicense": "CC BY-SA 4.0",
+      "transforms": [
+        "trim transparent margins",
+        "proportional resize within 900×900",
+        "WebP quality 88, alpha quality 100"
+      ],
+      "aiGenerated": false,
+      "sourceSha256": "b607f6defe7199f08ced828297525bc0b12091c6bce31892b7692820dfdb0c12",
+      "runtimeSha256": "f72b0d59977f8e48ed6bd3e6fc87864d32a371ee01c3c21d8827763ea46ec005",
+      "runtimeBytes": 65790,
+      "width": 496,
+      "height": 900,
+      "hasAlpha": true
+    },
+    {
+      "id": "paper",
+      "sourceFile": "sources/paper.jpg",
+      "runtimeFile": "assets/paper.webp",
+      "source": "https://commons.wikimedia.org/wiki/File:Paper002_4K_Color.jpg",
+      "download": "https://upload.wikimedia.org/wikipedia/commons/f/f3/Paper002_4K_Color.jpg",
+      "author": "ambientCG / Lennart Demes",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "transforms": [
+        "center crop to square",
+        "resize 768×768",
+        "WebP quality 80"
+      ],
+      "aiGenerated": false,
+      "sourceSha256": "fed4bf44cc94058f65af0ac83b4e3d65d16bb02a14332eb361999cada6cff59e",
+      "runtimeSha256": "853aec845768f700a52987abfa3a031a101d2c48d21ff88d7f312c3af65b7cb5",
+      "runtimeBytes": 45024,
+      "width": 768,
+      "height": 768,
+      "hasAlpha": false
+    },
+    {
+      "id": "barlow",
+      "runtimeFile": "assets/BarlowCondensed-Black.ttf",
+      "source": "https://github.com/google/fonts/blob/main/ofl/barlowcondensed/BarlowCondensed-Black.ttf",
+      "author": "The Barlow Project Authors",
+      "license": "SIL OFL 1.1",
+      "licenseFile": "assets/OFL.txt",
+      "aiGenerated": false,
+      "transforms": [],
+      "runtimeBytes": 110828,
+      "runtimeSha256": "e74b750df582c608f35db467b711b2b60d2217618e85e60b72b42dfd00446cab"
+    }
+  ],
+  "totalRuntimeBytes": 364808
+}

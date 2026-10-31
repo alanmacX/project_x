@@ -1,0 +1,152 @@
+{
+  "date": "2026-11-01",
+  "browser": "Chrome",
+  "checks": {
+    "twoModes": true,
+    "independentDrafts": true,
+    "timeZone": true,
+    "hour12": true,
+    "midnightRollover": true,
+    "depthOrder": true,
+    "subjectTransform": true,
+    "transparentImageUpload": true,
+    "opaqueCutoutRejected": true,
+    "photoUpload": true,
+    "schemeDownload": true,
+    "nativeCardExportReader": true,
+    "smallCalendarWeekLayout": true,
+    "narrowOverflow": false,
+    "offsiteRequests": [],
+    "browserErrors": []
+  },
+  "sizeChecks": [
+    {
+      "variant": 0,
+      "size": 180,
+      "w": 180,
+      "h": 114,
+      "scroll": 180
+    },
+    {
+      "variant": 1,
+      "size": 180,
+      "w": 180,
+      "h": 114,
+      "scroll": 180
+    },
+    {
+      "variant": 2,
+      "size": 180,
+      "w": 180,
+      "h": 180,
+      "scroll": 180
+    },
+    {
+      "variant": 3,
+      "size": 180,
+      "w": 180,
+      "h": 180,
+      "scroll": 180
+    },
+    {
+      "variant": 4,
+      "size": 180,
+      "w": 180,
+      "h": 180,
+      "scroll": 180
+    },
+    {
+      "variant": 5,
+      "size": 180,
+      "w": 180,
+      "h": 180,
+      "scroll": 180
+    },
+    {
+      "variant": 0,
+      "size": 300,
+      "w": 300,
+      "h": 190,
+      "scroll": 300
+    },
+    {
+      "variant": 1,
+      "size": 300,
+      "w": 300,
+      "h": 190,
+      "scroll": 300
+    },
+    {
+      "variant": 2,
+      "size": 300,
+      "w": 300,
+      "h": 300,
+      "scroll": 300
+    },
+    {
+      "variant": 3,
+      "size": 300,
+      "w": 300,
+      "h": 300,
+      "scroll": 300
+    },
+    {
+      "variant": 4,
+      "size": 300,
+      "w": 300,
+      "h": 300,
+      "scroll": 300
+    },
+    {
+      "variant": 5,
+      "size": 300,
+      "w": 300,
+      "h": 300,
+      "scroll": 300
+    },
+    {
+      "variant": 0,
+      "size": 420,
+      "w": 420,
+      "h": 266,
+      "scroll": 420
+    },
+    {
+      "variant": 1,
+      "size": 420,
+      "w": 420,
+      "h": 266,
+      "scroll": 420
+    },
+    {
+      "variant": 2,
+      "size": 420,
+      "w": 420,
+      "h": 420,
+      "scroll": 420
+    },
+    {
+      "variant": 3,
+      "size": 420,
+      "w": 420,
+      "h": 420,
+      "scroll": 420
+    },
+    {
+      "variant": 4,
+      "size": 420,
+      "w": 420,
+      "h": 420,
+      "scroll": 420
+    },
+    {
+      "variant": 5,
+      "size": 420,
+      "w": 420,
+      "h": 420,
+      "scroll": 420
+    }
+  ],
+  "actualAppIntegration": false,
+  "actualFormVerified": false
+}
