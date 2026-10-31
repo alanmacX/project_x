@@ -48,6 +48,6 @@ const rows=[
 ['ensemble','mix-memory','相片日历','照片 + 纸本','纪念日照片 + 日期 + 农历',['照片','起始日期','配色']]
 ];
 const sourceMap={'mix-standby':['clock','calendar'],'mix-modular':['clock','agenda','battery'],'mix-study':['clock','timetable','dayprogress'],'mix-travel':['worldclock','countdown'],'mix-memory':['anniversary','date','lunar']};
-const catalog=rows.map(([kind,id,name,reference,intent,customize])=>({kind,id,name,reference,intent,customize,sources:sourceMap[id]||[kind],scope:kind==='ensemble'?'group':'card',aspect:id==='mix-standby'?2:1,revision:id==='dial'?3:['dial','countdown-orbit','day-dial','year-arc','course-week','calendar-ledger','battery-segments'].includes(id)?2:1}));
+const catalog=rows.map(([kind,id,name,reference,intent,customize])=>({kind,id,name,reference,intent,customize,sources:sourceMap[id]||[kind],scope:kind==='ensemble'?'group':'card',aspect:id==='mix-standby'?2:1,revision:id==='dial'?4:['dial','countdown-orbit','day-dial','year-arc','course-week','calendar-ledger','battery-segments'].includes(id)?2:1}));
 g.TemplateCatalog={categories,catalog};if(typeof module!=='undefined')module.exports=g.TemplateCatalog;
 })(globalThis);

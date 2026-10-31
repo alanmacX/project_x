@@ -50,3 +50,8 @@
 .dial.palette-cream{--sheet-base:#e9ddc6;--sheet-a:#db8d9e;--sheet-b:#dfa578;--sheet-c:#f6e49f;--sheet-d:#d9ba91}
 .dial.palette-ink{--sheet-base:#b8b3d2;--sheet-a:#aa8ce0;--sheet-b:#dc8bb8;--sheet-c:#e2bedd;--sheet-d:#949fda}
 .palette-art{overflow:hidden}
+/* Both full rectangles share the clock pivot; their long axes follow the hands. */
+.palette-band{transform-origin:50% 50%}
+.palette-band.outer{width:42%;height:94%;border-radius:11cqw;transform:translate(-50%,-50%) rotate(var(--minute-angle));background:linear-gradient(165deg,var(--sheet-a),var(--sheet-b));opacity:.82}
+.palette-band.middle{width:48%;height:76%;border-radius:11cqw;transform:translate(-50%,-50%) rotate(var(--hour-angle));background:linear-gradient(165deg,var(--sheet-c),var(--sheet-d));opacity:.76}
+.dial{--sheet-a:#6797f0;--sheet-b:#e782ba;--sheet-c:#f0dd75;--sheet-d:#7dd4c8}
