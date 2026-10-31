@@ -1,0 +1,109 @@
+{
+  "format": "fridgememo-template",
+  "version": 1,
+  "kind": "canvas",
+  "state": {
+    "schemaVersion": 2,
+    "canvasId": "canvas_main",
+    "canvasDimension": "2*4",
+    "canvasAspect": 2,
+    "background": {
+      "mode": "solid",
+      "color": "#E7E4DE",
+      "src": "",
+      "photo": "",
+      "frameStyle": "none",
+      "frameMaterial": "stone",
+      "palette": [],
+      "anchors": [],
+      "signature": ""
+    },
+    "maxZ": 2,
+    "cards": [
+      {
+        "id": "module-timetable",
+        "x": 16,
+        "y": 43.72093023255814,
+        "w": 220,
+        "h": 140,
+        "rot": 0,
+        "z": 1,
+        "shape": "rect",
+        "frame": false,
+        "material": "white",
+        "paper": "#FAF8F3",
+        "ink": "#34332F",
+        "capability": {
+          "k": "timetable",
+          "timetableMode": "next",
+          "courses": [],
+          "readingBlend": "bare",
+          "readingStyle": "plain",
+          "readingOpacity": 0
+        },
+        "capBox": {
+          "x": 0.07,
+          "y": 0.06,
+          "w": 0.86,
+          "h": 0.88,
+          "rot": 0,
+          "opacity": 1
+        },
+        "capFree": true,
+        "elements": [],
+        "cutout": "",
+        "outline": [],
+        "groupId": "",
+        "subjectPhoto": false,
+        "subjectBorder": true,
+        "subjectAspect": 1,
+        "subjectInk": "#34332F",
+        "subjectVersion": 0,
+        "inDoor": false
+      },
+      {
+        "id": "module-class-time",
+        "x": 240,
+        "y": 43.72093023255814,
+        "w": 88,
+        "h": 140,
+        "rot": 0,
+        "z": 2,
+        "shape": "rect",
+        "frame": false,
+        "material": "white",
+        "paper": "#34332F",
+        "ink": "#FAF8F3",
+        "capability": {
+          "k": "clock",
+          "readingBlend": "bare",
+          "readingStyle": "plain",
+          "readingOpacity": 0
+        },
+        "capBox": {
+          "x": 0.03,
+          "y": 0.2,
+          "w": 0.94,
+          "h": 0.6,
+          "rot": 0,
+          "opacity": 1
+        },
+        "capFree": true,
+        "elements": [],
+        "cutout": "",
+        "outline": [],
+        "groupId": "",
+        "subjectPhoto": false,
+        "subjectBorder": true,
+        "subjectAspect": 1,
+        "subjectInk": "#FAF8F3",
+        "subjectVersion": 0,
+        "inDoor": false
+      }
+    ],
+    "sceneLayouts": [],
+    "sceneRules": [],
+    "sceneBaseLayoutId": ""
+  },
+  "assets": []
+}

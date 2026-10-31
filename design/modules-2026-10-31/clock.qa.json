@@ -1,0 +1,448 @@
+{
+  "sha256": "e71c88178886c0b82cde3b089cde9addd762f9e69e775e10f3389be0b13ac6d0",
+  "dimension": "2*4",
+  "tick": "2026-11-02T09:10:00+08:00",
+  "contract": {
+    "models": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+    "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
+    "browserAdapter": "39aaca0185ae7433b9c6921e802bf03c85278a5ddb260837c7a3f9bb0bd2ac65",
+    "nativeViews": "2b66939ac2d027f4f0df0ab906b78fd3926f440bb3eefc5ee90e8e2cb397a726"
+  },
+  "structureValidated": true,
+  "visualReview": "reviewed-browser",
+  "actualFormVerified": false,
+  "checks": [
+    {
+      "mode": "demo",
+      "size": 300,
+      "metrics": [
+        {
+          "id": "module-clock",
+          "minimumCardSize": {
+            "w": 70.4,
+            "h": 41.6
+          },
+          "requestedBox": {
+            "x": 0.06,
+            "y": 0.15,
+            "w": 0.88,
+            "h": 0.7,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.06,
+            "y": 0.15,
+            "w": 0.88,
+            "h": 0.7,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 258.56,
+          "contentHeight": 76.39999999999999,
+          "compact": false,
+          "contentScale": 1.3172413793103446,
+          "readableMinimum": {
+            "w": 112,
+            "h": 58
+          },
+          "fits": true
+        }
+      ],
+      "report": {
+        "previewVersion": 2,
+        "adapter": "browser-svg-v2",
+        "sourceFingerprint": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+        "designContract": {
+          "contractVersion": 1,
+          "skillContractVersion": 8,
+          "identity": {
+            "models": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+            "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
+            "browserAdapter": "39aaca0185ae7433b9c6921e802bf03c85278a5ddb260837c7a3f9bb0bd2ac65",
+            "nativeViews": "2b66939ac2d027f4f0df0ab906b78fd3926f440bb3eefc5ee90e8e2cb397a726"
+          },
+          "appVersion": "1.2.0"
+        },
+        "packageVersion": 1,
+        "schemaVersion": 2,
+        "width": 300,
+        "height": 150,
+        "tick": 1793581800000,
+        "timeZone": "Asia/Shanghai",
+        "cards": 1,
+        "previewData": {
+          "mode": "demo",
+          "synthetic": true,
+          "appliedCards": [],
+          "portablePackageUnchanged": true
+        },
+        "status": "ready-for-review",
+        "issues": [],
+        "actualFormVerified": false,
+        "pixelParityVerified": false
+      }
+    },
+    {
+      "mode": "demo",
+      "size": 420,
+      "metrics": [
+        {
+          "id": "module-clock",
+          "minimumCardSize": {
+            "w": 70.4,
+            "h": 41.6
+          },
+          "requestedBox": {
+            "x": 0.06,
+            "y": 0.15,
+            "w": 0.88,
+            "h": 0.7,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.06,
+            "y": 0.15,
+            "w": 0.88,
+            "h": 0.7,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 258.56,
+          "contentHeight": 76.39999999999999,
+          "compact": false,
+          "contentScale": 1.3172413793103446,
+          "readableMinimum": {
+            "w": 112,
+            "h": 58
+          },
+          "fits": true
+        }
+      ],
+      "report": {
+        "previewVersion": 2,
+        "adapter": "browser-svg-v2",
+        "sourceFingerprint": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+        "designContract": {
+          "contractVersion": 1,
+          "skillContractVersion": 8,
+          "identity": {
+            "models": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+            "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
+            "browserAdapter": "39aaca0185ae7433b9c6921e802bf03c85278a5ddb260837c7a3f9bb0bd2ac65",
+            "nativeViews": "2b66939ac2d027f4f0df0ab906b78fd3926f440bb3eefc5ee90e8e2cb397a726"
+          },
+          "appVersion": "1.2.0"
+        },
+        "packageVersion": 1,
+        "schemaVersion": 2,
+        "width": 420,
+        "height": 210,
+        "tick": 1793581800000,
+        "timeZone": "Asia/Shanghai",
+        "cards": 1,
+        "previewData": {
+          "mode": "demo",
+          "synthetic": true,
+          "appliedCards": [],
+          "portablePackageUnchanged": true
+        },
+        "status": "ready-for-review",
+        "issues": [],
+        "actualFormVerified": false,
+        "pixelParityVerified": false
+      }
+    },
+    {
+      "mode": "empty",
+      "size": 300,
+      "metrics": [
+        {
+          "id": "module-clock",
+          "minimumCardSize": {
+            "w": 70.4,
+            "h": 41.6
+          },
+          "requestedBox": {
+            "x": 0.06,
+            "y": 0.15,
+            "w": 0.88,
+            "h": 0.7,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.06,
+            "y": 0.15,
+            "w": 0.88,
+            "h": 0.7,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 258.56,
+          "contentHeight": 76.39999999999999,
+          "compact": false,
+          "contentScale": 1.3172413793103446,
+          "readableMinimum": {
+            "w": 112,
+            "h": 58
+          },
+          "fits": true
+        }
+      ],
+      "report": {
+        "previewVersion": 2,
+        "adapter": "browser-svg-v2",
+        "sourceFingerprint": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+        "designContract": {
+          "contractVersion": 1,
+          "skillContractVersion": 8,
+          "identity": {
+            "models": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+            "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
+            "browserAdapter": "39aaca0185ae7433b9c6921e802bf03c85278a5ddb260837c7a3f9bb0bd2ac65",
+            "nativeViews": "2b66939ac2d027f4f0df0ab906b78fd3926f440bb3eefc5ee90e8e2cb397a726"
+          },
+          "appVersion": "1.2.0"
+        },
+        "packageVersion": 1,
+        "schemaVersion": 2,
+        "width": 300,
+        "height": 150,
+        "tick": 1793581800000,
+        "timeZone": "Asia/Shanghai",
+        "cards": 1,
+        "previewData": {
+          "mode": "empty",
+          "synthetic": true,
+          "appliedCards": [],
+          "portablePackageUnchanged": true
+        },
+        "status": "ready-for-review",
+        "issues": [],
+        "actualFormVerified": false,
+        "pixelParityVerified": false
+      }
+    },
+    {
+      "mode": "empty",
+      "size": 420,
+      "metrics": [
+        {
+          "id": "module-clock",
+          "minimumCardSize": {
+            "w": 70.4,
+            "h": 41.6
+          },
+          "requestedBox": {
+            "x": 0.06,
+            "y": 0.15,
+            "w": 0.88,
+            "h": 0.7,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.06,
+            "y": 0.15,
+            "w": 0.88,
+            "h": 0.7,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 258.56,
+          "contentHeight": 76.39999999999999,
+          "compact": false,
+          "contentScale": 1.3172413793103446,
+          "readableMinimum": {
+            "w": 112,
+            "h": 58
+          },
+          "fits": true
+        }
+      ],
+      "report": {
+        "previewVersion": 2,
+        "adapter": "browser-svg-v2",
+        "sourceFingerprint": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+        "designContract": {
+          "contractVersion": 1,
+          "skillContractVersion": 8,
+          "identity": {
+            "models": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+            "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
+            "browserAdapter": "39aaca0185ae7433b9c6921e802bf03c85278a5ddb260837c7a3f9bb0bd2ac65",
+            "nativeViews": "2b66939ac2d027f4f0df0ab906b78fd3926f440bb3eefc5ee90e8e2cb397a726"
+          },
+          "appVersion": "1.2.0"
+        },
+        "packageVersion": 1,
+        "schemaVersion": 2,
+        "width": 420,
+        "height": 210,
+        "tick": 1793581800000,
+        "timeZone": "Asia/Shanghai",
+        "cards": 1,
+        "previewData": {
+          "mode": "empty",
+          "synthetic": true,
+          "appliedCards": [],
+          "portablePackageUnchanged": true
+        },
+        "status": "ready-for-review",
+        "issues": [],
+        "actualFormVerified": false,
+        "pixelParityVerified": false
+      }
+    },
+    {
+      "mode": "long",
+      "size": 300,
+      "metrics": [
+        {
+          "id": "module-clock",
+          "minimumCardSize": {
+            "w": 70.4,
+            "h": 41.6
+          },
+          "requestedBox": {
+            "x": 0.06,
+            "y": 0.15,
+            "w": 0.88,
+            "h": 0.7,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.06,
+            "y": 0.15,
+            "w": 0.88,
+            "h": 0.7,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 258.56,
+          "contentHeight": 76.39999999999999,
+          "compact": false,
+          "contentScale": 1.3172413793103446,
+          "readableMinimum": {
+            "w": 112,
+            "h": 58
+          },
+          "fits": true
+        }
+      ],
+      "report": {
+        "previewVersion": 2,
+        "adapter": "browser-svg-v2",
+        "sourceFingerprint": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+        "designContract": {
+          "contractVersion": 1,
+          "skillContractVersion": 8,
+          "identity": {
+            "models": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+            "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
+            "browserAdapter": "39aaca0185ae7433b9c6921e802bf03c85278a5ddb260837c7a3f9bb0bd2ac65",
+            "nativeViews": "2b66939ac2d027f4f0df0ab906b78fd3926f440bb3eefc5ee90e8e2cb397a726"
+          },
+          "appVersion": "1.2.0"
+        },
+        "packageVersion": 1,
+        "schemaVersion": 2,
+        "width": 300,
+        "height": 150,
+        "tick": 1793581800000,
+        "timeZone": "Asia/Shanghai",
+        "cards": 1,
+        "previewData": {
+          "mode": "long",
+          "synthetic": true,
+          "appliedCards": [],
+          "portablePackageUnchanged": true
+        },
+        "status": "ready-for-review",
+        "issues": [],
+        "actualFormVerified": false,
+        "pixelParityVerified": false
+      }
+    },
+    {
+      "mode": "long",
+      "size": 420,
+      "metrics": [
+        {
+          "id": "module-clock",
+          "minimumCardSize": {
+            "w": 70.4,
+            "h": 41.6
+          },
+          "requestedBox": {
+            "x": 0.06,
+            "y": 0.15,
+            "w": 0.88,
+            "h": 0.7,
+            "rot": 0,
+            "opacity": 1
+          },
+          "placement": {
+            "x": 0.06,
+            "y": 0.15,
+            "w": 0.88,
+            "h": 0.7,
+            "rot": 0,
+            "opacity": 1
+          },
+          "contentWidth": 258.56,
+          "contentHeight": 76.39999999999999,
+          "compact": false,
+          "contentScale": 1.3172413793103446,
+          "readableMinimum": {
+            "w": 112,
+            "h": 58
+          },
+          "fits": true
+        }
+      ],
+      "report": {
+        "previewVersion": 2,
+        "adapter": "browser-svg-v2",
+        "sourceFingerprint": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+        "designContract": {
+          "contractVersion": 1,
+          "skillContractVersion": 8,
+          "identity": {
+            "models": "b313688bb8b1cab7b3a27411d97e5c188918a424d24932da82f8fad960092eed",
+            "materials": "745e5b2b72279c7dfeaa279bdd5962f81a3a58c3064b29d70c31958906105458",
+            "browserAdapter": "39aaca0185ae7433b9c6921e802bf03c85278a5ddb260837c7a3f9bb0bd2ac65",
+            "nativeViews": "2b66939ac2d027f4f0df0ab906b78fd3926f440bb3eefc5ee90e8e2cb397a726"
+          },
+          "appVersion": "1.2.0"
+        },
+        "packageVersion": 1,
+        "schemaVersion": 2,
+        "width": 420,
+        "height": 210,
+        "tick": 1793581800000,
+        "timeZone": "Asia/Shanghai",
+        "cards": 1,
+        "previewData": {
+          "mode": "long",
+          "synthetic": true,
+          "appliedCards": [],
+          "portablePackageUnchanged": true
+        },
+        "status": "ready-for-review",
+        "issues": [],
+        "actualFormVerified": false,
+        "pixelParityVerified": false
+      }
+    }
+  ],
+  "visualReviewEvidence": [
+    "overview.png",
+    "overview-empty.png",
+    "overview-long.png",
+    "mobile.png"
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "format": "fridgememo-template",
+  "version": 1,
+  "kind": "canvas",
+  "state": {
+    "schemaVersion": 2,
+    "canvasId": "canvas_main",
+    "canvasDimension": "2*2",
+    "canvasAspect": 1,
+    "background": {
+      "mode": "solid",
+      "color": "#E5E8DE",
+      "src": "",
+      "photo": "",
+      "frameStyle": "none",
+      "frameMaterial": "stone",
+      "palette": [],
+      "anchors": [],
+      "signature": ""
+    },
+    "maxZ": 1,
+    "cards": [
+      {
+        "id": "module-battery",
+        "x": 32,
+        "y": 43.72093023255814,
+        "w": 280,
+        "h": 280,
+        "rot": 0,
+        "z": 1,
+        "shape": "round",
+        "frame": false,
+        "material": "white",
+        "paper": "#F6F7F0",
+        "ink": "#465E3D",
+        "capability": {
+          "k": "battery",
+          "percent": -1,
+          "charging": false,
+          "updatedAt": 0,
+          "attemptedAt": 0,
+          "readingBlend": "bare",
+          "readingStyle": "plain",
+          "readingOpacity": 0
+        },
+        "capBox": {
+          "x": 0.12,
+          "y": 0.12,
+          "w": 0.76,
+          "h": 0.76,
+          "rot": 0,
+          "opacity": 1
+        },
+        "capFree": true,
+        "elements": [],
+        "cutout": "",
+        "outline": [],
+        "groupId": "",
+        "subjectPhoto": false,
+        "subjectBorder": true,
+        "subjectAspect": 1,
+        "subjectInk": "#465E3D",
+        "subjectVersion": 0,
+        "inDoor": false
+      }
+    ],
+    "sceneLayouts": [],
+    "sceneRules": [],
+    "sceneBaseLayoutId": ""
+  },
+  "assets": []
+}

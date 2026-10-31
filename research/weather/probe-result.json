@@ -1,0 +1,17 @@
+{
+  "checkedAt": "2026-10-31T07:16:45.104Z",
+  "host": "api.met.no",
+  "sampleCity": "Shanghai public city centre",
+  "status": 200,
+  "elapsedMs": 1983,
+  "bytes": 38252,
+  "expires": "Sat, 31 Oct 2026 07:34:47 GMT",
+  "lastModified": "Sat, 31 Oct 2026 07:03:35 GMT",
+  "updatedAt": "2026-10-31T05:21:54Z",
+  "forecastRows": 87,
+  "firstForecastAt": "2026-10-31T07:00:00Z",
+  "firstTemperature": 21.7,
+  "symbol": "clearsky_day",
+  "platform": "macOS Node HTTPS, not HarmonyOS native",
+  "keyUsed": false
+}

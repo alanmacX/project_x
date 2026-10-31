@@ -1,0 +1,44 @@
+[
+  {
+    "id": "clock",
+    "name": "时间",
+    "dimension": "2*4",
+    "card": "cards/clock.fridge",
+    "canvas": "canvases/clock.fridge"
+  },
+  {
+    "id": "calendar",
+    "name": "月历",
+    "dimension": "4*4",
+    "card": "cards/calendar.fridge",
+    "canvas": "canvases/calendar.fridge"
+  },
+  {
+    "id": "timetable",
+    "name": "下一课",
+    "dimension": "2*4",
+    "card": "cards/timetable.fridge",
+    "canvas": "canvases/timetable.fridge"
+  },
+  {
+    "id": "agenda",
+    "name": "接下来",
+    "dimension": "2*4",
+    "card": "cards/agenda.fridge",
+    "canvas": "canvases/agenda.fridge"
+  },
+  {
+    "id": "countdown",
+    "name": "倒计日",
+    "dimension": "2*2",
+    "card": "cards/countdown.fridge",
+    "canvas": "canvases/countdown.fridge"
+  },
+  {
+    "id": "battery",
+    "name": "电量",
+    "dimension": "2*2",
+    "card": "cards/battery.fridge",
+    "canvas": "canvases/battery.fridge"
+  }
+]

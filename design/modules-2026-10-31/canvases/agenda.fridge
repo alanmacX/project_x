@@ -1,0 +1,70 @@
+{
+  "format": "fridgememo-template",
+  "version": 1,
+  "kind": "canvas",
+  "state": {
+    "schemaVersion": 2,
+    "canvasId": "canvas_main",
+    "canvasDimension": "2*4",
+    "canvasAspect": 2,
+    "background": {
+      "mode": "solid",
+      "color": "#DFE8EA",
+      "src": "",
+      "photo": "",
+      "frameStyle": "none",
+      "frameMaterial": "stone",
+      "palette": [],
+      "anchors": [],
+      "signature": ""
+    },
+    "maxZ": 1,
+    "cards": [
+      {
+        "id": "module-agenda",
+        "x": 16,
+        "y": 21.86046511627907,
+        "w": 312,
+        "h": 156,
+        "rot": 0,
+        "z": 1,
+        "shape": "rect",
+        "frame": false,
+        "material": "white",
+        "paper": "#F5FAFB",
+        "ink": "#22474E",
+        "capability": {
+          "k": "agenda",
+          "agendaSource": "system",
+          "events": [],
+          "readingBlend": "bare",
+          "readingStyle": "plain",
+          "readingOpacity": 0
+        },
+        "capBox": {
+          "x": 0.075,
+          "y": 0.02,
+          "w": 0.85,
+          "h": 0.96,
+          "rot": 0,
+          "opacity": 1
+        },
+        "capFree": true,
+        "elements": [],
+        "cutout": "",
+        "outline": [],
+        "groupId": "",
+        "subjectPhoto": false,
+        "subjectBorder": true,
+        "subjectAspect": 1,
+        "subjectInk": "#22474E",
+        "subjectVersion": 0,
+        "inDoor": false
+      }
+    ],
+    "sceneLayouts": [],
+    "sceneRules": [],
+    "sceneBaseLayoutId": ""
+  },
+  "assets": []
+}

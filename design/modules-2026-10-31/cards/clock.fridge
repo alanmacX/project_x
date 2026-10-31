@@ -1,0 +1,68 @@
+{
+  "format": "fridgememo-template",
+  "version": 1,
+  "kind": "card",
+  "state": {
+    "schemaVersion": 2,
+    "canvasId": "canvas_main",
+    "canvasDimension": "2*4",
+    "canvasAspect": 2,
+    "background": {
+      "mode": "solid",
+      "color": "#E7E8EB",
+      "src": "",
+      "photo": "",
+      "frameStyle": "none",
+      "frameMaterial": "stone",
+      "palette": [],
+      "anchors": [],
+      "signature": ""
+    },
+    "maxZ": 1,
+    "cards": [
+      {
+        "id": "module-clock",
+        "x": 16,
+        "y": 54.651162790697676,
+        "w": 312,
+        "h": 132,
+        "rot": 0,
+        "z": 1,
+        "shape": "rect",
+        "frame": false,
+        "material": "white",
+        "paper": "#22242A",
+        "ink": "#F5F6F8",
+        "capability": {
+          "k": "clock",
+          "readingBlend": "bare",
+          "readingStyle": "plain",
+          "readingOpacity": 0
+        },
+        "capBox": {
+          "x": 0.06,
+          "y": 0.15,
+          "w": 0.88,
+          "h": 0.7,
+          "rot": 0,
+          "opacity": 1
+        },
+        "capFree": true,
+        "elements": [],
+        "cutout": "",
+        "outline": [],
+        "groupId": "",
+        "subjectPhoto": false,
+        "subjectBorder": true,
+        "subjectAspect": 1,
+        "subjectInk": "#F5F6F8",
+        "subjectVersion": 0,
+        "inDoor": false
+      }
+    ],
+    "sceneLayouts": [],
+    "sceneRules": [],
+    "sceneBaseLayoutId": ""
+  },
+  "assets": []
+}
