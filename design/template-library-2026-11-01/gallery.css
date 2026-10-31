@@ -3,3 +3,5 @@
 @media(min-width:1100px){.grid.clock-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .stage.card.wide>.slot{top:31%;bottom:auto}.stage.fill.wide{aspect-ratio:2}
 .stage.fill.framed.wide>.slot{top:16%;bottom:16%}
+
+#dial-time{min-width:0;width:130px;border:1px solid #ccd2c6;background:#f9faf7;border-radius:9px;padding:8px;font-size:13px;color:inherit}

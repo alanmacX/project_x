@@ -3,7 +3,7 @@ const categories=[['clock','时间'],['date','日期'],['calendar','台历'],['c
 // Stable design IDs; schemes are preview definitions, not native package fields.
 const rows=[
 ['clock','standby','浮字','StandBy','薄字、横向留白、远距离读数',['配色','12/24 小时制','日期']],
-['clock','dial','色盘','Watch Palette / Simple','盘面色块、清晰指针与小时刻度',['配色','数字刻度']],
+['clock','dial','色盘','Watch Palette / Simple','三层叠色随指针位置变化，白描边指针',['光谱/海蓝/暖光/暮紫','时间']],
 ['clock','flip','翻页','物件 / 热门翻页钟','数字面与机械接缝',['深浅色','12/24 小时制']],
 ['clock','portrait','景深照片','Watch Photos','个人抠图与大数字前后遮挡',['照片','景深','位置','配色']],
 ['date','date-poster','日历海报','StandBy 日期','大日期与竖向星期分工',['强调色','星期']],
@@ -13,7 +13,7 @@ const rows=[
 ['calendar','calendar-ledger','月记','纸本 / 编辑排版','月份大标题与衬线日期',['纸色','强调色']],
 ['calendar','calendar-week','周历','紧凑日历','只保留本周的七天',['周起始','配色']],
 ['countdown','countdown-poster','出发','大数字海报','目标标题、极大剩余天数',['标题','目标日期','配色']],
-['countdown','countdown-orbit','环绕','Watch 图形信息','剩余天数置中，外圈按起止区间显示',['目标日期','起始日期','配色']],
+['countdown','countdown-orbit','环绕','Watch 图形信息','薄弧显示区间进度，剩余天数置中',['目标日期','起始日期','配色']],
 ['countdown','countdown-paper','撕页','纸本','独立数字面与目标日期',['标题','目标日期','纸色']],
 ['anniversary','anniversary-photo','相遇','照片 / 个性内容','照片与共同经历的天数',['照片','标题','起始日期']],
 ['anniversary','anniversary-type','记忆','编辑排版','高反差大数字与日期刻印',['标题','起始日期','配色']],
@@ -31,7 +31,7 @@ const rows=[
 ['agenda','agenda-timeline','时间轴','Watch Modular','时间与事件沿同一轴排列',['强调色','时间格式']],
 ['agenda','agenda-paper','手帐','纸本','细横线与安静标题',['纸色','信息密度']],
 ['timetable','course-next','下节课','Watch Modular Duo','下一节课程做主角，时间地点收在底部',['课程来源','配色']],
-['timetable','course-week','一周课表','网格 / 功能型','五个工作日的课程结构',['课程来源','配色']],
+['timetable','course-week','一周课表','网格 / 功能型','五个工作日按真实课程时间排列',['课程来源','配色']],
 ['timetable','course-slips','课程纸条','冰箱贴','当日课程按时间分成小纸条',['课程来源','纸色']],
 ['worldclock','world-dial','异地','Watch GMT','双时区指针与目的地时间',['城市','配色']],
 ['worldclock','world-duo','两地','StandBy 分栏','本地与目的地两列直接比较',['城市','12/24 小时制']],
@@ -49,6 +49,6 @@ const rows=[
 ['ensemble','mix-memory','相片日历','照片 + 纸本','纪念日照片 + 日期 + 农历',['照片','起始日期','配色']]
 ];
 const sourceMap={'mix-standby':['clock','calendar'],'mix-modular':['clock','agenda','battery'],'mix-study':['clock','timetable','dayprogress'],'mix-travel':['worldclock','countdown'],'mix-memory':['anniversary','date','lunar']};
-const catalog=rows.map(([kind,id,name,reference,intent,customize])=>({kind,id,name,reference,intent,customize,sources:sourceMap[id]||[kind],scope:kind==='ensemble'?'group':'card',aspect:id==='mix-standby'?2:1,revision:1}));
+const catalog=rows.map(([kind,id,name,reference,intent,customize])=>({kind,id,name,reference,intent,customize,sources:sourceMap[id]||[kind],scope:kind==='ensemble'?'group':'card',aspect:id==='mix-standby'?2:1,revision:['dial','countdown-orbit','day-dial','year-arc','course-week','anniversary-stamp','calendar-ledger','battery-segments'].includes(id)?2:1}));
 g.TemplateCatalog={categories,catalog};if(typeof module!=='undefined')module.exports=g.TemplateCatalog;
 })(globalThis);
