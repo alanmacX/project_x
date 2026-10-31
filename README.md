@@ -37,7 +37,7 @@
 
 ## 本地数据与云同步
 
-作品、素材和课表保存在本机。网络权限用于学校教务网页。App 没有云同步菜单；保留系统云能力声明和实验源码，系统开关开启后的自动同步尚未完成。
+作品、素材和课表保存在本机。网络权限用于学校教务网页。App 没有云同步菜单；当前本地包显式关闭文件与结构化云同步能力，实验同步代码与产品调用链隔离。作品存储使用 SQLite 事务、陈旧写入拦截和独立校验快照，真机记录见 [存储验收](tests/native/library-storage-device/README.md)。
 
 接入云能力前的本地版检查点为 `fa38973a97287eac20550d4cd285cf4b7ecdeab1`。回退构建方式、签名包性质及云服务验收情况见 [发布检查点](RELEASE_CHECKPOINTS.md)。
 
@@ -66,4 +66,6 @@ node previewer/build.cjs --check
 - [作品格式与创作 Skill](skills/fridge-create/SKILL.md)
 - [离线预览器](previewer/README.md)
 - [文案审查](COPY_REVIEW_1.2.0.md)
+- [下个 milestone：稳定性与恢复](MILESTONE_NEXT.md)
+- [鸿蒙组件竞品调研](research/2026-10-31-harmony-widgets.md)
 - [第三方许可](THIRD_PARTY_NOTICES.md)
