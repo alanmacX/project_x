@@ -4,9 +4,11 @@ Read this for a themed or visually ambitious canvas. The native example demonstr
 
 ## Start from the user's world
 
-### Single-capability presets
+### Capability templates and portable card presets
 
-When the user asks for a capability/card template, author one ordinary `kind:card` package with one capability. Start from a finished, distinctive card appearance that the user could recreate with the same editor: shape, material, element layers, ink and capability box. Do not substitute a whole-canvas dashboard or fixed arrangement of several capabilities. Multiple looks for the same capability are useful. Materials may be supplied as importable image layers; preserve their sources and keep live data native. Template-only hidden renderer branches, flattened readouts and invented fields defeat the editable-preset premise.
+The user has withdrawn the requirement that every template must be reproducible by hand in the current editor. Product templates may be specialized capabilities with their own composition, typography, rendering and configuration, reusing existing data providers and appropriate shared UI. Do not constrain their visual design to a generic capBox readout on primitive shapes. Research actual popular examples and keep template/data persistence and rendering contracts explicit.
+
+For packages intended to import into the current shipped reader, its documented format still applies: an ordinary `kind:card` preset contains one supported capability and editable artwork layers. New specialized template renderers require app/model/preview/Form implementation and compatibility work before their files can be claimed importable. Do not invent fields or flatten live values into an image to disguise that missing implementation. A card template is not a whole-canvas dashboard or a fixed arrangement of several independent cards.
 
 Identify what makes the theme recognizable beyond its name: silhouette, object/material, composition, typography, color relationship, imagery or a distinctive recurring motif. Research factual themes using primary sources before depicting characters or quoting text. Choose a coherent visual thesis and translate it into the canvas rather than reproducing a generic dashboard with theme labels.
 

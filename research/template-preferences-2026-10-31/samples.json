@@ -1,0 +1,595 @@
+{
+  "date": "2026-10-31",
+  "timezone": "Asia/Shanghai",
+  "method": {
+    "popular": "浏览器读取 Popular 当前前40项，仅按标题关键词标注用途；目视检查前15项",
+    "recent": "浏览器读取 Top 100 当前前20项并逐屏检查主视觉，手工按主视觉分三组",
+    "metricCheck": {
+      "url": "https://widgetopia.io/widget/moon-phase-sSS",
+      "label": "Views",
+      "value": 238526,
+      "checkedBy": "browser detail"
+    }
+  },
+  "popular": {
+    "source": "https://widgetopia.io/?sort=popular",
+    "items": [
+      {
+        "position": 1,
+        "title": "Date calendar",
+        "url": "https://widgetopia.io/widget/date-calendar-sMH",
+        "titleTags": [
+          "calendar"
+        ],
+        "visualReviewed": true
+      },
+      {
+        "position": 2,
+        "title": "Flip Clock",
+        "url": "https://widgetopia.io/widget/flip-clock-sLH",
+        "titleTags": [
+          "clock"
+        ],
+        "visualReviewed": true
+      },
+      {
+        "position": 3,
+        "title": "Time Network Battery",
+        "url": "https://widgetopia.io/widget/time-network-battery",
+        "titleTags": [
+          "battery"
+        ],
+        "visualReviewed": true
+      },
+      {
+        "position": 4,
+        "title": "Simple Small Battery V.2",
+        "url": "https://widgetopia.io/widget/simple-small-battery-v-2",
+        "titleTags": [
+          "battery"
+        ],
+        "visualReviewed": true
+      },
+      {
+        "position": 5,
+        "title": "Moon time",
+        "url": "https://widgetopia.io/widget/moon-time-sMH",
+        "titleTags": [],
+        "visualReviewed": true
+      },
+      {
+        "position": 6,
+        "title": "City Night",
+        "url": "https://widgetopia.io/widget/city-night-sMm",
+        "titleTags": [],
+        "visualReviewed": true
+      },
+      {
+        "position": 7,
+        "title": "Moon Phase",
+        "url": "https://widgetopia.io/widget/moon-phase-sSS",
+        "titleTags": [],
+        "visualReviewed": true
+      },
+      {
+        "position": 8,
+        "title": "Date calendar 2 Copy",
+        "url": "https://widgetopia.io/widget/date-calendar-2-copy-sMB",
+        "titleTags": [
+          "calendar"
+        ],
+        "visualReviewed": true
+      },
+      {
+        "position": 9,
+        "title": "Battery 11 refresh 1s",
+        "url": "https://widgetopia.io/widget/battery-11-refresh-1s",
+        "titleTags": [
+          "battery"
+        ],
+        "visualReviewed": true
+      },
+      {
+        "position": 10,
+        "title": "Blubasaur",
+        "url": "https://widgetopia.io/widget/blubasaur",
+        "titleTags": [],
+        "visualReviewed": true
+      },
+      {
+        "position": 11,
+        "title": "Battery 11",
+        "url": "https://widgetopia.io/widget/battery-11-sSH",
+        "titleTags": [
+          "battery"
+        ],
+        "visualReviewed": true
+      },
+      {
+        "position": 12,
+        "title": "MD190",
+        "url": "https://widgetopia.io/widget/md190",
+        "titleTags": [],
+        "visualReviewed": true
+      },
+      {
+        "position": 13,
+        "title": "Gradient Clock 1",
+        "url": "https://widgetopia.io/widget/gradient-clock-1",
+        "titleTags": [
+          "clock"
+        ],
+        "visualReviewed": true
+      },
+      {
+        "position": 14,
+        "title": "Mini Heart",
+        "url": "https://widgetopia.io/widget/mini-heart",
+        "titleTags": [],
+        "visualReviewed": true
+      },
+      {
+        "position": 15,
+        "title": "Flip Clock",
+        "url": "https://widgetopia.io/widget/flip-clock-sLS",
+        "titleTags": [
+          "clock"
+        ],
+        "visualReviewed": true
+      },
+      {
+        "position": 16,
+        "title": "widgetopia - Calendar 2",
+        "url": "https://widgetopia.io/widget/widgetopia-calendar-2",
+        "titleTags": [
+          "calendar"
+        ],
+        "visualReviewed": false
+      },
+      {
+        "position": 17,
+        "title": "Weather Clock6",
+        "url": "https://widgetopia.io/widget/weather-clock6",
+        "titleTags": [
+          "clock",
+          "weather"
+        ],
+        "visualReviewed": false
+      },
+      {
+        "position": 18,
+        "title": "JD_House transparent",
+        "url": "https://widgetopia.io/widget/jd-house-transparent",
+        "titleTags": [],
+        "visualReviewed": false
+      },
+      {
+        "position": 19,
+        "title": "Battery + date + time PINK",
+        "url": "https://widgetopia.io/widget/battery-date-time-pink-sSB",
+        "titleTags": [
+          "battery"
+        ],
+        "visualReviewed": false
+      },
+      {
+        "position": 20,
+        "title": "Blue Panel",
+        "url": "https://widgetopia.io/widget/blue-panel",
+        "titleTags": [],
+        "visualReviewed": false
+      },
+      {
+        "position": 21,
+        "title": "Flip Clock Weather V3 Dark",
+        "url": "https://widgetopia.io/widget/flip-clock-weather-v3-dark",
+        "titleTags": [
+          "clock",
+          "weather"
+        ],
+        "visualReviewed": false
+      },
+      {
+        "position": 22,
+        "title": "Search Bar Google + Weather - Dark",
+        "url": "https://widgetopia.io/widget/search-bar-google-weather-dark-sLx",
+        "titleTags": [
+          "weather"
+        ],
+        "visualReviewed": false
+      },
+      {
+        "position": 23,
+        "title": "Quad Device Info",
+        "url": "https://widgetopia.io/widget/quad-device-info-sSv",
+        "titleTags": [],
+        "visualReviewed": false
+      },
+      {
+        "position": 24,
+        "title": "Battery + Date + Time 2",
+        "url": "https://widgetopia.io/widget/battery-date-time-2-sMS",
+        "titleTags": [
+          "battery"
+        ],
+        "visualReviewed": false
+      },
+      {
+        "position": 25,
+        "title": "Battery + date + time GREEN",
+        "url": "https://widgetopia.io/widget/battery-date-time-green-sSH",
+        "titleTags": [
+          "battery"
+        ],
+        "visualReviewed": false
+      },
+      {
+        "position": 26,
+        "title": "tokyo",
+        "url": "https://widgetopia.io/widget/tokyo-sSH",
+        "titleTags": [],
+        "visualReviewed": false
+      },
+      {
+        "position": 27,
+        "title": "Steps Man Black",
+        "url": "https://widgetopia.io/widget/steps-man-black",
+        "titleTags": [
+          "steps"
+        ],
+        "visualReviewed": false
+      },
+      {
+        "position": 28,
+        "title": "Calendar 01",
+        "url": "https://widgetopia.io/widget/calendar-01-sS",
+        "titleTags": [
+          "calendar"
+        ],
+        "visualReviewed": false
+      },
+      {
+        "position": 29,
+        "title": "Calendar and agenda",
+        "url": "https://widgetopia.io/widget/calendar-and-agenda-sL",
+        "titleTags": [
+          "calendar"
+        ],
+        "visualReviewed": false
+      },
+      {
+        "position": 30,
+        "title": "SHINING",
+        "url": "https://widgetopia.io/widget/shining",
+        "titleTags": [],
+        "visualReviewed": false
+      },
+      {
+        "position": 31,
+        "title": "Month & Date",
+        "url": "https://widgetopia.io/widget/month-date",
+        "titleTags": [
+          "calendar"
+        ],
+        "visualReviewed": false
+      },
+      {
+        "position": 32,
+        "title": "Step It Up Themeable Version",
+        "url": "https://widgetopia.io/widget/step-it-up-themeable-version",
+        "titleTags": [
+          "steps"
+        ],
+        "visualReviewed": false
+      },
+      {
+        "position": 33,
+        "title": "Steps Woman Black",
+        "url": "https://widgetopia.io/widget/steps-woman-black",
+        "titleTags": [
+          "steps"
+        ],
+        "visualReviewed": false
+      },
+      {
+        "position": 34,
+        "title": "Flip Clock Weather v2 Copy",
+        "url": "https://widgetopia.io/widget/flip-clock-weather-v2-copy-sLF",
+        "titleTags": [
+          "clock",
+          "weather"
+        ],
+        "visualReviewed": false
+      },
+      {
+        "position": 35,
+        "title": "Hush",
+        "url": "https://widgetopia.io/widget/hush-sL",
+        "titleTags": [],
+        "visualReviewed": false
+      },
+      {
+        "position": 36,
+        "title": "Calendar Window",
+        "url": "https://widgetopia.io/widget/calendar-window",
+        "titleTags": [
+          "calendar"
+        ],
+        "visualReviewed": false
+      },
+      {
+        "position": 37,
+        "title": "12 Widget 02",
+        "url": "https://widgetopia.io/widget/12-widget-02",
+        "titleTags": [],
+        "visualReviewed": false
+      },
+      {
+        "position": 38,
+        "title": "widgetopia - Calendar",
+        "url": "https://widgetopia.io/widget/widgetopia-calendar",
+        "titleTags": [
+          "calendar"
+        ],
+        "visualReviewed": false
+      },
+      {
+        "position": 39,
+        "title": "INFOS SYSTEME 001 page 1 bleu",
+        "url": "https://widgetopia.io/widget/infos-systeme-001-page-1-bleu",
+        "titleTags": [],
+        "visualReviewed": false
+      },
+      {
+        "position": 40,
+        "title": "c u t i e",
+        "url": "https://widgetopia.io/widget/c-u-t-i-e",
+        "titleTags": [],
+        "visualReviewed": false
+      }
+    ],
+    "keywordCounts": {
+      "clock": 6,
+      "calendar": 8,
+      "battery": 7,
+      "steps": 3,
+      "weather": 4
+    }
+  },
+  "recent": {
+    "source": "https://widgetopia.io/chart",
+    "items": [
+      {
+        "position": 1,
+        "title": "、うい",
+        "url": "https://widgetopia.io/widget/z7OUN9hYnxS",
+        "visualGroup": "information",
+        "visualNote": "大数字与月历，黑白装饰",
+        "visualReviewed": true
+      },
+      {
+        "position": 2,
+        "title": "satosugu",
+        "url": "https://widgetopia.io/widget/satosugu-Y",
+        "visualGroup": "image",
+        "visualNote": "角色图像",
+        "visualReviewed": true
+      },
+      {
+        "position": 3,
+        "title": "spiderman",
+        "url": "https://widgetopia.io/widget/spiderman-sS7X",
+        "visualGroup": "image",
+        "visualNote": "角色肖像",
+        "visualReviewed": true
+      },
+      {
+        "position": 4,
+        "title": ".. black n white spider lily gif",
+        "url": "https://widgetopia.io/widget/--black-n-white-spider-lily-gif-W",
+        "visualGroup": "image",
+        "visualNote": "纽约文字与城市图像",
+        "visualReviewed": true
+      },
+      {
+        "position": 5,
+        "title": "jshsjs",
+        "url": "https://widgetopia.io/widget/jshsjs",
+        "visualGroup": "image",
+        "visualNote": "花卉",
+        "visualReviewed": true
+      },
+      {
+        "position": 6,
+        "title": "Cat",
+        "url": "https://widgetopia.io/widget/cat-L",
+        "visualGroup": "image",
+        "visualNote": "猫的图像",
+        "visualReviewed": true
+      },
+      {
+        "position": 7,
+        "title": "Porsche 911 gt3 rs",
+        "url": "https://widgetopia.io/widget/porsche-911-gt3-rs",
+        "visualGroup": "image",
+        "visualNote": "汽车与品牌文字",
+        "visualReviewed": true
+      },
+      {
+        "position": 8,
+        "title": "calendario hello kitty copy",
+        "url": "https://widgetopia.io/widget/calendario-hello-kitty-copy",
+        "visualGroup": "information",
+        "visualNote": "角色与月历",
+        "visualReviewed": true
+      },
+      {
+        "position": 9,
+        "title": "Waving Paw",
+        "url": "https://widgetopia.io/widget/waving-paw-W",
+        "visualGroup": "image",
+        "visualNote": "像素猫爪",
+        "visualReviewed": true
+      },
+      {
+        "position": 10,
+        "title": "cherry clossom moving widget",
+        "url": "https://widgetopia.io/widget/cherry-clossom-moving-widget",
+        "visualGroup": "image",
+        "visualNote": "樱花风景",
+        "visualReviewed": true
+      },
+      {
+        "position": 11,
+        "title": "clock",
+        "url": "https://widgetopia.io/widget/clock-u",
+        "visualGroup": "information",
+        "visualNote": "大时间数字与角色符号",
+        "visualReviewed": true
+      },
+      {
+        "position": 12,
+        "title": ".. black n white spider lily gif copy",
+        "url": "https://widgetopia.io/widget/--black-n-white-spider-lily-gif-copy-Y",
+        "visualGroup": "image",
+        "visualNote": "蜘蛛符号",
+        "visualReviewed": true
+      },
+      {
+        "position": 13,
+        "title": ".. black n white spider lily gif",
+        "url": "https://widgetopia.io/widget/--black-n-white-spider-lily-gif",
+        "visualGroup": "image",
+        "visualNote": "黑白花卉",
+        "visualReviewed": true
+      },
+      {
+        "position": 14,
+        "title": "sksksoxmskzo",
+        "url": "https://widgetopia.io/widget/sksksoxmskzo",
+        "visualGroup": "image",
+        "visualNote": "像素角色",
+        "visualReviewed": true
+      },
+      {
+        "position": 15,
+        "title": "music",
+        "url": "https://widgetopia.io/widget/music-e",
+        "visualGroup": "music-object",
+        "visualNote": "音乐播放器造型",
+        "visualReviewed": true
+      },
+      {
+        "position": 16,
+        "title": "blue aesthetic",
+        "url": "https://widgetopia.io/widget/blue-aesthetic-s",
+        "visualGroup": "image",
+        "visualNote": "人物插画",
+        "visualReviewed": true
+      },
+      {
+        "position": 17,
+        "title": "cd",
+        "url": "https://widgetopia.io/widget/cd-sStC",
+        "visualGroup": "music-object",
+        "visualNote": "透明 CD 盒图像",
+        "visualReviewed": true
+      },
+      {
+        "position": 18,
+        "title": "gif",
+        "url": "https://widgetopia.io/widget/gif-V",
+        "visualGroup": "image",
+        "visualNote": "像素角色",
+        "visualReviewed": true
+      },
+      {
+        "position": 19,
+        "title": "cutecore gif _",
+        "url": "https://widgetopia.io/widget/cutecore-gif-",
+        "visualGroup": "image",
+        "visualNote": "角色图像",
+        "visualReviewed": true
+      },
+      {
+        "position": 20,
+        "title": "dollar",
+        "url": "https://widgetopia.io/widget/dollar-sMa",
+        "visualGroup": "image",
+        "visualNote": "纸币图像",
+        "visualReviewed": true
+      }
+    ],
+    "visualCounts": {
+      "image": 15,
+      "information": 3,
+      "music-object": 2
+    }
+  },
+  "reviews": [
+    {
+      "source": "https://apps.apple.com/us/app/color-widgets/id1531594277?platform=watch",
+      "title": "It’s good",
+      "displayDate": "Oct 5",
+      "summary": "希望照片背景与图标文字有更多组合方式。"
+    },
+    {
+      "source": "https://apps.apple.com/us/app/color-widgets/id1531594277?platform=watch",
+      "title": "I love it buttt",
+      "displayDate": "Jul 15",
+      "summary": "喜欢表达个人风格，希望更容易追踪创作者的新作品。"
+    },
+    {
+      "source": "https://apps.apple.com/us/app/color-widgets/id1531594277?platform=watch",
+      "title": "Love it but some things….",
+      "displayDate": "Jun 12",
+      "summary": "逐个修改图标麻烦，喜欢可免费使用的内容。"
+    },
+    {
+      "source": "https://apps.apple.com/us/app/color-widgets/id1531594277?platform=watch",
+      "title": "(;",
+      "displayDate": "May 11",
+      "summary": "希望浏览主题照片，并应用到背景、图标或组件。"
+    },
+    {
+      "source": "https://apps.apple.com/us/app/md-clock-flip-clock/id1536358464?platform=mac",
+      "title": "Good for Classroom",
+      "displayDate": "2023-10-02",
+      "summary": "喜欢大屏时钟用于课堂，趣味外观营造氛围，希望有更多视觉选项。"
+    },
+    {
+      "source": "https://apps.apple.com/us/app/md-clock-flip-clock/id1536358464?platform=mac",
+      "title": "Not worth the hassle",
+      "displayDate": "Feb 2",
+      "summary": "喜欢部分表盘，但切换提示和设置控件失效妨碍使用。"
+    },
+    {
+      "source": "https://apps.apple.com/us/app/md-clock-flip-clock/id1536358464?platform=mac",
+      "title": "Worth getting premium lifetime",
+      "displayDate": "2022-11-17",
+      "summary": "特别喜欢像素动物和时钟，也在意买断付费。"
+    },
+    {
+      "source": "https://apps.apple.com/us/app/md-clock-flip-clock/id1536358464?platform=mac",
+      "title": "Worked really well until it didn't",
+      "displayDate": "2022-11-10",
+      "summary": "肯定外观，但更新后无法使用。"
+    }
+  ],
+  "usageSignals": [
+    {
+      "source": "https://david-smith.org/blog/2023/09/18/widgetsmith-5-interactive-widgets/",
+      "date": "2023-09-18",
+      "summary": "开发者披露单图是当时配置最多的组件；未披露占比。"
+    },
+    {
+      "source": "https://apps.apple.com/us/app/color-widgets/id1531594277?platform=watch",
+      "summary": "开发者列出的常用类型包含照片、时间日期电量、倒计日和日历；未披露各类型占比。"
+    },
+    {
+      "source": "https://apps.apple.com/us/app/md-clock-flip-clock/id1536358464?platform=mac",
+      "displayDate": "2025-12-02",
+      "summary": "版本记录将 8-Bit、Digital、Hard Candy 列为热门主题；未披露各主题占比。"
+    }
+  ]
+}

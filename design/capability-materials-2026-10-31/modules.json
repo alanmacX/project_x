@@ -32,22 +32,6 @@
     "assetBytes": 108162
   },
   {
-    "id": "clock-signal",
-    "name": "信号",
-    "capability": "时钟",
-    "tone": "#D9DAE1",
-    "recipe": [
-      "蓝色纸张上叠低透明度磨砂材质",
-      "横向椭圆卡片，深蓝纸张",
-      "左侧添加三条斜线，调成荧光黄",
-      "把时钟移到右侧，使用浅色墨色"
-    ],
-    "dimension": "2*2",
-    "canvas": "cards/clock-signal.fridge",
-    "elements": 4,
-    "assetBytes": 64172
-  },
-  {
     "id": "date-leaf",
     "name": "日历纸",
     "capability": "日期",
@@ -80,22 +64,5 @@
     "canvas": "cards/countdown-pass.fridge",
     "elements": 7,
     "assetBytes": 33860
-  },
-  {
-    "id": "battery-tag",
-    "name": "电量吊牌",
-    "capability": "电量",
-    "tone": "#C4D2D8",
-    "recipe": [
-      "黄色卡片上叠低透明度磨砂材质",
-      "窄长椭圆卡片，亮黄色纸张",
-      "顶部叠放深色、浅色两个圆形形成环形装饰",
-      "电量能力移到下半部，使用深蓝墨色",
-      "纸张、装饰和电量位置都可单独改"
-    ],
-    "dimension": "2*2",
-    "canvas": "cards/battery-tag.fridge",
-    "elements": 3,
-    "assetBytes": 64172
   }
 ]

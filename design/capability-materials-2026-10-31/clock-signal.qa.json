@@ -440,12 +440,11 @@
     }
   ],
   "visualEvidence": [
-    "overview.png",
-    "overview-empty.png",
-    "overview-long.png",
-    "layers.png",
-    "mobile-editor.png"
+    "previews/clock-signal-demo-300.png",
+    "previews/clock-signal-empty-180.png",
+    "previews/clock-signal-long-300.png"
   ],
   "singleCapability": true,
-  "editableLayers": true
+  "editableLayers": true,
+  "candidateStatus": "rejected-by-user"
 }

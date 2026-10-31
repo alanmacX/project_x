@@ -452,12 +452,11 @@
     }
   ],
   "visualEvidence": [
-    "overview.png",
-    "overview-empty.png",
-    "overview-long.png",
-    "layers.png",
-    "mobile-editor.png"
+    "previews/battery-tag-demo-300.png",
+    "previews/battery-tag-empty-180.png",
+    "previews/battery-tag-long-300.png"
   ],
   "singleCapability": true,
-  "editableLayers": true
+  "editableLayers": true,
+  "candidateStatus": "rejected-by-user"
 }

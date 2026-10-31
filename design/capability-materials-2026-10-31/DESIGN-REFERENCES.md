@@ -2,6 +2,8 @@
 
 2026-10-31。采用 anti-aidesign、仓库 fridge-create 与 imagegen skill。范围已经按用户纠偏改为单能力卡片预设。
 
+状态：此页记录旧材质稿的制作依据。用户随后撤回手工复现限制，并否定吊牌与信号；最新研究与架构见[模板偏好调查](../../research/template-preferences-2026-10-31/README.md)。
+
 ## 实际查看
 
 - [Apple Watch 表盘](https://support.apple.com/en-ie/guide/watch/apde9218b440/watchos)：浏览器查看 Artist、Contour、Numerals Duo、Playtime 的图像。时间可参与插画、轮廓和数字造型；据此选择让每张能力卡拥有自己的外形与材质，不要求每张都带相同标题和底板。没有使用 Apple 图像、字体、角色或表盘资产。
