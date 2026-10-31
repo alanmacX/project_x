@@ -1,0 +1,20 @@
+{
+  "at": "2026-10-31T16:47:53.764Z",
+  "tests": [
+    "source preserved",
+    "card/canvas ID preserved",
+    "independent agenda/note",
+    "no duplicate added card",
+    "instance parameters retained",
+    "depth z-order",
+    "reset keeps other cards",
+    "remove affects selected card",
+    "390px no overflow",
+    "no offsite requests",
+    "no JS errors"
+  ],
+  "browserErrors": [],
+  "offsiteRequests": [],
+  "nativeAppModified": false,
+  "prototypeOnly": true
+}

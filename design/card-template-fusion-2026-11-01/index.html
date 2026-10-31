@@ -1,0 +1,19 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>卡片模板 · 融合原型</title><link rel="stylesheet" href="style.css"><body>
+<header class="study"><strong>卡片模板 · 融合原型</strong><nav><a href="ARCHITECTURE.md">重构方案</a><a href="#concepts">概念稿</a></nav></header>
+<main><div class="demo-switch" role="group" aria-label="演示画布"><button id="solo" aria-pressed="true">单卡画布</button><button id="ensemble" aria-pressed="false">自由组合</button></div>
+<section class="editor"><div class="editor-nav"><h1>皮皮的冰箱</h1><button id="add" aria-expanded="false">＋ 添加卡片</button></div>
+<div id="add-menu" hidden><button data-add="agenda">日程</button><button data-add="note">便签</button></div>
+<div class="workspace"><div class="board-wrap"><div id="board" class="board solo" aria-label="画布">
+<div id="clock-card" class="clock-card photo depth sage" role="img" aria-label="景深照片时钟，09:41"><div class="clock-surface"></div><div class="clock-time">09:41</div><div class="cat-wrap"><img id="cat" src="../template-capabilities-2026-11-01/assets/cat-pipi.webp" alt="Painjet 拍摄的皮皮"></div></div>
+<article id="agenda-card" class="agenda" hidden><span>接下来</span><strong>14:00</strong><p>阅读</p><small>示例日程</small><button aria-label="移除日程" data-remove="agenda">×</button></article>
+<article id="note-card" class="note" hidden><p>周末去看海</p><span>留一个没有安排的下午。</span><button aria-label="移除便签" data-remove="note">×</button></article>
+</div><p class="stage-caption" id="stage-caption">1 张卡片 · 2×2 画布</p></div>
+<aside aria-label="定制卡片"><h2>照片时钟</h2><div class="field"><span>照片</span><div class="subjects"><button data-subject="pipi" aria-pressed="true"><img src="../template-capabilities-2026-11-01/assets/cat-pipi.webp" alt="皮皮"></button><button data-subject="tabby" aria-pressed="false"><img src="../template-capabilities-2026-11-01/assets/cat-tabby.webp" alt="棕猫"></button></div></div>
+<label class="line"><span>景深</span><input id="depth" type="checkbox" role="switch" checked></label>
+<fieldset><legend>呈现</legend><div class="choices"><button data-surface="photo" aria-pressed="true">照片卡</button><button data-surface="bare" aria-pressed="false">无底</button></div></fieldset>
+<fieldset><legend>配色</legend><div class="swatches"><button class="sage" data-palette="sage" aria-label="草绿" aria-pressed="true"></button><button class="lilac" data-palette="lilac" aria-label="淡紫" aria-pressed="false"></button><button class="sand" data-palette="sand" aria-label="沙色" aria-pressed="false"></button></div></fieldset>
+<label class="field">主体大小<input id="scale" type="range" min="82" max="106" value="100"></label><label class="field">左右位置<input id="offset" type="range" min="-14" max="14" value="0"></label>
+<button id="reset" class="reset">还原定制</button><p class="credits"><a href="../template-capabilities-2026-11-01/LICENSES.md">照片与字体授权</a></p></aside></div></section>
+<p class="study-note">交互原型 · 示例时间 09:41</p>
+<section id="concepts"><h2>产品概念稿</h2><a href="concept-flow.png"><img src="concept-flow.png" alt="同一张模板卡从直接使用到自由组合"></a><a href="concept-customize.png"><img src="concept-customize.png" alt="景深与照片卡、贴纸、无底的定制方向"></a><p>以上两张为 imagegen 产品概念图。交互原型采用真实授权照片。</p></section></main>
+<script src="fusion-state.js"></script><script src="app.js"></script></body></html>
