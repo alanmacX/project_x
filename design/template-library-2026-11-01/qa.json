@@ -1,0 +1,31 @@
+{
+  "at": "2026-10-31T17:25:03.560Z",
+  "templates": 45,
+  "singleCards": 40,
+  "ensembles": 5,
+  "renderedStates": 405,
+  "sizes": [
+    180,
+    300,
+    420
+  ],
+  "scenarios": [
+    "demo",
+    "empty",
+    "long"
+  ],
+  "overflows": [],
+  "errors": [],
+  "offsiteRequests": [],
+  "dataChecks": {
+    "yearDays": 366,
+    "day": 365,
+    "zero": true,
+    "unknown": true,
+    "destNext": true,
+    "current": "九月 廿三"
+  },
+  "hostFrame": "actual FridgeWeb renderer, production shared-materials",
+  "nativeAppModified": false,
+  "unusedTitleControlsHidden": true
+}

@@ -1,0 +1,34 @@
+(function(){
+const $=id=>document.getElementById(id),{catalog,categories}=TemplateCatalog;
+let kind='all',scenario='demo',picked=new Set(),onlyPicked=false,selected=null,place='card';const drafts=new Map();
+try{picked=new Set(JSON.parse(localStorage.getItem('template-library-review-20261101')||'[]').filter(id=>catalog.some(c=>c.id===id)));}catch(_){}
+const titleKinds=['countdown','anniversary','agenda','timetable','album'];
+const options=()=>selected?{scenario,...(drafts.get(selected.id)||{})}:{scenario};
+function persist(){try{localStorage.setItem('template-library-review-20261101',JSON.stringify([...picked]));}catch(_){}$('picked-count').textContent=picked.size;}
+function toggle(id){picked.has(id)?picked.delete(id):picked.add(id);persist();if(onlyPicked)gallery();else document.querySelectorAll(`[data-pick="${id}"]`).forEach(b=>{b.setAttribute('aria-pressed',String(picked.has(id)));b.textContent=picked.has(id)?'★':'☆';});if(selected?.id===id)$('pick').textContent=picked.has(id)?'已收藏 · 取消收藏':'收藏这款';}
+function gallery(){const filtered=catalog.filter(c=>(kind==='all'||c.kind===kind)&&(!onlyPicked||picked.has(c.id)));
+ $('results').textContent=filtered.length+' 款';$('no-results').hidden=filtered.length>0;
+ $('gallery').innerHTML=categories.map(([k,label])=>{const items=filtered.filter(c=>c.kind===k);return !items.length?'':`<section data-category="${k}"><h2>${label}</h2><div class="grid ${k==='clock'?'clock-grid':''}">${items.map(c=>`<figure class="sample"><button class="sample-open" data-open="${c.id}" aria-label="预览${c.name}"><div class="slot">${TemplateRender.render(c.id,{scenario,...(drafts.get(c.id)||{})})}</div></button><figcaption><div>${c.name}<small>${c.scope==='group'?c.sources.map(s=>categories.find(([k])=>k===s)?.[1]||s).join(' + '):c.reference}</small></div><button class="star" data-pick="${c.id}" aria-label="收藏${c.name}" aria-pressed="${picked.has(c.id)}">${picked.has(c.id)?'★':'☆'}</button></figcaption></figure>`).join('')}</div></section>`;}).join('');
+ document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>open(b.dataset.open));document.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>toggle(b.dataset.pick));
+ document.querySelectorAll('[data-filter]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.filter===kind)));
+}
+function press(selector,attr,value){document.querySelectorAll(selector).forEach(b=>b.setAttribute('aria-pressed',String(b.dataset[attr]===value)));}
+function host(){const o=options();$('stage').className='stage '+place+(selected.aspect===2?' wide':'');const source=TemplateRender.render(selected.id,o);$('stage').innerHTML='<div class="host-background"></div><div class="slot">'+source+'</div><div class="host-frame"></div>';
+ if(place==='fill'){
+ const art=$('stage').querySelector('.art'),style=getComputedStyle(art),original=style.getPropertyValue('--bg').trim(),bg=o.background==='light'?'#EAE5D8':o.background==='dark'?'#15191B':original;
+ const frame=o.frame||'none',state=FridgeCore.load('CardSchema').defaultState();state.canvasDimension=selected.aspect===2?'2*4':'4*4';state.canvasAspect=selected.aspect;state.background.color=bg;state.background.frameStyle=frame==='none'?'none':(o.background==='dark'?'dark':'light');state.background.frameMaterial=frame==='none'?'stone':frame;
+ const output=FridgeWeb.renderPackage({format:'fridgememo-template',version:1,kind:'canvas',state,assets:[]},420,LibraryFixtures.tick),layers=output.layers;
+ $('stage').querySelector('.host-background').innerHTML=`<svg viewBox="0 0 420 ${420/selected.aspect}" xmlns="http://www.w3.org/2000/svg"><defs>${layers.defs}</defs>${layers.background}</svg>`;
+ $('stage').querySelector('.host-frame').innerHTML=`<svg viewBox="0 0 420 ${420/selected.aspect}" xmlns="http://www.w3.org/2000/svg">${layers.frame}</svg>`;
+ if(frame!=='none')$('stage').classList.add('framed');if(o.background==='light'||o.background==='dark'){$('stage').classList.add(o.background);art.style.setProperty('--accent',o.background==='light'?'#597849':'#D4C782');}
+ }
+ $('host-controls').hidden=place!=='fill';press('[data-place]','place',place);
+}
+function open(id){selected=catalog.find(c=>c.id===id);if(!drafts.has(id))drafts.set(id,{});place='card';$('detail-name').textContent=selected.name;$('sources').textContent=selected.sources.map(s=>categories.find(([k])=>k===s)?.[1]||s).join(' + ');$('customizable').textContent='可定制：'+selected.customize.join('、');$('title-field').hidden=!(titleKinds.includes(selected.kind)||['mix-modular','mix-study','mix-travel'].includes(selected.id));$('depth-field').hidden=id!=='portrait';const o=options();$('title').value=o.title||'';$('depth').checked=o.depth!==false;$('background').value=o.background||'template';$('frame').value=o.frame||'none';press('[data-palette]','palette',o.palette||'');$('pick').textContent=picked.has(id)?'已收藏 · 取消收藏':'收藏这款';host();$('detail').showModal();}
+function set(key,value){drafts.set(selected.id,{...drafts.get(selected.id),[key]:value});host();}
+$('filters').innerHTML=[['all','全部'],...categories].map(([k,n])=>`<button data-filter="${k}" aria-pressed="${k==='all'}">${n}</button>`).join('');document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{kind=b.dataset.filter;gallery();});
+$('scenario').onchange=e=>{scenario=e.target.value;gallery();};$('size').onchange=e=>document.body.classList.toggle('compact',e.target.value==='180');$('review').onclick=()=>{onlyPicked=!onlyPicked;$('review').setAttribute('aria-pressed',String(onlyPicked));gallery();};$('close').onclick=()=>{$('detail').close();gallery();};$('detail').addEventListener('click',e=>{if(e.target===$('detail')){const r=$('detail').getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom){$('detail').close();gallery();}}});$('detail').addEventListener('cancel',()=>requestAnimationFrame(gallery));
+$('title').oninput=e=>set('title',e.target.value);$('depth').onchange=e=>set('depth',e.target.checked);$('background').onchange=e=>set('background',e.target.value);$('frame').onchange=e=>set('frame',e.target.value);document.querySelectorAll('[data-palette]').forEach(b=>b.onclick=()=>{set('palette',b.dataset.palette);press('[data-palette]','palette',b.dataset.palette);});document.querySelectorAll('[data-place]').forEach(b=>b.onclick=()=>{place=b.dataset.place;host();});$('pick').onclick=()=>toggle(selected.id);
+window.LibraryDemo={open,setScenario:v=>{scenario=v;$('scenario').value=v;gallery();},snapshot:()=>({kind,scenario,picked:[...picked],selected:selected?.id,place,drafts:Object.fromEntries(drafts)}),render:TemplateRender.render,catalog};
+persist();gallery();
+})();
