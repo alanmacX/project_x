@@ -91,6 +91,7 @@ exports.templateArcPath = templateArcPath;
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.cardTemplateScene = exports.templatePhoto = exports.templateContrastInk = exports.templateColors = exports.TemplateScene = exports.TemplateMark = void 0;
+const TemplatePhotoComposition_1 = require("./TemplatePhotoComposition");
 const CompositionCatalog_1 = require("./CompositionCatalog");
 const TemplatePhotoGeometry_1 = require("./TemplatePhotoGeometry");
 const CompositionCatalog_2 = require("./CompositionCatalog");
@@ -167,7 +168,7 @@ function cardTemplateScene(card, tick) {
     const id = card.template?.id ?? '', now = new Date(tick || Date.now()), zone = cap.zone ?? 'Asia/Shanghai', zoned = cap.k === 'worldclock' ? new Date(tick - (0, TimeCapabilities_1.clockOffset)(zone, tick) * 3600000) : now;
     const hour = cap.k === 'worldclock' ? zoned.getUTCHours() : now.getHours(), minute = cap.k === 'worldclock' ? zoned.getUTCMinutes() : now.getMinutes(), hh = ('0' + hour).slice(-2), mm = ('0' + minute).slice(-2), day = now.getDate(), month = now.getMonth() + 1, year = now.getFullYear(), week = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][now.getDay()];
     const add = (kind, x, y, w, h, color = s.ink) => { const m = new TemplateSceneTypes_1.TemplateMark(); m.kind = kind; m.x = x; m.y = y; m.w = w; m.h = h; m.color = color; s.marks.push(m); return m; };
-    const text = (value, x, y, size = 16, color = s.ink, width = 250, align = 'left', weight = 400) => { const m = add('text', x, y, Math.max(1, Math.min(width, 300 - x)), Math.max(1, Math.min(size * 1.2, 300 - y)), color); m.text = value.trim().replace(/\s+/g, ' '); m.size = size; m.align = align; m.weight = weight; return m; };
+    const text = (value, x, y, size = 16, color = s.ink, width = 250, align = 'left', weight = 400) => { const m = add('text', x, y, Math.max(1, Math.min(width, 300 - x)), Math.max(1, Math.min(size * 1.2, s.height - y)), color); m.text = value.trim().replace(/\s+/g, ' '); m.size = size; m.align = align; m.weight = weight; return m; };
     const rect = (x, y, w, h, color, r = 0) => { const m = add('rect', x, y, w, h, color); m.r = r; return m; };
     const arc = (x, y, r, start, sweep, color, width) => { const m = add('arc', x, y, r * 2, r * 2, color); m.r = r; m.start = start; m.sweep = sweep; m.stroke = width; return m; };
     const line = (x, y, a, b, color = s.ink, width = 1) => { const m = add('line', x, y, a, b, color); m.stroke = width; return m; };
@@ -251,26 +252,36 @@ function cardTemplateScene(card, tick) {
     }
     else if (id === 'portrait') {
         s.height = 300 * card.h / card.w;
-        const reserve = s.height < 180 ? 44 : 74, available = Math.max(1, s.height - reserve), subject = photo?.depthEnabled && !!photo.depthForeground, subjectMode = subject && personal.photoMode !== 'photo';
+        const subject = photo?.depthEnabled && !!photo.depthForeground, subjectMode = subject && personal.photoMode !== 'photo';
         if (photo) {
+            const frame = (0, TemplatePhotoComposition_1.portraitPhotoFrame)(card, photo);
             if (subjectMode) {
-                const box = (0, TemplatePhotoGeometry_1.templatePhotoBox)(photo, personal, 300, available, false, true);
-                image(photo.depthForeground, box.x, reserve + box.y, box.w, box.h, personal.depth ? 3 : 1);
+                image(photo.depthForeground, frame.x, frame.y, frame.w, frame.h, personal.depth ? 3 : 1);
             }
             else {
-                const frame = (0, TemplatePhotoGeometry_1.templatePhotoBox)(photo, personal, 300, available, false);
-                image(photo.src, frame.x, reserve + frame.y, frame.w, frame.h);
+                image(photo.src, frame.x, frame.y, frame.w, frame.h);
                 if (subject && personal.depth) {
                     const box = (0, TemplatePhotoGeometry_1.templateSubjectBox)(photo, frame);
-                    image(photo.depthForeground, box.x, reserve + box.y, box.w, box.h, 3);
+                    image(photo.depthForeground, box.x, box.y, box.w, box.h, 3);
                 }
             }
         }
         else
             text('选择你的照片', 24, Math.min(174, s.height - 28), 22, s.ink, 252, 'center');
-        const t = text(hh + ':' + mm, 9, s.height < 180 ? 8 : 14, s.height < 180 ? 48 : 82, s.ink, 282, 'center', 800);
-        t.layer = 2;
-        t.font = 'digits';
+        const clock = (0, TemplatePhotoComposition_1.photoClockLayout)(300, s.height, personal.clockPosition ?? 'top'), ink = personal.clockInk || s.ink;
+        if (clock.stacked) {
+            const hour = text(hh, clock.x, clock.y, clock.size, ink, clock.w, 'center', 800);
+            hour.layer = 2;
+            hour.font = 'digits';
+            const minute = text(mm, clock.x, clock.y + clock.size * 1.04, clock.size, ink, clock.w, 'center', 800);
+            minute.layer = 2;
+            minute.font = 'digits';
+        }
+        else {
+            const t = text(hh + ':' + mm, clock.x, clock.y, clock.size, ink, clock.w, 'center', 800);
+            t.layer = 2;
+            t.font = 'digits';
+        }
     }
     else if (id === 'anniversary-photo') {
         if (photo)
@@ -547,107 +558,166 @@ function cardTemplateScene(card, tick) {
 exports.cardTemplateScene = cardTemplateScene;
 
 },
-"CompositionCatalog":function(require,module,exports){
+"TemplatePhotoComposition":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.compositionLayout = exports.compositionColors = exports.compositionOwner = exports.compositionSlot = exports.compositionDefinition = exports.COMPOSITIONS = void 0;
-exports.COMPOSITIONS = [
-    { id: 'mix-standby', revision: 1, name: '桌边', slots: [
-            { id: 'face-desk-clock', kind: 'clock', role: '主时间', x: 0, y: 0, w: 300, h: 300, primary: true },
-            { id: 'face-desk-calendar', kind: 'calendar', role: '周历', x: 22, y: 180, w: 256, h: 98, primary: false }
-        ] },
-    { id: 'mix-modular', revision: 1, name: '今日', slots: [
-            { id: 'face-day-clock', kind: 'clock', role: '主时间', x: 0, y: 0, w: 300, h: 300, primary: true },
-            { id: 'face-day-agenda', kind: 'agenda', role: '接下来的日程', x: 24, y: 151, w: 252, h: 65, primary: false },
-            { id: 'face-day-battery', kind: 'battery', role: '电量', x: 24, y: 238, w: 252, h: 40, primary: false }
-        ] },
-    { id: 'mix-study', revision: 1, name: '课间', slots: [
-            { id: 'face-study-clock', kind: 'clock', role: '时间', x: 0, y: 0, w: 300, h: 300, primary: true },
-            { id: 'face-study-course', kind: 'timetable', role: '下节课', x: 22, y: 106, w: 256, h: 124, primary: false },
-            { id: 'face-study-progress', kind: 'dayprogress', role: '今日进度', x: 22, y: 251, w: 256, h: 27, primary: false }
-        ] },
-    { id: 'mix-travel', revision: 1, name: '远行', slots: [
-            { id: 'face-travel-world', kind: 'worldclock', role: '目的地时间', x: 0, y: 0, w: 300, h: 300, primary: true },
-            { id: 'face-travel-countdown', kind: 'countdown', role: '出发倒计时', x: 24, y: 239, w: 252, h: 39, primary: false }
-        ] },
-    { id: 'mix-memory', revision: 1, name: '相片日历', slots: [
-            { id: 'face-memory-photo', kind: 'anniversary', role: '照片与纪念日', x: 0, y: 0, w: 300, h: 300, primary: true },
-            { id: 'face-memory-date', kind: 'date', role: '日期', x: 22, y: 20, w: 256, h: 28, primary: false },
-            { id: 'face-memory-lunar', kind: 'lunar', role: '农历', x: 22, y: 265, w: 256, h: 16, primary: false }
-        ] }
-];
-function compositionDefinition(id) { return exports.COMPOSITIONS.find(c => c.id === id); }
-exports.compositionDefinition = compositionDefinition;
-function compositionSlot(id) {
-    for (const face of exports.COMPOSITIONS) {
-        const slot = face.slots.find(s => s.id === id);
-        if (slot)
-            return slot;
-    }
-    return undefined;
-}
-exports.compositionSlot = compositionSlot;
-function compositionOwner(id) { return exports.COMPOSITIONS.find(c => c.slots.some(s => s.id === id)); }
-exports.compositionOwner = compositionOwner;
-function compositionColors(id, palette) {
-    if (palette === 'cream')
-        return ['#EFE8D9', '#333C43', '#B36143'];
-    if (palette === 'cobalt')
-        return ['#173F89', '#F5EDDB', '#ECC071'];
-    if (palette === 'ink')
-        return ['#131A1E', '#F1EDE4', '#B9D889'];
-    if (id === 'mix-modular')
-        return ['#111B22', '#F5F0E5', '#BBDD88'];
-    if (id === 'mix-travel')
-        return ['#172F3D', '#F2E7D4', '#E9AB69'];
-    if (id === 'mix-study')
-        return ['#F0EADD', '#493F33', '#A6523C'];
-    if (id === 'mix-memory')
-        return ['#D8DECD', '#2B4338', '#5F795F'];
-    return ['#E9E8DD', '#263B4E', '#AF653D'];
-}
-exports.compositionColors = compositionColors;
-/** Wide faces have separately authored positions, never stretched square glyphs. */
-function compositionLayout(face, aspect) {
-    if (aspect < 1.5)
-        return { width: 300, height: 300, slots: face.slots };
-    const output = face.slots.map((s) => ({ id: s.id, kind: s.kind, role: s.role, x: s.x, y: s.y, w: s.w, h: s.h, primary: s.primary }));
-    if (!output.length)
-        return { width: 300, height: 150, slots: [] };
-    output[0].h = 150;
-    const boxes = face.id === 'mix-standby' ? [[176, 16, 104, 120]] : face.id === 'mix-modular' ? [[180, 18, 100, 67], [180, 103, 100, 30]] : face.id === 'mix-study' ? [[156, 18, 124, 88], [18, 119, 262, 18]] : face.id === 'mix-travel' ? [[174, 46, 104, 80]] : face.id === 'mix-memory' ? [[18, 14, 130, 22], [18, 128, 130, 12]] : [];
-    if (boxes.length !== output.length - 1)
-        return { width: 300, height: 150, slots: [] };
-    boxes.forEach((b, i) => { output[i + 1].x = b[0]; output[i + 1].y = b[1]; output[i + 1].w = b[2]; output[i + 1].h = b[3]; });
-    return { width: 300, height: 150, slots: output };
-}
-exports.compositionLayout = compositionLayout;
-
-},
-"TemplatePhotoGeometry":function(require,module,exports){
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.templateSubjectBox = exports.templatePhotoBox = void 0;
+exports.recommendPhotoClock = exports.PhotoClockRecommendation = exports.PhotoSamples = exports.PhotoCameraGesture = exports.PhotoCameraPose = exports.PhotoGesturePoint = exports.portraitPhotoFrame = exports.photoControlRegion = exports.photoClockLayout = exports.PhotoClockLayout = exports.PHOTO_CLOCK_POSITIONS = void 0;
 const CardSchema_1 = require("./CardSchema");
-/** One camera for the original image and the extracted foreground; no independently floating duplicate. */
-function templatePhotoBox(photo, config, width, height, cover, subject = false) {
-    const box = new CardSchema_1.ElementBox(), aspect = Math.max(.01, (photo.depthSourceAspect || 1) * (subject ? photo.depthCrop.w / Math.max(.001, photo.depthCrop.h) : 1)), scale = cover ? Math.max(width / aspect, height) : Math.min(width / aspect, height);
-    box.w = scale * aspect * config.zoom;
-    box.h = scale * config.zoom;
-    box.x = (width - box.w) / 2 + config.offsetX * width;
-    box.y = (height - box.h) / 2 + config.offsetY * height;
+const TemplatePhotoGeometry_1 = require("./TemplatePhotoGeometry");
+exports.PHOTO_CLOCK_POSITIONS = ['top-left', 'top', 'top-right', 'bottom-left', 'bottom', 'bottom-right'];
+class PhotoClockLayout {
+    constructor() {
+        this.x = 0;
+        this.y = 0;
+        this.w = 0;
+        this.h = 0;
+        this.size = 0;
+        this.stacked = false;
+    }
+}
+exports.PhotoClockLayout = PhotoClockLayout;
+function photoClockLayout(width, height, position = 'top') {
+    const out = new PhotoClockLayout(), side = position.endsWith('-left') || position.endsWith('-right');
+    out.stacked = side;
+    out.size = side ? Math.min(70, width * .24, height * .27) : Math.min(82, width * .274, height * .32);
+    out.w = side ? width * .42 : width * .94;
+    out.h = out.size * (side ? 2.24 : 1.2);
+    out.x = side ? (position.endsWith('-right') ? width - out.w - width * .04 : width * .04) : (width - out.w) / 2;
+    const inset = Math.min(18, height * .065);
+    out.y = position.startsWith('bottom') ? height - out.h - inset : inset;
+    return out;
+}
+exports.photoClockLayout = photoClockLayout;
+function photoControlRegion(card) {
+    const box = new CardSchema_1.ElementBox(), wide = card.w / card.h >= 1.5;
+    box.w = 300;
+    box.h = 300 * card.h / card.w;
+    if (card.template?.id === 'portrait') {
+        if (card.template.photoFraming !== 'cover') {
+            box.y = box.h < 180 ? 44 : 74;
+            box.h = Math.max(1, box.h - box.y);
+        }
+    }
+    else {
+        box.x = wide ? 148 : 138;
+        box.y = wide ? 16 : 58;
+        box.w = wide ? 134 : 140;
+        box.h = wide ? 118 : 169;
+    }
     return box;
 }
-exports.templatePhotoBox = templatePhotoBox;
-function templateSubjectBox(photo, frame) {
-    const box = new CardSchema_1.ElementBox(), crop = photo.depthCrop;
-    box.x = frame.x + crop.x * frame.w;
-    box.y = frame.y + crop.y * frame.h;
-    box.w = crop.w * frame.w;
-    box.h = crop.h * frame.h;
+exports.photoControlRegion = photoControlRegion;
+function portraitPhotoFrame(card, photo) {
+    const region = photoControlRegion(card), t = card.template, subject = photo.depthEnabled && !!photo.depthForeground && t.photoMode !== 'photo';
+    const box = (0, TemplatePhotoGeometry_1.templatePhotoBox)(photo, t, region.w, region.h, t.photoFraming === 'cover' && !subject, subject);
+    box.x += region.x;
+    box.y += region.y;
     return box;
 }
-exports.templateSubjectBox = templateSubjectBox;
+exports.portraitPhotoFrame = portraitPhotoFrame;
+class PhotoGesturePoint {
+    constructor() {
+        this.id = 0;
+        this.x = 0;
+        this.y = 0;
+    }
+}
+exports.PhotoGesturePoint = PhotoGesturePoint;
+class PhotoCameraPose {
+    constructor() {
+        this.zoom = 1;
+        this.offsetX = 0;
+        this.offsetY = 0;
+    }
+}
+exports.PhotoCameraPose = PhotoCameraPose;
+/** Pointer coordinates and camera dimensions use the same local scene units. */
+class PhotoCameraGesture {
+    constructor() {
+        this.ids = '';
+        this.centerX = 0;
+        this.centerY = 0;
+        this.distance = 1;
+        this.initial = new PhotoCameraPose();
+    }
+    reset() { this.ids = ''; }
+    update(points, config, region) {
+        const result = new PhotoCameraPose();
+        result.zoom = config.zoom;
+        result.offsetX = config.offsetX;
+        result.offsetY = config.offsetY;
+        if (!points.length) {
+            this.reset();
+            return result;
+        }
+        const selected = points.slice(0, 2).sort((a, b) => a.id - b.id), ids = selected.map(p => p.id).join(':'), cx = selected.reduce((n, p) => n + p.x, 0) / selected.length, cy = selected.reduce((n, p) => n + p.y, 0) / selected.length;
+        const distance = selected.length > 1 ? Math.max(1, Math.hypot(selected[1].x - selected[0].x, selected[1].y - selected[0].y)) : 1;
+        if (ids !== this.ids) {
+            this.ids = ids;
+            this.centerX = cx;
+            this.centerY = cy;
+            this.distance = distance;
+            this.initial = result;
+            return result;
+        }
+        result.zoom = Math.max(.25, Math.min(4, this.initial.zoom * distance / this.distance));
+        const ratio = result.zoom / this.initial.zoom;
+        const originX = region.x + region.w / 2 + this.initial.offsetX * region.w, originY = region.y + region.h / 2 + this.initial.offsetY * region.h;
+        result.offsetX = Math.max(-1, Math.min(1, (cx + (originX - this.centerX) * ratio - region.x - region.w / 2) / region.w));
+        result.offsetY = Math.max(-1, Math.min(1, (cy + (originY - this.centerY) * ratio - region.y - region.h / 2) / region.h));
+        return result;
+    }
+}
+exports.PhotoCameraGesture = PhotoCameraGesture;
+class PhotoSamples {
+    constructor() {
+        this.width = 0;
+        this.height = 0;
+        this.rgba = [];
+    }
+}
+exports.PhotoSamples = PhotoSamples;
+class PhotoClockRecommendation {
+    constructor() {
+        this.position = 'top';
+        this.ink = '';
+    }
+}
+exports.PhotoClockRecommendation = PhotoClockRecommendation;
+function sample(image, u, v) { if (!image.width || u < 0 || v < 0 || u >= 1 || v >= 1)
+    return [0, 0, 0, 0]; const i = (Math.floor(v * image.height) * image.width + Math.floor(u * image.width)) * 4; return image.rgba.slice(i, i + 4); }
+function luma(rgb) { return (rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722) / 255; }
+/** Scores real alpha coverage (especially the upper subject) and visual texture in each time region. */
+function recommendPhotoClock(card, subject, original, background) {
+    const result = new PhotoClockRecommendation(), photo = card.elements.find(e => e.kind === 'image' && !!e.src);
+    if (!photo)
+        return result;
+    const frame = portraitPhotoFrame(card, photo), subjectMode = photo.depthEnabled && !!photo.depthForeground && card.template?.photoMode !== 'photo', front = subjectMode ? frame : (0, TemplatePhotoGeometry_1.templateSubjectBox)(photo, frame), height = 300 * card.h / card.w;
+    const bg = [parseInt(background.slice(1, 3), 16), parseInt(background.slice(3, 5), 16), parseInt(background.slice(5, 7), 16)];
+    let best = Infinity;
+    exports.PHOTO_CLOCK_POSITIONS.forEach((position, index) => {
+        const box = photoClockLayout(300, height, position);
+        let occupied = 0, bright = 0, squared = 0, n = 0;
+        for (let row = 0; row < 12; row++)
+            for (let col = 0; col < 16; col++) {
+                const x = box.x + (col + .5) / 16 * box.w, y = box.y + (row + .5) / 12 * box.h, uvY = (y - front.y) / front.h, mask = sample(subject, (x - front.x) / front.w, uvY), alpha = (mask[3] ?? 0) / 255;
+                occupied += alpha * (uvY < .42 ? 1.7 : 1);
+                const raw = subjectMode ? [...bg, 255] : sample(original, (x - frame.x) / frame.w, (y - frame.y) / frame.h), a = (raw[3] ?? 0) / 255;
+                const value = luma(raw) * a + luma(bg) * (1 - a);
+                bright += value;
+                squared += value * value;
+                n++;
+            }
+        const mean = bright / n, variance = Math.max(0, squared / n - mean * mean), score = occupied / n * 5 + Math.sqrt(variance) * 1.3 + index * .006;
+        if (score < best) {
+            best = score;
+            result.position = position;
+            result.ink = mean > .56 ? '#202222' : '#FFFFFF';
+        }
+    });
+    return result;
+}
+exports.recommendPhotoClock = recommendPhotoClock;
 
 },
 "CardSchema":function(require,module,exports){
@@ -1193,6 +1263,83 @@ function unifyTemplateGroups(cards, aspect) {
 exports.unifyTemplateGroups = unifyTemplateGroups;
 
 },
+"CompositionCatalog":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.compositionLayout = exports.compositionColors = exports.compositionOwner = exports.compositionSlot = exports.compositionDefinition = exports.COMPOSITIONS = void 0;
+exports.COMPOSITIONS = [
+    { id: 'mix-standby', revision: 1, name: '桌边', slots: [
+            { id: 'face-desk-clock', kind: 'clock', role: '主时间', x: 0, y: 0, w: 300, h: 300, primary: true },
+            { id: 'face-desk-calendar', kind: 'calendar', role: '周历', x: 22, y: 180, w: 256, h: 98, primary: false }
+        ] },
+    { id: 'mix-modular', revision: 1, name: '今日', slots: [
+            { id: 'face-day-clock', kind: 'clock', role: '主时间', x: 0, y: 0, w: 300, h: 300, primary: true },
+            { id: 'face-day-agenda', kind: 'agenda', role: '接下来的日程', x: 24, y: 151, w: 252, h: 65, primary: false },
+            { id: 'face-day-battery', kind: 'battery', role: '电量', x: 24, y: 238, w: 252, h: 40, primary: false }
+        ] },
+    { id: 'mix-study', revision: 1, name: '课间', slots: [
+            { id: 'face-study-clock', kind: 'clock', role: '时间', x: 0, y: 0, w: 300, h: 300, primary: true },
+            { id: 'face-study-course', kind: 'timetable', role: '下节课', x: 22, y: 106, w: 256, h: 124, primary: false },
+            { id: 'face-study-progress', kind: 'dayprogress', role: '今日进度', x: 22, y: 251, w: 256, h: 27, primary: false }
+        ] },
+    { id: 'mix-travel', revision: 1, name: '远行', slots: [
+            { id: 'face-travel-world', kind: 'worldclock', role: '目的地时间', x: 0, y: 0, w: 300, h: 300, primary: true },
+            { id: 'face-travel-countdown', kind: 'countdown', role: '出发倒计时', x: 24, y: 239, w: 252, h: 39, primary: false }
+        ] },
+    { id: 'mix-memory', revision: 1, name: '相片日历', slots: [
+            { id: 'face-memory-photo', kind: 'anniversary', role: '照片与纪念日', x: 0, y: 0, w: 300, h: 300, primary: true },
+            { id: 'face-memory-date', kind: 'date', role: '日期', x: 22, y: 20, w: 256, h: 28, primary: false },
+            { id: 'face-memory-lunar', kind: 'lunar', role: '农历', x: 22, y: 265, w: 256, h: 16, primary: false }
+        ] }
+];
+function compositionDefinition(id) { return exports.COMPOSITIONS.find(c => c.id === id); }
+exports.compositionDefinition = compositionDefinition;
+function compositionSlot(id) {
+    for (const face of exports.COMPOSITIONS) {
+        const slot = face.slots.find(s => s.id === id);
+        if (slot)
+            return slot;
+    }
+    return undefined;
+}
+exports.compositionSlot = compositionSlot;
+function compositionOwner(id) { return exports.COMPOSITIONS.find(c => c.slots.some(s => s.id === id)); }
+exports.compositionOwner = compositionOwner;
+function compositionColors(id, palette) {
+    if (palette === 'cream')
+        return ['#EFE8D9', '#333C43', '#B36143'];
+    if (palette === 'cobalt')
+        return ['#173F89', '#F5EDDB', '#ECC071'];
+    if (palette === 'ink')
+        return ['#131A1E', '#F1EDE4', '#B9D889'];
+    if (id === 'mix-modular')
+        return ['#111B22', '#F5F0E5', '#BBDD88'];
+    if (id === 'mix-travel')
+        return ['#172F3D', '#F2E7D4', '#E9AB69'];
+    if (id === 'mix-study')
+        return ['#F0EADD', '#493F33', '#A6523C'];
+    if (id === 'mix-memory')
+        return ['#D8DECD', '#2B4338', '#5F795F'];
+    return ['#E9E8DD', '#263B4E', '#AF653D'];
+}
+exports.compositionColors = compositionColors;
+/** Wide faces have separately authored positions, never stretched square glyphs. */
+function compositionLayout(face, aspect) {
+    if (aspect < 1.5)
+        return { width: 300, height: 300, slots: face.slots };
+    const output = face.slots.map((s) => ({ id: s.id, kind: s.kind, role: s.role, x: s.x, y: s.y, w: s.w, h: s.h, primary: s.primary }));
+    if (!output.length)
+        return { width: 300, height: 150, slots: [] };
+    output[0].h = 150;
+    const boxes = face.id === 'mix-standby' ? [[176, 16, 104, 120]] : face.id === 'mix-modular' ? [[180, 18, 100, 67], [180, 103, 100, 30]] : face.id === 'mix-study' ? [[156, 18, 124, 88], [18, 119, 262, 18]] : face.id === 'mix-travel' ? [[174, 46, 104, 80]] : face.id === 'mix-memory' ? [[18, 14, 130, 22], [18, 128, 130, 12]] : [];
+    if (boxes.length !== output.length - 1)
+        return { width: 300, height: 150, slots: [] };
+    boxes.forEach((b, i) => { output[i + 1].x = b[0]; output[i + 1].y = b[1]; output[i + 1].w = b[2]; output[i + 1].h = b[3]; });
+    return { width: 300, height: 150, slots: output };
+}
+exports.compositionLayout = compositionLayout;
+
+},
 "CardTemplate":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -1252,12 +1399,12 @@ function normalizeCardTemplate(raw) {
         return undefined;
     const definition = templateDefinition(raw.id);
     const sources = definition.kind === 'ensemble' ? definition.sources.slice(1).map((k, index) => { const cap = raw.sources?.[index]; return cap?.k === k ? JSON.parse(JSON.stringify(cap)) : { k: k }; }) : undefined;
-    return { photoMode: raw.photoMode === 'photo' ? 'photo' : 'subject', background: raw.background === 'smart' ? 'smart' : 'template', sources: sources, version: 1, id: raw.id, palette: ['', 'cobalt', 'cream', 'ink'].includes(raw.palette) ? raw.palette : '', fill: raw.fill === true, depth: raw.depth !== false, zoom: Math.max(.5, Math.min(1.5, Number.isFinite(raw.zoom) ? raw.zoom : 1)), offsetX: Math.max(-.35, Math.min(.35, Number.isFinite(raw.offsetX) ? raw.offsetX : 0)), offsetY: Math.max(-.35, Math.min(.35, Number.isFinite(raw.offsetY) ? raw.offsetY : 0)) };
+    return { clockPosition: ['top-left', 'top', 'top-right', 'bottom-left', 'bottom', 'bottom-right'].includes(raw.clockPosition ?? '') ? raw.clockPosition : 'top', clockAuto: raw.clockAuto === true, clockInk: ['#FFFFFF', '#202222'].includes(raw.clockInk ?? '') ? raw.clockInk : '', photoFraming: raw.photoFraming === 'cover' ? 'cover' : 'fit', photoMode: raw.photoMode === 'photo' ? 'photo' : 'subject', background: raw.background === 'smart' ? 'smart' : 'template', sources: sources, version: 1, id: raw.id, palette: ['', 'cobalt', 'cream', 'ink'].includes(raw.palette) ? raw.palette : '', fill: raw.fill === true, depth: raw.depth !== false, zoom: Math.max(.25, Math.min(4, Number.isFinite(raw.zoom) ? raw.zoom : 1)), offsetX: Math.max(-1, Math.min(1, Number.isFinite(raw.offsetX) ? raw.offsetX : 0)), offsetY: Math.max(-1, Math.min(1, Number.isFinite(raw.offsetY) ? raw.offsetY : 0)) };
 }
 exports.normalizeCardTemplate = normalizeCardTemplate;
 function newCardTemplate(id) { return { photoMode: 'subject', background: 'template', version: 1, id, palette: '', fill: false, depth: true, zoom: 1, offsetX: 0, offsetY: 0 }; }
 exports.newCardTemplate = newCardTemplate;
-function copyCardTemplate(raw, includeSources = true) { return raw ? { photoMode: raw.photoMode, background: raw.background, sources: includeSources && raw.sources ? JSON.parse(JSON.stringify(raw.sources)) : undefined, version: raw.version, id: raw.id, palette: raw.palette, fill: raw.fill, depth: raw.depth, zoom: raw.zoom, offsetX: raw.offsetX, offsetY: raw.offsetY } : undefined; }
+function copyCardTemplate(raw, includeSources = true) { return raw ? { clockPosition: raw.clockPosition, clockAuto: raw.clockAuto, clockInk: raw.clockInk, photoFraming: raw.photoFraming, photoMode: raw.photoMode, background: raw.background, sources: includeSources && raw.sources ? JSON.parse(JSON.stringify(raw.sources)) : undefined, version: raw.version, id: raw.id, palette: raw.palette, fill: raw.fill, depth: raw.depth, zoom: raw.zoom, offsetX: raw.offsetX, offsetY: raw.offsetY } : undefined; }
 exports.copyCardTemplate = copyCardTemplate;
 
 },
@@ -1655,6 +1802,32 @@ function holidayFileDates(text) {
     return out;
 }
 exports.holidayFileDates = holidayFileDates;
+
+},
+"TemplatePhotoGeometry":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.templateSubjectBox = exports.templatePhotoBox = void 0;
+const CardSchema_1 = require("./CardSchema");
+/** One camera for the original image and the extracted foreground; no independently floating duplicate. */
+function templatePhotoBox(photo, config, width, height, cover, subject = false) {
+    const box = new CardSchema_1.ElementBox(), aspect = Math.max(.01, (photo.depthSourceAspect || 1) * (subject ? photo.depthCrop.w / Math.max(.001, photo.depthCrop.h) : 1)), scale = cover ? Math.max(width / aspect, height) : Math.min(width / aspect, height);
+    box.w = scale * aspect * config.zoom;
+    box.h = scale * config.zoom;
+    box.x = (width - box.w) / 2 + config.offsetX * width;
+    box.y = (height - box.h) / 2 + config.offsetY * height;
+    return box;
+}
+exports.templatePhotoBox = templatePhotoBox;
+function templateSubjectBox(photo, frame) {
+    const box = new CardSchema_1.ElementBox(), crop = photo.depthCrop;
+    box.x = frame.x + crop.x * frame.w;
+    box.y = frame.y + crop.y * frame.h;
+    box.w = crop.w * frame.w;
+    box.h = crop.h * frame.h;
+    return box;
+}
+exports.templateSubjectBox = templateSubjectBox;
 
 },
 "AlbumRotation":function(require,module,exports){
@@ -5517,4 +5690,4 @@ exports.creationDimension = creationDimension;
 function creationAspect(dimension) { return dimension === '2*4' ? 2 : 1; }
 exports.creationAspect = creationAspect;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"7d5660013aeed8bc5bf9ae5661b3270c97ab1695d415d16c5b422df0ac64b117"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"0da2e614f597accca552eda27b467424500526c1f637fd2aadf577c5835e4c37"};})(globalThis);

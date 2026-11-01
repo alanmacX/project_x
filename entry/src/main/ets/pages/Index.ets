@@ -1,10 +1,10 @@
-import { TemplatePhotoGesture } from '../views/TemplatePhotoGesture';
+import { TemplatePhotoEditor } from '../views/TemplatePhotoEditor';
 import { cardCapabilities, replaceCardCapability } from '../model/TemplateSources';
 import { compositionDefinition } from '../model/CompositionCatalog';
 import { compositionPaletteState, restoreCompositionPalette, setCompositionPalette } from '../model/CompositionPalette';
 import { templateColors } from '../model/TemplateScene';
 import { makeTemplateCards } from '../model/TemplateFactory';
-import { templateDefinition } from '../model/CardTemplate';
+import { templateDefinition, CardTemplate, copyCardTemplate } from '../model/CardTemplate';
 import { CardTemplatePicker } from '../views/CardTemplatePicker';
 import { TemplateSettings } from '../views/TemplateSettings';
 import { projectCapabilityData } from '../model/CapabilityProjection';
@@ -357,6 +357,7 @@ struct Index {
 
   @State repairingSubjects: boolean = false;
   @State templateDataIndex:number=0;
+  @State photoEditorOpen:boolean=false;
   @State tick: number = Math.floor(Date.now()/60000)*60000;
   private foregroundRefreshTimer: number = -1;
 
@@ -1002,6 +1003,7 @@ struct Index {
   }
   aboutToDisappear(): void { this.cancelGalleryWarm();this.cancelGalleryTransition();this.canvasFlightGeneration++;this.canvasFlightY=0;this.canvasFlightX=0;this.canvasFlightAngle=0;this.canvasChanging=false; this.reliefGeneration++;if(this.reliefTimer>=0)clearTimeout(this.reliefTimer); this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer); if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
   onBackPress(): boolean {
+    if(this.photoEditorOpen){this.finishPhotoEditor(null);return true;}
     if(this.galleryTransitioning)return true;
     if(this.galleryVisible&&this.galleryController.dismiss())return true;
     if(this.navMenuOpen){this.finishNavMenu(-1);return true;}
@@ -1242,7 +1244,7 @@ struct Index {
       this.scenePanelGeneration++;this.cancelScheduledTransition();this.timedScene=null;this.scheduleOverride=null;this.sceneEditing=this.store.catalog.scenes.some(c=>c.id===this.store.state.canvasId);this.scheduledName='';this.scheduledFocusId='';this.syncSchedules();
       this.refreshCanvasList();this.syncHostCanvasGeometry();this.canvasBackground=this.store.state.background;
       this.editorMountGeneration++;this.editorSheetOpen=false;this.editorMounted=false;this.editorReady=false;
-      this.editing=false;this.heroActive=false;this.viewing=false;this.selectedId='';this.activeBoardId='';this.boardOpacity=1;this.scatter=0;this.render();this.layoutBoard();this.retainCanvasImages();
+      this.photoEditorOpen=false;this.photoEditorCardId='';this.photoEditorCanvasId='';this.editing=false;this.heroActive=false;this.viewing=false;this.selectedId='';this.activeBoardId='';this.boardOpacity=1;this.scatter=0;this.render();this.layoutBoard();this.retainCanvasImages();
       this.presentWidgetWorkspace();published=true;
       AppStorage.setOrCreate('viewCardId','');
       if(this.routeCanvasId===canvas)AppStorage.setOrCreate('routeCanvasId','');
@@ -1498,17 +1500,13 @@ struct Index {
   private dataPreview():CapBlock|null{return this.dataCapability(this.preview);}
   private templateSourceIndices():number[]{return cardCapabilities(this.preview).map((cap,index)=>['countdown','anniversary','worldclock','agenda','timetable','album'].includes(cap.k)?index:-1).filter(index=>index>=0);}
   private templateSourceLabels():string[]{const face=compositionDefinition(this.preview.template?.id??'');return face?this.templateSourceIndices().map(index=>face.slots[index].role):[];}
-  private photoStartX:number=0;
-  private photoStartY:number=0;
-  private photoStartZoom:number=1;
-  private photoGestureStart():void {const t=this.current()?.template;if(!t)return;this.photoStartX=t.offsetX;this.photoStartY=t.offsetY;this.photoStartZoom=t.zoom;}
-  private photoGesturePan(x:number,y:number):void {
-    const t=this.current()?.template;if(!t||this.busy)return;const box=this.editorRect(),a=this.editingAngle()*Math.PI/180;
-    t.offsetX=Math.max(-.35,Math.min(.35,this.photoStartX+(x*Math.cos(a)+y*Math.sin(a))/Math.max(1,box.w)));
-    t.offsetY=Math.max(-.35,Math.min(.35,this.photoStartY+(-x*Math.sin(a)+y*Math.cos(a))/Math.max(1,box.h)));this.continuousChange(SliderChangeMode.Moving);
+  private photoEditorCardId:string='';
+  private photoEditorCanvasId:string='';
+  private openPhotoEditor():void{if(this.busy||this.heroActive)return;this.photoEditorCardId=this.selectedId;this.photoEditorCanvasId=this.store.state.canvasId;this.editorSheetOpen=false;this.photoEditorOpen=true;}
+  private finishPhotoEditor(template:CardTemplate|null):void{
+    const card=this.current();if(template&&card?.id===this.photoEditorCardId&&this.store.state.canvasId===this.photoEditorCanvasId&&card.template?.id===template.id){const sources=card.template.sources;card.template=copyCardTemplate(template,false);card.template!.sources=sources;this.change();}
+    this.photoEditorOpen=false;this.photoEditorCardId='';this.photoEditorCanvasId='';if(this.editing&&!this.editorLandscape())this.editorSheetOpen=true;
   }
-  private photoGestureZoom(scale:number):void {const t=this.current()?.template;if(!t||this.busy)return;t.zoom=Math.max(.5,Math.min(1.5,this.photoStartZoom*scale));this.continuousChange(SliderChangeMode.Moving);}
-  private photoGestureEnabled():boolean{return this.editing&&!this.heroActive&&!this.busy&&this.editorSection===0&&['portrait','mix-memory','face-memory-photo'].includes(this.preview.template?.id??'')&&this.preview.elements.some(e=>e.kind==='image'&&e.src.length>0);}
   private templatePhotoElement():CanvasElement|null {
     const card=this.current();if(!card)return null;let el=card.elements.find(e=>e.kind==='image');
     if(!el){el=new CanvasElement();el.id=this.store.newId();el.kind='image';el.x=0;el.y=0;el.w=1;el.h=1;card.elements.push(el);}this.layerId=el.id;return el;
@@ -1518,6 +1516,7 @@ struct Index {
     await this.pickImage();if(this.current()!==card)return;
     if(el.src&&el.src!==old){card.template!.zoom=1;card.template!.offsetX=0;card.template!.offsetY=0;this.change();if(!el.animated&&['portrait','mix-memory','face-memory-photo'].includes(card.template!.id))await this.setElementDepth(true);}
     if(!el.src)card.elements=card.elements.filter(e=>e!==el);this.layerId='';this.syncFields();
+    if(this.current()===card&&el.src&&el.src!==old&&['portrait','mix-memory','face-memory-photo'].includes(card.template!.id))this.openPhotoEditor();
   }
   private async templateCutout():Promise<void>{if(this.busy)return;const card=this.current(),el=this.templatePhotoElement();if(!el||!card)return;if(!el.src)await this.pickImage();if(this.current()!==card)return;if(el.src)await this.setElementDepth(true);else card.elements=card.elements.filter(e=>e!==el);if(this.current()===card){this.layerId='';this.syncFields();}}
   private templateBrightness(hex:string):number{return parseInt(hex.slice(1,3),16)*.2126+parseInt(hex.slice(3,5),16)*.7152+parseInt(hex.slice(5,7),16)*.0722;}
@@ -1531,13 +1530,13 @@ struct Index {
   private templateSetting(key:string,value:string|number|boolean,mode?:SliderChangeMode):void{
     const card=this.current(),t=card?.template;if(!card||!t)return;
     if(key==='id'){const next=templateDefinition(String(value));if(next?.kind!==card.capability?.k)return;t.id=String(value);}
-    else if(key==='palette'){setCompositionPalette(card,this.store.state.cards,String(value));this.templateCanvasBackground();}else if(key==='background'){t.background=String(value);this.templateCanvasBackground();}else if(key==='photoMode'){t.photoMode=String(value);t.zoom=1;t.offsetX=0;t.offsetY=0;}else if(key==='reset'){t.zoom=1;t.offsetX=0;t.offsetY=0;}else if(key==='depth')t.depth=value===true;
+    else if(key==='palette'){setCompositionPalette(card,this.store.state.cards,String(value));t.clockInk='';this.templateCanvasBackground();}else if(key==='background'){t.background=String(value);this.templateCanvasBackground();}else if(key==='photoMode'){t.photoMode=String(value);t.zoom=1;t.offsetX=0;t.offsetY=0;}else if(key==='reset'){t.zoom=1;t.offsetX=0;t.offsetY=0;}else if(key==='depth')t.depth=value===true;
     else if(key==='fill'){t.fill=value===true;if(t.fill)this.templateCanvasBackground();if(!t.fill){card.w=Math.min(260,BOARD_W/this.canvasAspect-24);card.h=compositionDefinition(t.id)&&this.canvasAspect>=1.5?card.w/2:card.w;card.x=(BOARD_W-card.w)/2;card.y=12;}this.clamp(card);}
     else if(key==='zoom')t.zoom=Number(value);else if(key==='offsetX')t.offsetX=Number(value);else if(key==='offsetY')t.offsetY=Number(value);
     if(mode===undefined)this.change();else this.continuousChange(mode);
   }
   @Builder
-  templateAppearance(){TemplateSettings({card:this.preview,processing:this.busy,appDark:this.appDark,onPhotoMode:(mode:string)=>this.templateSetting('photoMode',mode),onReset:()=>this.templateSetting('reset',true),onBackground:(mode:string)=>this.templateSetting('background',mode),onDesign:(id:string)=>this.templateSetting('id',id),onPalette:(value:string)=>this.templateSetting('palette',value),onFill:(value:boolean)=>this.templateSetting('fill',value),onPhoto:()=>{this.templatePhotoPick();},onCutout:()=>{this.templateCutout();},onDepth:(value:boolean)=>this.templateSetting('depth',value),onTransform:(key:string,value:number,mode:SliderChangeMode)=>this.templateSetting(key,value,mode)})}
+  templateAppearance(){TemplateSettings({card:this.preview,processing:this.busy,appDark:this.appDark,onPhotoEdit:()=>this.openPhotoEditor(),onBackground:(mode:string)=>this.templateSetting('background',mode),onDesign:(id:string)=>this.templateSetting('id',id),onPalette:(value:string)=>this.templateSetting('palette',value),onFill:(value:boolean)=>this.templateSetting('fill',value),onPhoto:()=>{this.templatePhotoPick();},onCutout:()=>{this.templateCutout();}})}
   private addCreativeCard(): void {
     if(this.scheduledName){this.getUIContext().getPromptAction().showToast({message:'请先恢复原始画布再添加卡片'});return;}
     if (this.busy || this.canvasChanging || !this.canAddCards(1)) return;
@@ -1865,6 +1864,7 @@ struct Index {
         }
         Column().width(1).height(1).position({x:this.navMenuX,y:this.navMenuY}).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
           .bindMenu(this.navMenuOpen,this.navMenuItems,{placement:Placement.BottomRight,systemMaterial:chromeMaterial(this.appDark),backgroundColor:AppDesign.popup(this.appDark),onDisappear:()=>this.finishNavMenu(this.navMenuResult)})
+        if(this.photoEditorOpen){TemplatePhotoEditor({card:this.preview,sceneBackground:this.canvasBackground,appDark:this.appDark,viewportWidth:this.screenWidth,viewportHeight:this.screenHeight,safeTop:this.safeTop,safeBottom:this.safeBottom,tick:this.tick,onDone:(template:CardTemplate)=>this.finishPhotoEditor(template),onCancel:()=>this.finishPhotoEditor(null)}).width('100%').height('100%').zIndex(210000)}
         if(this.galleryHeroSource){
           Image(this.galleryHeroSource).id('galleryTransitionArtwork').syncLoad(true).objectFit(ImageFit.Fill)
             .width(this.galleryHeroW).height(this.galleryHeroH).position({x:this.galleryHeroX,y:this.galleryHeroY}).opacity(this.galleryHeroOpacity)
@@ -2795,8 +2795,7 @@ struct Index {
   canvasEditor() {
     Stack({ alignContent: Alignment.TopStart }) {
       Column().width('100%').height('100%').backgroundColor(Color.Transparent).onClick(() => this.chooseLayer(''))
-      if(this.photoGestureEnabled()){TemplatePhotoGesture({onStart:()=>this.photoGestureStart(),onPan:(x:number,y:number)=>this.photoGesturePan(x,y),onZoom:(scale:number)=>this.photoGestureZoom(scale),onEnd:()=>this.continuousChange(SliderChangeMode.End)})
-        .id('templatePhotoCamera').width(this.editorRect().w).height(this.editorRect().h).position({x:this.previewViewport().left,y:this.previewViewport().top}).zIndex(10)}
+
       Stack({ alignContent: Alignment.TopStart }) {
         ForEach(this.preview.elements.filter((el: CanvasElement) => !this.preview.template && this.preview.capability?.k!=='album' && el.behindCapability && this.settingsTab === 0), (el: CanvasElement) => { this.layerTouch(el.id) }, (el: CanvasElement) => el.id)
         if (!this.preview.template && this.settingsTab === 1 && this.preview.capability !== null && this.preview.capability.k!=='album') { this.layerTouch('capability') }

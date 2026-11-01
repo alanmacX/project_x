@@ -1,3 +1,4 @@
+import { portraitPhotoFrame, photoClockLayout } from './TemplatePhotoComposition';
 import { compositionDefinition } from './CompositionCatalog';
 import { templatePhotoBox, templateSubjectBox } from './TemplatePhotoGeometry';
 import { compositionOwner, compositionColors } from './CompositionCatalog';
@@ -67,7 +68,7 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
     const id = card.template?.id ?? '', now = new Date(tick || Date.now()), zone = cap.zone ?? 'Asia/Shanghai', zoned = cap.k==='worldclock'?new Date(tick-clockOffset(zone,tick)*3600000):now;
     const hour = cap.k === 'worldclock' ? zoned.getUTCHours() : now.getHours(), minute = cap.k === 'worldclock' ? zoned.getUTCMinutes() : now.getMinutes(), hh = ('0' + hour).slice(-2), mm = ('0' + minute).slice(-2), day = now.getDate(), month = now.getMonth() + 1, year = now.getFullYear(), week = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][now.getDay()];
     const add = (kind: string, x: number, y: number, w: number, h: number, color: string = s.ink): TemplateMark => { const m = new TemplateMark(); m.kind = kind; m.x = x; m.y = y; m.w = w; m.h = h; m.color = color; s.marks.push(m); return m; };
-    const text = (value: string, x: number, y: number, size: number = 16, color: string = s.ink, width: number = 250, align: string = 'left', weight: number = 400): TemplateMark => { const m = add('text', x, y, Math.max(1,Math.min(width,300-x)), Math.max(1,Math.min(size*1.2,300-y)), color); m.text = value.trim().replace(/\s+/g,' '); m.size = size; m.align = align; m.weight = weight; return m; };
+    const text = (value: string, x: number, y: number, size: number = 16, color: string = s.ink, width: number = 250, align: string = 'left', weight: number = 400): TemplateMark => { const m = add('text', x, y, Math.max(1,Math.min(width,300-x)), Math.max(1,Math.min(size*1.2,s.height-y)), color); m.text = value.trim().replace(/\s+/g,' '); m.size = size; m.align = align; m.weight = weight; return m; };
     const rect = (x: number, y: number, w: number, h: number, color: string, r: number = 0): TemplateMark => { const m = add('rect', x, y, w, h, color); m.r = r; return m; };
     const arc = (x: number, y: number, r: number, start: number, sweep: number, color: string, width: number): TemplateMark => { const m = add('arc', x, y, r * 2, r * 2, color); m.r = r; m.start = start; m.sweep = sweep; m.stroke = width; return m; };
     const line = (x: number, y: number, a: number, b: number, color: string = s.ink, width: number = 1): TemplateMark => { const m = add('line', x, y, a, b, color); m.stroke = width; return m; };
@@ -133,16 +134,15 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
     }
     else if (id === 'portrait') {
         s.height=300*card.h/card.w;
-        const reserve=s.height<180?44:74,available=Math.max(1,s.height-reserve),subject=photo?.depthEnabled&&!!photo.depthForeground,subjectMode=subject&&personal.photoMode!=='photo';
+        const subject=photo?.depthEnabled&&!!photo.depthForeground,subjectMode=subject&&personal.photoMode!=='photo';
         if(photo){
-          if(subjectMode){
-            const box=templatePhotoBox(photo,personal,300,available,false,true);image(photo.depthForeground,box.x,reserve+box.y,box.w,box.h,personal.depth?3:1);
-          }else{
-            const frame=templatePhotoBox(photo,personal,300,available,false);image(photo.src,frame.x,reserve+frame.y,frame.w,frame.h);
-            if(subject&&personal.depth){const box=templateSubjectBox(photo,frame);image(photo.depthForeground,box.x,reserve+box.y,box.w,box.h,3);}
-          }
+          const frame=portraitPhotoFrame(card,photo);
+          if(subjectMode){image(photo.depthForeground,frame.x,frame.y,frame.w,frame.h,personal.depth?3:1);}
+          else{image(photo.src,frame.x,frame.y,frame.w,frame.h);if(subject&&personal.depth){const box=templateSubjectBox(photo,frame);image(photo.depthForeground,box.x,box.y,box.w,box.h,3);}}
         }else text('选择你的照片',24,Math.min(174,s.height-28),22,s.ink,252,'center');
-        const t=text(hh+':'+mm,9,s.height<180?8:14,s.height<180?48:82,s.ink,282,'center',800);t.layer=2;t.font='digits';
+        const clock=photoClockLayout(300,s.height,personal.clockPosition??'top'),ink=personal.clockInk||s.ink;
+        if(clock.stacked){const hour=text(hh,clock.x,clock.y,clock.size,ink,clock.w,'center',800);hour.layer=2;hour.font='digits';const minute=text(mm,clock.x,clock.y+clock.size*1.04,clock.size,ink,clock.w,'center',800);minute.layer=2;minute.font='digits';}
+        else{const t=text(hh+':'+mm,clock.x,clock.y,clock.size,ink,clock.w,'center',800);t.layer=2;t.font='digits';}
     }
     else if (id === 'anniversary-photo') {
         if(photo)image(photo.src,0,0,300,212);else text('选择你的照片',24,174,22,s.ink,252,'center');
