@@ -4,7 +4,7 @@ const page=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
 const start=page.indexOf('  private async refreshCapabilities():');
 const method=page.slice(start,page.indexOf('\n\n\n  build()',start));
 let requests=0,resolveData;
-const sandbox={exports:{},needsDataRefresh:()=>true,capabilityRequestKey:()=>'',readCapability:()=>{requests++;return new Promise(resolve=>resolveData=resolve);}};
+const sandbox={exports:{},cardCapabilities:card=>(card.capability?[card.capability]:[]).concat(card.template?.sources??[]),replaceCardCapability:(card,old,next)=>{if(card.capability===old)card.capability=next;else card.template.sources[card.template.sources.indexOf(old)]=next;},needsDataRefresh:()=>true,capabilityRequestKey:()=>'',readCapability:()=>{requests++;return new Promise(resolve=>resolveData=resolve);}};
 vm.runInNewContext(ts.transpileModule(`export class Fixture {
  ready=true;alive=true;pageVisible=true;appWindowFocused=true;appBackgrounded=false;canvasChanging=false;galleryTransitioning=false;arriving=false;heroActive=false;activeBoardId='';layerDrag='';gestureGroup='';refreshingCapabilities=false;context={};foregroundGeneration=0;renderCount=0;deferred=0;
  card={id:'photo',capability:{k:'weather',temperature:20}};

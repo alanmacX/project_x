@@ -9,7 +9,7 @@ import { BoardMotion } from '../model/BoardMotion';
 import { dragBounds, DragBounds } from '../model/DragGeometry';
 import { cardOutline } from '../model/RenderContours';
 import { motionFrameRate } from '../model/MotionPolicy';
-import { FridgeCard, ShapePoint, shapeRadius, BOARD_W, BOARD_H } from '../model/CardSchema';
+import { CanvasBackground, FridgeCard, ShapePoint, shapeRadius, BOARD_W, BOARD_H } from '../model/CardSchema';
 import { resizeFactor, clampCardGeometry, minimumCardSize, cardHandlePoint } from '../model/CanvasLayout';
 import { CardFace } from './CardFace';
 import { cardContainsPoint } from '../model/CardHitTest';
@@ -63,6 +63,7 @@ export struct BoardCard {
   @Prop heroHidden: boolean = false;
   @Prop localCoordinates: boolean = false;
   private frameRate: ExpectedFrameRateRange = motionFrameRate();
+  @Prop editorBackground:CanvasBackground=new CanvasBackground();
   @Prop @Watch('syncHandles') editingSurface: boolean = false;
   @Prop hideContent: boolean = false;
   @Prop animateContent: boolean = false;
@@ -299,7 +300,7 @@ export struct BoardCard {
         // Shadow fringe stays in the texture; rotation and translation stay outside it.
         Stack({ alignContent: Alignment.TopStart }) {
           // Decode local artwork while the gallery still covers this persistent surface.
-          CardFace({ snapshot:true, layerMotion:this.layerMotion, card: this.faceCard(), scaleFactor: this.scaleFactor, tick: this.tick, lifted: this.moving || this.motion.ids.includes(this.card.id), hideContent: this.hideContent, animateContent:this.animateContent, movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
+          CardFace({ snapshot:true,templateBackground:this.editingSurface?this.editorBackground:undefined, layerMotion:this.layerMotion, card: this.faceCard(), scaleFactor: this.scaleFactor, tick: this.tick, lifted: this.moving || this.motion.ids.includes(this.card.id), hideContent: this.hideContent, animateContent:this.animateContent, movingLayerId: this.movingLayerId, moveX: this.moveX, moveY: this.moveY })
             .width(this.card.w*this.scaleFactor).height(this.card.h*this.scaleFactor).position({ x: 24+this.attachmentOverflow().left, y: 24+this.attachmentOverflow().top }).hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS)
         }.width(this.card.w*this.scaleFactor+48+this.attachmentOverflow().left+this.attachmentOverflow().right).height(this.card.h*this.scaleFactor+48+this.attachmentOverflow().top+this.attachmentOverflow().bottom).scale({x:this.resizeScale(),y:this.resizeScale(),centerX:0,centerY:0}).position({ x: -this.shadowFringe(), y: -this.shadowFringe() })
           .id('deleteFace_'+this.card.id).renderGroup(this.moving || this.motion.ids.includes(this.card.id) || (this.movingLayerId.length === 0 && this.card.elements.every(el => !el.animated))).hitTestBehavior(HitTestMode.None)

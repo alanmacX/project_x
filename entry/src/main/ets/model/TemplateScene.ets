@@ -1,3 +1,5 @@
+import { compositionDefinition } from './CompositionCatalog';
+import { templatePhotoBox, templateSubjectBox } from './TemplatePhotoGeometry';
 import { compositionOwner, compositionColors } from './CompositionCatalog';
 import { validDay } from './HolidayCalendar';
 import { activeAlbum } from './AlbumRotation';
@@ -12,7 +14,7 @@ import { compositionScene } from './CompositionScene';
 export { TemplateMark, TemplateScene } from './TemplateSceneTypes';
 export function templateColors(card: FridgeCard): string[] {
     const id = card.template?.id ?? '', p = card.template?.palette ?? '';
-    const face=compositionOwner(id);if(face)return compositionColors(face.id,p);
+    const face=compositionDefinition(id)??compositionOwner(id);if(face)return compositionColors(face.id,p);
     if (p === 'cobalt')
         return ['#2443A2', '#F5EDDA', '#EABB65'];
     if (p === 'cream')
@@ -129,34 +131,23 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
         [hh, mm].forEach((v, i) => { const x = 15 + i * 141; rect(x, 54, 128, 190, '#30322F', 12).end = '#212320'; text(v, x, 80, 100, s.ink, 128, 'center', 800).font = 'digits'; line(x, 149, x + 128, 149, '#121412', 2); });
         date();
     }
-    else if (id === 'portrait' || id === 'anniversary-photo') {
-        if (photo) {
-            if (id === 'anniversary-photo') {
-                image(photo.src, 0, 0, 300, 212);
-            }
-            else {
-                const w = 300 * Math.max(1, card.w / card.h), h = 300 * Math.max(1, card.h / card.w);
-                image(photo.src, (300 - w) / 2, (300 - h) / 2, w, h);
-            }
-        }
-        else {
-            text('选择你的照片', 24, 174, 22, s.ink, 252, 'center');
-        }
-        if (id === 'portrait') {
-            const t = text(hh + ':' + mm, 9, 7, 94, s.ink, 282, 'center', 800);
-            t.layer = 2;
-            t.font = 'digits';
-            if (photo?.depthForeground && personal.depth) {
-                const box = depthPhotoBox(photo, card.w, card.h), w = 300 * Math.max(1, card.w / card.h), h = 300 * Math.max(1, card.h / card.w);
-                image(photo.depthForeground, (300 - w) / 2 + (box.x + box.w * (1 - personal.zoom) / 2 + personal.offsetX) * w, (300 - h) / 2 + (box.y + box.h * (1 - personal.zoom) / 2 + personal.offsetY) * h, box.w * w * personal.zoom, box.h * h * personal.zoom, 3);
-            }
-        }
-        else {
-            rect(0, 211, 300, 89, s.background);
-            text(cap.title || '纪念日', 20, 236, 17, s.ink, 126);
-            text(left === null ? '—' : String(Math.abs(left)), 156, 223, 48, s.ink, 104, 'right', 700).font = 'digits';
-            text(left!==null&&left>0?'天后':'天', 268, 260, 12);
-        }
+    else if (id === 'portrait') {
+        s.height=300*card.h/card.w;
+        const reserve=s.height<180?44:74,available=Math.max(1,s.height-reserve),subject=photo?.depthEnabled&&!!photo.depthForeground,subjectMode=subject&&personal.photoMode!=='photo';
+        if(photo){
+          if(subjectMode){
+            const box=templatePhotoBox(photo,personal,300,available,false,true);image(photo.depthForeground,box.x,reserve+box.y,box.w,box.h,personal.depth?3:1);
+          }else{
+            const frame=templatePhotoBox(photo,personal,300,available,false);image(photo.src,frame.x,reserve+frame.y,frame.w,frame.h);
+            if(subject&&personal.depth){const box=templateSubjectBox(photo,frame);image(photo.depthForeground,box.x,reserve+box.y,box.w,box.h,3);}
+          }
+        }else text('选择你的照片',24,Math.min(174,s.height-28),22,s.ink,252,'center');
+        const t=text(hh+':'+mm,9,s.height<180?8:14,s.height<180?48:82,s.ink,282,'center',800);t.layer=2;t.font='digits';
+    }
+    else if (id === 'anniversary-photo') {
+        if(photo)image(photo.src,0,0,300,212);else text('选择你的照片',24,174,22,s.ink,252,'center');
+        rect(0,211,300,89,s.background);text(cap.title||'纪念日',20,236,17,s.ink,126);
+        text(left===null?'—':String(Math.abs(left)),156,223,48,s.ink,104,'right',700).font='digits';text(left!==null&&left>0?'天后':'天',268,260,12);
     }
     else if (id.startsWith('date-')) {
         if (id === 'date-poster') {

@@ -1,3 +1,4 @@
+import { cardCapabilities, replaceCardCapability } from '../model/TemplateSources';
 import { getLibraryPreferences, LibraryPreferences } from '../model/LibraryStorage';
 import { projectCapabilityData } from '../model/CapabilityProjection';
 import { widgetRefreshDigest } from '../model/WidgetRefreshDigest';
@@ -83,7 +84,7 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     const instance=await widgetInstance(this.context,formId);if(!instance||instance.removed||!instance.canvasId)return; // Unknown/unbound restoration cannot clear cached desktop artwork.
     const scene=await this.displayedScene(formId);
     const projected=await projectCapabilityData(scene.state,this.context),json=JSON.stringify(projected),sceneContext=sceneWidgetContext(scene);
-    if(onlyChanged&&projected.cards.some(card=>card.capability?.k==='battery'&&card.capability.refreshState==='failed')){
+    if(onlyChanged&&projected.cards.some(card=>cardCapabilities(card).some(cap=>cap.k==='battery'&&cap.refreshState==='failed'))){
       // A display-only poll must not replace a newer desktop reading with an old saved value.
       hilog.warn(0,'BatteryRefresh','form=%{public}s battery unavailable; retain displayed packet',formId);return;
     }
@@ -94,7 +95,7 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     if(onlyChanged&&await receipts.get(key,'')===signature){hilog.info(0,'BatteryRefresh','form=%{public}s provider unchanged check=%{public}dms',formId,Date.now()-started);return;}
     await updateWidget(formId,json,instance.dimension,sceneContext,await this.contourCache(scene.state.canvasId),new WidgetGuard(this.context,instance));
     await receipts.put(key,signature);await receipts.flush();
-    for(const card of projected.cards)if(card.capability?.k==='battery')hilog.info(0,'BatteryRefresh','form=%{public}s delivered soc=%{public}d charging=%{public}s total=%{public}dms',formId,card.capability.percent??-1,String(card.capability.charging===true),Date.now()-started);
+    for(const card of projected.cards)for(const cap of cardCapabilities(card))if(cap.k==='battery')hilog.info(0,'BatteryRefresh','form=%{public}s delivered soc=%{public}d charging=%{public}s total=%{public}dms',formId,cap.percent??-1,String(cap.charging===true),Date.now()-started);
   }
   private async scheduleForm(formId:string):Promise<void> {
     const base=await this.loadState(formId);
@@ -134,19 +135,21 @@ export default class FridgeFormAbility extends FormExtensionAbility {
   private async refreshDueData(formId:string):Promise<boolean> {
     let changed=false;
     const visibleScene=await this.displayedScene(formId);let state=visibleScene.state,canvasId=state.canvasId;
-    for(const original of state.cards.slice()) {
-      const cap=original.capability;if(!cap||!needsDataRefresh(cap))continue;
+    for(const original of state.cards.slice())for(const cap of cardCapabilities(original)) {
+      if(!needsDataRefresh(cap))continue;
       const key=capabilityRequestKey(cap),attempted=cap.attemptedAt??0;
       const service=await import('../model/CapabilityService');
       const next=await service.readCapability(cap,this.context);
       // Only merge this result after reloading the bound canvas; never replace a newer edit or another canvas.
       state=(await this.displayedScene(formId)).state;const card=state.cards.find((c)=>c.id===original.id);
-      if(state.canvasId!==canvasId||!card?.capability||capabilityRequestKey(card.capability)!==key||(card.capability.attemptedAt??0)!==attempted)continue;
-      if(cap.k==='battery'&&card.capability.percent===next.percent&&card.capability.charging===next.charging&&card.capability.chargeState===next.chargeState&&card.capability.refreshState===next.refreshState)continue;
+      const current=card?cardCapabilities(card).find(c=>capabilityRequestKey(c)===key):undefined;
+      if(state.canvasId!==canvasId||!current||(current.attemptedAt??0)!==attempted)continue;
+      if(cap.k==='battery'&&current.percent===next.percent&&current.charging===next.charging&&current.chargeState===next.chargeState&&current.refreshState===next.refreshState)continue;
       const prefs=await getLibraryPreferences(this.context);const sourceId=original.id===visibleScene.focusId?visibleScene.focusSourceId||canvasId:canvasId;const raw=await prefs.get(canvasKey(sourceId),'') as string;
       const originalState=raw?normalizeState(JSON.parse(raw) as FridgeState):await this.loadState(formId);const stored=originalState.cards.find(c=>c.id===original.id);
-      if(!stored?.capability||capabilityRequestKey(stored.capability)!==key||(stored.capability.attemptedAt??0)!==attempted)continue;
-      stored.capability=mergeCapabilityResult(stored.capability,next);await prefs.put(canvasKey(originalState.canvasId),JSON.stringify(originalState));await prefs.flush();changed=true;
+      const previous=stored?cardCapabilities(stored).find(c=>capabilityRequestKey(c)===key):undefined;
+      if(!stored||!previous||(previous.attemptedAt??0)!==attempted)continue;
+      replaceCardCapability(stored,previous,mergeCapabilityResult(previous,next));await prefs.put(canvasKey(originalState.canvasId),JSON.stringify(originalState));await prefs.flush();changed=true;
     }
     return changed;
   }

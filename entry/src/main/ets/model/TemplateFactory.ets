@@ -27,22 +27,13 @@ export function makeTemplateCards(id: string, aspect: number, makeId: () => stri
     const height = BOARD_W / Math.max(.3, aspect);
     const face = compositionDefinition(id);
     if (face) {
-        const layout = compositionLayout(face, aspect);
-        if (!layout.slots.length) return [];
-        const scale = Math.min((BOARD_W - 24) / layout.width, (height - 24) / layout.height);
-        const left = (BOARD_W - layout.width * scale) / 2;
-        const top = (height - layout.height * scale) / 2;
-        const group = makeId();
-        return layout.slots.map((slot, index) => {
-            const card = templateCard(slot.id, slot.kind, makeId, now);
-            card.groupId = group;
-            card.z = index;
-            card.x = left + slot.x * scale;
-            card.y = (top + slot.y * scale) / height * 470;
-            card.w = slot.w * scale;
-            card.h = slot.h * scale;
-            return card;
-        });
+        const card = templateCard(id, face.slots[0].kind, makeId, now);
+        card.template!.sources=face.slots.slice(1).map(slot=>templateCard(slot.id,slot.kind,makeId,now).capability!);
+        card.w=Math.min(300,height-24 < 150 ? (height-24)*2 : 300);
+        card.h=aspect>=1.5?card.w/2:card.w;
+        if(card.h>height-24){card.h=height-24;card.w=card.h;}
+        card.x=(BOARD_W-card.w)/2;card.y=(height-card.h)/2/height*470;
+        return [card];
     }
     // An ensemble must have an authored face. Never fall back to a miniature widget grid.
     if (definition.kind === 'ensemble') return [];

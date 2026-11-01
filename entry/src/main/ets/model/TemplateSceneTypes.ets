@@ -31,3 +31,9 @@ export class TemplateScene {
     ink: string = '#30362D';
     accent: string = '#B6593D';
 }
+
+export function copyTemplateMark(source:TemplateMark):TemplateMark{
+ const mark=new TemplateMark();
+ mark.kind=source.kind;mark.x=source.x;mark.y=source.y;mark.w=source.w;mark.h=source.h;mark.r=source.r;mark.color=source.color;mark.end=source.end;mark.angle=source.angle;mark.opacity=source.opacity;mark.text=source.text;mark.lines=source.lines;mark.size=source.size;mark.weight=source.weight;mark.align=source.align;mark.font=source.font;mark.start=source.start;mark.sweep=source.sweep;mark.stroke=source.stroke;mark.layer=source.layer;mark.src=source.src;mark.fit=source.fit;
+ return mark;
+}

@@ -30,7 +30,9 @@ background / ink / accent：
 ]}
 // CardTemplate.ets：公开 ensemble 的 sources 顺序与各槽位 capability 保持一致。
 // CompositionScene.ets：每个槽位共用 compositionColors；只画它自己的信息。
-// 后续渲染、绑定、存储、刷新和分组继续走原来的 card 管线。
+// 工厂只创建一张 card；主来源存 capability，其他来源存 template.sources。
+// 槽位只生成内部 scene marks，不能插入独立 card 或 group。
+// 后续渲染、绑定、存储和刷新继续走原来的 card 管线。
 ```
 
 不新增模板专属定时器、文件夹、数据仓库或网络请求。需要新能力时先扩展 capability 数据框架，再设计模板。

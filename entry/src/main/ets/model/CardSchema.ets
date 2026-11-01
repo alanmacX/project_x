@@ -1,3 +1,4 @@
+import { unifyTemplateGroups } from './TemplateGroupMigration';
 import { compositionSlot } from './CompositionCatalog';
 import { CardTemplate, normalizeCardTemplate } from './CardTemplate';
 import { CanvasRotation } from './CanvasRotation';
@@ -284,7 +285,7 @@ export function normalizeState(raw: FridgeState): FridgeState {
   state.maxZ = bounded(raw.maxZ, 0, Number.MAX_SAFE_INTEGER, 10);
   for (const source of (Array.isArray(raw.cards) ? raw.cards : [])) {
     if (source === null || typeof source.id !== 'string') continue;
-    const card = new FridgeCard(); if(source.template!==undefined)card.template=normalizeCardTemplate(source.template); if(source.html!==undefined)card.html=normalizeHtmlCard(source.html); card.id = source.id; card.hidden = source.hidden === true; card.groupId = typeof source.groupId === 'string' ? source.groupId.slice(0, 96) : '';
+    const card = new FridgeCard(); if(source.template!==undefined){card.template=normalizeCardTemplate(source.template);if(card.template?.sources)card.template.sources=card.template.sources.map((cap:CapBlock):CapBlock=>normalizeCapability(cap));} if(source.html!==undefined)card.html=normalizeHtmlCard(source.html); card.id = source.id; card.hidden = source.hidden === true; card.groupId = typeof source.groupId === 'string' ? source.groupId.slice(0, 96) : '';
     card.w = bounded(source.w, card.template&&compositionSlot(card.template.id)?1:source.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE, card.template?.fill?BOARD_W:320, 180); card.h = bounded(source.h, card.template&&compositionSlot(card.template.id)?1:source.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE, card.template?.fill?BOARD_W/state.canvasAspect:420, 180);
     // Validate finite coordinates here. Rotated/host-aware recovery belongs to
     // the whole canvas, where grouping and the actual aspect are available.
@@ -353,6 +354,7 @@ export function normalizeState(raw: FridgeState): FridgeState {
     if (card.capability?.k === 'album') { card.shape='rect'; card.frame=false; }
     if (card.shape === 'subject' && card.cutout.length === 0) card.shape = 'rect';
   }
+  if(state.sceneLayouts.length===0&&state.sceneRules.length===0)state.cards=unifyTemplateGroups(state.cards,state.canvasAspect);
   return state;
 }
 export function serializeFaceCards(state: FridgeState): string { return JSON.stringify(state.cards.filter((c: FridgeCard) => !c.inDoor && !c.hidden)); }

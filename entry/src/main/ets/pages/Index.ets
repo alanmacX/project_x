@@ -1,3 +1,6 @@
+import { TemplatePhotoGesture } from '../views/TemplatePhotoGesture';
+import { cardCapabilities, replaceCardCapability } from '../model/TemplateSources';
+import { compositionDefinition } from '../model/CompositionCatalog';
 import { compositionPaletteState, restoreCompositionPalette, setCompositionPalette } from '../model/CompositionPalette';
 import { templateColors } from '../model/TemplateScene';
 import { makeTemplateCards } from '../model/TemplateFactory';
@@ -353,6 +356,7 @@ struct Index {
   }
 
   @State repairingSubjects: boolean = false;
+  @State templateDataIndex:number=0;
   @State tick: number = Math.floor(Date.now()/60000)*60000;
   private foregroundRefreshTimer: number = -1;
 
@@ -668,6 +672,8 @@ struct Index {
             backgroundBlurStyle: chromeMaterial(this.appDark) !== undefined ? BlurStyle.NONE : BlurStyle.COMPONENT_THIN,
             enableArrow: false, autoCancel: false, focusable: false, mask: false })
         if (this.editorMounted) { this.editor() }
+
+
         if (this.viewing) { this.detail() }
     }.width('100%').height('100%')
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
@@ -1098,9 +1104,9 @@ struct Index {
     if(this.scheduledName||this.scheduleTransition){this.getUIContext().getPromptAction().showToast({message:'请先恢复原始画布再编辑'});return;}
     if (this.heroActive || this.arriving) return;
     this.galleryVisible=false;
-    this.editorExpanded=false;this.editorSheetHeightVp=0;this.editorBackPending=false;
+    this.templateDataIndex=0;this.editorExpanded=false;this.editorSheetHeightVp=0;this.editorBackPending=false;
     this.editorContentStage=0;this.editorMountGeneration++;
-    this.heroHideContent = false; this.select(id, true); this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false;this.editorSection=0;this.editorSheetTab=0;this.settingsTab=this.preview.capability!==null?1:0;
+    this.heroHideContent = false; this.select(id, true);if(this.current()?.template?.fill){this.templateCanvasBackground(false);this.history.reset(this.current()!,[],this.canvasBackground);} this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false;this.editorSection=0;this.editorSheetTab=0;this.settingsTab=this.preview.capability!==null?1:0;
     this.heroRect = this.boardRect();
     if (created) {
       const rect = new SceneRect(); rect.w = 28; rect.h = 28 * this.preview.h / this.preview.w;
@@ -1156,7 +1162,7 @@ struct Index {
   private closeEditor(): void {
     if (this.heroActive || !this.editing) return;
     if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview();
-    const origin=this.editorRect();this.editorSheetOpen=false;this.editorExpanded=false;this.editorSheetHeightVp=0;
+    const origin=this.editorRect();this.editorSheetOpen=false;this.templateDataIndex=0;this.editorExpanded=false;this.editorSheetHeightVp=0;
     this.creatingTransition = false; this.heroHideContent = this.settingsTab === 0;
     this.heroBase = origin; this.setHeroPose(this.heroBase); this.setTransitionClip(false); this.heroActive = true;
     // Publish the edited card to the board once, before it fades back in.
@@ -1304,7 +1310,7 @@ struct Index {
   private select(id: string, refresh: boolean = false): void {
     if (!refresh && !this.editing && !this.viewing && this.selectedId === id) return;
     const selected = this.store.findCard(id);
-    if (selected !== null && this.selectedId !== id) { this.history.reset(selected,compositionPaletteState(selected,this.store.state.cards)); this.undoAvailable = false; this.redoAvailable = false; }
+    if (selected !== null && this.selectedId !== id) { this.history.reset(selected,compositionPaletteState(selected,this.store.state.cards),selected.template?this.canvasBackground:undefined); this.undoAvailable = false; this.redoAvailable = false; }
     this.selectedId = id; this.layerId = ''; this.syncFields();
     const card = this.current(); if (card !== null) this.preview = cardRenderSnapshot(card);
   }
@@ -1316,7 +1322,7 @@ struct Index {
     this.syncPreviewFields();
     const card = this.current(), element = this.currentElement();
     this.textValue = element?.text ?? ''; this.elementColor = element?.color ?? '';
-    this.titleValue = card?.capability?.title ?? '';
+    this.titleValue = this.dataCapability(card)?.title ?? '';
     this.paperValue = card?.paper ?? ''; this.inkValue = card?.ink ?? '';
   }
   private change(group: string = this.gestureGroup): void {
@@ -1330,7 +1336,7 @@ struct Index {
       }
       if (card.capability !== null&&!card.template) card.capBox = capabilityPlacement(card);
       this.clamp(card);
-      if (this.editing) { this.history.record(card, group,compositionPaletteState(card,this.store.state.cards)); this.undoAvailable = this.history.canUndo(); this.redoAvailable = this.history.canRedo(); }
+      if (this.editing) { this.history.record(card, group,compositionPaletteState(card,this.store.state.cards),card.template?this.canvasBackground:undefined); this.undoAvailable = this.history.canUndo(); this.redoAvailable = this.history.canRedo(); }
     }
     this.render();
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer);
@@ -1344,6 +1350,7 @@ struct Index {
     if (index < 0) return;
     this.store.state.cards[index] = restored;
     restoreCompositionPalette(this.history.paletteState(),this.store.state.cards);
+    const background=this.history.backgroundState();if(restored.template&&background)this.applyBackground(background);
     if (this.layerId !== 'capability' && !restored.elements.some((el: CanvasElement) => el.id === this.layerId)) this.layerId = '';
     if (this.layerId === 'capability' && restored.capability === null) this.layerId = '';
     this.gestureGroup = ''; this.syncFields(); this.render();
@@ -1480,30 +1487,57 @@ struct Index {
     if(!cards.length||this.busy||!this.canAddCards(cards.length))return;
     this.busy=true;
     try{
-      if(cards.some(c=>c.capability?.k==='timetable')){
+      if(cards.some(c=>cardCapabilities(c).some(cap=>cap.k==='timetable'))){
         const saved=await this.store.savedTimetable();if(!this.alive||canvas!==this.store.state.canvasId)return;
-        for(const card of cards)if(card.capability?.k==='timetable'){if(saved)card.capability=useSavedTimetable(card.capability,saved);else{const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));card.capability.semester=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);card.capability.courses=[];}}
+        for(const card of cards)for(const cap of cardCapabilities(card))if(cap.k==='timetable'){if(saved)replaceCardCapability(card,cap,useSavedTimetable(cap,saved));else{const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));cap.semester=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);cap.courses=[];}}
       }
       cards.forEach(card=>this.clamp(card));this.store.addCards(cards);this.select(cards[0].id);this.change();this.openEditor(cards[0].id,true);this.scheduleForegroundRefresh();
     }catch(e){this.getUIContext().getPromptAction().showToast({message:(e as Error).message});}finally{this.busy=false;}
   }
+  private dataCapability(card:FridgeCard|null=this.current()):CapBlock|null{return card?cardCapabilities(card)[this.templateDataIndex]??card.capability:null;}
+  private dataPreview():CapBlock|null{return this.dataCapability(this.preview);}
+  private templateSourceIndices():number[]{return cardCapabilities(this.preview).map((cap,index)=>['countdown','anniversary','worldclock','agenda','timetable','album'].includes(cap.k)?index:-1).filter(index=>index>=0);}
+  private templateSourceLabels():string[]{const face=compositionDefinition(this.preview.template?.id??'');return face?this.templateSourceIndices().map(index=>face.slots[index].role):[];}
+  private photoStartX:number=0;
+  private photoStartY:number=0;
+  private photoStartZoom:number=1;
+  private photoGestureStart():void {const t=this.current()?.template;if(!t)return;this.photoStartX=t.offsetX;this.photoStartY=t.offsetY;this.photoStartZoom=t.zoom;}
+  private photoGesturePan(x:number,y:number):void {
+    const t=this.current()?.template;if(!t||this.busy)return;const box=this.editorRect(),a=this.editingAngle()*Math.PI/180;
+    t.offsetX=Math.max(-.35,Math.min(.35,this.photoStartX+(x*Math.cos(a)+y*Math.sin(a))/Math.max(1,box.w)));
+    t.offsetY=Math.max(-.35,Math.min(.35,this.photoStartY+(-x*Math.sin(a)+y*Math.cos(a))/Math.max(1,box.h)));this.continuousChange(SliderChangeMode.Moving);
+  }
+  private photoGestureZoom(scale:number):void {const t=this.current()?.template;if(!t||this.busy)return;t.zoom=Math.max(.5,Math.min(1.5,this.photoStartZoom*scale));this.continuousChange(SliderChangeMode.Moving);}
+  private photoGestureEnabled():boolean{return this.editing&&!this.heroActive&&!this.busy&&this.editorSection===0&&['portrait','mix-memory','face-memory-photo'].includes(this.preview.template?.id??'')&&this.preview.elements.some(e=>e.kind==='image'&&e.src.length>0);}
   private templatePhotoElement():CanvasElement|null {
     const card=this.current();if(!card)return null;let el=card.elements.find(e=>e.kind==='image');
     if(!el){el=new CanvasElement();el.id=this.store.newId();el.kind='image';el.x=0;el.y=0;el.w=1;el.h=1;card.elements.push(el);}this.layerId=el.id;return el;
   }
-  private async templatePhotoPick():Promise<void>{if(this.busy)return;const card=this.current(),el=this.templatePhotoElement();if(!el||!card)return;await this.pickImage();if(this.current()!==card)return;if(!el.src)card.elements=card.elements.filter(e=>e!==el);this.layerId='';this.syncFields();}
+  private async templatePhotoPick():Promise<void>{
+    if(this.busy)return;const card=this.current(),el=this.templatePhotoElement();if(!el||!card)return;const old=el.src;
+    await this.pickImage();if(this.current()!==card)return;
+    if(el.src&&el.src!==old){card.template!.zoom=1;card.template!.offsetX=0;card.template!.offsetY=0;this.change();if(!el.animated&&['portrait','mix-memory','face-memory-photo'].includes(card.template!.id))await this.setElementDepth(true);}
+    if(!el.src)card.elements=card.elements.filter(e=>e!==el);this.layerId='';this.syncFields();
+  }
   private async templateCutout():Promise<void>{if(this.busy)return;const card=this.current(),el=this.templatePhotoElement();if(!el||!card)return;if(!el.src)await this.pickImage();if(this.current()!==card)return;if(el.src)await this.setElementDepth(true);else card.elements=card.elements.filter(e=>e!==el);if(this.current()===card){this.layerId='';this.syncFields();}}
   private templateBrightness(hex:string):number{return parseInt(hex.slice(1,3),16)*.2126+parseInt(hex.slice(3,5),16)*.7152+parseInt(hex.slice(5,7),16)*.0722;}
+  private templateCanvasBackground(force:boolean=true):void {
+    const card=this.current();if(!card?.template?.fill)return;
+    if(!force&&((card.template.background==='smart'&&this.canvasBackground.mode==='blend'&&this.canvasBackground.src.length>0)||(card.template.background!=='smart'&&this.canvasBackground.mode==='solid'&&this.canvasBackground.color===templateColors(card)[0])))return;
+    const bg=normalizeBackground(JSON.parse(JSON.stringify(this.canvasBackground)) as CanvasBackground);
+    bg.mode=card.template.background==='smart'?'blend':'solid';bg.color=templateColors(card)[0];bg.src='';
+    this.applyBackground(bg);if(bg.mode==='blend')this.refreshBackground(true);
+  }
   private templateSetting(key:string,value:string|number|boolean,mode?:SliderChangeMode):void{
     const card=this.current(),t=card?.template;if(!card||!t)return;
     if(key==='id'){const next=templateDefinition(String(value));if(next?.kind!==card.capability?.k)return;t.id=String(value);}
-    else if(key==='palette')setCompositionPalette(card,this.store.state.cards,String(value));else if(key==='depth')t.depth=value===true;
-    else if(key==='fill'){t.fill=value===true;if(t.fill){const bg=this.templateBrightness(this.canvasBackground.color),ink=this.templateBrightness(templateColors(card)[1]);if(bg>180&&ink>180)t.palette='cream';else if(bg<90&&ink<90)t.palette='ink';}if(!t.fill){card.w=Math.min(260,BOARD_W/this.canvasAspect-24);card.h=card.w;card.x=(BOARD_W-card.w)/2;card.y=12;}this.clamp(card);}
+    else if(key==='palette'){setCompositionPalette(card,this.store.state.cards,String(value));this.templateCanvasBackground();}else if(key==='background'){t.background=String(value);this.templateCanvasBackground();}else if(key==='photoMode'){t.photoMode=String(value);t.zoom=1;t.offsetX=0;t.offsetY=0;}else if(key==='reset'){t.zoom=1;t.offsetX=0;t.offsetY=0;}else if(key==='depth')t.depth=value===true;
+    else if(key==='fill'){t.fill=value===true;if(t.fill)this.templateCanvasBackground();if(!t.fill){card.w=Math.min(260,BOARD_W/this.canvasAspect-24);card.h=compositionDefinition(t.id)&&this.canvasAspect>=1.5?card.w/2:card.w;card.x=(BOARD_W-card.w)/2;card.y=12;}this.clamp(card);}
     else if(key==='zoom')t.zoom=Number(value);else if(key==='offsetX')t.offsetX=Number(value);else if(key==='offsetY')t.offsetY=Number(value);
     if(mode===undefined)this.change();else this.continuousChange(mode);
   }
   @Builder
-  templateAppearance(){TemplateSettings({card:this.preview,appDark:this.appDark,onDesign:(id:string)=>this.templateSetting('id',id),onPalette:(value:string)=>this.templateSetting('palette',value),onFill:(value:boolean)=>this.templateSetting('fill',value),onPhoto:()=>{this.templatePhotoPick();},onCutout:()=>{this.templateCutout();},onDepth:(value:boolean)=>this.templateSetting('depth',value),onTransform:(key:string,value:number,mode:SliderChangeMode)=>this.templateSetting(key,value,mode)})}
+  templateAppearance(){TemplateSettings({card:this.preview,processing:this.busy,appDark:this.appDark,onPhotoMode:(mode:string)=>this.templateSetting('photoMode',mode),onReset:()=>this.templateSetting('reset',true),onBackground:(mode:string)=>this.templateSetting('background',mode),onDesign:(id:string)=>this.templateSetting('id',id),onPalette:(value:string)=>this.templateSetting('palette',value),onFill:(value:boolean)=>this.templateSetting('fill',value),onPhoto:()=>{this.templatePhotoPick();},onCutout:()=>{this.templateCutout();},onDepth:(value:boolean)=>this.templateSetting('depth',value),onTransform:(key:string,value:number,mode:SliderChangeMode)=>this.templateSetting(key,value,mode)})}
   private addCreativeCard(): void {
     if(this.scheduledName){this.getUIContext().getPromptAction().showToast({message:'请先恢复原始画布再添加卡片'});return;}
     if (this.busy || this.canvasChanging || !this.canAddCards(1)) return;
@@ -1675,6 +1709,7 @@ struct Index {
         const header = new ArrayBuffer(6); fileIo.readSync(output.fd, header, { offset: 0, length: 6 });
         const bytes = new Uint8Array(header); const gif = bytes[0] === 71 && bytes[1] === 73 && bytes[2] === 70 && bytes[3] === 56 && (bytes[4] === 55 || bytes[4] === 57) && bytes[5] === 97;
         if (this.store.findCard(id) !== card || !card.elements.includes(element)) { await fileIo.unlink(path); return; }
+        const metadata=image.createImageSource(output.fd);try{const info=await metadata.getImageInfo();element.depthSourceAspect=info.size.width/Math.max(1,info.size.height);}finally{await metadata.release();}
         element.src = 'file://' + path; element.animated = gif; element.depthEnabled=false;element.depthForeground=''; this.change(group);
       }
     } catch (e) {
@@ -1713,11 +1748,11 @@ struct Index {
     finally{if(subject)this.enhancingSubject=false;else this.enhancingBackground=false;}
   }
   private pickDate(): void {
-    const cap = this.current()?.capability; if (cap === null || cap === undefined) return;
+    const cap = this.dataCapability(); if (cap === null || cap === undefined) return;
     const card = this.current();
     this.getUIContext().showDatePickerDialog({ start: new Date('1900-01-01'), end: new Date('2100-12-31'), selected: new Date((cap.date ?? '2026-09-30') + 'T00:00:00'),
       onDateAccept: (d: Date) => {
-        if (card?.capability !== cap) return;
+        if (!card||!cardCapabilities(card).includes(cap)) return;
         cap.date = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); this.change();
       }
     });
@@ -1737,20 +1772,19 @@ struct Index {
     else{this.capabilityPickerSheet()}
   }
   private updateExtraCapability(id:string,next:CapBlock):void {
-    const card=this.store.findCard(id);if(!card||card.capability?.k!==next.k)return;
-    const courseDataChanged=next.k==='timetable'&&!sameTimetable(card.capability,next);
-    if(next.k==='album'&&(next.albumPresentation??'cover')!==(card.capability.albumPresentation??'cover')) {
+    const card=this.store.findCard(id);if(!card)return;const previous=cardCapabilities(card).find(cap=>cap.k===next.k);if(!previous)return;
+    const courseDataChanged=next.k==='timetable'&&!sameTimetable(previous,next);
+    if(next.k==='album'&&(next.albumPresentation??'cover')!==(previous.albumPresentation??'cover')) {
       if(next.albumPresentation==='row')card.h=card.w/2;else card.h=card.w;
     }
-    card.capability=next;this.syncFields();this.change();
-    if(courseDataChanged&&this.store.findCard(id)?.capability===next)this.store.rememberTimetable(next).catch(()=>{if(this.alive)this.getUIContext().getPromptAction().showToast({message:'课表保存失败，原课表已保留。请重试'});});
+    replaceCardCapability(card,previous,next);this.syncFields();this.change();
+    if(courseDataChanged&&cardCapabilities(this.store.findCard(id)!).includes(next))this.store.rememberTimetable(next).catch(()=>{if(this.alive)this.getUIContext().getPromptAction().showToast({message:'课表保存失败，原课表已保留。请重试'});});
   }
   private async reuseTimetable(id:string):Promise<void> {
-    const card=this.store.findCard(id);if(card?.capability?.k!=='timetable')return;
-    const previous=card.capability;
+    const card=this.store.findCard(id);if(!card)return;const previous=cardCapabilities(card).find(cap=>cap.k==='timetable');if(!previous)return;
     try {
       const saved=await this.store.savedTimetable();
-      if(!this.alive||this.store.findCard(id)!==card||card.capability!==previous)return;
+      if(!this.alive||this.store.findCard(id)!==card||!cardCapabilities(card).includes(previous))return;
       if(!saved){this.getUIContext().getPromptAction().showToast({message:'没有已保存的课表，请导入或添加课程'});return;}
       this.updateExtraCapability(id,useSavedTimetable(previous,saved));
     }catch(e){if(this.alive)this.getUIContext().getPromptAction().showToast({message:(e as Error).message});}
@@ -1779,8 +1813,8 @@ struct Index {
     this.refreshingCapabilities=true;const canvasId=this.store.state.canvasId,generation=this.foregroundGeneration;
     const sources:FridgeCard[]=[],previous:CapBlock[]=[],results:CapBlock[]=[],keys:string[]=[];
     try {
-      for(const card of this.store.state.cards.slice()) {
-        const cap=card.capability;if(!needsDataRefresh(cap)||!cap)continue;
+      for(const card of this.store.state.cards.slice())for(const cap of cardCapabilities(card)) {
+        if(!needsDataRefresh(cap))continue;
         const key=capabilityRequestKey(cap),next=await readCapability(cap,this.context);
         if(!this.alive||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded||generation!==this.foregroundGeneration||this.store.state.canvasId!==canvasId)return;
         sources.push(card);previous.push(cap);results.push(next);keys.push(key);
@@ -1789,10 +1823,10 @@ struct Index {
       let changed=false;
       sources.forEach((card:FridgeCard,index:number)=>{
         const cap=previous[index],next=results[index];
-        if(this.store.findCard(card.id)!==card||card.capability!==cap||capabilityRequestKey(cap)!==keys[index])return;
+        if(this.store.findCard(card.id)!==card||!cardCapabilities(card).includes(cap)||capabilityRequestKey(cap)!==keys[index])return;
         if(cap.k==='battery'&&cap.percent===next.percent&&cap.charging===next.charging&&cap.chargeState===next.chargeState&&cap.refreshState===next.refreshState)return;
         if(JSON.stringify(next)===JSON.stringify(cap))return;
-        card.capability=next;changed=true;
+        replaceCardCapability(card,cap,next);changed=true;
       });
       if(changed){this.render();this.persist(true);this.updateScheduledScene(true);}
     }finally{this.refreshingCapabilities=false;}
@@ -1890,7 +1924,7 @@ struct Index {
   depthSceneLayer(id:string,renderId:string){
           Stack({ alignContent: Alignment.TopStart }) {
             Stack({ alignContent: Alignment.TopStart }) {
-            BoardCard({ showControls:false,layerMotion:this.layerMotion, controlViewportWidth: BOARD_W * this.boardScale, controlViewportHeight: this.boardHeight, motion: this.boardMotion, card: this.sceneCard(renderId), localCoordinates: true, scatterAngle: 0, editingSurface: this.editing,
+            BoardCard({ editorBackground:this.canvasBackground,showControls:false,layerMotion:this.layerMotion, controlViewportWidth: BOARD_W * this.boardScale, controlViewportHeight: this.boardHeight, motion: this.boardMotion, card: this.sceneCard(renderId), localCoordinates: true, scatterAngle: 0, editingSurface: this.editing,
               displayAngle: id === this.selectedId ? this.surfaceAngle() : this.cardMap[id].rot + this.scatter * (this.cardMap[id].z % 2 === 0 ? 9 : -9),
               selected: this.selectedId === id && !this.editing && !this.groupSelecting && this.selectedGroup().length < 2, scaleFactor: this.boardScale, yScaleFactor: this.boardHeight / BOARD_H,
               animateContent:this.editing&&!this.heroActive&&id===this.selectedId,
@@ -2651,13 +2685,13 @@ struct Index {
     Scroll() {Column({space:8}) {this.layerEntries()}.width('100%').padding({top:8,bottom:8,right:4})}
       .id('editorLayerStrip').width(this.editorWorkspace().layersW).height(this.previewPaneHeight()+(this.editorLandscape()?0:64)).scrollable(ScrollDirection.Vertical).align(Alignment.Top).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring).fadingEdge(true,{fadingEdgeLength:LengthMetrics.vp(10)})
   }
-  private capabilityHasEditableData():boolean {return ['countdown','anniversary','worldclock','agenda','timetable','album'].includes(this.preview.capability?.k??'');}
+  private capabilityHasEditableData():boolean {return cardCapabilities(this.preview).some(cap=>['countdown','anniversary','worldclock','agenda','timetable','album'].includes(cap.k));}
   private editorTools():string[] {
     if(this.preview.template)return this.capabilityHasEditableData()?['模板','数据']:['模板'];
     return this.preview.capability?.k==='album'?['样式','封面与资料']:this.layerId==='capability'?(this.capabilityHasEditableData()?['样式','位置','颜色','数据']:['样式','位置','颜色']):this.layerId.length?(this.elementPreview.kind==='image'?['图片','位置']:['外观','位置','颜色']):['形状','底色'];
   }
   private openEditorSection(index:number):void {
-    if(this.heroActive||this.editorSection===index)return;this.editorSection=index;this.editorSheetTab=0;this.scroller.scrollTo({xOffset:0,yOffset:0});
+    if(this.heroActive||this.editorSection===index)return;this.editorSection=index;this.editorSheetTab=0;if(index===1&&this.preview.template)this.templateDataIndex=this.templateSourceIndices()[0]??0;this.scroller.scrollTo({xOffset:0,yOffset:0});
   }
   private dismissEditorSheet(action:DismissSheetAction):void {
     if(action.reason===DismissReason.PRESS_BACK){this.editorSheetOpen=false;action.dismiss();if(this.heroActive)this.editorBackPending=true;else this.closeEditor();}else this.expandEditor(false);
@@ -2678,14 +2712,14 @@ struct Index {
     },(toolsKey:string)=>toolsKey)}.width('100%').height(48)
   }
   private editorSheetHeight():number {return Math.min(520,Math.max(300,this.screenHeight*.52),this.screenHeight-this.safeTop-80);}
-  private sectionTabs():string[] {return this.preview.capability?.k==='album'?['封面库','资料','轮换']:this.preview.capability?.k==='timetable'?['显示','课表','校历']:[];}
+  private sectionTabs():string[] {return this.dataPreview()?.k==='album'?['封面库','资料','轮换']:this.dataPreview()?.k==='timetable'?['显示','课表','校历']:[];}
   @Builder
   editorSectionSheet() {
     Column({space:10}) {
       if(this.editorContentStage>=1){this.editorInspector()}
       if(this.editorContentStage>=1&&this.sectionTabs().length>0 && (this.preview.template&&this.editorSection===1 || this.preview.capability?.k==='album'&&this.editorSection===1 || this.layerId==='capability'&&this.editorSection===3)) {SettingsSegmented({labels:this.sectionTabs(),selectedIndex:this.editorSheetTab,appDark:this.appDark,onSelect:(i:number)=>{this.editorSheetTab=i;this.scroller.scrollTo({xOffset:0,yOffset:0});}})}
       Scroll(this.scroller) {
-        Stack({alignContent:Alignment.TopStart}) {if(this.editorContentStage>=2){ForEach([this.layerId+':'+this.editorSection+':'+this.editorSheetTab],(sectionKey:string)=>{Column({space:16}) {
+        Stack({alignContent:Alignment.TopStart}) {if(this.editorContentStage>=2){ForEach([this.layerId+':'+this.editorSection+':'+this.editorSheetTab+':'+this.templateDataIndex],(sectionKey:string)=>{Column({space:16}) {
           if(this.preview.template){if(this.editorSection===0){this.templateAppearance()}else{Column(){this.capabilityDataPanel()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(20)}} else if(this.preview.capability?.k==='album') {
             if(this.editorSection===0) {this.albumStyleChoices()}
             else {Column() {this.capabilityDataPanel()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(20)}
@@ -2761,6 +2795,8 @@ struct Index {
   canvasEditor() {
     Stack({ alignContent: Alignment.TopStart }) {
       Column().width('100%').height('100%').backgroundColor(Color.Transparent).onClick(() => this.chooseLayer(''))
+      if(this.photoGestureEnabled()){TemplatePhotoGesture({onStart:()=>this.photoGestureStart(),onPan:(x:number,y:number)=>this.photoGesturePan(x,y),onZoom:(scale:number)=>this.photoGestureZoom(scale),onEnd:()=>this.continuousChange(SliderChangeMode.End)})
+        .id('templatePhotoCamera').width(this.editorRect().w).height(this.editorRect().h).position({x:this.previewViewport().left,y:this.previewViewport().top}).zIndex(10)}
       Stack({ alignContent: Alignment.TopStart }) {
         ForEach(this.preview.elements.filter((el: CanvasElement) => !this.preview.template && this.preview.capability?.k!=='album' && el.behindCapability && this.settingsTab === 0), (el: CanvasElement) => { this.layerTouch(el.id) }, (el: CanvasElement) => el.id)
         if (!this.preview.template && this.settingsTab === 1 && this.preview.capability !== null && this.preview.capability.k!=='album') { this.layerTouch('capability') }
@@ -2971,7 +3007,7 @@ struct Index {
   }
   @Builder
   layerEntries() {
-    if(this.preview.template){this.layerEntry('');if(this.capabilityHasEditableData()){Button('数据',{type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}).width(this.editorWorkspace().layersW-4).height(80).backgroundColor(this.appSurface()).fontColor(this.appText()).borderRadius(18).onClick(()=>{this.editorSection=1;this.editorSheetTab=0;})}}else if(this.preview.capability?.k==='album') {this.layerEntry('capability')} else {
+    if(this.preview.template){this.layerEntry('');if(this.capabilityHasEditableData()){Button('数据',{type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}).width(this.editorWorkspace().layersW-4).height(80).backgroundColor(this.appSurface()).fontColor(this.appText()).borderRadius(18).onClick(()=>this.openEditorSection(1))}}else if(this.preview.capability?.k==='album') {this.layerEntry('capability')} else {
       this.layerEntry('')
       ForEach(this.preview.elements.slice().reverse(),(el:CanvasElement)=>{this.layerEntry(el.id)},(el:CanvasElement)=>el.id)
       if(this.preview.capability!==null) {this.layerEntry('capability')}
@@ -3078,18 +3114,19 @@ struct Index {
   @Builder
   capabilityDataPanel() {
     Column({space:12}) {
+      if(this.templateSourceLabels().length>1){SettingsSegmented({labels:this.templateSourceLabels(),selectedIndex:Math.max(0,this.templateSourceIndices().indexOf(this.templateDataIndex)),appDark:this.appDark,onSelect:(i:number)=>{this.templateDataIndex=this.templateSourceIndices()[i]??0;this.editorSheetTab=0;this.titleValue=this.dataCapability()?.title??'';}})}
 
-      if (this.preview.capability?.k === 'countdown' || this.preview.capability?.k === 'anniversary') {
+      if (this.dataPreview()?.k === 'countdown' || this.dataPreview()?.k === 'anniversary') {
         TextInput({ text: this.titleValue, placeholder: '名称' }).height(AppDesign.controlHeight).borderRadius(AppDesign.controlRadius).fontSize(16).fontColor(this.appText()).placeholderColor(this.appMuted()).backgroundColor(this.appControl())
-          .onChange((v: string) => { this.titleValue = v; const cap = this.current()?.capability; if (cap !== null && cap !== undefined) { cap.title = v; this.change(); } })
-        Button('日期  ' + (this.preview.capability?.date ?? ''), { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(() => this.pickDate())
+          .onChange((v: string) => { this.titleValue = v; const cap = this.dataCapability(); if (cap !== null && cap !== undefined) { cap.title = v; this.change(); } })
+        Button('日期  ' + (this.dataPreview()?.date ?? ''), { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontColor(this.appText()).backgroundColor(this.appControl()).onClick(() => this.pickDate())
       }
-      if (this.preview.capability?.k === 'worldclock') {
-        TimeCapabilitySettings({cap:this.preview.capability!,appDark:this.appDark,onUpdate:(next:CapBlock)=>this.updateExtraCapability(this.preview.id,next)})
+      if (this.dataPreview()?.k === 'worldclock') {
+        TimeCapabilitySettings({cap:this.dataPreview()!,appDark:this.appDark,onUpdate:(next:CapBlock)=>this.updateExtraCapability(this.preview.id,next)})
       }
 
-      if(this.preview.capability!==null && ['album','battery','agenda','timetable'].includes(this.preview.capability!.k)) {
-        CapabilitySettings({section:this.preview.capability?.k==='timetable'?['display','courses','calendar'][this.editorSheetTab]:this.preview.capability?.k==='album'?['library','metadata','rotation'][this.editorSheetTab]:'all',tick:this.tick,cap:this.preview.capability!,cardId:this.preview.id,appDark:this.appDark,onReuseTimetable:(id:string)=>this.reuseTimetable(id),onUpdate:(id:string,next:CapBlock)=>this.updateExtraCapability(id,next)})
+      if(this.dataPreview()!==null && ['album','battery','agenda','timetable'].includes(this.dataPreview()!.k)) {
+        CapabilitySettings({section:this.dataPreview()?.k==='timetable'?['display','courses','calendar'][this.editorSheetTab]:this.dataPreview()?.k==='album'?['library','metadata','rotation'][this.editorSheetTab]:'all',tick:this.tick,cap:this.dataPreview()!,cardId:this.preview.id,appDark:this.appDark,onReuseTimetable:(id:string)=>this.reuseTimetable(id),onUpdate:(id:string,next:CapBlock)=>this.updateExtraCapability(id,next)})
       }
     }.width('100%')
   }

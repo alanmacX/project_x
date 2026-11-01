@@ -6,7 +6,7 @@ const singles=t.CARD_TEMPLATES.filter(t=>t.kind!=='ensemble');assert.equal(singl
 let id=0;const now=Date.parse('2026-11-01T10:08:00+08:00');
 for(const item of t.CARD_TEMPLATES){
  for(const aspect of [0.3,0.9,1,2,3]){
-  const cards=f.makeTemplateCards(item.id,aspect,()=>String(++id),now);assert.equal(cards.length,item.sources.length);
+  const cards=f.makeTemplateCards(item.id,aspect,()=>String(++id),now);assert.equal(cards.length,1);
   for(const card of cards){
    assert.ok(card.x>=0&&card.x+card.w<=344.001,item.id+' horizontal recipe fit');assert.ok(card.y/470*(344/aspect)+card.h<=344/aspect+.001,item.id+' vertical recipe fit');
    const before=JSON.stringify(card),scene=r.cardTemplateScene(card,now);assert.equal(JSON.stringify(card),before,'render must not mutate card');assert.ok(scene.marks.length>0,item.id);for(const m of scene.marks){for(const k of ['x','y','w','h','angle'])assert.ok(Number.isFinite(m[k]),item.id+' '+k);}
@@ -33,7 +33,7 @@ console.log('Native templates: responsive recipes, gradient color distribution, 
 const history=new (nativeLoad('CardEditHistory').CardEditHistory)(),editing=nativeFactory.makeTemplateCards('dial',1,()=> 'history')[0];history.reset(editing);editing.template.palette='cobalt';history.record(editing);assert.ok(history.canUndo(),'palette-only changes must enter undo history');assert.equal(history.undo().template.palette,'');assert.equal(history.redo().template.palette,'cobalt');editing.template.id='portrait';history.record(editing);assert.equal(history.undo().template.id,'dial');
 console.log('Native templates: full-size editor gate and template-only undo/redo changes passed');
 
-const paletteModel=nativeLoad('CompositionPalette'),combo=nativeFactory.makeTemplateCards('mix-modular',1,()=>String(++id),now),unrelated=nativeFactory.makeTemplateCards('standby',1,()=>String(++id),now)[0];unrelated.groupId=combo[0].groupId;unrelated.template.palette='cream';combo[1].template.palette='cream';
+const paletteModel=nativeLoad('CompositionPalette'),combo=nativeLoad('CompositionCatalog').compositionDefinition('mix-modular').slots.map(slot=>{const c=nativeFactory.makeTemplateCards(slot.id,1,()=>String(++id),now)[0];c.groupId='legacy-face';return c;}),unrelated=nativeFactory.makeTemplateCards('standby',1,()=>String(++id),now)[0];unrelated.groupId=combo[0].groupId;unrelated.template.palette='cream';combo[1].template.palette='cream';
 const peerCards=combo.concat([unrelated]),paletteHistory=new (nativeLoad('CardEditHistory').CardEditHistory)();paletteHistory.reset(combo[0],paletteModel.compositionPaletteState(combo[0],peerCards));
 paletteModel.setCompositionPalette(combo[0],peerCards,'cobalt');paletteHistory.record(combo[0],'',paletteModel.compositionPaletteState(combo[0],peerCards));assert.ok(combo.every(c=>c.template.palette==='cobalt'));assert.equal(unrelated.template.palette,'cream');
 peerCards[0]=paletteHistory.undo();paletteModel.restoreCompositionPalette(paletteHistory.paletteState(),peerCards);assert.deepEqual(peerCards.map(c=>c.template.palette),['','cream','','cream'],'undo restores exact per-role palettes including imported customization');
@@ -43,7 +43,7 @@ console.log('PASS unified composition palettes: group switch, exact undo/redo of
 
 // Photo combinations preserve the whole source in square and wide layouts, including smart-color area.
 for(const aspect of [1,2])for(const ratio of [.125,1,8]){
- const card=nativeFactory.makeTemplateCards('mix-memory',aspect,()=>String(++id),now)[0],photo=new (nativeLoad('CardSchema').CanvasElement)();photo.kind='image';photo.src='file:///photo.webp';card.elements=[photo];
+ const card=nativeFactory.makeTemplateCards('mix-memory',aspect,()=>String(++id),now)[0],photo=new (nativeLoad('CardSchema').CanvasElement)();photo.kind='image';photo.src='file:///photo.webp';photo.depthSourceAspect=ratio;card.elements=[photo];
  const scene=nativeLoad('TemplateScene').cardTemplateScene(card,now),image=scene.marks.find(m=>m.kind==='image');assert.equal(image.fit,'contain');assert.ok(image.x>=0&&image.y>=0&&image.x+image.w<=scene.width&&image.y+image.h<=scene.height);
  const width=ratio<1?8:64,height=ratio<1?64:64/ratio,rgba=new Uint8Array(width*height*4);for(let i=0;i<rgba.length;i+=4){rgba[i]=255;rgba[i+3]=255;}
  const raster=nativeLoad('CardColorDistribution').cardColorRaster(card,new Map([[photo.src,{width,height,rgba}]]),240),count=Array.from(raster.rgba).filter((v,i)=>i%4===0&&v===255&&raster.rgba[i+1]===0&&raster.rgba[i+2]===0).length;
@@ -51,3 +51,12 @@ for(const aspect of [1,2])for(const ratio of [.125,1,8]){
  photo.depthEnabled=true;photo.depthForeground='file:///subject.png';photo.depthSourceAspect=ratio;assert.equal(nativeLoad('TemplateScene').cardTemplateScene(card,now).marks.find(m=>m.kind==='image').fit,'contain');
 }
 console.log('PASS photo combination fit: tall/square/wide sources in square and wide faces, complete image/subject and matching smart-color area');
+
+// An atomic face is one undoable object, including auxiliary data and its adopted canvas background.
+const atomic=nativeFactory.makeTemplateCards('mix-travel',1,()=> 'atomic-history',now)[0],atomicHistory=new (nativeLoad('CardEditHistory').CardEditHistory)();
+const oldBg=nativeLoad('CardSchema').normalizeBackground({mode:'solid',color:'#FFFFFF',frameStyle:'dark',frameMaterial:'walnut'});
+atomicHistory.reset(atomic,[],oldBg);const nested=nativeLoad('TemplateSources').cardCapabilities(atomic);assert.ok(nested.length>1);nested[1].title='新的目的地';atomic.template.palette='cobalt';atomic.template.fill=true;atomic.template.background='smart';
+const smartBg={...oldBg,mode:'blend',color:'#001155',src:'file:///blend.webp'};atomicHistory.record(atomic,'',[],smartBg);
+oldBg.color='#FF0000';smartBg.color='#00FF00';nested[1].title='后来修改';const originalAtomic=atomicHistory.undo();assert.notEqual(originalAtomic.template.sources[0].title,'新的目的地');assert.equal(atomicHistory.backgroundState().color,'#FFFFFF');assert.equal(atomicHistory.backgroundState().frameMaterial,'walnut');
+const redoneAtomic=atomicHistory.redo();assert.equal(redoneAtomic.template.sources[0].title,'新的目的地');assert.equal(atomicHistory.backgroundState().mode,'blend');assert.equal(atomicHistory.backgroundState().color,'#001155');assert.equal(atomicHistory.backgroundState().frameStyle,'dark');
+console.log('PASS atomic face undo: nested source snapshots, full-canvas palette/smart background and unchanged frame, detached from later mutations');

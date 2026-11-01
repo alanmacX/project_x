@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const ctx=vm.createContext({});vm.runInContext(fs.readFileSync('previewer/shared-models.js','utf8'),ctx);const load=n=>ctx.FridgeCore.load(n),s=load('CardSchema'),f=load('TemplateFactory'),scene=load('TemplateScene');let count=0;
+for(const aspect of [.3,1,2,3])for(const source of [.3,.69,1,3])for(const zoom of [.5,1,1.5])for(const offset of [-.35,0,.35]){
+ const c=f.makeTemplateCards('portrait',1,()=> 'photo')[0];c.w=300;c.h=300/aspect;c.template.photoMode='photo';c.template.zoom=zoom;c.template.offsetX=offset;c.template.offsetY=-offset;
+ const p=new s.CanvasElement();Object.assign(p,{kind:'image',src:'file:///original.png',depthForeground:'file:///subject.png',depthEnabled:true,depthSourceAspect:source});Object.assign(p.depthCrop,{x:.1,y:.2,w:.7,h:.6});c.elements=[p];
+ const marks=scene.cardTemplateScene(c,1793536957629).marks,base=marks.find(m=>m.src===p.src),front=marks.find(m=>m.src===p.depthForeground);
+ assert.ok(base&&front);for(const [a,b] of [[front.x,base.x+p.depthCrop.x*base.w],[front.y,base.y+p.depthCrop.y*base.h],[front.w,base.w*p.depthCrop.w],[front.h,base.h*p.depthCrop.h]])assert.ok(Math.abs(a-b)<1e-8,'original and foreground share the exact camera transform');
+ c.template.depth=false;const off=scene.cardTemplateScene(c,1793536957629);assert.ok(!off.marks.some(m=>m.layer===3));const unchanged=off.marks.find(m=>m.src===p.src);assert.equal(base.x,unchanged.x);assert.equal(base.w,unchanged.w);count++;
+}
+const base=f.makeTemplateCards('portrait',1,()=> 'default')[0],p=new s.CanvasElement();p.kind='image';p.src='file:///original.png';p.depthSourceAspect=.69;base.elements=[p];const rendered=scene.cardTemplateScene(base,1793536957629),photo=rendered.marks.find(m=>m.kind==='image');assert.ok(photo.y>=74,'default whole subject starts below the main clock area');assert.ok(photo.y+photo.h<=rendered.height+.001,'default framing retains the whole image');
+console.log(`PASS photo camera: ${count} paired transforms, 4 canvas ratios, 4 source ratios, zoom/pan extremes; no foreground ghosting, unchanged camera when depth switches, readable default clock and complete subject`);
+
+base.elements[0].depthEnabled=true;base.elements[0].depthForeground='file:///subject.png';const only=scene.cardTemplateScene(base,1793536957629);assert.ok(only.marks.some(m=>m.src==='file:///subject.png'));assert.ok(!only.marks.some(m=>m.src==='file:///original.png'),'subject mode cannot paint the original advertising/photo background');base.template.depth=false;const behind=scene.cardTemplateScene(base,1793536957629);assert.ok(behind.marks.some(m=>m.src==='file:///subject.png'&&m.layer===1));

@@ -92,13 +92,14 @@ exports.templateArcPath = templateArcPath;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.cardTemplateScene = exports.templatePhoto = exports.templateContrastInk = exports.templateColors = exports.TemplateScene = exports.TemplateMark = void 0;
 const CompositionCatalog_1 = require("./CompositionCatalog");
+const TemplatePhotoGeometry_1 = require("./TemplatePhotoGeometry");
+const CompositionCatalog_2 = require("./CompositionCatalog");
 const HolidayCalendar_1 = require("./HolidayCalendar");
 const AlbumRotation_1 = require("./AlbumRotation");
 const CapabilityCalendar_1 = require("./CapabilityCalendar");
 const TimeCapabilities_1 = require("./TimeCapabilities");
 const CapabilityData_1 = require("./CapabilityData");
 const TimetableLayout_1 = require("./TimetableLayout");
-const DepthComposition_1 = require("./DepthComposition");
 const TemplateSceneTypes_1 = require("./TemplateSceneTypes");
 const CompositionScene_1 = require("./CompositionScene");
 var TemplateSceneTypes_2 = require("./TemplateSceneTypes");
@@ -106,9 +107,9 @@ Object.defineProperty(exports, "TemplateMark", { enumerable: true, get: function
 Object.defineProperty(exports, "TemplateScene", { enumerable: true, get: function () { return TemplateSceneTypes_2.TemplateScene; } });
 function templateColors(card) {
     const id = card.template?.id ?? '', p = card.template?.palette ?? '';
-    const face = (0, CompositionCatalog_1.compositionOwner)(id);
+    const face = (0, CompositionCatalog_1.compositionDefinition)(id) ?? (0, CompositionCatalog_2.compositionOwner)(id);
     if (face)
-        return (0, CompositionCatalog_1.compositionColors)(face.id, p);
+        return (0, CompositionCatalog_2.compositionColors)(face.id, p);
     if (p === 'cobalt')
         return ['#2443A2', '#F5EDDA', '#EABB65'];
     if (p === 'cream')
@@ -248,34 +249,38 @@ function cardTemplateScene(card, tick) {
         [hh, mm].forEach((v, i) => { const x = 15 + i * 141; rect(x, 54, 128, 190, '#30322F', 12).end = '#212320'; text(v, x, 80, 100, s.ink, 128, 'center', 800).font = 'digits'; line(x, 149, x + 128, 149, '#121412', 2); });
         date();
     }
-    else if (id === 'portrait' || id === 'anniversary-photo') {
+    else if (id === 'portrait') {
+        s.height = 300 * card.h / card.w;
+        const reserve = s.height < 180 ? 44 : 74, available = Math.max(1, s.height - reserve), subject = photo?.depthEnabled && !!photo.depthForeground, subjectMode = subject && personal.photoMode !== 'photo';
         if (photo) {
-            if (id === 'anniversary-photo') {
-                image(photo.src, 0, 0, 300, 212);
+            if (subjectMode) {
+                const box = (0, TemplatePhotoGeometry_1.templatePhotoBox)(photo, personal, 300, available, false, true);
+                image(photo.depthForeground, box.x, reserve + box.y, box.w, box.h, personal.depth ? 3 : 1);
             }
             else {
-                const w = 300 * Math.max(1, card.w / card.h), h = 300 * Math.max(1, card.h / card.w);
-                image(photo.src, (300 - w) / 2, (300 - h) / 2, w, h);
+                const frame = (0, TemplatePhotoGeometry_1.templatePhotoBox)(photo, personal, 300, available, false);
+                image(photo.src, frame.x, reserve + frame.y, frame.w, frame.h);
+                if (subject && personal.depth) {
+                    const box = (0, TemplatePhotoGeometry_1.templateSubjectBox)(photo, frame);
+                    image(photo.depthForeground, box.x, reserve + box.y, box.w, box.h, 3);
+                }
             }
         }
-        else {
+        else
+            text('选择你的照片', 24, Math.min(174, s.height - 28), 22, s.ink, 252, 'center');
+        const t = text(hh + ':' + mm, 9, s.height < 180 ? 8 : 14, s.height < 180 ? 48 : 82, s.ink, 282, 'center', 800);
+        t.layer = 2;
+        t.font = 'digits';
+    }
+    else if (id === 'anniversary-photo') {
+        if (photo)
+            image(photo.src, 0, 0, 300, 212);
+        else
             text('选择你的照片', 24, 174, 22, s.ink, 252, 'center');
-        }
-        if (id === 'portrait') {
-            const t = text(hh + ':' + mm, 9, 7, 94, s.ink, 282, 'center', 800);
-            t.layer = 2;
-            t.font = 'digits';
-            if (photo?.depthForeground && personal.depth) {
-                const box = (0, DepthComposition_1.depthPhotoBox)(photo, card.w, card.h), w = 300 * Math.max(1, card.w / card.h), h = 300 * Math.max(1, card.h / card.w);
-                image(photo.depthForeground, (300 - w) / 2 + (box.x + box.w * (1 - personal.zoom) / 2 + personal.offsetX) * w, (300 - h) / 2 + (box.y + box.h * (1 - personal.zoom) / 2 + personal.offsetY) * h, box.w * w * personal.zoom, box.h * h * personal.zoom, 3);
-            }
-        }
-        else {
-            rect(0, 211, 300, 89, s.background);
-            text(cap.title || '纪念日', 20, 236, 17, s.ink, 126);
-            text(left === null ? '—' : String(Math.abs(left)), 156, 223, 48, s.ink, 104, 'right', 700).font = 'digits';
-            text(left !== null && left > 0 ? '天后' : '天', 268, 260, 12);
-        }
+        rect(0, 211, 300, 89, s.background);
+        text(cap.title || '纪念日', 20, 236, 17, s.ink, 126);
+        text(left === null ? '—' : String(Math.abs(left)), 156, 223, 48, s.ink, 104, 'right', 700).font = 'digits';
+        text(left !== null && left > 0 ? '天后' : '天', 268, 260, 12);
     }
     else if (id.startsWith('date-')) {
         if (id === 'date-poster') {
@@ -619,6 +624,934 @@ function compositionLayout(face, aspect) {
 exports.compositionLayout = compositionLayout;
 
 },
+"TemplatePhotoGeometry":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.templateSubjectBox = exports.templatePhotoBox = void 0;
+const CardSchema_1 = require("./CardSchema");
+/** One camera for the original image and the extracted foreground; no independently floating duplicate. */
+function templatePhotoBox(photo, config, width, height, cover, subject = false) {
+    const box = new CardSchema_1.ElementBox(), aspect = Math.max(.01, (photo.depthSourceAspect || 1) * (subject ? photo.depthCrop.w / Math.max(.001, photo.depthCrop.h) : 1)), scale = cover ? Math.max(width / aspect, height) : Math.min(width / aspect, height);
+    box.w = scale * aspect * config.zoom;
+    box.h = scale * config.zoom;
+    box.x = (width - box.w) / 2 + config.offsetX * width;
+    box.y = (height - box.h) / 2 + config.offsetY * height;
+    return box;
+}
+exports.templatePhotoBox = templatePhotoBox;
+function templateSubjectBox(photo, frame) {
+    const box = new CardSchema_1.ElementBox(), crop = photo.depthCrop;
+    box.x = frame.x + crop.x * frame.w;
+    box.y = frame.y + crop.y * frame.h;
+    box.w = crop.w * frame.w;
+    box.h = crop.h * frame.h;
+    return box;
+}
+exports.templateSubjectBox = templateSubjectBox;
+
+},
+"CardSchema":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.normalizeCapability = exports.contrastingInk = exports.serializeDoorCards = exports.serializeFaceCards = exports.normalizeState = exports.normalizeElement = exports.localImageSource = exports.normalizeBox = exports.bounded = exports.defaultState = exports.cardCornerRadius = exports.shapeRadius = exports.materialColors = exports.typeLabel = exports.FridgeState = exports.normalizeBackground = exports.CanvasBackground = exports.BackgroundAnchor = exports.DoorState = exports.FridgeCard = exports.CanvasElement = exports.PhotoDepthCrop = exports.ElementBox = exports.CAPABILITIES = exports.CapType = exports.MIN_SUBJECT_EDGE = exports.ALBUM_CARD_CORNER_RADIUS = exports.ALBUM_CORNER_RADIUS = exports.ALBUM_INSET = exports.RECT_CORNER_RADIUS = exports.MIN_CARD_EDGE = exports.BOARD_H = exports.BOARD_W = void 0;
+const TemplateGroupMigration_1 = require("./TemplateGroupMigration");
+const CompositionCatalog_1 = require("./CompositionCatalog");
+const CardTemplate_1 = require("./CardTemplate");
+const HtmlCardTemplate_1 = require("./HtmlCardTemplate");
+const ReadingStylePolicy_1 = require("./ReadingStylePolicy");
+const SceneScheduleSchema_1 = require("./SceneScheduleSchema");
+const TimeCapabilities_1 = require("./TimeCapabilities");
+const HolidayCalendar_1 = require("./HolidayCalendar");
+/** Pure, versioned schema shared by the app and FormKit renderer. */
+exports.BOARD_W = 344;
+exports.BOARD_H = 470;
+/** Artwork bounds only; capability readability is enforced separately by layout. */
+exports.MIN_CARD_EDGE = 32;
+exports.RECT_CORNER_RADIUS = 16;
+exports.ALBUM_INSET = 4.9;
+exports.ALBUM_CORNER_RADIUS = 14;
+exports.ALBUM_CARD_CORNER_RADIUS = 20;
+exports.MIN_SUBJECT_EDGE = 16;
+class CapType {
+}
+exports.CapType = CapType;
+CapType.CLOCK = 'clock';
+CapType.DATE = 'date';
+CapType.CALENDAR = 'calendar';
+CapType.COUNTDOWN = 'countdown';
+CapType.ANNIVERSARY = 'anniversary';
+CapType.DAY_PROGRESS = 'dayprogress';
+CapType.YEAR_PROGRESS = 'yearprogress';
+exports.CAPABILITIES = ['clock', 'date', 'calendar', 'countdown', 'anniversary', 'dayprogress', 'yearprogress', 'battery', 'agenda', 'timetable', 'worldclock', 'lunar', 'album'];
+class ElementBox {
+    constructor() {
+        this.x = 0.1;
+        this.y = 0.12;
+        this.w = 0.8;
+        this.h = 0.7;
+        this.rot = 0;
+        this.opacity = 1;
+    }
+}
+exports.ElementBox = ElementBox;
+class PhotoDepthCrop extends ElementBox {
+    constructor() {
+        super(...arguments);
+        this.x = 0;
+        this.y = 0;
+        this.w = 1;
+        this.h = 1;
+    }
+}
+exports.PhotoDepthCrop = PhotoDepthCrop;
+class CanvasElement extends ElementBox {
+    constructor() {
+        super(...arguments);
+        this.id = '';
+        this.kind = 'text'; // text | image | shape
+        this.text = '';
+        this.src = '';
+        this.animated = false;
+        this.fs = 18;
+        this.color = '';
+        this.bold = false;
+        this.align = 'left';
+        this.behindCapability = false;
+        this.depthEnabled = false;
+        this.depthForeground = '';
+        this.depthCrop = new PhotoDepthCrop();
+        this.depthSourceAspect = 1;
+        this.depthFront = false;
+        this.primitive = 'rect'; // rect | circle | line
+    }
+}
+exports.CanvasElement = CanvasElement;
+class FridgeCard {
+    constructor() {
+        this.subjectDepth = false;
+        this.depthCapabilityFront = false;
+        this.depthGroup = false;
+        this.depthOwnerId = ''; // Render projection owner, never imported or stored.
+        this.depthPass = ''; // Derived render pass; never imported or stored.
+        this.reliefSrc = ''; // Host-derived only; ignored by import and omitted from editable storage.
+        this.groupId = '';
+        this.hidden = false;
+        this.id = '';
+        this.x = 24;
+        this.y = 32;
+        this.w = 180;
+        this.h = 180;
+        this.rot = 0;
+        this.z = 1;
+        this.shape = 'rect';
+        this.frame = false;
+        this.material = 'white';
+        this.paper = '';
+        this.ink = '';
+        this.capability = null;
+        this.capBox = new ElementBox();
+        this.capFree = false; // Manual foreground placement uses the whole card box, not its silhouette.
+        this.elements = [];
+        this.subjectPhoto = false;
+        this.subjectBorder = true;
+        this.subjectAspect = 1;
+        this.subjectInk = '#262824';
+        this.subjectVersion = 0;
+        this.cutout = ''; // transparent subject PNG, also the alpha mask
+        this.outline = [];
+        this.renderContourKey = '';
+        this.inDoor = false;
+    }
+}
+exports.FridgeCard = FridgeCard;
+class DoorState {
+    constructor() {
+        this.reveal = '07:30';
+        this.open = false;
+    }
+}
+exports.DoorState = DoorState;
+class BackgroundAnchor {
+    constructor() {
+        this.x = .5;
+        this.y = .5;
+        this.color = '#E9E5DF';
+        this.weight = 1;
+    }
+}
+exports.BackgroundAnchor = BackgroundAnchor;
+class CanvasBackground {
+    constructor() {
+        this.mode = 'solid';
+        this.color = '#FFFFFF';
+        this.src = '';
+        this.photo = '';
+        this.transparentFrame = 'auto'; // Legacy transparent-only setting.
+        this.frameStyle = 'none';
+        this.frameMaterial = 'stone';
+        this.palette = [];
+        this.anchors = [];
+        this.signature = '';
+    }
+}
+exports.CanvasBackground = CanvasBackground;
+function normalizeBackground(raw) {
+    const bg = new CanvasBackground();
+    if (raw === undefined || raw === null)
+        return bg;
+    bg.mode = ['solid', 'smart', 'blend', 'photo', 'preset', 'transparent'].includes(raw.mode) ? raw.mode : 'solid';
+    bg.transparentFrame = ['auto', 'light', 'dark', 'none'].includes(raw.transparentFrame) ? raw.transparentFrame : 'auto';
+    bg.frameStyle = ['auto', 'light', 'dark', 'none'].includes(raw.frameStyle) ? raw.frameStyle : bg.mode === 'transparent' ? bg.transparentFrame : 'none';
+    bg.frameMaterial = ['stone', 'walnut', 'oak'].includes(raw.frameMaterial) ? raw.frameMaterial : 'stone';
+    bg.color = /^#[0-9a-fA-F]{6}$/.test(raw.color ?? '') ? raw.color : '#FFFFFF';
+    bg.src = (raw.src ?? '').startsWith('file://') || (raw.src ?? '').startsWith('memory://') ? raw.src : '';
+    bg.photo = (raw.photo ?? '').startsWith('file://') ? raw.photo : '';
+    bg.palette = (Array.isArray(raw.palette) ? raw.palette : []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c)).slice(0, 6);
+    bg.anchors = (Array.isArray(raw.anchors) ? raw.anchors : []).slice(0, 12).filter((a) => a !== null && /^#[0-9a-fA-F]{6}$/.test(a.color)).map((a) => ({ x: bounded(a.x, 0, 1, .5), y: bounded(a.y, 0, 1, .5), color: a.color, weight: bounded(a.weight, .000001, 8, 1) }));
+    bg.signature = typeof raw.signature === 'string' ? raw.signature : '';
+    return bg;
+}
+exports.normalizeBackground = normalizeBackground;
+class FridgeState {
+    constructor() {
+        this.sceneLayouts = [];
+        this.sceneRules = [];
+        this.canvasRotation = undefined;
+        this.scenePolicyV2 = undefined;
+        this.systemDark = undefined;
+        this.sceneBaseLayoutId = ''; // Empty = current homepage; selecting a saved normal layout applies its geometry.
+        this.schemaVersion = 2;
+        this.canvasId = 'canvas_main';
+        this.background = new CanvasBackground();
+        this.canvasAspect = 1;
+        this.canvasDimension = '4*4';
+        this.fridge = 'board';
+        this.door = new DoorState();
+        this.maxZ = 10;
+        this.cards = [];
+    }
+}
+exports.FridgeState = FridgeState;
+function typeLabel(k) {
+    const index = exports.CAPABILITIES.indexOf(k);
+    const names = ['时间', '日期', '台历', '倒计时', '纪念日', '今日进度', '年度进度', '本机电量', '日程', '课程表', '世界时钟', '农历', '音乐专辑'];
+    return index >= 0 ? names[index] : '自定义';
+}
+exports.typeLabel = typeLabel;
+function materialColors(material, paper = '', ink = '') {
+    let base = ['#FFFFFF', '#262824'];
+    if (material === 'cream')
+        base = ['#F3EEDC', '#454035'];
+    if (material === 'kraft')
+        base = ['#DED0B8', '#433B31'];
+    if (material === 'mint')
+        base = ['#E1E9DF', '#344237'];
+    if (material === 'blue')
+        base = ['#E2E8EE', '#354553'];
+    if (material === 'pink')
+        base = ['#EEDFE0', '#543C40'];
+    if (material === 'dark')
+        base = ['#292A28', '#F4F3EF'];
+    return [/^#[0-9a-fA-F]{6}$/.test(paper) ? paper : base[0], /^#[0-9a-fA-F]{6}$/.test(ink) ? ink : base[1]];
+}
+exports.materialColors = materialColors;
+function shapeRadius(shape, scale = 1) {
+    if (shape === 'round')
+        return '50%';
+    if (shape === 'pill')
+        return 999;
+    if (shape === 'blob')
+        return { topLeft: '28%', topRight: '12%', bottomLeft: '18%', bottomRight: '26%' };
+    return shape === 'subject' ? 0 : exports.RECT_CORNER_RADIUS * scale;
+}
+exports.shapeRadius = shapeRadius;
+/** Album geometry approved in the interactive demo; shared by app, export and widget. */
+function cardCornerRadius(card, scale = 1) {
+    return card.capability?.k === 'album' ? exports.ALBUM_CARD_CORNER_RADIUS * scale : shapeRadius(card.shape, scale);
+}
+exports.cardCornerRadius = cardCornerRadius;
+function defaultState() { return new FridgeState(); }
+exports.defaultState = defaultState;
+function bounded(value, min, max, fallback) {
+    return Math.max(min, Math.min(max, Number.isFinite(value) ? value : fallback));
+}
+exports.bounded = bounded;
+function normalizeBox(raw) {
+    const box = new ElementBox();
+    box.w = bounded(raw?.w, 0.1, 1, 0.8);
+    box.h = bounded(raw?.h, 0.08, 1, 0.7);
+    box.x = bounded(raw?.x, 0, 1 - box.w, 0.1);
+    box.y = bounded(raw?.y, 0, 1 - box.h, 0.12);
+    box.rot = bounded(raw?.rot, -180, 180, 0);
+    box.opacity = bounded(raw?.opacity, 0.1, 1, 1);
+    return box;
+}
+exports.normalizeBox = normalizeBox;
+/** Runtime images must never trigger HTTP requests, including migrated artwork. */
+function localImageSource(value) {
+    return typeof value === 'string' && (value.startsWith('file://') || value.startsWith('memory://')) ? value : '';
+}
+exports.localImageSource = localImageSource;
+function normalizeElement(raw, clippedSubject = false) {
+    const box = normalizeBox(raw);
+    const el = new CanvasElement();
+    el.id = raw.id;
+    el.kind = ['text', 'image', 'shape'].includes(raw.kind) ? raw.kind : 'text';
+    el.x = clippedSubject ? bounded(raw.x, -8, 8, box.x) : box.x;
+    el.y = clippedSubject ? bounded(raw.y, -8, 8, box.y) : box.y;
+    el.w = clippedSubject ? bounded(raw.w, .01, 16, box.w) : box.w;
+    el.h = clippedSubject ? bounded(raw.h, .01, 16, box.h) : box.h;
+    el.rot = box.rot;
+    el.opacity = box.opacity;
+    el.text = raw.text ?? '';
+    el.src = localImageSource(raw.src);
+    el.animated = raw.animated === true;
+    el.fs = bounded(raw.fs, 10, 64, 18);
+    el.color = raw.color ?? '';
+    el.behindCapability = raw.behindCapability ?? false;
+    el.depthFront = raw.depthFront === true;
+    el.depthForeground = localImageSource(raw.depthForeground);
+    el.depthEnabled = el.kind === 'image' && !el.animated && raw.depthEnabled === true && el.depthForeground.length > 0;
+    if (el.depthEnabled)
+        el.depthFront = false;
+    el.depthSourceAspect = bounded(raw.depthSourceAspect, .01, 100, 1);
+    const crop = raw.depthCrop;
+    el.depthCrop.x = bounded(crop?.x, 0, .999, 0);
+    el.depthCrop.y = bounded(crop?.y, 0, .999, 0);
+    el.depthCrop.w = bounded(crop?.w, .001, 1 - el.depthCrop.x, 1 - el.depthCrop.x);
+    el.depthCrop.h = bounded(crop?.h, .001, 1 - el.depthCrop.y, 1 - el.depthCrop.y);
+    el.bold = raw.bold ?? false;
+    el.align = raw.align ?? 'left';
+    el.primitive = raw.primitive ?? 'rect';
+    return el;
+}
+exports.normalizeElement = normalizeElement;
+function legacyElement(cap, id, index, count) {
+    const el = new CanvasElement();
+    el.id = id + '_element_' + index;
+    el.y = index / count;
+    el.h = 1 / count;
+    el.x = 0.08;
+    el.w = 0.84;
+    if (cap.k === 'photo') {
+        el.kind = 'image';
+        el.src = localImageSource(cap.seed);
+        el.x = 0;
+        el.w = 1;
+    }
+    else {
+        el.text = cap.k === 'np' ? [cap.title ?? '', cap.artist ?? ''].filter((v) => v.length > 0).join('\n') : (cap.text ?? '');
+        el.fs = cap.fs ?? 18;
+        el.align = cap.align ?? 'left';
+        el.bold = cap.bold ?? false;
+    }
+    return el;
+}
+function normalizeState(raw) {
+    const state = new FridgeState();
+    state.canvasId = typeof raw.canvasId === 'string' && /^[a-zA-Z0-9_-]{1,96}$/.test(raw.canvasId) ? raw.canvasId : 'canvas_main';
+    state.background = normalizeBackground(raw.background);
+    state.door = raw.door ?? new DoorState();
+    state.canvasDimension = ['2*2', '2*4', '4*4', '6*4'].includes(raw.canvasDimension) ? raw.canvasDimension : '4*4';
+    state.canvasAspect = bounded(raw.canvasAspect, .3, 3, 1);
+    state.sceneLayouts = (0, SceneScheduleSchema_1.normalizeSceneLayouts)(raw.sceneLayouts);
+    state.sceneRules = (0, SceneScheduleSchema_1.normalizeSceneRules)(raw.sceneRules);
+    state.sceneBaseLayoutId = state.sceneLayouts.some(s => s.id === raw.sceneBaseLayoutId) ? raw.sceneBaseLayoutId : '';
+    state.maxZ = bounded(raw.maxZ, 0, Number.MAX_SAFE_INTEGER, 10);
+    for (const source of (Array.isArray(raw.cards) ? raw.cards : [])) {
+        if (source === null || typeof source.id !== 'string')
+            continue;
+        const card = new FridgeCard();
+        if (source.template !== undefined) {
+            card.template = (0, CardTemplate_1.normalizeCardTemplate)(source.template);
+            if (card.template?.sources)
+                card.template.sources = card.template.sources.map((cap) => normalizeCapability(cap));
+        }
+        if (source.html !== undefined)
+            card.html = (0, HtmlCardTemplate_1.normalizeHtmlCard)(source.html);
+        card.id = source.id;
+        card.hidden = source.hidden === true;
+        card.groupId = typeof source.groupId === 'string' ? source.groupId.slice(0, 96) : '';
+        card.w = bounded(source.w, card.template && (0, CompositionCatalog_1.compositionSlot)(card.template.id) ? 1 : source.shape === 'subject' ? exports.MIN_SUBJECT_EDGE : exports.MIN_CARD_EDGE, card.template?.fill ? exports.BOARD_W : 320, 180);
+        card.h = bounded(source.h, card.template && (0, CompositionCatalog_1.compositionSlot)(card.template.id) ? 1 : source.shape === 'subject' ? exports.MIN_SUBJECT_EDGE : exports.MIN_CARD_EDGE, card.template?.fill ? exports.BOARD_W / state.canvasAspect : 420, 180);
+        // Validate finite coordinates here. Rotated/host-aware recovery belongs to
+        // the whole canvas, where grouping and the actual aspect are available.
+        card.x = bounded(source.x, -840, exports.BOARD_W + 840, 24);
+        card.y = bounded(source.y, -840, exports.BOARD_H + 840, 32);
+        if (raw.schemaVersion !== 2) {
+            card.x = bounded(source.x, -card.w + Math.min(32, card.w * .2), exports.BOARD_W - Math.min(32, card.w * .2), 24);
+            card.y = bounded(source.y, -card.h + Math.min(32, card.h * .2), exports.BOARD_H - Math.min(32, card.h * .2), 32);
+        }
+        card.rot = bounded(source.rot, -180, 180, 0);
+        card.z = bounded(source.z, 0, Number.MAX_SAFE_INTEGER, 1);
+        card.shape = source.shape ?? 'rect';
+        card.frame = source.frame ?? false;
+        card.material = source.material ?? 'white';
+        card.paper = source.paper ?? '';
+        card.ink = source.ink ?? '';
+        card.inDoor = source.inDoor ?? false;
+        card.subjectDepth = source.subjectDepth === true;
+        card.depthCapabilityFront = source.depthCapabilityFront === true;
+        card.depthGroup = source.depthGroup === true;
+        card.cutout = (source.cutout ?? '').startsWith('file://') || (source.cutout ?? '').startsWith('memory://') ? source.cutout : '';
+        card.subjectBorder = true;
+        card.subjectPhoto = source.subjectPhoto ?? false;
+        card.subjectVersion = source.subjectVersion ?? 0;
+        card.subjectInk = source.subjectInk ?? '#262824';
+        card.subjectAspect = source.subjectAspect ?? 1;
+        card.outline = Array.isArray(source.outline) ? source.outline : [];
+        card.capBox = normalizeBox(source.capBox);
+        card.capBox.rot = 0;
+        card.capFree = source.capFree === true;
+        card.elements = Array.isArray(source.elements) ? source.elements.filter((el) => el !== null && typeof el.id === 'string').map((el) => normalizeElement(el, card.shape === 'subject')) : [];
+        const caps = raw.schemaVersion === 2 ? (source.capability !== null && source.capability !== undefined ? [source.capability] : []) : (source.caps ?? []);
+        state.cards.push(card);
+        state.maxZ = Math.max(state.maxZ, card.z);
+        for (let i = 0; i < caps.length; i++) {
+            const cap = caps[i];
+            if (cap === null || typeof cap.k !== 'string')
+                continue;
+            // Retired capabilities leave the user's card artwork intact.
+            if (cap.k === 'weather' || cap.k === 'parcel')
+                continue;
+            if (cap.k === 'fetch') {
+                // Keep the last visible result as artwork, without retaining a network source.
+                if (typeof cap.value === 'string' && cap.value.length > 0) {
+                    const cached = legacyElement({ k: 'text', text: [cap.title ?? '', cap.value + (cap.unit ?? '')].filter((v) => v.length > 0).join('\n') }, card.id, i, caps.length);
+                    if (raw.schemaVersion === 2) {
+                        const box = normalizeBox(source.capBox);
+                        cached.x = box.x;
+                        cached.y = box.y;
+                        cached.w = box.w;
+                        cached.h = box.h;
+                    }
+                    cached.id = card.id + '_cached_value_' + i;
+                    while (card.elements.some((el) => el.id === cached.id))
+                        cached.id += '_';
+                    card.elements.push(cached);
+                }
+                continue;
+            }
+            if (exports.CAPABILITIES.includes(cap.k)) {
+                if (card.capability === null) {
+                    card.capability = normalizeCapability(cap);
+                    if (card.capFree && ['cloud', 'bare', 'badge', 'sticker', 'space', 'tag', 'dock'].includes(card.capability.readingBlend ?? '')) {
+                        if (card.capability.readingBlend === 'sticker')
+                            card.capBox.w = bounded(source.capBox?.w, .01, 3, .8);
+                        card.capBox.x = bounded(source.capBox?.x, -2, 2, .1);
+                        card.capBox.y = bounded(source.capBox?.y, -2, 2, .12);
+                        card.capBox.rot = bounded(source.capBox?.rot, -180, 180, 0);
+                    }
+                    if (cap.k === 'calendar')
+                        card.capability.calendarOffset = Math.round(bounded(cap.calendarOffset ?? 0, -120, 120, 0));
+                    if (raw.schemaVersion !== 2) {
+                        card.capBox.y = i / caps.length;
+                        card.capBox.h = 1 / caps.length;
+                    }
+                }
+                else {
+                    const extra = new FridgeCard();
+                    extra.id = card.id + '_cap_' + i;
+                    extra.capability = normalizeCapability(cap);
+                    extra.w = card.w;
+                    extra.h = card.h;
+                    extra.x = Math.min(exports.BOARD_W - extra.w, card.x + 16 * i);
+                    extra.y = Math.min(exports.BOARD_H - extra.h, card.y + 16 * i);
+                    extra.material = card.material;
+                    extra.paper = card.paper;
+                    extra.ink = card.ink;
+                    extra.rot = card.rot;
+                    extra.inDoor = card.inDoor;
+                    extra.z = ++state.maxZ;
+                    state.cards.push(extra);
+                }
+            }
+            else {
+                card.elements.push(legacyElement(cap, card.id, i, caps.length));
+                if (cap.k === 'photo' && (cap.label ?? '').length > 0) {
+                    const caption = legacyElement({ k: 'text', text: cap.label, fs: 12 }, card.id, i, caps.length);
+                    caption.id += '_caption';
+                    caption.h = Math.min(0.15, 1 / caps.length);
+                    caption.y = (i + 1) / caps.length - caption.h;
+                    card.elements.push(caption);
+                }
+            }
+        }
+        if (card.capability?.k === 'album') {
+            card.shape = 'rect';
+            card.frame = false;
+        }
+        if (card.shape === 'subject' && card.cutout.length === 0)
+            card.shape = 'rect';
+    }
+    if (state.sceneLayouts.length === 0 && state.sceneRules.length === 0)
+        state.cards = (0, TemplateGroupMigration_1.unifyTemplateGroups)(state.cards, state.canvasAspect);
+    return state;
+}
+exports.normalizeState = normalizeState;
+function serializeFaceCards(state) { return JSON.stringify(state.cards.filter((c) => !c.inDoor && !c.hidden)); }
+exports.serializeFaceCards = serializeFaceCards;
+function serializeDoorCards(state) { return JSON.stringify(state.cards.filter((c) => c.inDoor && !c.hidden)); }
+exports.serializeDoorCards = serializeDoorCards;
+function contrastingInk(color) {
+    if (!/^#[0-9a-fA-F]{6}$/.test(color))
+        return '#FFFFFF';
+    const light = .2126 * parseInt(color.slice(1, 3), 16) + .7152 * parseInt(color.slice(3, 5), 16) + .0722 * parseInt(color.slice(5, 7), 16);
+    return light >= 145 ? '#262824' : '#FFFFFF';
+}
+exports.contrastingInk = contrastingInk;
+function normalizeCapability(raw) {
+    const cap = JSON.parse(JSON.stringify(raw));
+    cap.url = undefined;
+    cap.field = undefined;
+    cap.sourceConfigured = undefined;
+    if (raw.k === 'album') {
+        const local = (v) => typeof v === 'string' && (v.startsWith('file://') || v.startsWith('memory://')) ? v : '';
+        cap.albumCover = local(raw.albumCover);
+        cap.albumBackground = local(raw.albumBackground);
+        cap.albumId = typeof raw.albumId === 'string' ? raw.albumId.slice(0, 96) : '';
+        cap.albumSource = ['local', 'musicbrainz'].includes(raw.albumSource ?? '') ? raw.albumSource : '';
+        cap.artist = typeof raw.artist === 'string' ? raw.artist.slice(0, 160) : '';
+        cap.albumInset = exports.ALBUM_INSET;
+        cap.albumPresentation = ['classic', 'row'].includes(raw.albumPresentation ?? '') ? raw.albumPresentation : 'cover';
+        cap.albumRotationMinutes = [60, 180, 360, 1440].includes(raw.albumRotationMinutes ?? 0) ? raw.albumRotationMinutes : 0;
+        cap.albumRotationStart = bounded(raw.albumRotationStart ?? 0, 0, 8640000000000000, 0);
+        const ids = [];
+        cap.albumItems = (Array.isArray(raw.albumItems) ? raw.albumItems : []).filter((a) => a !== null && a !== undefined && typeof a.id === 'string' && a.id.length > 0 && !!local(a.cover) && !!local(a.background) && !ids.includes(a.id.slice(0, 96)) && (ids.push(a.id.slice(0, 96)) > 0)).slice(0, 12).map((a) => ({ id: a.id.slice(0, 96), cover: local(a.cover), background: local(a.background), title: typeof a.title === 'string' ? a.title.slice(0, 160) : '', artist: typeof a.artist === 'string' ? a.artist.slice(0, 160) : '' }));
+    }
+    if (raw.k === 'worldclock')
+        cap.zone = (0, TimeCapabilities_1.clockZone)(typeof raw.zone === 'string' ? raw.zone : '');
+    cap.readingOpacity = bounded(raw.readingOpacity ?? 1, 0, 1, 1);
+    cap.readingMaterialStudy = undefined;
+    cap.readingMaterial = raw.readingMaterial === 'matte' ? 'matte' : 'paper';
+    cap.readingStyle = ['plain', 'surface'].includes(raw.readingStyle ?? '') ? raw.readingStyle : 'auto';
+    cap.readingOutside = raw.readingOutside === true;
+    cap.readingEdge = ['left', 'right', 'top', 'bottom'].includes(raw.readingEdge ?? '') ? raw.readingEdge : '';
+    cap.readingHook = bounded(raw.readingHook ?? .2, 0, 1, .2);
+    cap.readingTintKey = typeof raw.readingTintKey === 'string' ? raw.readingTintKey.slice(0, 64) : '';
+    cap.readingTint = /^#[0-9a-fA-F]{6}$/.test(raw.readingTint ?? '') ? raw.readingTint : '';
+    cap.readingBlend = ['cloud', 'bare', 'badge', 'sticker', 'space', 'tag', 'dock', 'paper', 'feather', 'scrim', 'halo'].includes(raw.readingBlend ?? '') ? raw.readingBlend : 'feather';
+    if (raw.k !== 'album')
+        cap.readingBlend = ['cloud', 'bare', 'badge', 'sticker', 'space', 'tag', 'dock'].includes(cap.readingBlend ?? '') ? (0, ReadingStylePolicy_1.validReadingStyle)(raw.k, cap.readingBlend) : (0, ReadingStylePolicy_1.defaultReadingStyle)(raw.k);
+    cap.parcelPlace = typeof raw.parcelPlace === 'string' ? raw.parcelPlace.slice(0, 80) : '';
+    cap.title = typeof raw.title === 'string' ? raw.title.slice(0, 160) : '';
+    cap.interval = Math.round(bounded(raw.interval ?? 60, 30, 1440, 60));
+    if (raw.k === 'battery')
+        cap.percent = bounded(raw.percent ?? -1, -1, 100, -1);
+    cap.events = (Array.isArray(raw.events) ? raw.events : []).filter((e) => e && typeof e.title === 'string' && Number.isFinite(e.start) && Number.isFinite(e.end) && e.end >= e.start).slice(0, 256).map((e) => ({ id: String(e.id).slice(0, 96), title: e.title.slice(0, 160), start: e.start, end: e.end, location: typeof e.location === 'string' ? e.location.slice(0, 160) : '', allDay: e.allDay === true }));
+    cap.parcels = (Array.isArray(raw.parcels) ? raw.parcels : []).filter((e) => e && typeof e.code === 'string' && e.code.length > 0).slice(0, 64).map((e) => ({ id: String(e.id).slice(0, 96), code: e.code.slice(0, 24), place: typeof e.place === 'string' ? e.place.slice(0, 80) : '', picked: e.picked === true }));
+    cap.courses = (Array.isArray(raw.courses) ? raw.courses : []).filter((c) => c && typeof c.name === 'string' && c.name.trim().length > 0 && /^([01]\d|2[0-3]):[0-5]\d$/.test(c.start) && /^([01]\d|2[0-3]):[0-5]\d$/.test(c.end) && c.end > c.start).slice(0, 128).map((c) => ({ id: String(c.id).slice(0, 96), name: c.name.slice(0, 80), room: typeof c.room === 'string' ? c.room.slice(0, 80) : '', day: Math.round(bounded(c.day, 1, 7, 1)), start: c.start, end: c.end, firstWeek: Math.round(bounded(c.firstWeek, 1, 60, 1)), lastWeek: Math.round(bounded(c.lastWeek, c.firstWeek || 1, 60, 16)), parity: [0, 1, 2].includes(c.parity) ? c.parity : 0 }));
+    if (raw.k === 'timetable') {
+        cap.timetableMode = raw.timetableMode === 'day' ? 'day' : 'next';
+        cap.skipHolidays = raw.skipHolidays !== false;
+        cap.holidayDates = (Array.isArray(raw.holidayDates) ? raw.holidayDates : []).filter((d) => d && (0, HolidayCalendar_1.validDay)(d.date)).slice(0, 512).map((d) => ({ date: d.date, name: typeof d.name === 'string' ? d.name.slice(0, 60) : '校历假期' }));
+        cap.teachingDays = (Array.isArray(raw.teachingDays) ? raw.teachingDays : []).filter((d) => d && (0, HolidayCalendar_1.validDay)(d.date) && (d.sourceDate === '' || (0, HolidayCalendar_1.validDay)(d.sourceDate))).slice(-512);
+        cap.courseChanges = (Array.isArray(raw.courseChanges) ? raw.courseChanges : []).filter((d) => d && typeof d.id === 'string' && cap.courses.some((c) => c.id === d.courseId) && (0, HolidayCalendar_1.validDay)(d.date) && (d.targetDate === '' || ((0, HolidayCalendar_1.validDay)(d.targetDate) && /^([01]\d|2[0-3]):[0-5]\d$/.test(d.start) && /^([01]\d|2[0-3]):[0-5]\d$/.test(d.end) && d.end > d.start))).slice(-256).map((d) => ({ id: d.id.slice(0, 96), courseId: d.courseId, date: d.date, targetDate: d.targetDate, start: d.start ?? '', end: d.end ?? '', room: typeof d.room === 'string' ? d.room.slice(0, 80) : '' }));
+    }
+    return cap;
+}
+exports.normalizeCapability = normalizeCapability;
+
+},
+"TemplateGroupMigration":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.unifyTemplateGroups = void 0;
+const CompositionCatalog_1 = require("./CompositionCatalog");
+/** Coalesce only intact pre-release built-in faces. Free compositions and moved/missing roles remain untouched. */
+function unifyTemplateGroups(cards, aspect) {
+    const removed = [], replacements = new Map();
+    for (const primary of cards) {
+        const face = (0, CompositionCatalog_1.compositionOwner)(primary.template?.id ?? '');
+        if (!face || !primary.groupId || primary.template?.id !== face.slots[0].id || primary.rot !== 0)
+            continue;
+        const members = cards.filter(c => c.groupId === primary.groupId);
+        if (members.length !== face.slots.length)
+            continue;
+        const layout = (0, CompositionCatalog_1.compositionLayout)(face, primary.w / primary.h), scale = primary.w / layout.width, boardHeight = 344 / Math.max(.3, aspect), baseY = primary.y / 470 * boardHeight;
+        const ordered = [];
+        let valid = true;
+        for (const slot of layout.slots) {
+            const card = members.find(c => c.template?.id === slot.id);
+            if (!card || (!slot.primary && card.elements.length > 0) || card.hidden !== primary.hidden || card.rot !== 0 || card.template?.palette !== primary.template?.palette || Math.abs(card.x - (primary.x + slot.x * scale)) > .1 || Math.abs(card.y / 470 * boardHeight - (baseY + slot.y * scale)) > .1 || Math.abs(card.w - slot.w * scale) > .1 || Math.abs(card.h - slot.h * scale) > .1) {
+                valid = false;
+                break;
+            }
+            ordered.push(card);
+        }
+        if (!valid)
+            continue;
+        const card = JSON.parse(JSON.stringify(primary));
+        card.template.id = face.id;
+        card.template.sources = ordered.slice(1).map(c => c.capability);
+        card.groupId = '';
+        replacements.set(primary.id, card);
+        removed.push(...ordered.slice(1).map(c => c.id));
+    }
+    return replacements.size ? cards.filter(c => !removed.includes(c.id)).map(c => replacements.get(c.id) ?? c) : cards;
+}
+exports.unifyTemplateGroups = unifyTemplateGroups;
+
+},
+"CardTemplate":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.copyCardTemplate = exports.newCardTemplate = exports.normalizeCardTemplate = exports.templateDefinition = exports.CARD_TEMPLATES = void 0;
+const CompositionCatalog_1 = require("./CompositionCatalog");
+exports.CARD_TEMPLATES = [
+    { "id": "standby", "kind": "clock", "name": "浮字", "sources": ["clock"] },
+    { "id": "dial", "kind": "clock", "name": "色盘", "sources": ["clock"] },
+    { "id": "flip", "kind": "clock", "name": "翻页", "sources": ["clock"] },
+    { "id": "portrait", "kind": "clock", "name": "景深照片", "sources": ["clock"] },
+    { "id": "date-poster", "kind": "date", "name": "日历海报", "sources": ["date"] },
+    { "id": "date-paper", "kind": "date", "name": "纸页", "sources": ["date"] },
+    { "id": "date-strip", "kind": "date", "name": "一周", "sources": ["date"] },
+    { "id": "calendar-month", "kind": "calendar", "name": "月历", "sources": ["calendar"] },
+    { "id": "calendar-ledger", "kind": "calendar", "name": "月记", "sources": ["calendar"] },
+    { "id": "calendar-week", "kind": "calendar", "name": "周历", "sources": ["calendar"] },
+    { "id": "countdown-poster", "kind": "countdown", "name": "出发", "sources": ["countdown"] },
+    { "id": "countdown-orbit", "kind": "countdown", "name": "环绕", "sources": ["countdown"] },
+    { "id": "countdown-paper", "kind": "countdown", "name": "撕页", "sources": ["countdown"] },
+    { "id": "anniversary-photo", "kind": "anniversary", "name": "相遇", "sources": ["anniversary"] },
+    { "id": "anniversary-type", "kind": "anniversary", "name": "记忆", "sources": ["anniversary"] },
+    { "id": "day-dial", "kind": "dayprogress", "name": "一天", "sources": ["dayprogress"] },
+    { "id": "day-timeline", "kind": "dayprogress", "name": "日线", "sources": ["dayprogress"] },
+    { "id": "day-blocks", "kind": "dayprogress", "name": "时块", "sources": ["dayprogress"] },
+    { "id": "year-dots", "kind": "yearprogress", "name": "年点", "sources": ["yearprogress"] },
+    { "id": "year-arc", "kind": "yearprogress", "name": "年轮", "sources": ["yearprogress"] },
+    { "id": "year-months", "kind": "yearprogress", "name": "十二月", "sources": ["yearprogress"] },
+    { "id": "battery-ring", "kind": "battery", "name": "能量环", "sources": ["battery"] },
+    { "id": "battery-cell", "kind": "battery", "name": "电芯", "sources": ["battery"] },
+    { "id": "battery-segments", "kind": "battery", "name": "电格", "sources": ["battery"] },
+    { "id": "agenda-editorial", "kind": "agenda", "name": "留白日程", "sources": ["agenda"] },
+    { "id": "agenda-timeline", "kind": "agenda", "name": "时间轴", "sources": ["agenda"] },
+    { "id": "agenda-paper", "kind": "agenda", "name": "手帐", "sources": ["agenda"] },
+    { "id": "course-next", "kind": "timetable", "name": "下节课", "sources": ["timetable"] },
+    { "id": "course-week", "kind": "timetable", "name": "一周课表", "sources": ["timetable"] },
+    { "id": "course-slips", "kind": "timetable", "name": "课程纸条", "sources": ["timetable"] },
+    { "id": "world-dial", "kind": "worldclock", "name": "异地", "sources": ["worldclock"] },
+    { "id": "world-duo", "kind": "worldclock", "name": "两地", "sources": ["worldclock"] },
+    { "id": "world-type", "kind": "worldclock", "name": "时差", "sources": ["worldclock"] },
+    { "id": "lunar-paper", "kind": "lunar", "name": "东方日历", "sources": ["lunar"] },
+    { "id": "lunar-night", "kind": "lunar", "name": "月白", "sources": ["lunar"] },
+    { "id": "lunar-seal", "kind": "lunar", "name": "朱印", "sources": ["lunar"] },
+    { "id": "album-record", "kind": "album", "name": "唱片", "sources": ["album"] },
+    { "id": "album-cover", "kind": "album", "name": "封面", "sources": ["album"] },
+    { "id": "album-sleeve", "kind": "album", "name": "唱片袋", "sources": ["album"] },
+    { "id": "mix-standby", "kind": "ensemble", "name": "桌边", "sources": ["clock", "calendar"] },
+    { "id": "mix-modular", "kind": "ensemble", "name": "今日", "sources": ["clock", "agenda", "battery"] },
+    { "id": "mix-study", "kind": "ensemble", "name": "课间", "sources": ["clock", "timetable", "dayprogress"] },
+    { "id": "mix-travel", "kind": "ensemble", "name": "远行", "sources": ["worldclock", "countdown"] },
+    { "id": "mix-memory", "kind": "ensemble", "name": "相片日历", "sources": ["anniversary", "date", "lunar"] }
+];
+function templateDefinition(id) { const single = exports.CARD_TEMPLATES.find(d => d.id === id); if (single)
+    return single; const slot = (0, CompositionCatalog_1.compositionSlot)(id); return slot ? { id: slot.id, kind: slot.kind, name: slot.role, sources: [slot.kind] } : undefined; }
+exports.templateDefinition = templateDefinition;
+function normalizeCardTemplate(raw) {
+    if (!raw || raw.version !== 1 || !templateDefinition(raw.id))
+        return undefined;
+    const definition = templateDefinition(raw.id);
+    const sources = definition.kind === 'ensemble' ? definition.sources.slice(1).map((k, index) => { const cap = raw.sources?.[index]; return cap?.k === k ? JSON.parse(JSON.stringify(cap)) : { k: k }; }) : undefined;
+    return { photoMode: raw.photoMode === 'photo' ? 'photo' : 'subject', background: raw.background === 'smart' ? 'smart' : 'template', sources: sources, version: 1, id: raw.id, palette: ['', 'cobalt', 'cream', 'ink'].includes(raw.palette) ? raw.palette : '', fill: raw.fill === true, depth: raw.depth !== false, zoom: Math.max(.5, Math.min(1.5, Number.isFinite(raw.zoom) ? raw.zoom : 1)), offsetX: Math.max(-.35, Math.min(.35, Number.isFinite(raw.offsetX) ? raw.offsetX : 0)), offsetY: Math.max(-.35, Math.min(.35, Number.isFinite(raw.offsetY) ? raw.offsetY : 0)) };
+}
+exports.normalizeCardTemplate = normalizeCardTemplate;
+function newCardTemplate(id) { return { photoMode: 'subject', background: 'template', version: 1, id, palette: '', fill: false, depth: true, zoom: 1, offsetX: 0, offsetY: 0 }; }
+exports.newCardTemplate = newCardTemplate;
+function copyCardTemplate(raw, includeSources = true) { return raw ? { photoMode: raw.photoMode, background: raw.background, sources: includeSources && raw.sources ? JSON.parse(JSON.stringify(raw.sources)) : undefined, version: raw.version, id: raw.id, palette: raw.palette, fill: raw.fill, depth: raw.depth, zoom: raw.zoom, offsetX: raw.offsetX, offsetY: raw.offsetY } : undefined; }
+exports.copyCardTemplate = copyCardTemplate;
+
+},
+"HtmlCardTemplate":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.normalizeHtmlCard = exports.validateHtmlCard = void 0;
+function validateHtmlCard(template) {
+    if (!template || template.version !== 1 || template.designVersion !== 1 || !Number.isInteger(template.width) || !Number.isInteger(template.height) || template.width < 32 || template.height < 32 || template.width > 1024 || template.height > 1024 || typeof template.previewElementId !== 'string' || !template.previewElementId.length || template.previewElementId.length > 96 || typeof template.source !== 'string' || !template.source.length || template.source.length > 512 * 1024)
+        throw new Error('HTML 卡片版本或尺寸不受支持，请更新应用');
+    for (const key of Object.keys(template))
+        if (!['version', 'designVersion', 'width', 'height', 'source', 'previewElementId'].includes(key))
+            throw new Error('HTML 卡片包含尚未支持的字段，请更新应用');
+    const source = template.source;
+    // These sources are data in the app. The same policy gates any authoring preview.
+    if (/<\s*\/?\s*(script|iframe|object|embed|link|base|form|input|button|audio|video|foreignobject|animate|animatetransform|animatemotion|set|marquee)\b/i.test(source) || /\bon[a-z]+\s*=/i.test(source) || /(javascript\s*:|https?\s*:|file\s*:|@import|@font-face|expression\s*\(|animation(?:-[a-z]+)?\s*:|transition(?:-[a-z]+)?\s*:)/i.test(source))
+        throw new Error('HTML 卡片只支持静态本地外观，不支持脚本、联网或交互控件');
+    const refs = source.match(/(?:src|href)\s*=\s*[^>\s]+/gi) ?? [];
+    for (const ref of refs)
+        if (!/^(?:src|href)\s*=\s*["'](?:data:image\/(?:png|jpeg|webp);base64,|#)/i.test(ref))
+            throw new Error('HTML 素材必须内嵌为本地图片');
+    for (const ref of source.match(/url\s*\([^)]*\)/gi) ?? [])
+        if (!/^url\s*\(\s*(["']?)#[a-z0-9_-]+\1\s*\)$/i.test(ref))
+            throw new Error('HTML 不使用外部 CSS 资源；SVG 可以引用本地渐变 ID');
+    if (/\bsrcset\s*=/i.test(source))
+        throw new Error('HTML 不使用外部响应式图片资源');
+}
+exports.validateHtmlCard = validateHtmlCard;
+function normalizeHtmlCard(template) {
+    if (template === undefined || template === null)
+        return undefined;
+    validateHtmlCard(template);
+    return { version: 1, designVersion: 1, width: template.width, height: template.height, source: template.source, previewElementId: template.previewElementId };
+}
+exports.normalizeHtmlCard = normalizeHtmlCard;
+
+},
+"ReadingStylePolicy":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.preferredReadingStyle = exports.validReadingStyle = exports.defaultReadingStyle = exports.readingStyles = exports.COMPOSITION_KEYS = void 0;
+exports.COMPOSITION_KEYS = ['cloud', 'bare', 'badge', 'sticker', 'tag'];
+function readingStyles(kind) {
+    if (kind === 'album')
+        return [];
+    return kind === 'battery' ? ['badge', 'cloud', 'bare'] : ['cloud', 'bare', 'tag', 'sticker'];
+}
+exports.readingStyles = readingStyles;
+function defaultReadingStyle(kind) {
+    if (kind === 'battery')
+        return 'badge';
+    if (kind === 'agenda' || kind === 'timetable' || kind === 'countdown' || kind === 'anniversary' || kind.endsWith('progress'))
+        return 'tag';
+    return kind === 'clock' ? 'bare' : 'sticker';
+}
+exports.defaultReadingStyle = defaultReadingStyle;
+function validReadingStyle(kind, style) {
+    const migrated = style === 'dock' ? 'tag' : style === 'space' ? 'sticker' : style;
+    return readingStyles(kind).includes(migrated) ? migrated : defaultReadingStyle(kind);
+}
+exports.validReadingStyle = validReadingStyle;
+/** Newly chosen capabilities use cloud; legacy defaults stay stable during migration. */
+function preferredReadingStyle(kind) { return kind === 'battery' ? 'badge' : kind === 'album' ? '' : 'cloud'; }
+exports.preferredReadingStyle = preferredReadingStyle;
+
+},
+"SceneScheduleSchema":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.sceneClock = exports.normalizeSceneRules = exports.normalizeSceneLayouts = exports.validSceneDate = exports.sceneDay = exports.SceneRule = exports.SavedSceneLayout = exports.ScenePlacement = void 0;
+/** Local wall-clock rules. Geometry references artwork; it never duplicates image assets. */
+class ScenePlacement {
+    constructor() {
+        this.id = '';
+        this.x = 0;
+        this.y = 0;
+        this.w = 180;
+        this.h = 180;
+        this.rot = 0;
+        this.z = 1;
+    }
+}
+exports.ScenePlacement = ScenePlacement;
+class SavedSceneLayout {
+    constructor() {
+        this.id = '';
+        this.name = '';
+        this.placements = [];
+    }
+}
+exports.SavedSceneLayout = SavedSceneLayout;
+class SceneRule {
+    constructor() {
+        this.id = '';
+        this.name = '';
+        this.enabled = true;
+        this.kind = 'layout';
+        this.targetId = '';
+        this.repeat = 'daily';
+        this.date = '';
+        this.weekdays = [0, 1, 2, 3, 4, 5, 6];
+        this.start = 1200;
+        this.end = 1380;
+        this.untilDismissed = true;
+        this.createdAt = 0;
+        this.dismissed = '';
+        this.timeoutMinutes = 15;
+        this.centralOnly = false;
+        this.migrationKey = '';
+    }
+}
+exports.SceneRule = SceneRule;
+function sceneDay(date) { return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0'); }
+exports.sceneDay = sceneDay;
+function validSceneDate(value) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value))
+        return false;
+    const parts = value.split('-').map(Number), date = new Date(parts[0], parts[1] - 1, parts[2]);
+    return sceneDay(date) === value;
+}
+exports.validSceneDate = validSceneDate;
+function number(value, min, max, fallback) { return Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback; }
+function normalizeSceneLayouts(raw) {
+    const out = [];
+    for (const source of (Array.isArray(raw) ? raw : []).slice(0, 8)) {
+        if (!source || typeof source.id !== 'string' || !source.id || out.some(s => s.id === source.id))
+            continue;
+        const next = new SavedSceneLayout();
+        next.id = source.id.slice(0, 96);
+        next.name = (typeof source.name === 'string' ? source.name : '布局').slice(0, 30);
+        for (const p of (Array.isArray(source.placements) ? source.placements : []).slice(0, 32)) {
+            if (!p || typeof p.id !== 'string' || next.placements.some(s => s.id === p.id))
+                continue;
+            const item = new ScenePlacement();
+            item.id = p.id.slice(0, 96);
+            item.x = number(p.x, -840, 1184, 0);
+            item.y = number(p.y, -840, 1310, 0);
+            item.w = number(p.w, 16, 320, 180);
+            item.h = number(p.h, 16, 420, 180);
+            item.rot = number(p.rot, -180, 180, 0);
+            item.z = number(p.z, 0, Number.MAX_SAFE_INTEGER, 1);
+            next.placements.push(item);
+        }
+        out.push(next);
+    }
+    return out;
+}
+exports.normalizeSceneLayouts = normalizeSceneLayouts;
+function normalizeSceneRules(raw) {
+    const out = [];
+    for (const source of (Array.isArray(raw) ? raw : []).slice(0, 12)) {
+        if (!source || typeof source.id !== 'string' || !source.id || out.some(s => s.id === source.id) || !['layout', 'canvas', 'focus'].includes(source.kind))
+            continue;
+        const rule = new SceneRule();
+        rule.id = source.id.slice(0, 96);
+        rule.name = (typeof source.name === 'string' ? source.name : '定时场景').slice(0, 30);
+        rule.enabled = source.enabled !== false;
+        rule.kind = source.kind;
+        rule.targetId = (typeof source.targetId === 'string' ? source.targetId : '').slice(0, 96);
+        rule.repeat = source.repeat === 'once' ? 'once' : 'daily';
+        rule.date = typeof source.date === 'string' && validSceneDate(source.date) ? source.date : '';
+        if (rule.repeat === 'once' && !rule.date)
+            rule.enabled = false;
+        rule.weekdays = Array.from(new Set((Array.isArray(source.weekdays) ? source.weekdays : rule.weekdays).filter((n) => Number.isInteger(n) && n >= 0 && n < 7)));
+        rule.start = Math.round(number(source.start, 0, 1439, 1200));
+        rule.end = Math.round(number(source.end, 0, 1439, 1380));
+        rule.untilDismissed = source.untilDismissed !== false;
+        rule.createdAt = number(source.createdAt, 0, Number.MAX_SAFE_INTEGER, 0);
+        rule.timeoutMinutes = Math.round(number(source.timeoutMinutes, 1, 120, 15));
+        rule.centralOnly = source.centralOnly === true;
+        rule.migrationKey = typeof source.migrationKey === 'string' ? source.migrationKey.slice(0, 200) : '';
+        rule.dismissed = typeof source.dismissed === 'string' ? source.dismissed.slice(0, 24) : '';
+        out.push(rule);
+    }
+    return out;
+}
+exports.normalizeSceneRules = normalizeSceneRules;
+function sceneClock(minute) { return String(Math.floor(minute / 60)).padStart(2, '0') + ':' + String(minute % 60).padStart(2, '0'); }
+exports.sceneClock = sceneClock;
+
+},
+"TimeCapabilities":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.lunarReading = exports.LunarReading = exports.nextCityBoundary = exports.nextCityMidnight = exports.cityReading = exports.CityReading = exports.clockOffset = exports.clockCity = exports.clockZone = exports.CLOCK_CITIES = void 0;
+exports.CLOCK_CITIES = [
+    { value: '北京', zone: 'Asia/Shanghai' }, { value: '东京', zone: 'Asia/Tokyo' },
+    { value: '首尔', zone: 'Asia/Seoul' }, { value: '新加坡', zone: 'Asia/Singapore' },
+    { value: '曼谷', zone: 'Asia/Bangkok' }, { value: '迪拜', zone: 'Asia/Dubai' },
+    { value: '新德里', zone: 'Asia/Kolkata' }, { value: '加德满都', zone: 'Asia/Kathmandu' },
+    { value: '伦敦', zone: 'Europe/London' }, { value: '巴黎', zone: 'Europe/Paris' },
+    { value: '柏林', zone: 'Europe/Berlin' }, { value: '纽约', zone: 'America/New_York' },
+    { value: '洛杉矶', zone: 'America/Los_Angeles' }, { value: '温哥华', zone: 'America/Vancouver' },
+    { value: '悉尼', zone: 'Australia/Sydney' }, { value: '阿德莱德', zone: 'Australia/Adelaide' },
+    { value: '奥克兰', zone: 'Pacific/Auckland' }, { value: '檀香山', zone: 'Pacific/Honolulu' }
+];
+function clockZone(zone = '') { return exports.CLOCK_CITIES.some((city) => city.zone === zone) ? zone : 'Asia/Shanghai'; }
+exports.clockZone = clockZone;
+function clockCity(zone = '') { return exports.CLOCK_CITIES.find((city) => city.zone === clockZone(zone)).value; }
+exports.clockCity = clockCity;
+const formatters = new Map();
+const offsets = new Map();
+function formatter(zone) {
+    let value = formatters.get(zone);
+    if (!value) {
+        value = new Intl.DateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+        formatters.set(zone, value);
+    }
+    return value;
+}
+/** TextClock uses the opposite sign to UTC offsets, including supported half/quarter-hour zones. */
+function clockOffset(zone, now) {
+    zone = clockZone(zone);
+    const minute = Math.floor(now / 60000), cached = offsets.get(zone);
+    if (cached?.minute === minute)
+        return cached.offset;
+    const parts = formatter(zone).formatToParts(new Date(now));
+    const field = (key) => Number(parts.find((part) => part.type === key)?.value ?? 0);
+    const offset = -(Date.UTC(field('year'), field('month') - 1, field('day'), field('hour'), field('minute'), field('second')) - Math.floor(now / 1000) * 1000) / 3600000 || 0;
+    offsets.set(zone, { minute: minute, offset: offset });
+    return offset;
+}
+exports.clockOffset = clockOffset;
+class CityReading {
+    constructor() {
+        this.city = '';
+        this.date = '';
+        this.difference = '';
+    }
+}
+exports.CityReading = CityReading;
+function cityReading(zone, now) {
+    const result = new CityReading(), offset = clockOffset(zone, now), date = new Date(now - offset * 3600000), local = new Date(now);
+    const localOffset = local.getTimezoneOffset() / 60, difference = localOffset - offset;
+    result.city = clockCity(zone);
+    result.date = (date.getUTCMonth() + 1) + '月' + date.getUTCDate() + '日 · ' + ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getUTCDay()];
+    result.difference = Math.abs(difference) < .01 ? '与本地同一时区' : (difference > 0 ? '比本地快 ' : '比本地慢 ') + Math.abs(difference) + ' 小时';
+    return result;
+}
+exports.cityReading = cityReading;
+function nextCityMidnight(zone, now) {
+    const offset = clockOffset(zone, now), date = new Date(now - offset * 3600000);
+    const midnight = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1);
+    let result = midnight + offset * 3600000;
+    for (let i = 0; i < 3; i++)
+        result = midnight + clockOffset(zone, result) * 3600000;
+    return result;
+}
+exports.nextCityMidnight = nextCityMidnight;
+/** Prioritize a nearby DST transition; the FormKit caller still honors its 5-minute quota. */
+function nextCityBoundary(zone, now) {
+    let result = nextCityMidnight(zone, now), end = now + 30 * 60000;
+    const offset = clockOffset(zone, now);
+    if (clockOffset(zone, end) !== offset) {
+        let lo = Math.floor(now / 60000), hi = Math.ceil(end / 60000);
+        while (hi - lo > 1) {
+            const mid = Math.floor((lo + hi) / 2);
+            if (clockOffset(zone, mid * 60000) === offset)
+                lo = mid;
+            else
+                hi = mid;
+        }
+        result = Math.min(result, hi * 60000);
+    }
+    return result;
+}
+exports.nextCityBoundary = nextCityBoundary;
+class LunarReading {
+    constructor() {
+        this.date = '';
+        this.year = '';
+    }
+}
+exports.LunarReading = LunarReading;
+let lunarFormatter = undefined;
+let lunarKey = '', lunarValue = new LunarReading();
+function lunarReading(now) {
+    const date = new Date(now), key = date.getFullYear() + ':' + date.getMonth() + ':' + date.getDate() + ':' + date.getTimezoneOffset();
+    if (key === lunarKey)
+        return lunarValue;
+    if (!lunarFormatter)
+        lunarFormatter = new Intl.DateTimeFormat('zh-CN-u-ca-chinese', { year: 'numeric', month: 'long', day: 'numeric' });
+    const parts = lunarFormatter.formatToParts(date), day = Number(parts.find((part) => part.type === 'day')?.value ?? 0);
+    const names = ['', '初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十', '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十', '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
+    const result = new LunarReading();
+    result.date = (parts.find((part) => part.type === 'month')?.value ?? '') + ' ' + (names[day] ?? '');
+    result.year = parts.filter((part) => String(part.type) === 'yearName').map((part) => part.value).join('') + '年';
+    lunarKey = key;
+    lunarValue = result;
+    return result;
+}
+exports.lunarReading = lunarReading;
+
+},
 "HolidayCalendar":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -820,119 +1753,6 @@ function calendarDetails(month) {
     return labels;
 }
 exports.calendarDetails = calendarDetails;
-
-},
-"TimeCapabilities":function(require,module,exports){
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.lunarReading = exports.LunarReading = exports.nextCityBoundary = exports.nextCityMidnight = exports.cityReading = exports.CityReading = exports.clockOffset = exports.clockCity = exports.clockZone = exports.CLOCK_CITIES = void 0;
-exports.CLOCK_CITIES = [
-    { value: '北京', zone: 'Asia/Shanghai' }, { value: '东京', zone: 'Asia/Tokyo' },
-    { value: '首尔', zone: 'Asia/Seoul' }, { value: '新加坡', zone: 'Asia/Singapore' },
-    { value: '曼谷', zone: 'Asia/Bangkok' }, { value: '迪拜', zone: 'Asia/Dubai' },
-    { value: '新德里', zone: 'Asia/Kolkata' }, { value: '加德满都', zone: 'Asia/Kathmandu' },
-    { value: '伦敦', zone: 'Europe/London' }, { value: '巴黎', zone: 'Europe/Paris' },
-    { value: '柏林', zone: 'Europe/Berlin' }, { value: '纽约', zone: 'America/New_York' },
-    { value: '洛杉矶', zone: 'America/Los_Angeles' }, { value: '温哥华', zone: 'America/Vancouver' },
-    { value: '悉尼', zone: 'Australia/Sydney' }, { value: '阿德莱德', zone: 'Australia/Adelaide' },
-    { value: '奥克兰', zone: 'Pacific/Auckland' }, { value: '檀香山', zone: 'Pacific/Honolulu' }
-];
-function clockZone(zone = '') { return exports.CLOCK_CITIES.some((city) => city.zone === zone) ? zone : 'Asia/Shanghai'; }
-exports.clockZone = clockZone;
-function clockCity(zone = '') { return exports.CLOCK_CITIES.find((city) => city.zone === clockZone(zone)).value; }
-exports.clockCity = clockCity;
-const formatters = new Map();
-const offsets = new Map();
-function formatter(zone) {
-    let value = formatters.get(zone);
-    if (!value) {
-        value = new Intl.DateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
-        formatters.set(zone, value);
-    }
-    return value;
-}
-/** TextClock uses the opposite sign to UTC offsets, including supported half/quarter-hour zones. */
-function clockOffset(zone, now) {
-    zone = clockZone(zone);
-    const minute = Math.floor(now / 60000), cached = offsets.get(zone);
-    if (cached?.minute === minute)
-        return cached.offset;
-    const parts = formatter(zone).formatToParts(new Date(now));
-    const field = (key) => Number(parts.find((part) => part.type === key)?.value ?? 0);
-    const offset = -(Date.UTC(field('year'), field('month') - 1, field('day'), field('hour'), field('minute'), field('second')) - Math.floor(now / 1000) * 1000) / 3600000 || 0;
-    offsets.set(zone, { minute: minute, offset: offset });
-    return offset;
-}
-exports.clockOffset = clockOffset;
-class CityReading {
-    constructor() {
-        this.city = '';
-        this.date = '';
-        this.difference = '';
-    }
-}
-exports.CityReading = CityReading;
-function cityReading(zone, now) {
-    const result = new CityReading(), offset = clockOffset(zone, now), date = new Date(now - offset * 3600000), local = new Date(now);
-    const localOffset = local.getTimezoneOffset() / 60, difference = localOffset - offset;
-    result.city = clockCity(zone);
-    result.date = (date.getUTCMonth() + 1) + '月' + date.getUTCDate() + '日 · ' + ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getUTCDay()];
-    result.difference = Math.abs(difference) < .01 ? '与本地同一时区' : (difference > 0 ? '比本地快 ' : '比本地慢 ') + Math.abs(difference) + ' 小时';
-    return result;
-}
-exports.cityReading = cityReading;
-function nextCityMidnight(zone, now) {
-    const offset = clockOffset(zone, now), date = new Date(now - offset * 3600000);
-    const midnight = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1);
-    let result = midnight + offset * 3600000;
-    for (let i = 0; i < 3; i++)
-        result = midnight + clockOffset(zone, result) * 3600000;
-    return result;
-}
-exports.nextCityMidnight = nextCityMidnight;
-/** Prioritize a nearby DST transition; the FormKit caller still honors its 5-minute quota. */
-function nextCityBoundary(zone, now) {
-    let result = nextCityMidnight(zone, now), end = now + 30 * 60000;
-    const offset = clockOffset(zone, now);
-    if (clockOffset(zone, end) !== offset) {
-        let lo = Math.floor(now / 60000), hi = Math.ceil(end / 60000);
-        while (hi - lo > 1) {
-            const mid = Math.floor((lo + hi) / 2);
-            if (clockOffset(zone, mid * 60000) === offset)
-                lo = mid;
-            else
-                hi = mid;
-        }
-        result = Math.min(result, hi * 60000);
-    }
-    return result;
-}
-exports.nextCityBoundary = nextCityBoundary;
-class LunarReading {
-    constructor() {
-        this.date = '';
-        this.year = '';
-    }
-}
-exports.LunarReading = LunarReading;
-let lunarFormatter = undefined;
-let lunarKey = '', lunarValue = new LunarReading();
-function lunarReading(now) {
-    const date = new Date(now), key = date.getFullYear() + ':' + date.getMonth() + ':' + date.getDate() + ':' + date.getTimezoneOffset();
-    if (key === lunarKey)
-        return lunarValue;
-    if (!lunarFormatter)
-        lunarFormatter = new Intl.DateTimeFormat('zh-CN-u-ca-chinese', { year: 'numeric', month: 'long', day: 'numeric' });
-    const parts = lunarFormatter.formatToParts(date), day = Number(parts.find((part) => part.type === 'day')?.value ?? 0);
-    const names = ['', '初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十', '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十', '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
-    const result = new LunarReading();
-    result.date = (parts.find((part) => part.type === 'month')?.value ?? '') + ' ' + (names[day] ?? '');
-    result.year = parts.filter((part) => String(part.type) === 'yearName').map((part) => part.value).join('') + '年';
-    lunarKey = key;
-    lunarValue = result;
-    return result;
-}
-exports.lunarReading = lunarReading;
 
 },
 "CapabilityData":function(require,module,exports){
@@ -1308,1166 +2128,10 @@ function visibleLessonCount(height, count, columns) {
 exports.visibleLessonCount = visibleLessonCount;
 
 },
-"DepthComposition":function(require,module,exports){
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.depthRenderCards = exports.depthOwner = exports.depthPhotoBox = exports.internalDepth = exports.hasDepthSubject = exports.depthElement = void 0;
-const CardSchema_1 = require("./CardSchema");
-const CardViewSnapshot_1 = require("./CardViewSnapshot");
-/** One subject source per composition. The foreground is an offline, reusable alpha image. */
-function depthElement(card) {
-    return (card.elements ?? []).find(el => el.kind === 'image' && !el.animated && el.depthEnabled && (el.depthForeground ?? '').length > 0 && (el.src ?? '').length > 0);
-}
-exports.depthElement = depthElement;
-function hasDepthSubject(card) {
-    return (card.shape === 'subject' && card.subjectPhoto && card.cutout.length > 0) || depthElement(card) !== undefined;
-}
-exports.hasDepthSubject = hasDepthSubject;
-function internalDepth(card) {
-    return (card.subjectDepth && card.shape === 'subject' && card.subjectPhoto && card.cutout.length > 0) || depthElement(card) !== undefined;
-}
-exports.internalDepth = internalDepth;
-/** Exact ImageFit.Cover transform, including source crop. Coordinates are fractions of the photo layer. */
-function depthPhotoBox(element, width, height) {
-    const result = new CardSchema_1.ElementBox(), aspect = Math.max(.001, width) / Math.max(.001, height), source = Math.max(.001, element.depthSourceAspect || 1);
-    const w = Math.max(1, source / aspect), h = Math.max(1, aspect / source), crop = element.depthCrop;
-    result.x = (1 - w) / 2 + crop.x * w;
-    result.y = (1 - h) / 2 + crop.y * h;
-    result.w = crop.w * w;
-    result.h = crop.h * h;
-    return result;
-}
-exports.depthPhotoBox = depthPhotoBox;
-function depthOwner(card) { return card.depthPass === 'foreground' ? card.depthOwnerId : card.id; }
-exports.depthOwner = depthOwner;
-class Projection {
-    constructor() {
-        this.source = new CardSchema_1.FridgeCard();
-        this.z = 0;
-        this.pass = '';
-        this.card = new CardSchema_1.FridgeCard();
-    }
-}
-const cache = new Map();
-function project(source, pass, z, id = source.id) {
-    const key = source.id + ':' + pass, old = cache.get(key);
-    if (old && old.source === source && old.z === z && old.card.id === id)
-        return old.card;
-    const copy = (0, CardViewSnapshot_1.cardViewSnapshot)(source);
-    copy.depthPass = pass;
-    copy.z = z;
-    copy.id = id;
-    if (pass === 'foreground')
-        copy.depthOwnerId = source.id;
-    const entry = new Projection();
-    entry.source = source;
-    entry.z = z;
-    entry.pass = pass;
-    entry.card = copy;
-    if (!cache.has(key) && cache.size >= 128)
-        cache.delete(cache.keys().next().value);
-    cache.set(key, entry);
-    return copy;
-}
-/** Render projection only: editable cards, groups, geometry and resource ownership remain unchanged. */
-function depthRenderCards(cards) {
-    const output = [], sources = cards.filter(c => !c.template && !c.hidden && (c.groupId ?? '').length > 0 && c.depthGroup && hasDepthSubject(c));
-    const used = [], occupied = cards.map(c => c.id);
-    for (const card of cards) {
-        const source = sources.find(c => c.id === card.id && !used.includes(c.groupId));
-        const members = source ? cards.filter(c => !c.hidden && c.groupId === source.groupId) : [];
-        if (source && members.length > 1) {
-            used.push(source.groupId);
-            output.push(project(source, 'base', Math.min(...members.map(c => c.z)) - .25));
-            let foregroundId = source.id + '::depth';
-            while (occupied.includes(foregroundId))
-                foregroundId += ':';
-            occupied.push(foregroundId);
-            output.push(project(source, 'foreground', Math.max(...members.map(c => c.z)) + .25, foregroundId));
-        }
-        else
-            output.push(card);
-    }
-    return used.length > 0 ? output.sort((a, b) => a.z - b.z) : output;
-}
-exports.depthRenderCards = depthRenderCards;
-
-},
-"CardSchema":function(require,module,exports){
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.normalizeCapability = exports.contrastingInk = exports.serializeDoorCards = exports.serializeFaceCards = exports.normalizeState = exports.normalizeElement = exports.localImageSource = exports.normalizeBox = exports.bounded = exports.defaultState = exports.cardCornerRadius = exports.shapeRadius = exports.materialColors = exports.typeLabel = exports.FridgeState = exports.normalizeBackground = exports.CanvasBackground = exports.BackgroundAnchor = exports.DoorState = exports.FridgeCard = exports.CanvasElement = exports.PhotoDepthCrop = exports.ElementBox = exports.CAPABILITIES = exports.CapType = exports.MIN_SUBJECT_EDGE = exports.ALBUM_CARD_CORNER_RADIUS = exports.ALBUM_CORNER_RADIUS = exports.ALBUM_INSET = exports.RECT_CORNER_RADIUS = exports.MIN_CARD_EDGE = exports.BOARD_H = exports.BOARD_W = void 0;
-const CompositionCatalog_1 = require("./CompositionCatalog");
-const CardTemplate_1 = require("./CardTemplate");
-const HtmlCardTemplate_1 = require("./HtmlCardTemplate");
-const ReadingStylePolicy_1 = require("./ReadingStylePolicy");
-const SceneScheduleSchema_1 = require("./SceneScheduleSchema");
-const TimeCapabilities_1 = require("./TimeCapabilities");
-const HolidayCalendar_1 = require("./HolidayCalendar");
-/** Pure, versioned schema shared by the app and FormKit renderer. */
-exports.BOARD_W = 344;
-exports.BOARD_H = 470;
-/** Artwork bounds only; capability readability is enforced separately by layout. */
-exports.MIN_CARD_EDGE = 32;
-exports.RECT_CORNER_RADIUS = 16;
-exports.ALBUM_INSET = 4.9;
-exports.ALBUM_CORNER_RADIUS = 14;
-exports.ALBUM_CARD_CORNER_RADIUS = 20;
-exports.MIN_SUBJECT_EDGE = 16;
-class CapType {
-}
-exports.CapType = CapType;
-CapType.CLOCK = 'clock';
-CapType.DATE = 'date';
-CapType.CALENDAR = 'calendar';
-CapType.COUNTDOWN = 'countdown';
-CapType.ANNIVERSARY = 'anniversary';
-CapType.DAY_PROGRESS = 'dayprogress';
-CapType.YEAR_PROGRESS = 'yearprogress';
-exports.CAPABILITIES = ['clock', 'date', 'calendar', 'countdown', 'anniversary', 'dayprogress', 'yearprogress', 'battery', 'agenda', 'timetable', 'worldclock', 'lunar', 'album'];
-class ElementBox {
-    constructor() {
-        this.x = 0.1;
-        this.y = 0.12;
-        this.w = 0.8;
-        this.h = 0.7;
-        this.rot = 0;
-        this.opacity = 1;
-    }
-}
-exports.ElementBox = ElementBox;
-class PhotoDepthCrop extends ElementBox {
-    constructor() {
-        super(...arguments);
-        this.x = 0;
-        this.y = 0;
-        this.w = 1;
-        this.h = 1;
-    }
-}
-exports.PhotoDepthCrop = PhotoDepthCrop;
-class CanvasElement extends ElementBox {
-    constructor() {
-        super(...arguments);
-        this.id = '';
-        this.kind = 'text'; // text | image | shape
-        this.text = '';
-        this.src = '';
-        this.animated = false;
-        this.fs = 18;
-        this.color = '';
-        this.bold = false;
-        this.align = 'left';
-        this.behindCapability = false;
-        this.depthEnabled = false;
-        this.depthForeground = '';
-        this.depthCrop = new PhotoDepthCrop();
-        this.depthSourceAspect = 1;
-        this.depthFront = false;
-        this.primitive = 'rect'; // rect | circle | line
-    }
-}
-exports.CanvasElement = CanvasElement;
-class FridgeCard {
-    constructor() {
-        this.subjectDepth = false;
-        this.depthCapabilityFront = false;
-        this.depthGroup = false;
-        this.depthOwnerId = ''; // Render projection owner, never imported or stored.
-        this.depthPass = ''; // Derived render pass; never imported or stored.
-        this.reliefSrc = ''; // Host-derived only; ignored by import and omitted from editable storage.
-        this.groupId = '';
-        this.hidden = false;
-        this.id = '';
-        this.x = 24;
-        this.y = 32;
-        this.w = 180;
-        this.h = 180;
-        this.rot = 0;
-        this.z = 1;
-        this.shape = 'rect';
-        this.frame = false;
-        this.material = 'white';
-        this.paper = '';
-        this.ink = '';
-        this.capability = null;
-        this.capBox = new ElementBox();
-        this.capFree = false; // Manual foreground placement uses the whole card box, not its silhouette.
-        this.elements = [];
-        this.subjectPhoto = false;
-        this.subjectBorder = true;
-        this.subjectAspect = 1;
-        this.subjectInk = '#262824';
-        this.subjectVersion = 0;
-        this.cutout = ''; // transparent subject PNG, also the alpha mask
-        this.outline = [];
-        this.renderContourKey = '';
-        this.inDoor = false;
-    }
-}
-exports.FridgeCard = FridgeCard;
-class DoorState {
-    constructor() {
-        this.reveal = '07:30';
-        this.open = false;
-    }
-}
-exports.DoorState = DoorState;
-class BackgroundAnchor {
-    constructor() {
-        this.x = .5;
-        this.y = .5;
-        this.color = '#E9E5DF';
-        this.weight = 1;
-    }
-}
-exports.BackgroundAnchor = BackgroundAnchor;
-class CanvasBackground {
-    constructor() {
-        this.mode = 'solid';
-        this.color = '#FFFFFF';
-        this.src = '';
-        this.photo = '';
-        this.transparentFrame = 'auto'; // Legacy transparent-only setting.
-        this.frameStyle = 'none';
-        this.frameMaterial = 'stone';
-        this.palette = [];
-        this.anchors = [];
-        this.signature = '';
-    }
-}
-exports.CanvasBackground = CanvasBackground;
-function normalizeBackground(raw) {
-    const bg = new CanvasBackground();
-    if (raw === undefined || raw === null)
-        return bg;
-    bg.mode = ['solid', 'smart', 'blend', 'photo', 'preset', 'transparent'].includes(raw.mode) ? raw.mode : 'solid';
-    bg.transparentFrame = ['auto', 'light', 'dark', 'none'].includes(raw.transparentFrame) ? raw.transparentFrame : 'auto';
-    bg.frameStyle = ['auto', 'light', 'dark', 'none'].includes(raw.frameStyle) ? raw.frameStyle : bg.mode === 'transparent' ? bg.transparentFrame : 'none';
-    bg.frameMaterial = ['stone', 'walnut', 'oak'].includes(raw.frameMaterial) ? raw.frameMaterial : 'stone';
-    bg.color = /^#[0-9a-fA-F]{6}$/.test(raw.color ?? '') ? raw.color : '#FFFFFF';
-    bg.src = (raw.src ?? '').startsWith('file://') || (raw.src ?? '').startsWith('memory://') ? raw.src : '';
-    bg.photo = (raw.photo ?? '').startsWith('file://') ? raw.photo : '';
-    bg.palette = (Array.isArray(raw.palette) ? raw.palette : []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c)).slice(0, 6);
-    bg.anchors = (Array.isArray(raw.anchors) ? raw.anchors : []).slice(0, 12).filter((a) => a !== null && /^#[0-9a-fA-F]{6}$/.test(a.color)).map((a) => ({ x: bounded(a.x, 0, 1, .5), y: bounded(a.y, 0, 1, .5), color: a.color, weight: bounded(a.weight, .000001, 8, 1) }));
-    bg.signature = typeof raw.signature === 'string' ? raw.signature : '';
-    return bg;
-}
-exports.normalizeBackground = normalizeBackground;
-class FridgeState {
-    constructor() {
-        this.sceneLayouts = [];
-        this.sceneRules = [];
-        this.canvasRotation = undefined;
-        this.scenePolicyV2 = undefined;
-        this.systemDark = undefined;
-        this.sceneBaseLayoutId = ''; // Empty = current homepage; selecting a saved normal layout applies its geometry.
-        this.schemaVersion = 2;
-        this.canvasId = 'canvas_main';
-        this.background = new CanvasBackground();
-        this.canvasAspect = 1;
-        this.canvasDimension = '4*4';
-        this.fridge = 'board';
-        this.door = new DoorState();
-        this.maxZ = 10;
-        this.cards = [];
-    }
-}
-exports.FridgeState = FridgeState;
-function typeLabel(k) {
-    const index = exports.CAPABILITIES.indexOf(k);
-    const names = ['时间', '日期', '台历', '倒计时', '纪念日', '今日进度', '年度进度', '本机电量', '日程', '课程表', '世界时钟', '农历', '音乐专辑'];
-    return index >= 0 ? names[index] : '自定义';
-}
-exports.typeLabel = typeLabel;
-function materialColors(material, paper = '', ink = '') {
-    let base = ['#FFFFFF', '#262824'];
-    if (material === 'cream')
-        base = ['#F3EEDC', '#454035'];
-    if (material === 'kraft')
-        base = ['#DED0B8', '#433B31'];
-    if (material === 'mint')
-        base = ['#E1E9DF', '#344237'];
-    if (material === 'blue')
-        base = ['#E2E8EE', '#354553'];
-    if (material === 'pink')
-        base = ['#EEDFE0', '#543C40'];
-    if (material === 'dark')
-        base = ['#292A28', '#F4F3EF'];
-    return [/^#[0-9a-fA-F]{6}$/.test(paper) ? paper : base[0], /^#[0-9a-fA-F]{6}$/.test(ink) ? ink : base[1]];
-}
-exports.materialColors = materialColors;
-function shapeRadius(shape, scale = 1) {
-    if (shape === 'round')
-        return '50%';
-    if (shape === 'pill')
-        return 999;
-    if (shape === 'blob')
-        return { topLeft: '28%', topRight: '12%', bottomLeft: '18%', bottomRight: '26%' };
-    return shape === 'subject' ? 0 : exports.RECT_CORNER_RADIUS * scale;
-}
-exports.shapeRadius = shapeRadius;
-/** Album geometry approved in the interactive demo; shared by app, export and widget. */
-function cardCornerRadius(card, scale = 1) {
-    return card.capability?.k === 'album' ? exports.ALBUM_CARD_CORNER_RADIUS * scale : shapeRadius(card.shape, scale);
-}
-exports.cardCornerRadius = cardCornerRadius;
-function defaultState() { return new FridgeState(); }
-exports.defaultState = defaultState;
-function bounded(value, min, max, fallback) {
-    return Math.max(min, Math.min(max, Number.isFinite(value) ? value : fallback));
-}
-exports.bounded = bounded;
-function normalizeBox(raw) {
-    const box = new ElementBox();
-    box.w = bounded(raw?.w, 0.1, 1, 0.8);
-    box.h = bounded(raw?.h, 0.08, 1, 0.7);
-    box.x = bounded(raw?.x, 0, 1 - box.w, 0.1);
-    box.y = bounded(raw?.y, 0, 1 - box.h, 0.12);
-    box.rot = bounded(raw?.rot, -180, 180, 0);
-    box.opacity = bounded(raw?.opacity, 0.1, 1, 1);
-    return box;
-}
-exports.normalizeBox = normalizeBox;
-/** Runtime images must never trigger HTTP requests, including migrated artwork. */
-function localImageSource(value) {
-    return typeof value === 'string' && (value.startsWith('file://') || value.startsWith('memory://')) ? value : '';
-}
-exports.localImageSource = localImageSource;
-function normalizeElement(raw, clippedSubject = false) {
-    const box = normalizeBox(raw);
-    const el = new CanvasElement();
-    el.id = raw.id;
-    el.kind = ['text', 'image', 'shape'].includes(raw.kind) ? raw.kind : 'text';
-    el.x = clippedSubject ? bounded(raw.x, -8, 8, box.x) : box.x;
-    el.y = clippedSubject ? bounded(raw.y, -8, 8, box.y) : box.y;
-    el.w = clippedSubject ? bounded(raw.w, .01, 16, box.w) : box.w;
-    el.h = clippedSubject ? bounded(raw.h, .01, 16, box.h) : box.h;
-    el.rot = box.rot;
-    el.opacity = box.opacity;
-    el.text = raw.text ?? '';
-    el.src = localImageSource(raw.src);
-    el.animated = raw.animated === true;
-    el.fs = bounded(raw.fs, 10, 64, 18);
-    el.color = raw.color ?? '';
-    el.behindCapability = raw.behindCapability ?? false;
-    el.depthFront = raw.depthFront === true;
-    el.depthForeground = localImageSource(raw.depthForeground);
-    el.depthEnabled = el.kind === 'image' && !el.animated && raw.depthEnabled === true && el.depthForeground.length > 0;
-    if (el.depthEnabled)
-        el.depthFront = false;
-    el.depthSourceAspect = bounded(raw.depthSourceAspect, .01, 100, 1);
-    const crop = raw.depthCrop;
-    el.depthCrop.x = bounded(crop?.x, 0, .999, 0);
-    el.depthCrop.y = bounded(crop?.y, 0, .999, 0);
-    el.depthCrop.w = bounded(crop?.w, .001, 1 - el.depthCrop.x, 1 - el.depthCrop.x);
-    el.depthCrop.h = bounded(crop?.h, .001, 1 - el.depthCrop.y, 1 - el.depthCrop.y);
-    el.bold = raw.bold ?? false;
-    el.align = raw.align ?? 'left';
-    el.primitive = raw.primitive ?? 'rect';
-    return el;
-}
-exports.normalizeElement = normalizeElement;
-function legacyElement(cap, id, index, count) {
-    const el = new CanvasElement();
-    el.id = id + '_element_' + index;
-    el.y = index / count;
-    el.h = 1 / count;
-    el.x = 0.08;
-    el.w = 0.84;
-    if (cap.k === 'photo') {
-        el.kind = 'image';
-        el.src = localImageSource(cap.seed);
-        el.x = 0;
-        el.w = 1;
-    }
-    else {
-        el.text = cap.k === 'np' ? [cap.title ?? '', cap.artist ?? ''].filter((v) => v.length > 0).join('\n') : (cap.text ?? '');
-        el.fs = cap.fs ?? 18;
-        el.align = cap.align ?? 'left';
-        el.bold = cap.bold ?? false;
-    }
-    return el;
-}
-function normalizeState(raw) {
-    const state = new FridgeState();
-    state.canvasId = typeof raw.canvasId === 'string' && /^[a-zA-Z0-9_-]{1,96}$/.test(raw.canvasId) ? raw.canvasId : 'canvas_main';
-    state.background = normalizeBackground(raw.background);
-    state.door = raw.door ?? new DoorState();
-    state.canvasDimension = ['2*2', '2*4', '4*4', '6*4'].includes(raw.canvasDimension) ? raw.canvasDimension : '4*4';
-    state.canvasAspect = bounded(raw.canvasAspect, .3, 3, 1);
-    state.sceneLayouts = (0, SceneScheduleSchema_1.normalizeSceneLayouts)(raw.sceneLayouts);
-    state.sceneRules = (0, SceneScheduleSchema_1.normalizeSceneRules)(raw.sceneRules);
-    state.sceneBaseLayoutId = state.sceneLayouts.some(s => s.id === raw.sceneBaseLayoutId) ? raw.sceneBaseLayoutId : '';
-    state.maxZ = bounded(raw.maxZ, 0, Number.MAX_SAFE_INTEGER, 10);
-    for (const source of (Array.isArray(raw.cards) ? raw.cards : [])) {
-        if (source === null || typeof source.id !== 'string')
-            continue;
-        const card = new FridgeCard();
-        if (source.template !== undefined)
-            card.template = (0, CardTemplate_1.normalizeCardTemplate)(source.template);
-        if (source.html !== undefined)
-            card.html = (0, HtmlCardTemplate_1.normalizeHtmlCard)(source.html);
-        card.id = source.id;
-        card.hidden = source.hidden === true;
-        card.groupId = typeof source.groupId === 'string' ? source.groupId.slice(0, 96) : '';
-        card.w = bounded(source.w, card.template && (0, CompositionCatalog_1.compositionSlot)(card.template.id) ? 1 : source.shape === 'subject' ? exports.MIN_SUBJECT_EDGE : exports.MIN_CARD_EDGE, card.template?.fill ? exports.BOARD_W : 320, 180);
-        card.h = bounded(source.h, card.template && (0, CompositionCatalog_1.compositionSlot)(card.template.id) ? 1 : source.shape === 'subject' ? exports.MIN_SUBJECT_EDGE : exports.MIN_CARD_EDGE, card.template?.fill ? exports.BOARD_W / state.canvasAspect : 420, 180);
-        // Validate finite coordinates here. Rotated/host-aware recovery belongs to
-        // the whole canvas, where grouping and the actual aspect are available.
-        card.x = bounded(source.x, -840, exports.BOARD_W + 840, 24);
-        card.y = bounded(source.y, -840, exports.BOARD_H + 840, 32);
-        if (raw.schemaVersion !== 2) {
-            card.x = bounded(source.x, -card.w + Math.min(32, card.w * .2), exports.BOARD_W - Math.min(32, card.w * .2), 24);
-            card.y = bounded(source.y, -card.h + Math.min(32, card.h * .2), exports.BOARD_H - Math.min(32, card.h * .2), 32);
-        }
-        card.rot = bounded(source.rot, -180, 180, 0);
-        card.z = bounded(source.z, 0, Number.MAX_SAFE_INTEGER, 1);
-        card.shape = source.shape ?? 'rect';
-        card.frame = source.frame ?? false;
-        card.material = source.material ?? 'white';
-        card.paper = source.paper ?? '';
-        card.ink = source.ink ?? '';
-        card.inDoor = source.inDoor ?? false;
-        card.subjectDepth = source.subjectDepth === true;
-        card.depthCapabilityFront = source.depthCapabilityFront === true;
-        card.depthGroup = source.depthGroup === true;
-        card.cutout = (source.cutout ?? '').startsWith('file://') || (source.cutout ?? '').startsWith('memory://') ? source.cutout : '';
-        card.subjectBorder = true;
-        card.subjectPhoto = source.subjectPhoto ?? false;
-        card.subjectVersion = source.subjectVersion ?? 0;
-        card.subjectInk = source.subjectInk ?? '#262824';
-        card.subjectAspect = source.subjectAspect ?? 1;
-        card.outline = Array.isArray(source.outline) ? source.outline : [];
-        card.capBox = normalizeBox(source.capBox);
-        card.capBox.rot = 0;
-        card.capFree = source.capFree === true;
-        card.elements = Array.isArray(source.elements) ? source.elements.filter((el) => el !== null && typeof el.id === 'string').map((el) => normalizeElement(el, card.shape === 'subject')) : [];
-        const caps = raw.schemaVersion === 2 ? (source.capability !== null && source.capability !== undefined ? [source.capability] : []) : (source.caps ?? []);
-        state.cards.push(card);
-        state.maxZ = Math.max(state.maxZ, card.z);
-        for (let i = 0; i < caps.length; i++) {
-            const cap = caps[i];
-            if (cap === null || typeof cap.k !== 'string')
-                continue;
-            // Retired capabilities leave the user's card artwork intact.
-            if (cap.k === 'weather' || cap.k === 'parcel')
-                continue;
-            if (cap.k === 'fetch') {
-                // Keep the last visible result as artwork, without retaining a network source.
-                if (typeof cap.value === 'string' && cap.value.length > 0) {
-                    const cached = legacyElement({ k: 'text', text: [cap.title ?? '', cap.value + (cap.unit ?? '')].filter((v) => v.length > 0).join('\n') }, card.id, i, caps.length);
-                    if (raw.schemaVersion === 2) {
-                        const box = normalizeBox(source.capBox);
-                        cached.x = box.x;
-                        cached.y = box.y;
-                        cached.w = box.w;
-                        cached.h = box.h;
-                    }
-                    cached.id = card.id + '_cached_value_' + i;
-                    while (card.elements.some((el) => el.id === cached.id))
-                        cached.id += '_';
-                    card.elements.push(cached);
-                }
-                continue;
-            }
-            if (exports.CAPABILITIES.includes(cap.k)) {
-                if (card.capability === null) {
-                    card.capability = normalizeCapability(cap);
-                    if (card.capFree && ['cloud', 'bare', 'badge', 'sticker', 'space', 'tag', 'dock'].includes(card.capability.readingBlend ?? '')) {
-                        if (card.capability.readingBlend === 'sticker')
-                            card.capBox.w = bounded(source.capBox?.w, .01, 3, .8);
-                        card.capBox.x = bounded(source.capBox?.x, -2, 2, .1);
-                        card.capBox.y = bounded(source.capBox?.y, -2, 2, .12);
-                        card.capBox.rot = bounded(source.capBox?.rot, -180, 180, 0);
-                    }
-                    if (cap.k === 'calendar')
-                        card.capability.calendarOffset = Math.round(bounded(cap.calendarOffset ?? 0, -120, 120, 0));
-                    if (raw.schemaVersion !== 2) {
-                        card.capBox.y = i / caps.length;
-                        card.capBox.h = 1 / caps.length;
-                    }
-                }
-                else {
-                    const extra = new FridgeCard();
-                    extra.id = card.id + '_cap_' + i;
-                    extra.capability = normalizeCapability(cap);
-                    extra.w = card.w;
-                    extra.h = card.h;
-                    extra.x = Math.min(exports.BOARD_W - extra.w, card.x + 16 * i);
-                    extra.y = Math.min(exports.BOARD_H - extra.h, card.y + 16 * i);
-                    extra.material = card.material;
-                    extra.paper = card.paper;
-                    extra.ink = card.ink;
-                    extra.rot = card.rot;
-                    extra.inDoor = card.inDoor;
-                    extra.z = ++state.maxZ;
-                    state.cards.push(extra);
-                }
-            }
-            else {
-                card.elements.push(legacyElement(cap, card.id, i, caps.length));
-                if (cap.k === 'photo' && (cap.label ?? '').length > 0) {
-                    const caption = legacyElement({ k: 'text', text: cap.label, fs: 12 }, card.id, i, caps.length);
-                    caption.id += '_caption';
-                    caption.h = Math.min(0.15, 1 / caps.length);
-                    caption.y = (i + 1) / caps.length - caption.h;
-                    card.elements.push(caption);
-                }
-            }
-        }
-        if (card.capability?.k === 'album') {
-            card.shape = 'rect';
-            card.frame = false;
-        }
-        if (card.shape === 'subject' && card.cutout.length === 0)
-            card.shape = 'rect';
-    }
-    return state;
-}
-exports.normalizeState = normalizeState;
-function serializeFaceCards(state) { return JSON.stringify(state.cards.filter((c) => !c.inDoor && !c.hidden)); }
-exports.serializeFaceCards = serializeFaceCards;
-function serializeDoorCards(state) { return JSON.stringify(state.cards.filter((c) => c.inDoor && !c.hidden)); }
-exports.serializeDoorCards = serializeDoorCards;
-function contrastingInk(color) {
-    if (!/^#[0-9a-fA-F]{6}$/.test(color))
-        return '#FFFFFF';
-    const light = .2126 * parseInt(color.slice(1, 3), 16) + .7152 * parseInt(color.slice(3, 5), 16) + .0722 * parseInt(color.slice(5, 7), 16);
-    return light >= 145 ? '#262824' : '#FFFFFF';
-}
-exports.contrastingInk = contrastingInk;
-function normalizeCapability(raw) {
-    const cap = JSON.parse(JSON.stringify(raw));
-    cap.url = undefined;
-    cap.field = undefined;
-    cap.sourceConfigured = undefined;
-    if (raw.k === 'album') {
-        const local = (v) => typeof v === 'string' && (v.startsWith('file://') || v.startsWith('memory://')) ? v : '';
-        cap.albumCover = local(raw.albumCover);
-        cap.albumBackground = local(raw.albumBackground);
-        cap.albumId = typeof raw.albumId === 'string' ? raw.albumId.slice(0, 96) : '';
-        cap.albumSource = ['local', 'musicbrainz'].includes(raw.albumSource ?? '') ? raw.albumSource : '';
-        cap.artist = typeof raw.artist === 'string' ? raw.artist.slice(0, 160) : '';
-        cap.albumInset = exports.ALBUM_INSET;
-        cap.albumPresentation = ['classic', 'row'].includes(raw.albumPresentation ?? '') ? raw.albumPresentation : 'cover';
-        cap.albumRotationMinutes = [60, 180, 360, 1440].includes(raw.albumRotationMinutes ?? 0) ? raw.albumRotationMinutes : 0;
-        cap.albumRotationStart = bounded(raw.albumRotationStart ?? 0, 0, 8640000000000000, 0);
-        const ids = [];
-        cap.albumItems = (Array.isArray(raw.albumItems) ? raw.albumItems : []).filter((a) => a !== null && a !== undefined && typeof a.id === 'string' && a.id.length > 0 && !!local(a.cover) && !!local(a.background) && !ids.includes(a.id.slice(0, 96)) && (ids.push(a.id.slice(0, 96)) > 0)).slice(0, 12).map((a) => ({ id: a.id.slice(0, 96), cover: local(a.cover), background: local(a.background), title: typeof a.title === 'string' ? a.title.slice(0, 160) : '', artist: typeof a.artist === 'string' ? a.artist.slice(0, 160) : '' }));
-    }
-    if (raw.k === 'worldclock')
-        cap.zone = (0, TimeCapabilities_1.clockZone)(typeof raw.zone === 'string' ? raw.zone : '');
-    cap.readingOpacity = bounded(raw.readingOpacity ?? 1, 0, 1, 1);
-    cap.readingMaterialStudy = undefined;
-    cap.readingMaterial = raw.readingMaterial === 'matte' ? 'matte' : 'paper';
-    cap.readingStyle = ['plain', 'surface'].includes(raw.readingStyle ?? '') ? raw.readingStyle : 'auto';
-    cap.readingOutside = raw.readingOutside === true;
-    cap.readingEdge = ['left', 'right', 'top', 'bottom'].includes(raw.readingEdge ?? '') ? raw.readingEdge : '';
-    cap.readingHook = bounded(raw.readingHook ?? .2, 0, 1, .2);
-    cap.readingTintKey = typeof raw.readingTintKey === 'string' ? raw.readingTintKey.slice(0, 64) : '';
-    cap.readingTint = /^#[0-9a-fA-F]{6}$/.test(raw.readingTint ?? '') ? raw.readingTint : '';
-    cap.readingBlend = ['cloud', 'bare', 'badge', 'sticker', 'space', 'tag', 'dock', 'paper', 'feather', 'scrim', 'halo'].includes(raw.readingBlend ?? '') ? raw.readingBlend : 'feather';
-    if (raw.k !== 'album')
-        cap.readingBlend = ['cloud', 'bare', 'badge', 'sticker', 'space', 'tag', 'dock'].includes(cap.readingBlend ?? '') ? (0, ReadingStylePolicy_1.validReadingStyle)(raw.k, cap.readingBlend) : (0, ReadingStylePolicy_1.defaultReadingStyle)(raw.k);
-    cap.parcelPlace = typeof raw.parcelPlace === 'string' ? raw.parcelPlace.slice(0, 80) : '';
-    cap.title = typeof raw.title === 'string' ? raw.title.slice(0, 160) : '';
-    cap.interval = Math.round(bounded(raw.interval ?? 60, 30, 1440, 60));
-    if (raw.k === 'battery')
-        cap.percent = bounded(raw.percent ?? -1, -1, 100, -1);
-    cap.events = (Array.isArray(raw.events) ? raw.events : []).filter((e) => e && typeof e.title === 'string' && Number.isFinite(e.start) && Number.isFinite(e.end) && e.end >= e.start).slice(0, 256).map((e) => ({ id: String(e.id).slice(0, 96), title: e.title.slice(0, 160), start: e.start, end: e.end, location: typeof e.location === 'string' ? e.location.slice(0, 160) : '', allDay: e.allDay === true }));
-    cap.parcels = (Array.isArray(raw.parcels) ? raw.parcels : []).filter((e) => e && typeof e.code === 'string' && e.code.length > 0).slice(0, 64).map((e) => ({ id: String(e.id).slice(0, 96), code: e.code.slice(0, 24), place: typeof e.place === 'string' ? e.place.slice(0, 80) : '', picked: e.picked === true }));
-    cap.courses = (Array.isArray(raw.courses) ? raw.courses : []).filter((c) => c && typeof c.name === 'string' && c.name.trim().length > 0 && /^([01]\d|2[0-3]):[0-5]\d$/.test(c.start) && /^([01]\d|2[0-3]):[0-5]\d$/.test(c.end) && c.end > c.start).slice(0, 128).map((c) => ({ id: String(c.id).slice(0, 96), name: c.name.slice(0, 80), room: typeof c.room === 'string' ? c.room.slice(0, 80) : '', day: Math.round(bounded(c.day, 1, 7, 1)), start: c.start, end: c.end, firstWeek: Math.round(bounded(c.firstWeek, 1, 60, 1)), lastWeek: Math.round(bounded(c.lastWeek, c.firstWeek || 1, 60, 16)), parity: [0, 1, 2].includes(c.parity) ? c.parity : 0 }));
-    if (raw.k === 'timetable') {
-        cap.timetableMode = raw.timetableMode === 'day' ? 'day' : 'next';
-        cap.skipHolidays = raw.skipHolidays !== false;
-        cap.holidayDates = (Array.isArray(raw.holidayDates) ? raw.holidayDates : []).filter((d) => d && (0, HolidayCalendar_1.validDay)(d.date)).slice(0, 512).map((d) => ({ date: d.date, name: typeof d.name === 'string' ? d.name.slice(0, 60) : '校历假期' }));
-        cap.teachingDays = (Array.isArray(raw.teachingDays) ? raw.teachingDays : []).filter((d) => d && (0, HolidayCalendar_1.validDay)(d.date) && (d.sourceDate === '' || (0, HolidayCalendar_1.validDay)(d.sourceDate))).slice(-512);
-        cap.courseChanges = (Array.isArray(raw.courseChanges) ? raw.courseChanges : []).filter((d) => d && typeof d.id === 'string' && cap.courses.some((c) => c.id === d.courseId) && (0, HolidayCalendar_1.validDay)(d.date) && (d.targetDate === '' || ((0, HolidayCalendar_1.validDay)(d.targetDate) && /^([01]\d|2[0-3]):[0-5]\d$/.test(d.start) && /^([01]\d|2[0-3]):[0-5]\d$/.test(d.end) && d.end > d.start))).slice(-256).map((d) => ({ id: d.id.slice(0, 96), courseId: d.courseId, date: d.date, targetDate: d.targetDate, start: d.start ?? '', end: d.end ?? '', room: typeof d.room === 'string' ? d.room.slice(0, 80) : '' }));
-    }
-    return cap;
-}
-exports.normalizeCapability = normalizeCapability;
-
-},
-"CardTemplate":function(require,module,exports){
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.copyCardTemplate = exports.newCardTemplate = exports.normalizeCardTemplate = exports.templateDefinition = exports.CARD_TEMPLATES = void 0;
-const CompositionCatalog_1 = require("./CompositionCatalog");
-exports.CARD_TEMPLATES = [
-    { "id": "standby", "kind": "clock", "name": "浮字", "sources": ["clock"] },
-    { "id": "dial", "kind": "clock", "name": "色盘", "sources": ["clock"] },
-    { "id": "flip", "kind": "clock", "name": "翻页", "sources": ["clock"] },
-    { "id": "portrait", "kind": "clock", "name": "景深照片", "sources": ["clock"] },
-    { "id": "date-poster", "kind": "date", "name": "日历海报", "sources": ["date"] },
-    { "id": "date-paper", "kind": "date", "name": "纸页", "sources": ["date"] },
-    { "id": "date-strip", "kind": "date", "name": "一周", "sources": ["date"] },
-    { "id": "calendar-month", "kind": "calendar", "name": "月历", "sources": ["calendar"] },
-    { "id": "calendar-ledger", "kind": "calendar", "name": "月记", "sources": ["calendar"] },
-    { "id": "calendar-week", "kind": "calendar", "name": "周历", "sources": ["calendar"] },
-    { "id": "countdown-poster", "kind": "countdown", "name": "出发", "sources": ["countdown"] },
-    { "id": "countdown-orbit", "kind": "countdown", "name": "环绕", "sources": ["countdown"] },
-    { "id": "countdown-paper", "kind": "countdown", "name": "撕页", "sources": ["countdown"] },
-    { "id": "anniversary-photo", "kind": "anniversary", "name": "相遇", "sources": ["anniversary"] },
-    { "id": "anniversary-type", "kind": "anniversary", "name": "记忆", "sources": ["anniversary"] },
-    { "id": "day-dial", "kind": "dayprogress", "name": "一天", "sources": ["dayprogress"] },
-    { "id": "day-timeline", "kind": "dayprogress", "name": "日线", "sources": ["dayprogress"] },
-    { "id": "day-blocks", "kind": "dayprogress", "name": "时块", "sources": ["dayprogress"] },
-    { "id": "year-dots", "kind": "yearprogress", "name": "年点", "sources": ["yearprogress"] },
-    { "id": "year-arc", "kind": "yearprogress", "name": "年轮", "sources": ["yearprogress"] },
-    { "id": "year-months", "kind": "yearprogress", "name": "十二月", "sources": ["yearprogress"] },
-    { "id": "battery-ring", "kind": "battery", "name": "能量环", "sources": ["battery"] },
-    { "id": "battery-cell", "kind": "battery", "name": "电芯", "sources": ["battery"] },
-    { "id": "battery-segments", "kind": "battery", "name": "电格", "sources": ["battery"] },
-    { "id": "agenda-editorial", "kind": "agenda", "name": "留白日程", "sources": ["agenda"] },
-    { "id": "agenda-timeline", "kind": "agenda", "name": "时间轴", "sources": ["agenda"] },
-    { "id": "agenda-paper", "kind": "agenda", "name": "手帐", "sources": ["agenda"] },
-    { "id": "course-next", "kind": "timetable", "name": "下节课", "sources": ["timetable"] },
-    { "id": "course-week", "kind": "timetable", "name": "一周课表", "sources": ["timetable"] },
-    { "id": "course-slips", "kind": "timetable", "name": "课程纸条", "sources": ["timetable"] },
-    { "id": "world-dial", "kind": "worldclock", "name": "异地", "sources": ["worldclock"] },
-    { "id": "world-duo", "kind": "worldclock", "name": "两地", "sources": ["worldclock"] },
-    { "id": "world-type", "kind": "worldclock", "name": "时差", "sources": ["worldclock"] },
-    { "id": "lunar-paper", "kind": "lunar", "name": "东方日历", "sources": ["lunar"] },
-    { "id": "lunar-night", "kind": "lunar", "name": "月白", "sources": ["lunar"] },
-    { "id": "lunar-seal", "kind": "lunar", "name": "朱印", "sources": ["lunar"] },
-    { "id": "album-record", "kind": "album", "name": "唱片", "sources": ["album"] },
-    { "id": "album-cover", "kind": "album", "name": "封面", "sources": ["album"] },
-    { "id": "album-sleeve", "kind": "album", "name": "唱片袋", "sources": ["album"] },
-    { "id": "mix-standby", "kind": "ensemble", "name": "桌边", "sources": ["clock", "calendar"] },
-    { "id": "mix-modular", "kind": "ensemble", "name": "今日", "sources": ["clock", "agenda", "battery"] },
-    { "id": "mix-study", "kind": "ensemble", "name": "课间", "sources": ["clock", "timetable", "dayprogress"] },
-    { "id": "mix-travel", "kind": "ensemble", "name": "远行", "sources": ["worldclock", "countdown"] },
-    { "id": "mix-memory", "kind": "ensemble", "name": "相片日历", "sources": ["anniversary", "date", "lunar"] }
-];
-function templateDefinition(id) { const single = exports.CARD_TEMPLATES.find(d => d.id === id); if (single)
-    return single; const slot = (0, CompositionCatalog_1.compositionSlot)(id); return slot ? { id: slot.id, kind: slot.kind, name: slot.role, sources: [slot.kind] } : undefined; }
-exports.templateDefinition = templateDefinition;
-function normalizeCardTemplate(raw) {
-    if (!raw || raw.version !== 1 || !templateDefinition(raw.id) || templateDefinition(raw.id)?.kind === 'ensemble')
-        return undefined;
-    return { version: 1, id: raw.id, palette: ['', 'cobalt', 'cream', 'ink'].includes(raw.palette) ? raw.palette : '', fill: raw.fill === true, depth: raw.depth !== false, zoom: Math.max(.5, Math.min(1.5, Number.isFinite(raw.zoom) ? raw.zoom : 1)), offsetX: Math.max(-.35, Math.min(.35, Number.isFinite(raw.offsetX) ? raw.offsetX : 0)), offsetY: Math.max(-.35, Math.min(.35, Number.isFinite(raw.offsetY) ? raw.offsetY : 0)) };
-}
-exports.normalizeCardTemplate = normalizeCardTemplate;
-function newCardTemplate(id) { return { version: 1, id, palette: '', fill: false, depth: true, zoom: 1, offsetX: 0, offsetY: 0 }; }
-exports.newCardTemplate = newCardTemplate;
-function copyCardTemplate(raw) { return raw ? { version: raw.version, id: raw.id, palette: raw.palette, fill: raw.fill, depth: raw.depth, zoom: raw.zoom, offsetX: raw.offsetX, offsetY: raw.offsetY } : undefined; }
-exports.copyCardTemplate = copyCardTemplate;
-
-},
-"HtmlCardTemplate":function(require,module,exports){
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.normalizeHtmlCard = exports.validateHtmlCard = void 0;
-function validateHtmlCard(template) {
-    if (!template || template.version !== 1 || template.designVersion !== 1 || !Number.isInteger(template.width) || !Number.isInteger(template.height) || template.width < 32 || template.height < 32 || template.width > 1024 || template.height > 1024 || typeof template.previewElementId !== 'string' || !template.previewElementId.length || template.previewElementId.length > 96 || typeof template.source !== 'string' || !template.source.length || template.source.length > 512 * 1024)
-        throw new Error('HTML 卡片版本或尺寸不受支持，请更新应用');
-    for (const key of Object.keys(template))
-        if (!['version', 'designVersion', 'width', 'height', 'source', 'previewElementId'].includes(key))
-            throw new Error('HTML 卡片包含尚未支持的字段，请更新应用');
-    const source = template.source;
-    // These sources are data in the app. The same policy gates any authoring preview.
-    if (/<\s*\/?\s*(script|iframe|object|embed|link|base|form|input|button|audio|video|foreignobject|animate|animatetransform|animatemotion|set|marquee)\b/i.test(source) || /\bon[a-z]+\s*=/i.test(source) || /(javascript\s*:|https?\s*:|file\s*:|@import|@font-face|expression\s*\(|animation(?:-[a-z]+)?\s*:|transition(?:-[a-z]+)?\s*:)/i.test(source))
-        throw new Error('HTML 卡片只支持静态本地外观，不支持脚本、联网或交互控件');
-    const refs = source.match(/(?:src|href)\s*=\s*[^>\s]+/gi) ?? [];
-    for (const ref of refs)
-        if (!/^(?:src|href)\s*=\s*["'](?:data:image\/(?:png|jpeg|webp);base64,|#)/i.test(ref))
-            throw new Error('HTML 素材必须内嵌为本地图片');
-    for (const ref of source.match(/url\s*\([^)]*\)/gi) ?? [])
-        if (!/^url\s*\(\s*(["']?)#[a-z0-9_-]+\1\s*\)$/i.test(ref))
-            throw new Error('HTML 不使用外部 CSS 资源；SVG 可以引用本地渐变 ID');
-    if (/\bsrcset\s*=/i.test(source))
-        throw new Error('HTML 不使用外部响应式图片资源');
-}
-exports.validateHtmlCard = validateHtmlCard;
-function normalizeHtmlCard(template) {
-    if (template === undefined || template === null)
-        return undefined;
-    validateHtmlCard(template);
-    return { version: 1, designVersion: 1, width: template.width, height: template.height, source: template.source, previewElementId: template.previewElementId };
-}
-exports.normalizeHtmlCard = normalizeHtmlCard;
-
-},
-"ReadingStylePolicy":function(require,module,exports){
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.preferredReadingStyle = exports.validReadingStyle = exports.defaultReadingStyle = exports.readingStyles = exports.COMPOSITION_KEYS = void 0;
-exports.COMPOSITION_KEYS = ['cloud', 'bare', 'badge', 'sticker', 'tag'];
-function readingStyles(kind) {
-    if (kind === 'album')
-        return [];
-    return kind === 'battery' ? ['badge', 'cloud', 'bare'] : ['cloud', 'bare', 'tag', 'sticker'];
-}
-exports.readingStyles = readingStyles;
-function defaultReadingStyle(kind) {
-    if (kind === 'battery')
-        return 'badge';
-    if (kind === 'agenda' || kind === 'timetable' || kind === 'countdown' || kind === 'anniversary' || kind.endsWith('progress'))
-        return 'tag';
-    return kind === 'clock' ? 'bare' : 'sticker';
-}
-exports.defaultReadingStyle = defaultReadingStyle;
-function validReadingStyle(kind, style) {
-    const migrated = style === 'dock' ? 'tag' : style === 'space' ? 'sticker' : style;
-    return readingStyles(kind).includes(migrated) ? migrated : defaultReadingStyle(kind);
-}
-exports.validReadingStyle = validReadingStyle;
-/** Newly chosen capabilities use cloud; legacy defaults stay stable during migration. */
-function preferredReadingStyle(kind) { return kind === 'battery' ? 'badge' : kind === 'album' ? '' : 'cloud'; }
-exports.preferredReadingStyle = preferredReadingStyle;
-
-},
-"SceneScheduleSchema":function(require,module,exports){
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.sceneClock = exports.normalizeSceneRules = exports.normalizeSceneLayouts = exports.validSceneDate = exports.sceneDay = exports.SceneRule = exports.SavedSceneLayout = exports.ScenePlacement = void 0;
-/** Local wall-clock rules. Geometry references artwork; it never duplicates image assets. */
-class ScenePlacement {
-    constructor() {
-        this.id = '';
-        this.x = 0;
-        this.y = 0;
-        this.w = 180;
-        this.h = 180;
-        this.rot = 0;
-        this.z = 1;
-    }
-}
-exports.ScenePlacement = ScenePlacement;
-class SavedSceneLayout {
-    constructor() {
-        this.id = '';
-        this.name = '';
-        this.placements = [];
-    }
-}
-exports.SavedSceneLayout = SavedSceneLayout;
-class SceneRule {
-    constructor() {
-        this.id = '';
-        this.name = '';
-        this.enabled = true;
-        this.kind = 'layout';
-        this.targetId = '';
-        this.repeat = 'daily';
-        this.date = '';
-        this.weekdays = [0, 1, 2, 3, 4, 5, 6];
-        this.start = 1200;
-        this.end = 1380;
-        this.untilDismissed = true;
-        this.createdAt = 0;
-        this.dismissed = '';
-        this.timeoutMinutes = 15;
-        this.centralOnly = false;
-        this.migrationKey = '';
-    }
-}
-exports.SceneRule = SceneRule;
-function sceneDay(date) { return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0'); }
-exports.sceneDay = sceneDay;
-function validSceneDate(value) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(value))
-        return false;
-    const parts = value.split('-').map(Number), date = new Date(parts[0], parts[1] - 1, parts[2]);
-    return sceneDay(date) === value;
-}
-exports.validSceneDate = validSceneDate;
-function number(value, min, max, fallback) { return Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback; }
-function normalizeSceneLayouts(raw) {
-    const out = [];
-    for (const source of (Array.isArray(raw) ? raw : []).slice(0, 8)) {
-        if (!source || typeof source.id !== 'string' || !source.id || out.some(s => s.id === source.id))
-            continue;
-        const next = new SavedSceneLayout();
-        next.id = source.id.slice(0, 96);
-        next.name = (typeof source.name === 'string' ? source.name : '布局').slice(0, 30);
-        for (const p of (Array.isArray(source.placements) ? source.placements : []).slice(0, 32)) {
-            if (!p || typeof p.id !== 'string' || next.placements.some(s => s.id === p.id))
-                continue;
-            const item = new ScenePlacement();
-            item.id = p.id.slice(0, 96);
-            item.x = number(p.x, -840, 1184, 0);
-            item.y = number(p.y, -840, 1310, 0);
-            item.w = number(p.w, 16, 320, 180);
-            item.h = number(p.h, 16, 420, 180);
-            item.rot = number(p.rot, -180, 180, 0);
-            item.z = number(p.z, 0, Number.MAX_SAFE_INTEGER, 1);
-            next.placements.push(item);
-        }
-        out.push(next);
-    }
-    return out;
-}
-exports.normalizeSceneLayouts = normalizeSceneLayouts;
-function normalizeSceneRules(raw) {
-    const out = [];
-    for (const source of (Array.isArray(raw) ? raw : []).slice(0, 12)) {
-        if (!source || typeof source.id !== 'string' || !source.id || out.some(s => s.id === source.id) || !['layout', 'canvas', 'focus'].includes(source.kind))
-            continue;
-        const rule = new SceneRule();
-        rule.id = source.id.slice(0, 96);
-        rule.name = (typeof source.name === 'string' ? source.name : '定时场景').slice(0, 30);
-        rule.enabled = source.enabled !== false;
-        rule.kind = source.kind;
-        rule.targetId = (typeof source.targetId === 'string' ? source.targetId : '').slice(0, 96);
-        rule.repeat = source.repeat === 'once' ? 'once' : 'daily';
-        rule.date = typeof source.date === 'string' && validSceneDate(source.date) ? source.date : '';
-        if (rule.repeat === 'once' && !rule.date)
-            rule.enabled = false;
-        rule.weekdays = Array.from(new Set((Array.isArray(source.weekdays) ? source.weekdays : rule.weekdays).filter((n) => Number.isInteger(n) && n >= 0 && n < 7)));
-        rule.start = Math.round(number(source.start, 0, 1439, 1200));
-        rule.end = Math.round(number(source.end, 0, 1439, 1380));
-        rule.untilDismissed = source.untilDismissed !== false;
-        rule.createdAt = number(source.createdAt, 0, Number.MAX_SAFE_INTEGER, 0);
-        rule.timeoutMinutes = Math.round(number(source.timeoutMinutes, 1, 120, 15));
-        rule.centralOnly = source.centralOnly === true;
-        rule.migrationKey = typeof source.migrationKey === 'string' ? source.migrationKey.slice(0, 200) : '';
-        rule.dismissed = typeof source.dismissed === 'string' ? source.dismissed.slice(0, 24) : '';
-        out.push(rule);
-    }
-    return out;
-}
-exports.normalizeSceneRules = normalizeSceneRules;
-function sceneClock(minute) { return String(Math.floor(minute / 60)).padStart(2, '0') + ':' + String(minute % 60).padStart(2, '0'); }
-exports.sceneClock = sceneClock;
-
-},
-"CardViewSnapshot":function(require,module,exports){
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.cardRenderSnapshot = exports.cardStorageShell = exports.cardViewSnapshot = void 0;
-const CardTemplate_1 = require("./CardTemplate");
-const ContourRegistry_1 = require("./ContourRegistry");
-const CardSchema_1 = require("./CardSchema");
-/** Contours are immutable after extraction. Keep them shared while editable values are snapshots. */
-function cardViewSnapshot(source) { return snapshotCard(source, true); }
-exports.cardViewSnapshot = cardViewSnapshot;
-/** Synchronously serialize this shell; its nested references must never escape into UI or undo. */
-function cardStorageShell(source) { return snapshotCard(source, false); }
-exports.cardStorageShell = cardStorageShell;
-function snapshotCard(source, detached) {
-    const copy = new CardSchema_1.FridgeCard();
-    copy.reliefSrc = detached ? source.reliefSrc : '';
-    copy.subjectDepth = source.subjectDepth;
-    copy.depthCapabilityFront = source.depthCapabilityFront;
-    copy.depthGroup = source.depthGroup;
-    copy.depthPass = detached ? source.depthPass : '';
-    copy.depthOwnerId = detached ? source.depthOwnerId : '';
-    if (source.template !== undefined)
-        copy.template = (0, CardTemplate_1.copyCardTemplate)(source.template);
-    copy.id = source.id;
-    copy.hidden = source.hidden === true;
-    copy.groupId = source.groupId;
-    copy.x = source.x;
-    copy.y = source.y;
-    copy.w = source.w;
-    copy.h = source.h;
-    copy.rot = source.rot;
-    copy.z = source.z;
-    copy.shape = source.shape;
-    copy.frame = source.frame;
-    copy.material = source.material;
-    copy.paper = source.paper;
-    copy.ink = source.ink;
-    copy.subjectPhoto = source.subjectPhoto;
-    copy.subjectBorder = true;
-    copy.subjectAspect = source.subjectAspect;
-    copy.subjectInk = source.subjectInk;
-    copy.subjectVersion = source.subjectVersion;
-    copy.cutout = source.cutout;
-    copy.inDoor = source.inDoor;
-    copy.outline = (0, ContourRegistry_1.cardOutline)(source);
-    copy.renderContourKey = '';
-    copy.capability = !detached || source.capability === null ? source.capability : JSON.parse(JSON.stringify(source.capability));
-    copy.capBox = detached ? JSON.parse(JSON.stringify(source.capBox)) : source.capBox;
-    copy.capFree = source.capFree;
-    copy.elements = detached ? source.elements.map((element) => JSON.parse(JSON.stringify(element))) : source.elements;
-    return copy;
-}
-const renderSnapshots = new Map();
-const renderSignatures = new Map();
-/** A lightweight render parameter. Storage and undo snapshots retain their original contours. */
-function cardRenderSnapshot(source, prepared = false) {
-    const contourKey = (0, ContourRegistry_1.registerRenderContour)(source, prepared);
-    // Compare mutable values before cloning. Reopening/committing one card should
-    // not deep-copy every unchanged capability, course list and background layer.
-    const signature = JSON.stringify([source.id, source.hidden, source.groupId, source.x, source.y, source.w, source.h, source.rot, source.z,
-        source.template, source.subjectDepth, source.depthCapabilityFront, source.depthGroup, source.depthPass, source.depthOwnerId, source.shape, source.frame, source.material, source.paper, source.ink, source.subjectPhoto, source.subjectAspect,
-        source.subjectInk, source.subjectVersion, source.cutout, source.reliefSrc, source.inDoor, contourKey, source.capability, source.capBox, source.capFree, source.elements]);
-    const previous = renderSnapshots.get(source.id);
-    if (previous !== undefined && renderSignatures.get(source.id) === signature)
-        return previous;
-    const copy = cardViewSnapshot(source);
-    copy.renderContourKey = contourKey;
-    copy.outline = [];
-    if (!renderSnapshots.has(source.id) && renderSnapshots.size >= 128) {
-        const oldest = renderSnapshots.keys().next().value;
-        renderSnapshots.delete(oldest);
-        renderSignatures.delete(oldest);
-    }
-    renderSignatures.set(source.id, signature);
-    renderSnapshots.set(source.id, copy);
-    return copy;
-}
-exports.cardRenderSnapshot = cardRenderSnapshot;
-
-},
-"ContourRegistry":function(require,module,exports){
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.storePreparedContour = exports.hasPreparedContour = exports.serializeContourCache = exports.restoreContourCache = exports.releaseRenderContours = exports.cardOutline = exports.registerRenderContour = void 0;
-const ContourGeometry_1 = require("./ContourGeometry");
-// Contours belong to immutable image assets, not to the reactive component tree.
-// Keeping one entry per card avoids @Prop cloning thousands of points at every transition.
-const contours = new Map();
-const compacted = new WeakMap();
-function registerRenderContour(card, prepared = false) {
-    if (card.outline.length === 0)
-        return card.renderContourKey;
-    const key = card.id + ':' + card.cutout + ':' + card.subjectVersion;
-    let outline = compacted.get(card.outline);
-    if (outline === undefined) {
-        outline = prepared ? card.outline : (0, ContourGeometry_1.compactContours)(card.outline);
-        compacted.set(card.outline, outline);
-    }
-    contours.set(key, outline);
-    return key;
-}
-exports.registerRenderContour = registerRenderContour;
-function cardOutline(card) {
-    return card.outline.length > 0 ? card.outline : (contours.get(card.renderContourKey) ?? []);
-}
-exports.cardOutline = cardOutline;
-function releaseRenderContours() { contours.clear(); serializedEntries = []; serializedJson = ''; }
-exports.releaseRenderContours = releaseRenderContours;
-class CachedContour {
-    constructor() {
-        this.source = '';
-        this.outline = [];
-    }
-}
-class ContourCache {
-    constructor() {
-        this.version = 1;
-        this.entries = {};
-    }
-}
-class SerializedEntry {
-    constructor() {
-        this.key = '';
-        this.source = [];
-        this.prepared = [];
-    }
-}
-let serializedEntries = [];
-let serializedJson = '';
-const encodedSources = new WeakMap();
-function contourSource(outline) {
-    let source = encodedSources.get(outline);
-    if (source === undefined) {
-        source = JSON.stringify(outline);
-        encodedSources.set(outline, source);
-    }
-    return source;
-}
-function assetKey(card) { return card.cutout ? card.cutout + ':' + card.subjectVersion : card.id; }
-/** Derived geometry is disposable. Exact source matching prevents stale shapes after edits/imports. */
-function restoreContourCache(cards, json) {
-    if (!json || json.length > 8 * 1024 * 1024)
-        return 0;
-    let cache;
-    try {
-        cache = JSON.parse(json);
-    }
-    catch (_) {
-        return 0;
-    }
-    if (cache?.version !== 1 || !cache.entries)
-        return 0;
-    let restored = 0;
-    for (const card of cards) {
-        if (!card.outline.length)
-            continue;
-        const entry = cache.entries[assetKey(card)];
-        if (!entry || entry.source !== contourSource(card.outline) || !Array.isArray(entry.outline) || entry.outline.length !== card.outline.length)
-            continue;
-        let count = 0;
-        const valid = entry.outline.every((loop) => Array.isArray(loop) && loop.length >= 3 && loop.every((p) => {
-            count++;
-            return count <= 65536 && p !== null && p !== undefined && Number.isFinite(p.x) && Number.isFinite(p.y) && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1;
-        }));
-        if (valid) {
-            compacted.set(card.outline, entry.outline);
-            restored++;
-        }
-    }
-    return restored;
-}
-exports.restoreContourCache = restoreContourCache;
-function serializeContourCache(cards) {
-    // Moving/resizing changes placement, never the immutable image contour. Avoid
-    // encoding the same potentially megabyte-sized cache after every gesture.
-    const entries = [];
-    for (const card of cards) {
-        const outline = compacted.get(card.outline);
-        if (outline === undefined || !card.outline.length)
-            continue;
-        const entry = new SerializedEntry();
-        entry.key = assetKey(card);
-        entry.source = card.outline;
-        entry.prepared = outline;
-        entries.push(entry);
-    }
-    if (entries.length === serializedEntries.length && entries.every((entry, index) => {
-        const previous = serializedEntries[index];
-        return entry.key === previous.key && entry.source === previous.source && entry.prepared === previous.prepared;
-    }))
-        return serializedJson;
-    const cache = new ContourCache();
-    for (const item of entries) {
-        const entry = new CachedContour();
-        entry.source = contourSource(item.source);
-        entry.outline = item.prepared;
-        cache.entries[item.key] = entry;
-    }
-    const json = entries.length === 0 ? '' : JSON.stringify(cache);
-    serializedEntries = entries;
-    serializedJson = json.length <= 8 * 1024 * 1024 ? json : '';
-    return serializedJson;
-}
-exports.serializeContourCache = serializeContourCache;
-/** Worker adapter primes this pure registry without platform dependencies. */
-function hasPreparedContour(outline) { return compacted.has(outline); }
-exports.hasPreparedContour = hasPreparedContour;
-function storePreparedContour(outline, prepared) { compacted.set(outline, prepared); }
-exports.storePreparedContour = storePreparedContour;
-
-},
-"ContourGeometry":function(require,module,exports){
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.compactContours = exports.compactLoop = void 0;
-function distanceSquared(p, a, b) {
-    const dx = b.x - a.x, dy = b.y - a.y, n = dx * dx + dy * dy;
-    const t = n === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / n));
-    return (p.x - a.x - t * dx) ** 2 + (p.y - a.y - t * dy) ** 2;
-}
-function area(points) {
-    let sum = 0;
-    for (let i = 0; i < points.length; i++) {
-        const a = points[i], b = points[(i + 1) % points.length];
-        sum += a.x * b.y - b.x * a.y;
-    }
-    return sum / 2;
-}
-function orient(a, b, c) { return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x); }
-function crosses(a, b, c, d) {
-    if (Math.max(a.x, b.x) < Math.min(c.x, d.x) || Math.max(c.x, d.x) < Math.min(a.x, b.x) ||
-        Math.max(a.y, b.y) < Math.min(c.y, d.y) || Math.max(c.y, d.y) < Math.min(a.y, b.y))
-        return false;
-    return orient(a, b, c) * orient(a, b, d) < -1e-18 && orient(c, d, a) * orient(c, d, b) < -1e-18;
-}
-function simple(points) {
-    for (let i = 0; i < points.length; i++)
-        for (let j = i + 2; j < points.length; j++) {
-            if (i === 0 && j === points.length - 1)
-                continue;
-            if (crosses(points[i], points[(i + 1) % points.length], points[j], points[(j + 1) % points.length]))
-                return false;
-        }
-    return true;
-}
-/** Closed Douglas-Peucker with a hard maximum deviation, original vertices and preserved winding. */
-function compactLoop(loop, tolerance = .00035) {
-    if (loop.length < 5)
-        return loop;
-    let opposite = 1, far = 0;
-    for (let i = 1; i < loop.length; i++) {
-        const d = (loop[i].x - loop[0].x) ** 2 + (loop[i].y - loop[0].y) ** 2;
-        if (d > far) {
-            far = d;
-            opposite = i;
-        }
-    }
-    const points = loop.concat([loop[0]]), keep = new Uint8Array(points.length);
-    keep[0] = 1;
-    keep[opposite] = 1;
-    keep[loop.length] = 1;
-    // Pin deliberate corners and the paired endpoints of narrow U-turns.
-    for (let i = 0; i < loop.length; i++) {
-        const a = loop[(i + loop.length - 1) % loop.length], p = loop[i], b = loop[(i + 1) % loop.length], c = loop[(i + 2) % loop.length];
-        const ux = p.x - a.x, uy = p.y - a.y, vx = b.x - p.x, vy = b.y - p.y, wx = c.x - b.x, wy = c.y - b.y;
-        const u = Math.hypot(ux, uy), v = Math.hypot(vx, vy), w = Math.hypot(wx, wy);
-        if (u > tolerance * 4 && v > tolerance * 4 && Math.abs(ux * vy - uy * vx) > u * v * .2)
-            keep[i] = 1;
-        if (v < tolerance * 2 && u > tolerance * 4 && w > tolerance * 4 && ux * wx + uy * wy < -.8 * u * w) {
-            keep[i] = 1;
-            keep[(i + 1) % loop.length] = 1;
-        }
-    }
-    const stack = [];
-    let previous = 0;
-    for (let i = 1; i < keep.length; i++)
-        if (keep[i]) {
-            stack.push(previous, i);
-            previous = i;
-        }
-    const limit = tolerance * tolerance;
-    while (stack.length > 0) {
-        const end = stack.pop(), start = stack.pop();
-        let index = -1, maximum = limit;
-        for (let i = start + 1; i < end; i++) {
-            const d = distanceSquared(points[i], points[start], points[end]);
-            if (d > maximum) {
-                maximum = d;
-                index = i;
-            }
-        }
-        if (index >= 0) {
-            keep[index] = 1;
-            stack.push(start, index, index, end);
-        }
-    }
-    const result = loop.filter((_, i) => keep[i] === 1), before = area(loop), after = area(result);
-    if (result.length < 3 || before * after <= 0 || Math.abs(after - before) > Math.abs(before) * .005 || !simple(result)) {
-        return tolerance > .00005 ? compactLoop(loop, tolerance / 2) : loop;
-    }
-    return result;
-}
-exports.compactLoop = compactLoop;
-function contains(loop, p) {
-    let inside = false;
-    for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
-        const a = loop[i], b = loop[j];
-        if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x)
-            inside = !inside;
-    }
-    return inside;
-}
-function compactContours(loops, tolerance = .00035) {
-    const result = loops.map((loop) => compactLoop(loop, tolerance));
-    // Never merge/cross separate parts or hole boundaries.
-    for (let i = 0; i < result.length; i++)
-        for (let j = i + 1; j < result.length; j++) {
-            if (contains(loops[i], loops[j][0]) !== contains(result[i], result[j][0]) || contains(loops[j], loops[i][0]) !== contains(result[j], result[i][0]))
-                return loops;
-            for (let a = 0; a < result[i].length; a++)
-                for (let b = 0; b < result[j].length; b++) {
-                    if (crosses(result[i][a], result[i][(a + 1) % result[i].length], result[j][b], result[j][(b + 1) % result[j].length]))
-                        return loops;
-                }
-        }
-    return result.every((loop, i) => loop === loops[i]) ? loops : result;
-}
-exports.compactContours = compactContours;
-
-},
 "TemplateSceneTypes":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TemplateScene = exports.TemplateMark = void 0;
+exports.copyTemplateMark = exports.TemplateScene = exports.TemplateMark = void 0;
 class TemplateMark {
     constructor() {
         this.kind = 'rect';
@@ -2507,6 +2171,33 @@ class TemplateScene {
     }
 }
 exports.TemplateScene = TemplateScene;
+function copyTemplateMark(source) {
+    const mark = new TemplateMark();
+    mark.kind = source.kind;
+    mark.x = source.x;
+    mark.y = source.y;
+    mark.w = source.w;
+    mark.h = source.h;
+    mark.r = source.r;
+    mark.color = source.color;
+    mark.end = source.end;
+    mark.angle = source.angle;
+    mark.opacity = source.opacity;
+    mark.text = source.text;
+    mark.lines = source.lines;
+    mark.size = source.size;
+    mark.weight = source.weight;
+    mark.align = source.align;
+    mark.font = source.font;
+    mark.start = source.start;
+    mark.sweep = source.sweep;
+    mark.stroke = source.stroke;
+    mark.layer = source.layer;
+    mark.src = source.src;
+    mark.fit = source.fit;
+    return mark;
+}
+exports.copyTemplateMark = copyTemplateMark;
 
 },
 "CompositionScene":function(require,module,exports){
@@ -2515,12 +2206,58 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.compositionScene = void 0;
 const TemplateSceneTypes_1 = require("./TemplateSceneTypes");
 const CompositionCatalog_1 = require("./CompositionCatalog");
+const CompositionCatalog_2 = require("./CompositionCatalog");
+const CardTemplate_1 = require("./CardTemplate");
+const TemplateSources_1 = require("./TemplateSources");
+const TemplatePhotoGeometry_1 = require("./TemplatePhotoGeometry");
+const CardSchema_1 = require("./CardSchema");
 const CapabilityData_1 = require("./CapabilityData");
 const CapabilityCalendar_1 = require("./CapabilityCalendar");
 const HolidayCalendar_1 = require("./HolidayCalendar");
 const TimeCapabilities_1 = require("./TimeCapabilities");
 /** A face's data slots use its typography and color roles, not miniature standalone widgets. */
 function compositionScene(card, tick) {
+    const composition = (0, CompositionCatalog_2.compositionDefinition)(card.template?.id ?? '');
+    if (composition) {
+        const layout = (0, CompositionCatalog_2.compositionLayout)(composition, card.w / card.h), out = new TemplateSceneTypes_1.TemplateScene(), caps = (0, TemplateSources_1.cardCapabilities)(card), colors = (0, CompositionCatalog_1.compositionColors)(composition.id, card.template?.palette ?? '');
+        out.width = layout.width;
+        out.height = layout.height;
+        out.background = colors[0];
+        out.ink = colors[1];
+        out.accent = colors[2];
+        layout.slots.forEach((slot, index) => {
+            const item = new CardSchema_1.FridgeCard();
+            item.template = (0, CardTemplate_1.copyCardTemplate)(card.template, false);
+            item.template.id = slot.id;
+            item.template.sources = undefined;
+            item.capability = caps[index] ?? { k: slot.kind };
+            item.elements = card.elements;
+            item.w = slot.w;
+            item.h = slot.h;
+            const scene = compositionScene(item, tick);
+            if (!scene)
+                return;
+            const scale = slot.w / scene.width;
+            for (const mark of scene.marks) {
+                const m = (0, TemplateSceneTypes_1.copyTemplateMark)(mark);
+                m.x = slot.x + m.x * scale;
+                m.y = slot.y + m.y * scale;
+                if (m.kind === 'line') {
+                    m.w = slot.x + m.w * scale;
+                    m.h = slot.y + m.h * scale;
+                }
+                else {
+                    m.w *= scale;
+                    m.h *= scale;
+                }
+                m.r *= scale;
+                m.size *= scale;
+                m.stroke *= scale;
+                out.marks.push(m);
+            }
+        });
+        return out;
+    }
     const id = card.template?.id ?? '', slot = (0, CompositionCatalog_1.compositionSlot)(id), face = (0, CompositionCatalog_1.compositionOwner)(id);
     if (!slot || !face)
         return undefined;
@@ -2647,12 +2384,9 @@ function compositionScene(card, tick) {
     else if (id === 'face-memory-photo') {
         const photo = card.elements.find(e => e.kind === 'image' && e.src.length > 0), t = card.template, box = wide ? [148, 16, 134, 118] : [138, 58, 140, 169];
         if (photo) {
-            if (t.depth && photo.depthForeground && photo.depthEnabled) {
-                const aspect = Math.max(.05, photo.depthSourceAspect * photo.depthCrop.w / Math.max(.01, photo.depthCrop.h)), h = Math.min(box[3], box[2] / aspect) * t.zoom, w = h * aspect;
-                image(photo.depthForeground, box[0] + (box[2] - w) / 2 + t.offsetX * box[2], box[1] + (box[3] - h) / 2 + t.offsetY * box[3], w, h).fit = 'contain';
-            }
-            else
-                image(photo.src, box[0], box[1], box[2], box[3], 10).fit = 'contain';
+            const frame = (0, TemplatePhotoGeometry_1.templatePhotoBox)(photo, t, box[2], box[3], false), subject = t.depth && photo.depthEnabled && photo.depthForeground.length > 0;
+            const placed = subject ? (0, TemplatePhotoGeometry_1.templateSubjectBox)(photo, frame) : frame;
+            image(subject ? photo.depthForeground : photo.src, box[0] + placed.x, box[1] + placed.y, placed.w, placed.h, subject ? 0 : 10).fit = 'contain';
         }
         const left = cap.date && (0, HolidayCalendar_1.validDay)(cap.date) ? (0, CapabilityCalendar_1.daysLeftOf)(cap.date, tick) : null;
         const number = text(left === null ? '—' : String(Math.abs(left)), 22, wide ? 43 : 106, wide ? 57 : 88, wide ? 92 : 114, 'left', 'digits');
@@ -2672,6 +2406,28 @@ function compositionScene(card, tick) {
 }
 exports.compositionScene = compositionScene;
 function accentInk(color) { const value = parseInt(color.slice(1), 16), light = ((value >> 16) * 299 + ((value >> 8) & 255) * 587 + (value & 255) * 114) / 1000; return light > 155 ? '#26312A' : '#FFFFFF'; }
+
+},
+"TemplateSources":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.replaceCardCapability = exports.cardCapabilities = void 0;
+/** The template is one editable card. Auxiliary sources belong to that card, never to the layer list. */
+function cardCapabilities(card) { return (card.capability ? [card.capability] : []).concat(card.template?.sources ?? []); }
+exports.cardCapabilities = cardCapabilities;
+function replaceCardCapability(card, previous, next) {
+    if (card.capability === previous) {
+        card.capability = next;
+        return true;
+    }
+    const sources = card.template?.sources, index = sources?.indexOf(previous) ?? -1;
+    if (sources && index >= 0) {
+        sources[index] = next;
+        return true;
+    }
+    return false;
+}
+exports.replaceCardCapability = replaceCardCapability;
 
 },
 "TemplateFactory":function(require,module,exports){
@@ -2707,23 +2463,17 @@ function makeTemplateCards(id, aspect, makeId, now = Date.now()) {
     const height = CardSchema_1.BOARD_W / Math.max(.3, aspect);
     const face = (0, CompositionCatalog_1.compositionDefinition)(id);
     if (face) {
-        const layout = (0, CompositionCatalog_1.compositionLayout)(face, aspect);
-        if (!layout.slots.length)
-            return [];
-        const scale = Math.min((CardSchema_1.BOARD_W - 24) / layout.width, (height - 24) / layout.height);
-        const left = (CardSchema_1.BOARD_W - layout.width * scale) / 2;
-        const top = (height - layout.height * scale) / 2;
-        const group = makeId();
-        return layout.slots.map((slot, index) => {
-            const card = templateCard(slot.id, slot.kind, makeId, now);
-            card.groupId = group;
-            card.z = index;
-            card.x = left + slot.x * scale;
-            card.y = (top + slot.y * scale) / height * 470;
-            card.w = slot.w * scale;
-            card.h = slot.h * scale;
-            return card;
-        });
+        const card = templateCard(id, face.slots[0].kind, makeId, now);
+        card.template.sources = face.slots.slice(1).map(slot => templateCard(slot.id, slot.kind, makeId, now).capability);
+        card.w = Math.min(300, height - 24 < 150 ? (height - 24) * 2 : 300);
+        card.h = aspect >= 1.5 ? card.w / 2 : card.w;
+        if (card.h > height - 24) {
+            card.h = height - 24;
+            card.w = card.h;
+        }
+        card.x = (CardSchema_1.BOARD_W - card.w) / 2;
+        card.y = (height - card.h) / 2 / height * 470;
+        return [card];
     }
     // An ensemble must have an authored face. Never fall back to a miniature widget grid.
     if (definition.kind === 'ensemble')
@@ -2766,9 +2516,12 @@ function packageScene(json, cardId) {
         rule.dismissed = '';
         rule.enabled = false;
     }
-    for (const card of state.cards)
+    for (const card of state.cards) {
         if (card.capability)
             card.capability = (0, SharedCapability_1.sharedCapability)(card.capability);
+        if (card.template?.sources)
+            card.template.sources = card.template.sources.map(SharedCapability_1.sharedCapability);
+    }
     return { format: 'fridgememo-template', version: state.cards.some((c) => c.template !== undefined) ? 3 : state.cards.some((c) => c.html !== undefined) ? 2 : 1, kind: cardId.length > 0 ? 'card' : 'canvas', state: state, assets: [] };
 }
 exports.packageScene = packageScene;
@@ -2781,9 +2534,12 @@ function readPackage(json) {
     (0, CanvasCapacity_1.assertCanvasCapacity)(0, raw.state.cards.length);
     for (const card of raw.state.cards) {
         if (card.template !== undefined) {
+            const definition = (0, CardTemplate_1.templateDefinition)(card.template.id);
+            if (definition?.kind === 'ensemble' && (!Array.isArray(card.template.sources) || card.template.sources.length !== definition.sources.length - 1 || card.template.sources.some((cap, index) => cap.k !== definition.sources[index + 1])))
+                throw new Error('模板数据源不完整');
             if (raw.version < 3)
                 throw new Error('模板卡片需要 v3 作品包');
-            if (!(0, CardTemplate_1.normalizeCardTemplate)(card.template) || (0, CardTemplate_1.templateDefinition)(card.template.id)?.kind !== card.capability?.k || card.html !== undefined)
+            if (!(0, CardTemplate_1.normalizeCardTemplate)(card.template) || (0, CardTemplate_1.templateDefinition)(card.template.id)?.sources[0] !== card.capability?.k || card.html !== undefined)
                 throw new Error('模板版本或能力不受支持，请更新应用');
         }
         if (card.html !== undefined) {
@@ -2863,6 +2619,8 @@ exports.readPackage = readPackage;
 function importedCards(state, newId) {
     const cards = (0, CardSchema_1.normalizeState)(JSON.parse(JSON.stringify(state))).cards, groups = new Map();
     for (const c of cards) {
+        if (c.template?.sources)
+            c.template.sources = c.template.sources.map(SharedCapability_1.sharedCapability);
         if (c.capability) {
             c.capability = (0, SharedCapability_1.sharedCapability)(c.capability);
             if (c.capability.k === 'album' && (c.capability.albumRotationMinutes ?? 0) > 0)
@@ -4184,6 +3942,256 @@ function paperReadingRadius(width, height) { return Math.max(0, Math.min(10, Mat
 exports.paperReadingRadius = paperReadingRadius;
 
 },
+"ContourRegistry":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.storePreparedContour = exports.hasPreparedContour = exports.serializeContourCache = exports.restoreContourCache = exports.releaseRenderContours = exports.cardOutline = exports.registerRenderContour = void 0;
+const ContourGeometry_1 = require("./ContourGeometry");
+// Contours belong to immutable image assets, not to the reactive component tree.
+// Keeping one entry per card avoids @Prop cloning thousands of points at every transition.
+const contours = new Map();
+const compacted = new WeakMap();
+function registerRenderContour(card, prepared = false) {
+    if (card.outline.length === 0)
+        return card.renderContourKey;
+    const key = card.id + ':' + card.cutout + ':' + card.subjectVersion;
+    let outline = compacted.get(card.outline);
+    if (outline === undefined) {
+        outline = prepared ? card.outline : (0, ContourGeometry_1.compactContours)(card.outline);
+        compacted.set(card.outline, outline);
+    }
+    contours.set(key, outline);
+    return key;
+}
+exports.registerRenderContour = registerRenderContour;
+function cardOutline(card) {
+    return card.outline.length > 0 ? card.outline : (contours.get(card.renderContourKey) ?? []);
+}
+exports.cardOutline = cardOutline;
+function releaseRenderContours() { contours.clear(); serializedEntries = []; serializedJson = ''; }
+exports.releaseRenderContours = releaseRenderContours;
+class CachedContour {
+    constructor() {
+        this.source = '';
+        this.outline = [];
+    }
+}
+class ContourCache {
+    constructor() {
+        this.version = 1;
+        this.entries = {};
+    }
+}
+class SerializedEntry {
+    constructor() {
+        this.key = '';
+        this.source = [];
+        this.prepared = [];
+    }
+}
+let serializedEntries = [];
+let serializedJson = '';
+const encodedSources = new WeakMap();
+function contourSource(outline) {
+    let source = encodedSources.get(outline);
+    if (source === undefined) {
+        source = JSON.stringify(outline);
+        encodedSources.set(outline, source);
+    }
+    return source;
+}
+function assetKey(card) { return card.cutout ? card.cutout + ':' + card.subjectVersion : card.id; }
+/** Derived geometry is disposable. Exact source matching prevents stale shapes after edits/imports. */
+function restoreContourCache(cards, json) {
+    if (!json || json.length > 8 * 1024 * 1024)
+        return 0;
+    let cache;
+    try {
+        cache = JSON.parse(json);
+    }
+    catch (_) {
+        return 0;
+    }
+    if (cache?.version !== 1 || !cache.entries)
+        return 0;
+    let restored = 0;
+    for (const card of cards) {
+        if (!card.outline.length)
+            continue;
+        const entry = cache.entries[assetKey(card)];
+        if (!entry || entry.source !== contourSource(card.outline) || !Array.isArray(entry.outline) || entry.outline.length !== card.outline.length)
+            continue;
+        let count = 0;
+        const valid = entry.outline.every((loop) => Array.isArray(loop) && loop.length >= 3 && loop.every((p) => {
+            count++;
+            return count <= 65536 && p !== null && p !== undefined && Number.isFinite(p.x) && Number.isFinite(p.y) && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1;
+        }));
+        if (valid) {
+            compacted.set(card.outline, entry.outline);
+            restored++;
+        }
+    }
+    return restored;
+}
+exports.restoreContourCache = restoreContourCache;
+function serializeContourCache(cards) {
+    // Moving/resizing changes placement, never the immutable image contour. Avoid
+    // encoding the same potentially megabyte-sized cache after every gesture.
+    const entries = [];
+    for (const card of cards) {
+        const outline = compacted.get(card.outline);
+        if (outline === undefined || !card.outline.length)
+            continue;
+        const entry = new SerializedEntry();
+        entry.key = assetKey(card);
+        entry.source = card.outline;
+        entry.prepared = outline;
+        entries.push(entry);
+    }
+    if (entries.length === serializedEntries.length && entries.every((entry, index) => {
+        const previous = serializedEntries[index];
+        return entry.key === previous.key && entry.source === previous.source && entry.prepared === previous.prepared;
+    }))
+        return serializedJson;
+    const cache = new ContourCache();
+    for (const item of entries) {
+        const entry = new CachedContour();
+        entry.source = contourSource(item.source);
+        entry.outline = item.prepared;
+        cache.entries[item.key] = entry;
+    }
+    const json = entries.length === 0 ? '' : JSON.stringify(cache);
+    serializedEntries = entries;
+    serializedJson = json.length <= 8 * 1024 * 1024 ? json : '';
+    return serializedJson;
+}
+exports.serializeContourCache = serializeContourCache;
+/** Worker adapter primes this pure registry without platform dependencies. */
+function hasPreparedContour(outline) { return compacted.has(outline); }
+exports.hasPreparedContour = hasPreparedContour;
+function storePreparedContour(outline, prepared) { compacted.set(outline, prepared); }
+exports.storePreparedContour = storePreparedContour;
+
+},
+"ContourGeometry":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.compactContours = exports.compactLoop = void 0;
+function distanceSquared(p, a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y, n = dx * dx + dy * dy;
+    const t = n === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / n));
+    return (p.x - a.x - t * dx) ** 2 + (p.y - a.y - t * dy) ** 2;
+}
+function area(points) {
+    let sum = 0;
+    for (let i = 0; i < points.length; i++) {
+        const a = points[i], b = points[(i + 1) % points.length];
+        sum += a.x * b.y - b.x * a.y;
+    }
+    return sum / 2;
+}
+function orient(a, b, c) { return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x); }
+function crosses(a, b, c, d) {
+    if (Math.max(a.x, b.x) < Math.min(c.x, d.x) || Math.max(c.x, d.x) < Math.min(a.x, b.x) ||
+        Math.max(a.y, b.y) < Math.min(c.y, d.y) || Math.max(c.y, d.y) < Math.min(a.y, b.y))
+        return false;
+    return orient(a, b, c) * orient(a, b, d) < -1e-18 && orient(c, d, a) * orient(c, d, b) < -1e-18;
+}
+function simple(points) {
+    for (let i = 0; i < points.length; i++)
+        for (let j = i + 2; j < points.length; j++) {
+            if (i === 0 && j === points.length - 1)
+                continue;
+            if (crosses(points[i], points[(i + 1) % points.length], points[j], points[(j + 1) % points.length]))
+                return false;
+        }
+    return true;
+}
+/** Closed Douglas-Peucker with a hard maximum deviation, original vertices and preserved winding. */
+function compactLoop(loop, tolerance = .00035) {
+    if (loop.length < 5)
+        return loop;
+    let opposite = 1, far = 0;
+    for (let i = 1; i < loop.length; i++) {
+        const d = (loop[i].x - loop[0].x) ** 2 + (loop[i].y - loop[0].y) ** 2;
+        if (d > far) {
+            far = d;
+            opposite = i;
+        }
+    }
+    const points = loop.concat([loop[0]]), keep = new Uint8Array(points.length);
+    keep[0] = 1;
+    keep[opposite] = 1;
+    keep[loop.length] = 1;
+    // Pin deliberate corners and the paired endpoints of narrow U-turns.
+    for (let i = 0; i < loop.length; i++) {
+        const a = loop[(i + loop.length - 1) % loop.length], p = loop[i], b = loop[(i + 1) % loop.length], c = loop[(i + 2) % loop.length];
+        const ux = p.x - a.x, uy = p.y - a.y, vx = b.x - p.x, vy = b.y - p.y, wx = c.x - b.x, wy = c.y - b.y;
+        const u = Math.hypot(ux, uy), v = Math.hypot(vx, vy), w = Math.hypot(wx, wy);
+        if (u > tolerance * 4 && v > tolerance * 4 && Math.abs(ux * vy - uy * vx) > u * v * .2)
+            keep[i] = 1;
+        if (v < tolerance * 2 && u > tolerance * 4 && w > tolerance * 4 && ux * wx + uy * wy < -.8 * u * w) {
+            keep[i] = 1;
+            keep[(i + 1) % loop.length] = 1;
+        }
+    }
+    const stack = [];
+    let previous = 0;
+    for (let i = 1; i < keep.length; i++)
+        if (keep[i]) {
+            stack.push(previous, i);
+            previous = i;
+        }
+    const limit = tolerance * tolerance;
+    while (stack.length > 0) {
+        const end = stack.pop(), start = stack.pop();
+        let index = -1, maximum = limit;
+        for (let i = start + 1; i < end; i++) {
+            const d = distanceSquared(points[i], points[start], points[end]);
+            if (d > maximum) {
+                maximum = d;
+                index = i;
+            }
+        }
+        if (index >= 0) {
+            keep[index] = 1;
+            stack.push(start, index, index, end);
+        }
+    }
+    const result = loop.filter((_, i) => keep[i] === 1), before = area(loop), after = area(result);
+    if (result.length < 3 || before * after <= 0 || Math.abs(after - before) > Math.abs(before) * .005 || !simple(result)) {
+        return tolerance > .00005 ? compactLoop(loop, tolerance / 2) : loop;
+    }
+    return result;
+}
+exports.compactLoop = compactLoop;
+function contains(loop, p) {
+    let inside = false;
+    for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
+        const a = loop[i], b = loop[j];
+        if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x)
+            inside = !inside;
+    }
+    return inside;
+}
+function compactContours(loops, tolerance = .00035) {
+    const result = loops.map((loop) => compactLoop(loop, tolerance));
+    // Never merge/cross separate parts or hole boundaries.
+    for (let i = 0; i < result.length; i++)
+        for (let j = i + 1; j < result.length; j++) {
+            if (contains(loops[i], loops[j][0]) !== contains(result[i], result[j][0]) || contains(loops[j], loops[i][0]) !== contains(result[j], result[i][0]))
+                return loops;
+            for (let a = 0; a < result[i].length; a++)
+                for (let b = 0; b < result[j].length; b++) {
+                    if (crosses(result[i][a], result[i][(a + 1) % result[i].length], result[j][b], result[j][(b + 1) % result[j].length]))
+                        return loops;
+                }
+        }
+    return result.every((loop, i) => loop === loops[i]) ? loops : result;
+}
+exports.compactContours = compactContours;
+
+},
 "BatteryPresentation":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -4817,6 +4825,86 @@ function editorVisualChoices(source, mode) {
 exports.editorVisualChoices = editorVisualChoices;
 
 },
+"CardViewSnapshot":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.cardRenderSnapshot = exports.cardStorageShell = exports.cardViewSnapshot = void 0;
+const CardTemplate_1 = require("./CardTemplate");
+const ContourRegistry_1 = require("./ContourRegistry");
+const CardSchema_1 = require("./CardSchema");
+/** Contours are immutable after extraction. Keep them shared while editable values are snapshots. */
+function cardViewSnapshot(source) { return snapshotCard(source, true); }
+exports.cardViewSnapshot = cardViewSnapshot;
+/** Synchronously serialize this shell; its nested references must never escape into UI or undo. */
+function cardStorageShell(source) { return snapshotCard(source, false); }
+exports.cardStorageShell = cardStorageShell;
+function snapshotCard(source, detached) {
+    const copy = new CardSchema_1.FridgeCard();
+    copy.reliefSrc = detached ? source.reliefSrc : '';
+    copy.subjectDepth = source.subjectDepth;
+    copy.depthCapabilityFront = source.depthCapabilityFront;
+    copy.depthGroup = source.depthGroup;
+    copy.depthPass = detached ? source.depthPass : '';
+    copy.depthOwnerId = detached ? source.depthOwnerId : '';
+    if (source.template !== undefined)
+        copy.template = (0, CardTemplate_1.copyCardTemplate)(source.template);
+    copy.id = source.id;
+    copy.hidden = source.hidden === true;
+    copy.groupId = source.groupId;
+    copy.x = source.x;
+    copy.y = source.y;
+    copy.w = source.w;
+    copy.h = source.h;
+    copy.rot = source.rot;
+    copy.z = source.z;
+    copy.shape = source.shape;
+    copy.frame = source.frame;
+    copy.material = source.material;
+    copy.paper = source.paper;
+    copy.ink = source.ink;
+    copy.subjectPhoto = source.subjectPhoto;
+    copy.subjectBorder = true;
+    copy.subjectAspect = source.subjectAspect;
+    copy.subjectInk = source.subjectInk;
+    copy.subjectVersion = source.subjectVersion;
+    copy.cutout = source.cutout;
+    copy.inDoor = source.inDoor;
+    copy.outline = (0, ContourRegistry_1.cardOutline)(source);
+    copy.renderContourKey = '';
+    copy.capability = !detached || source.capability === null ? source.capability : JSON.parse(JSON.stringify(source.capability));
+    copy.capBox = detached ? JSON.parse(JSON.stringify(source.capBox)) : source.capBox;
+    copy.capFree = source.capFree;
+    copy.elements = detached ? source.elements.map((element) => JSON.parse(JSON.stringify(element))) : source.elements;
+    return copy;
+}
+const renderSnapshots = new Map();
+const renderSignatures = new Map();
+/** A lightweight render parameter. Storage and undo snapshots retain their original contours. */
+function cardRenderSnapshot(source, prepared = false) {
+    const contourKey = (0, ContourRegistry_1.registerRenderContour)(source, prepared);
+    // Compare mutable values before cloning. Reopening/committing one card should
+    // not deep-copy every unchanged capability, course list and background layer.
+    const signature = JSON.stringify([source.id, source.hidden, source.groupId, source.x, source.y, source.w, source.h, source.rot, source.z,
+        source.template, source.subjectDepth, source.depthCapabilityFront, source.depthGroup, source.depthPass, source.depthOwnerId, source.shape, source.frame, source.material, source.paper, source.ink, source.subjectPhoto, source.subjectAspect,
+        source.subjectInk, source.subjectVersion, source.cutout, source.reliefSrc, source.inDoor, contourKey, source.capability, source.capBox, source.capFree, source.elements]);
+    const previous = renderSnapshots.get(source.id);
+    if (previous !== undefined && renderSignatures.get(source.id) === signature)
+        return previous;
+    const copy = cardViewSnapshot(source);
+    copy.renderContourKey = contourKey;
+    copy.outline = [];
+    if (!renderSnapshots.has(source.id) && renderSnapshots.size >= 128) {
+        const oldest = renderSnapshots.keys().next().value;
+        renderSnapshots.delete(oldest);
+        renderSignatures.delete(oldest);
+    }
+    renderSignatures.set(source.id, signature);
+    renderSnapshots.set(source.id, copy);
+    return copy;
+}
+exports.cardRenderSnapshot = cardRenderSnapshot;
+
+},
 "CanvasRotation":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -5331,6 +5419,91 @@ function scenePolicyShell(base) {
 exports.scenePolicyShell = scenePolicyShell;
 
 },
+"DepthComposition":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.depthRenderCards = exports.depthOwner = exports.depthPhotoBox = exports.internalDepth = exports.hasDepthSubject = exports.depthElement = void 0;
+const CardSchema_1 = require("./CardSchema");
+const CardViewSnapshot_1 = require("./CardViewSnapshot");
+/** One subject source per composition. The foreground is an offline, reusable alpha image. */
+function depthElement(card) {
+    return (card.elements ?? []).find(el => el.kind === 'image' && !el.animated && el.depthEnabled && (el.depthForeground ?? '').length > 0 && (el.src ?? '').length > 0);
+}
+exports.depthElement = depthElement;
+function hasDepthSubject(card) {
+    return (card.shape === 'subject' && card.subjectPhoto && card.cutout.length > 0) || depthElement(card) !== undefined;
+}
+exports.hasDepthSubject = hasDepthSubject;
+function internalDepth(card) {
+    return (card.subjectDepth && card.shape === 'subject' && card.subjectPhoto && card.cutout.length > 0) || depthElement(card) !== undefined;
+}
+exports.internalDepth = internalDepth;
+/** Exact ImageFit.Cover transform, including source crop. Coordinates are fractions of the photo layer. */
+function depthPhotoBox(element, width, height) {
+    const result = new CardSchema_1.ElementBox(), aspect = Math.max(.001, width) / Math.max(.001, height), source = Math.max(.001, element.depthSourceAspect || 1);
+    const w = Math.max(1, source / aspect), h = Math.max(1, aspect / source), crop = element.depthCrop;
+    result.x = (1 - w) / 2 + crop.x * w;
+    result.y = (1 - h) / 2 + crop.y * h;
+    result.w = crop.w * w;
+    result.h = crop.h * h;
+    return result;
+}
+exports.depthPhotoBox = depthPhotoBox;
+function depthOwner(card) { return card.depthPass === 'foreground' ? card.depthOwnerId : card.id; }
+exports.depthOwner = depthOwner;
+class Projection {
+    constructor() {
+        this.source = new CardSchema_1.FridgeCard();
+        this.z = 0;
+        this.pass = '';
+        this.card = new CardSchema_1.FridgeCard();
+    }
+}
+const cache = new Map();
+function project(source, pass, z, id = source.id) {
+    const key = source.id + ':' + pass, old = cache.get(key);
+    if (old && old.source === source && old.z === z && old.card.id === id)
+        return old.card;
+    const copy = (0, CardViewSnapshot_1.cardViewSnapshot)(source);
+    copy.depthPass = pass;
+    copy.z = z;
+    copy.id = id;
+    if (pass === 'foreground')
+        copy.depthOwnerId = source.id;
+    const entry = new Projection();
+    entry.source = source;
+    entry.z = z;
+    entry.pass = pass;
+    entry.card = copy;
+    if (!cache.has(key) && cache.size >= 128)
+        cache.delete(cache.keys().next().value);
+    cache.set(key, entry);
+    return copy;
+}
+/** Render projection only: editable cards, groups, geometry and resource ownership remain unchanged. */
+function depthRenderCards(cards) {
+    const output = [], sources = cards.filter(c => !c.template && !c.hidden && (c.groupId ?? '').length > 0 && c.depthGroup && hasDepthSubject(c));
+    const used = [], occupied = cards.map(c => c.id);
+    for (const card of cards) {
+        const source = sources.find(c => c.id === card.id && !used.includes(c.groupId));
+        const members = source ? cards.filter(c => !c.hidden && c.groupId === source.groupId) : [];
+        if (source && members.length > 1) {
+            used.push(source.groupId);
+            output.push(project(source, 'base', Math.min(...members.map(c => c.z)) - .25));
+            let foregroundId = source.id + '::depth';
+            while (occupied.includes(foregroundId))
+                foregroundId += ':';
+            occupied.push(foregroundId);
+            output.push(project(source, 'foreground', Math.max(...members.map(c => c.z)) + .25, foregroundId));
+        }
+        else
+            output.push(card);
+    }
+    return used.length > 0 ? output.sort((a, b) => a.z - b.z) : output;
+}
+exports.depthRenderCards = depthRenderCards;
+
+},
 "CanvasSize":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -5344,4 +5517,4 @@ exports.creationDimension = creationDimension;
 function creationAspect(dimension) { return dimension === '2*4' ? 2 : 1; }
 exports.creationAspect = creationAspect;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"69e4d7dcd21dd570239cc0245643106ae05e26190b9c681386481203cbf38091"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"7d5660013aeed8bc5bf9ae5661b3270c97ab1695d415d16c5b422df0ac64b117"};})(globalThis);

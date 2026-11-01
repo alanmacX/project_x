@@ -1,3 +1,4 @@
+import { cardCapabilities } from './TemplateSources';
 import { getLibraryPreferences } from './LibraryStorage';
 import { capabilityRenderTick } from './CapabilityClock';
 import { projectCapabilityData } from './CapabilityProjection';
@@ -95,7 +96,7 @@ export async function pushWidgets(context: Context, json: string, refreshAll:boo
       const targetJson=await sourceFor(targetId);if(!targetJson)return null;const target=normalizeState(JSON.parse(targetJson) as FridgeState);return target.canvasDimension===instance.dimension?target:null;
     });
     const projected=await projectCapabilityData(scene.state,context);
-    for(const card of projected.cards)if(card.capability?.k==='battery')hilog.info(0,'BatteryRefresh','form=%{public}s soc=%{public}d charging=%{public}s result=%{public}s',id,card.capability.percent??-1,String(card.capability.charging===true),card.capability.refreshState??'');
+    for(const card of projected.cards)for(const cap of cardCapabilities(card))if(cap.k==='battery')hilog.info(0,'BatteryRefresh','form=%{public}s soc=%{public}d charging=%{public}s result=%{public}s',id,cap.percent??-1,String(cap.charging===true),cap.refreshState??'');
     const sceneJson=JSON.stringify(projected);
     const liveKey=instance.revision+':'+projected.cards.map(card=>capabilityRenderTick(card.capability,Math.floor(Date.now()/60000)*60000)).join(',')+':'+sceneJson+':'+sceneWidgetContext(scene);
     if(refreshAll&&liveDeliveries.get(id)===liveKey)return;

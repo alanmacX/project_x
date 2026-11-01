@@ -1,5 +1,9 @@
-import { TemplateScene, TemplateMark } from './TemplateSceneTypes';
+import { TemplateScene, TemplateMark, copyTemplateMark } from './TemplateSceneTypes';
 import { compositionSlot, compositionOwner, compositionColors } from './CompositionCatalog';
+import { compositionDefinition, compositionLayout } from './CompositionCatalog';
+import { copyCardTemplate } from './CardTemplate';
+import { cardCapabilities } from './TemplateSources';
+import { templatePhotoBox, templateSubjectBox } from './TemplatePhotoGeometry';
 import { FridgeCard } from './CardSchema';
 import { agendaItems, timeText, eventWhen, courseInstances } from './CapabilityData';
 import { progressOf, daysLeftOf, calendarCells } from './CapabilityCalendar';
@@ -7,6 +11,19 @@ import { validDay } from './HolidayCalendar';
 import { clockOffset, lunarReading } from './TimeCapabilities';
 /** A face's data slots use its typography and color roles, not miniature standalone widgets. */
 export function compositionScene(card: FridgeCard, tick: number): TemplateScene | undefined {
+    const composition=compositionDefinition(card.template?.id??'');
+    if(composition){
+      const layout=compositionLayout(composition,card.w/card.h),out=new TemplateScene(),caps=cardCapabilities(card),colors=compositionColors(composition.id,card.template?.palette??'');
+      out.width=layout.width;out.height=layout.height;out.background=colors[0];out.ink=colors[1];out.accent=colors[2];
+      layout.slots.forEach((slot,index)=>{
+        const item=new FridgeCard();item.template=copyCardTemplate(card.template,false);item.template!.id=slot.id;item.template!.sources=undefined;item.capability=caps[index]??{k:slot.kind};item.elements=card.elements;item.w=slot.w;item.h=slot.h;
+        const scene=compositionScene(item,tick);if(!scene)return;const scale=slot.w/scene.width;
+        for(const mark of scene.marks){const m=copyTemplateMark(mark);m.x=slot.x+m.x*scale;m.y=slot.y+m.y*scale;
+          if(m.kind==='line'){m.w=slot.x+m.w*scale;m.h=slot.y+m.h*scale;}else{m.w*=scale;m.h*=scale;}
+          m.r*=scale;m.size*=scale;m.stroke*=scale;out.marks.push(m);
+        }
+      });return out;
+    }
     const id = card.template?.id ?? '', slot = compositionSlot(id), face = compositionOwner(id);
     if (!slot || !face)
         return undefined;
@@ -121,12 +138,9 @@ export function compositionScene(card: FridgeCard, tick: number): TemplateScene 
     else if (id === 'face-memory-photo') {
         const photo = card.elements.find(e => e.kind === 'image' && e.src.length > 0), t = card.template!, box = wide ? [148, 16, 134, 118] : [138, 58, 140, 169];
         if (photo) {
-            if (t.depth && photo.depthForeground && photo.depthEnabled) {
-                const aspect = Math.max(.05, photo.depthSourceAspect * photo.depthCrop.w / Math.max(.01, photo.depthCrop.h)), h = Math.min(box[3], box[2] / aspect) * t.zoom, w = h * aspect;
-                image(photo.depthForeground, box[0] + (box[2] - w) / 2 + t.offsetX * box[2], box[1] + (box[3] - h) / 2 + t.offsetY * box[3], w, h).fit = 'contain';
-            }
-            else
-                image(photo.src, box[0], box[1], box[2], box[3], 10).fit = 'contain';
+            const frame=templatePhotoBox(photo,t,box[2],box[3],false),subject=t.depth&&photo.depthEnabled&&photo.depthForeground.length>0;
+            const placed=subject?templateSubjectBox(photo,frame):frame;
+            image(subject?photo.depthForeground:photo.src,box[0]+placed.x,box[1]+placed.y,placed.w,placed.h,subject?0:10).fit='contain';
         }
         const left = cap.date && validDay(cap.date) ? daysLeftOf(cap.date, tick) : null;
         const number = text(left === null ? '—' : String(Math.abs(left)), 22, wide ? 43 : 106, wide ? 57 : 88, wide ? 92 : 114, 'left', 'digits');

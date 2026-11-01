@@ -4,7 +4,7 @@ const source=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
 function method(start,end){return source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start)));}
 assert.match(source, /@State tick: number = Math\.floor\(Date\.now\(\)\/60000\)\*60000;/, 'initial clock uses the same minute bucket as foreground reconciliation');
 const routes=[],reads=[],saves=[];
-const context={exports:{},prepareSceneImages:async()=>{},AppStorage:{setOrCreate:(key,value)=>routes.push([key,value])},DismissReason:{PRESS_BACK:0,SLIDE_DOWN:3},needsDataRefresh:cap=>!!cap,capabilityRequestKey:cap=>cap.k,readCapability:async cap=>{reads.push(cap.k);return {...cap,percent:cap.percent+1};}};
+const context={exports:{},cardCapabilities:card=>(card.capability?[card.capability]:[]).concat(card.template?.sources??[]),replaceCardCapability:(card,old,next)=>{if(card.capability===old)card.capability=next;else card.template.sources[card.template.sources.indexOf(old)]=next;},prepareSceneImages:async()=>{},AppStorage:{setOrCreate:(key,value)=>routes.push([key,value])},DismissReason:{PRESS_BACK:0,SLIDE_DOWN:3},needsDataRefresh:cap=>!!cap,capabilityRequestKey:cap=>cap.k,readCapability:async cap=>{reads.push(cap.k);return {...cap,percent:cap.percent+1};}};
 const fixture=`class Fixture {
  alive=true;ready=true;context={};appBackgrounded=false;editing=false;viewing=false;pageVisible=true;appWindowFocused=true;foregroundGeneration=0;
  editorSheetOpen=true;editorBackPending=false;arriving=false;heroActive=false;activeBoardId='';layerDrag='';gestureGroup='';refreshingCapabilities=false;
@@ -28,7 +28,7 @@ vm.runInNewContext(ts.transpileModule(fixture,{compilerOptions:{target:ts.Script
  await f.refreshCapabilities();assert.equal(f.renders,1);assert.equal(saves.length,1);assert.deepEqual(Array.from(saves[0]),[31,41],'batch results produce one coherent render and persistence');
  // Pause one result, then begin a gesture before it arrives.
  let release;const pending=new Promise(resolve=>release=resolve);
- const isolated={exports:{},prepareSceneImages:async()=>{},AppStorage:context.AppStorage,DismissReason:context.DismissReason,needsDataRefresh:()=>true,capabilityRequestKey:cap=>cap.k,readCapability:async cap=>{await pending;return {...cap,percent:99};},saves:[]};
+ const isolated={exports:{},cardCapabilities:card=>(card.capability?[card.capability]:[]).concat(card.template?.sources??[]),replaceCardCapability:(card,old,next)=>{if(card.capability===old)card.capability=next;else card.template.sources[card.template.sources.indexOf(old)]=next;},prepareSceneImages:async()=>{},AppStorage:context.AppStorage,DismissReason:context.DismissReason,needsDataRefresh:()=>true,capabilityRequestKey:cap=>cap.k,readCapability:async cap=>{await pending;return {...cap,percent:99};},saves:[]};
  vm.runInNewContext(ts.transpileModule(fixture,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,isolated);
  const moving=new isolated.exports.Fixture(),job=moving.refreshCapabilities();moving.layerDrag='capability';release();await job;
  assert.equal(moving.renders,0);assert.equal(moving.store.state.cards[0].capability.percent,30,'late results cannot mutate artwork during a gesture');assert.equal(moving.refreshes,1,'defer reconciliation until interaction settles');

@@ -1,3 +1,4 @@
+import { templateDefinition } from './CardTemplate';
 import { BOARD_W, BOARD_H, FridgeCard, typeLabel } from './CardSchema';
 export class SceneRect {
   x: number = 0; y: number = 0; w: number = 0; h: number = 0; rot: number = 0;
@@ -14,6 +15,7 @@ export function sceneRect(card: FridgeCard, width: number, height: number): Scen
   rect.w = card.w * scale; rect.h = card.h * scale; rect.rot = card.rot; return rect;
 }
 export function layerLabel(card: FridgeCard): string {
+  if(card.template)return templateDefinition(card.template.id)?.name??'模板';
   const text = card.elements.filter(el => el.kind === 'text').map(el => el.text.trim()).filter(value => value.length > 0).join(' ');
   return text.length > 0 ? text : (card.capability?.title || (card.capability !== null ? typeLabel(card.capability.k) : (card.shape === 'subject' ? '主体卡片' : '自定义卡片')));
 }

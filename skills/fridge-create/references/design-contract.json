@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "skillContractVersion": 8,
+  "skillContractVersion": 9,
   "app": {
     "bundleName": "com.fridgewidget.app",
     "vendor": "fridgememo",
@@ -31,10 +31,10 @@
     "htmlTemplateVersion": 1
   },
   "identity": {
-    "models": "69e4d7dcd21dd570239cc0245643106ae05e26190b9c681386481203cbf38091",
+    "models": "7d5660013aeed8bc5bf9ae5661b3270c97ab1695d415d16c5b422df0ac64b117",
     "materials": "6d8e88bb47c640df4d872e472f3e5c578e04efc21bedc564d9d86c0ea7daf723",
     "browserAdapter": "afe78ed60496701d0b5d0517ad28a7e3f2dbf4afa528f9b991e51be53c5672d5",
-    "nativeViews": "27101f04e50415fe06896dfee6753e3612cb0eb77b7e3ec7d1e1a6fb97e68209"
+    "nativeViews": "5bd2617fd23a16604831c48b93d400a0fff79e7458f161e2cd66fb9e5bc951b8"
   },
   "coordinates": {
     "boardWidth": 344,
@@ -428,6 +428,16 @@
       ],
       "fullCanvas": true,
       "photoDepth": true,
+      "atomicCompositions": true,
+      "auxiliarySourcesField": "template.sources",
+      "backgroundModes": [
+        "template",
+        "smart"
+      ],
+      "photoModes": [
+        "subject",
+        "photo"
+      ],
       "compositions": [
         {
           "id": "mix-standby",

@@ -1,3 +1,6 @@
+import { CanvasBackdrop } from './CanvasBackdrop';
+import { CanvasFrame } from './CanvasFrame';
+import { CanvasBackground } from '../model/CardSchema';
 import { compositionSlot } from '../model/CompositionCatalog';
 import { TemplateSnapshot } from './TemplateSnapshot';
 import { TemplateFace } from './TemplateFace';
@@ -12,6 +15,7 @@ import { cardDepthScale, cardEdgeColor, contourReliefBands, ReliefBand, CARD_SID
 /** The same surface, optional frame and depth are used in app, editor, hero and widget. */
 @Component
 export struct CardFace {
+  @Prop templateBackground:CanvasBackground|undefined=undefined;
   @Prop card: FridgeCard = new FridgeCard();
   @Prop scaleFactor: number = 1;
   @Prop tick: number = 0;
@@ -64,9 +68,11 @@ export struct CardFace {
   build() {
     Stack() {
       if(this.card.template){
+        if(this.card.template.fill&&this.templateBackground){CanvasBackdrop({sceneBackground:this.templateBackground,showFrame:false,snapshot:this.snapshot}).width('100%').height('100%')}
         if(this.offscreen){TemplateSnapshot({card:this.card,tick:this.tick,scaleFactor:this.scaleFactor}).width('100%').height('100%').borderRadius(this.card.template.fill||compositionSlot(this.card.template.id)?.primary===false?0:cardCornerRadius(this.card,this.scaleFactor)).clip(true)}else{
         TemplateFace({card:this.card,tick:this.tick,scaleFactor:this.scaleFactor,snapshot:this.snapshot}).width('100%').height('100%').borderRadius(this.card.template.fill||compositionSlot(this.card.template.id)?.primary===false?0:cardCornerRadius(this.card,this.scaleFactor)).clip(true)
         }
+        if(this.card.template.fill&&this.templateBackground&&this.templateBackground.frameStyle!=='none'){CanvasFrame({material:this.templateBackground.frameMaterial,style:this.templateBackground.frameStyle}).width('100%').height('100%').hitTestBehavior(HitTestMode.None)}
       }else if(this.card.depthPass==='foreground'){
         CardCanvas({snapshot:this.snapshot,card:this.card,layerMotion:this.layerMotion,scaleFactor:this.scaleFactor,tick:this.tick,widget:this.widget,hideContent:this.hideContent}).width(subjectSurfaceFactor(this.card)*100+'%').height(subjectSurfaceFactor(this.card)*100+'%')
       }else {

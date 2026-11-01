@@ -11,7 +11,7 @@ export function packageScene(json: string, cardId: string): TemplatePackage {
   if(cardId.length>0){state.cards=state.cards.filter((c:FridgeCard)=>c.id===cardId);if(state.cards.length!==1)throw new Error('卡片不存在');state.cards[0].groupId='';state.cards[0].depthGroup=false;state.sceneLayouts=[];state.sceneRules=[];state.sceneBaseLayoutId='';state.background=defaultState().background;}
   state.canvasId='canvas_main';
   for(const rule of state.sceneRules){rule.createdAt=0;rule.dismissed='';rule.enabled=false;}
-  for(const card of state.cards)if(card.capability)card.capability=sharedCapability(card.capability);
+  for(const card of state.cards){if(card.capability)card.capability=sharedCapability(card.capability);if(card.template?.sources)card.template.sources=card.template.sources.map(sharedCapability);}
   return {format:'fridgememo-template',version:state.cards.some((c:FridgeCard)=>c.template!==undefined)?3:state.cards.some((c:FridgeCard)=>c.html!==undefined)?2:1,kind:cardId.length>0?'card':'canvas',state:state,assets:[]};
 }
 export function readPackage(json: string): TemplatePackage {
@@ -20,7 +20,7 @@ export function readPackage(json: string): TemplatePackage {
   if(raw.format!=='fridgememo-template'||![1,2,3].includes(raw.version)||!['card','canvas'].includes(raw.kind)||raw.state?.schemaVersion!==2||!Array.isArray(raw.state?.cards)||raw.state.cards.length>128||!Array.isArray(raw.assets)||raw.assets.length>256)throw new Error('不是支持的作品包');
   assertCanvasCapacity(0, raw.state.cards.length);
   for(const card of raw.state.cards) {
-    if(card.template!==undefined){if(raw.version<3)throw new Error('模板卡片需要 v3 作品包');if(!normalizeCardTemplate(card.template)||templateDefinition(card.template.id)?.kind!==card.capability?.k||card.html!==undefined)throw new Error('模板版本或能力不受支持，请更新应用');}
+    if(card.template!==undefined){const definition=templateDefinition(card.template.id);if(definition?.kind==='ensemble'&&(!Array.isArray(card.template.sources)||card.template.sources.length!==definition.sources.length-1||card.template.sources.some((cap,index)=>cap.k!==definition.sources[index+1])))throw new Error('模板数据源不完整');if(raw.version<3)throw new Error('模板卡片需要 v3 作品包');if(!normalizeCardTemplate(card.template)||templateDefinition(card.template.id)?.sources[0]!==card.capability?.k||card.html!==undefined)throw new Error('模板版本或能力不受支持，请更新应用');}
     if(card.html!==undefined) {
       if(raw.version<2)throw new Error('HTML 卡片需要 v2 作品包');
       validateHtmlCard(card.html);
@@ -48,7 +48,7 @@ export function readPackage(json: string): TemplatePackage {
 /** Remap every identifier; importing twice never aliases a card, element or group. */
 export function importedCards(state:FridgeState,newId:()=>string):FridgeCard[]{
   const cards=normalizeState(JSON.parse(JSON.stringify(state)) as FridgeState).cards,groups=new Map<string,string>();
-  for(const c of cards){if(c.capability){c.capability=sharedCapability(c.capability);if(c.capability.k==='album'&&(c.capability.albumRotationMinutes??0)>0)c.capability.albumRotationStart=Date.now();}c.id=newId();if(c.groupId.length>0){if(!groups.has(c.groupId))groups.set(c.groupId,newId());c.groupId=groups.get(c.groupId)??'';}c.elements.forEach(el=>{const old=el.id;el.id=newId();if(c.html?.previewElementId===old)c.html.previewElementId=el.id;});c.renderContourKey='';}
+  for(const c of cards){if(c.template?.sources)c.template.sources=c.template.sources.map(sharedCapability);if(c.capability){c.capability=sharedCapability(c.capability);if(c.capability.k==='album'&&(c.capability.albumRotationMinutes??0)>0)c.capability.albumRotationStart=Date.now();}c.id=newId();if(c.groupId.length>0){if(!groups.has(c.groupId))groups.set(c.groupId,newId());c.groupId=groups.get(c.groupId)??'';}c.elements.forEach(el=>{const old=el.id;el.id=newId();if(c.html?.previewElementId===old)c.html.previewElementId=el.id;});c.renderContourKey='';}
   return cards;
 }
 
