@@ -1,3 +1,4 @@
+import { compositionSlot } from './CompositionCatalog';
 /** Built-in designs. Artwork is local; data stays in the existing capability. */
 export interface CardTemplate {
     version: number;
@@ -61,7 +62,7 @@ export const CARD_TEMPLATES: TemplateDefinition[] = [
     { "id": "mix-travel", "kind": "ensemble", "name": "远行", "sources": ["worldclock", "countdown"] },
     { "id": "mix-memory", "kind": "ensemble", "name": "相片日历", "sources": ["anniversary", "date", "lunar"] }
 ];
-export function templateDefinition(id: string): TemplateDefinition | undefined { return CARD_TEMPLATES.find(d => d.id === id); }
+export function templateDefinition(id: string): TemplateDefinition | undefined { const single=CARD_TEMPLATES.find(d=>d.id===id);if(single)return single;const slot=compositionSlot(id);return slot?{id:slot.id,kind:slot.kind,name:slot.role,sources:[slot.kind]}:undefined; }
 export function normalizeCardTemplate(raw: CardTemplate | undefined): CardTemplate | undefined { if (!raw || raw.version !== 1 || !templateDefinition(raw.id) || templateDefinition(raw.id)?.kind === 'ensemble')
     return undefined; return { version: 1, id: raw.id, palette: ['', 'cobalt', 'cream', 'ink'].includes(raw.palette) ? raw.palette : '', fill: raw.fill === true, depth: raw.depth !== false, zoom: Math.max(.5, Math.min(1.5, Number.isFinite(raw.zoom) ? raw.zoom : 1)), offsetX: Math.max(-.35, Math.min(.35, Number.isFinite(raw.offsetX) ? raw.offsetX : 0)), offsetY: Math.max(-.35, Math.min(.35, Number.isFinite(raw.offsetY) ? raw.offsetY : 0)) }; }
 export function newCardTemplate(id: string): CardTemplate { return { version: 1, id, palette: '', fill: false, depth: true, zoom: 1, offsetX: 0, offsetY: 0 }; }

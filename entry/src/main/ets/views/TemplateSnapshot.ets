@@ -11,9 +11,9 @@ export struct TemplateSnapshot {
   @Prop scaleFactor:number=1;
   private scene:TemplateScene=new TemplateScene();
   aboutToAppear():void {this.scene=cardTemplateScene(this.card,this.tick);try{this.getUIContext().getFont().registerFont({familyName:'TemplateDigits',familySrc:$rawfile('template-digits.ttf')});}catch(_){}}
-  private unit():number{return Math.min(this.card.w,this.card.h)*this.scaleFactor/300;}
-  private x(m:TemplateMark):number{return (this.card.w*this.scaleFactor-300*this.unit())/2+m.x*this.unit();}
-  private y(m:TemplateMark):number{return (this.card.h*this.scaleFactor-300*this.unit())/2+m.y*this.unit();}
+  private unit():number{return Math.min(this.card.w/this.scene.width,this.card.h/this.scene.height)*this.scaleFactor;}
+  private x(m:TemplateMark):number{return (this.card.w*this.scaleFactor-this.scene.width*this.unit())/2+m.x*this.unit();}
+  private y(m:TemplateMark):number{return (this.card.h*this.scaleFactor-this.scene.height*this.unit())/2+m.y*this.unit();}
   private textCache:Map<TemplateMark,TemplateTextLayout>=new Map();
   private fitted(m:TemplateMark):TemplateTextLayout{
     const cached=this.textCache.get(m);if(cached)return cached;
@@ -27,13 +27,13 @@ export struct TemplateSnapshot {
         .textAlign(m.align==='center'?TextAlign.Center:m.align==='right'?TextAlign.End:TextAlign.Start).width('100%').height(this.fitted(m).lineHeight*this.unit())})}
         .width(m.w*this.unit()).height(m.h*this.unit()).clip(true).position({x:this.x(m),y:this.y(m)})
     }else if(m.kind==='image'){
-      Image(sceneImage(m.src)).syncLoad(true).objectFit(ImageFit.Cover).width(m.w*this.unit()).height(m.h*this.unit()).position({x:this.x(m),y:this.y(m)})
+      Image(sceneImage(m.src)).syncLoad(true).objectFit(ImageFit.Cover).width(m.w*this.unit()).height(m.h*this.unit()).position({x:this.x(m),y:this.y(m)}).borderRadius(m.r*this.unit()).clip(m.r>0)
     }else if(m.kind==='line'){
       Line().startPoint([m.x*this.unit(),m.y*this.unit()]).endPoint([m.w*this.unit(),m.h*this.unit()]).stroke(m.color).strokeWidth(m.stroke*this.unit()).strokeLineCap(LineCapStyle.Round)
-        .width(300*this.unit()).height(300*this.unit()).position({x:(this.card.w*this.scaleFactor-300*this.unit())/2,y:(this.card.h*this.scaleFactor-300*this.unit())/2})
+        .width(this.scene.width*this.unit()).height(this.scene.height*this.unit()).position({x:(this.card.w*this.scaleFactor-this.scene.width*this.unit())/2,y:(this.card.h*this.scaleFactor-this.scene.height*this.unit())/2})
     }else if(m.kind==='arc'){
       Path().commands(templateArcPath(m,vp2px(this.unit()))).fill(Color.Transparent).stroke(m.color).strokeWidth(m.stroke*this.unit()).strokeLineCap(LineCapStyle.Round)
-        .width(300*this.unit()).height(300*this.unit()).position({x:(this.card.w*this.scaleFactor-300*this.unit())/2,y:(this.card.h*this.scaleFactor-300*this.unit())/2})
+        .width(this.scene.width*this.unit()).height(this.scene.height*this.unit()).position({x:(this.card.w*this.scaleFactor-this.scene.width*this.unit())/2,y:(this.card.h*this.scaleFactor-this.scene.height*this.unit())/2})
     }else if(m.kind==='circle'){
       Ellipse().fill(m.color).width(m.w*this.unit()).height(m.h*this.unit()).position({x:this.x(m),y:this.y(m)})
     }else{
@@ -45,7 +45,7 @@ export struct TemplateSnapshot {
   }
   build(){
     Stack({alignContent:Alignment.TopStart}){
-      if(!this.card.template?.fill){Column().width('100%').height('100%').backgroundColor(this.scene.background)}
+      if(this.scene.surface&&!this.card.template?.fill){Column().width('100%').height('100%').backgroundColor(this.scene.background)}
       ForEach([0,1,2,3],(layer:number)=>{ForEach(this.scene.marks.filter(m=>m.layer===layer),(m:TemplateMark)=>{Stack(){this.mark(m)}.width('100%').height('100%').opacity(m.opacity)});if(layer===0&&/(paper|ledger|slips|sleeve)/.test(this.card.template?.id??'')){Image($rawfile('template-paper.webp')).syncLoad(true).width('100%').height('100%').objectFit(ImageFit.Cover).opacity(.09)}})
     }.width('100%').height('100%').clip(true).hitTestBehavior(HitTestMode.None)
   }

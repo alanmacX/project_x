@@ -4,7 +4,8 @@
   "scripts": {
     "test": "node scripts/test.cjs",
     "test:storage": "node scripts/test-library-integrity.cjs",
-    "release:check": "python3 scripts/audit-release-pages.py"
+    "release:check": "python3 scripts/audit-release-pages.py",
+    "templates:check": "node previewer/build.cjs --check && node tests/card-templates.test.cjs && node tests/template-layout.test.cjs && node tests/template-compositions.test.cjs && node tests/template-face-cache.test.cjs"
   },
   "devDependencies": {
     "sharp": "^0.35.5",

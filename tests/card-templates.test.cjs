@@ -32,3 +32,11 @@ console.log('Native templates: responsive recipes, gradient color distribution, 
 
 const history=new (nativeLoad('CardEditHistory').CardEditHistory)(),editing=nativeFactory.makeTemplateCards('dial',1,()=> 'history')[0];history.reset(editing);editing.template.palette='cobalt';history.record(editing);assert.ok(history.canUndo(),'palette-only changes must enter undo history');assert.equal(history.undo().template.palette,'');assert.equal(history.redo().template.palette,'cobalt');editing.template.id='portrait';history.record(editing);assert.equal(history.undo().template.id,'dial');
 console.log('Native templates: full-size editor gate and template-only undo/redo changes passed');
+
+const paletteModel=nativeLoad('CompositionPalette'),combo=nativeFactory.makeTemplateCards('mix-modular',1,()=>String(++id),now),unrelated=nativeFactory.makeTemplateCards('standby',1,()=>String(++id),now)[0];unrelated.groupId=combo[0].groupId;unrelated.template.palette='cream';combo[1].template.palette='cream';
+const peerCards=combo.concat([unrelated]),paletteHistory=new (nativeLoad('CardEditHistory').CardEditHistory)();paletteHistory.reset(combo[0],paletteModel.compositionPaletteState(combo[0],peerCards));
+paletteModel.setCompositionPalette(combo[0],peerCards,'cobalt');paletteHistory.record(combo[0],'',paletteModel.compositionPaletteState(combo[0],peerCards));assert.ok(combo.every(c=>c.template.palette==='cobalt'));assert.equal(unrelated.template.palette,'cream');
+peerCards[0]=paletteHistory.undo();paletteModel.restoreCompositionPalette(paletteHistory.paletteState(),peerCards);assert.deepEqual(peerCards.map(c=>c.template.palette),['','cream','','cream'],'undo restores exact per-role palettes including imported customization');
+peerCards[0]=paletteHistory.redo();paletteModel.restoreCompositionPalette(paletteHistory.paletteState(),peerCards);assert.deepEqual(peerCards.map(c=>c.template.palette),['cobalt','cobalt','cobalt','cream']);
+for(const c of peerCards.slice(0,3)){const model=nativeLoad('TemplateScene'),scene=model.cardTemplateScene(c,now);assert.deepEqual(Array.from(model.templateColors(c)),[scene.background,scene.ink,scene.accent]);}
+console.log('PASS unified composition palettes: group switch, exact undo/redo of mixed previous palettes, matching swatches and legacy group isolation');

@@ -1,3 +1,4 @@
+import { compositionSlot } from './CompositionCatalog';
 import { hookReserve } from './MicaGeometry';
 import { isReadingComposition, compositionPadding } from './ReadingComposition';
 import { readingSurface } from './CapabilityPresentation';
@@ -229,7 +230,7 @@ function readableSlot(card: FridgeCard, safe: ElementBox): ElementBox {
 }
 export function minimumCardSize(card: FridgeCard): CapabilitySize {
   const size = new CapabilitySize(); size.w = card.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE; size.h = card.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE;
-  if(card.template){size.w=80;size.h=80;return size;}
+  if(card.template){const slot=compositionSlot(card.template.id);size.w=slot&&!slot.primary?12:80;size.h=slot&&!slot.primary?4:80;return size;}
   if (card.capability === null || card.capability.k==='album') return size;
   if(card.capFree){const min=cardCapabilityMinimum(card,true,card.w*card.capBox.w);size.w=Math.max(size.w,min.w);size.h=Math.max(size.h,min.h);return size;}
   const safe = safeContentBox(card), min = cardCapabilityMinimum(card, true, card.w*safe.w);
@@ -246,6 +247,7 @@ export function minimumCardSize(card: FridgeCard): CapabilitySize {
 }
 /** Expand proportionally and refuse a shape whose interior cannot support this capability on the board. */
 export function ensureCapabilitySize(card: FridgeCard): boolean {
+  if(card.template&&compositionSlot(card.template.id))return card.w>0&&card.h>0&&card.w<=344&&card.h<=1147;
   const min = minimumCardSize(card), factor = Math.max(1, min.w / card.w, min.h / card.h);
   const w = card.w * factor, h = card.h * factor;
   if (w > (card.template?.fill?BOARD_W:320) + .01 || h > (card.template?.fill?BOARD_W/.3:420) + .01) return false;

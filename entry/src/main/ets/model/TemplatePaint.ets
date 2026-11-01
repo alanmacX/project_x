@@ -17,12 +17,12 @@ function rounded(ctx: CanvasRenderingContext2D, m: TemplateMark): void {
 export function paintTemplate(ctx: CanvasRenderingContext2D, scene: TemplateScene, width: number, height: number, layer: number, fill: boolean): void {
     ctx.clearRect(0, 0, width, height);
     ctx.save();
-    if (layer === 0 && !fill) {
+    if (layer === 0 && !fill && scene.surface) {
         ctx.fillStyle = scene.background;
         ctx.fillRect(0, 0, width, height);
     }
-    const scale = Math.min(width, height) / 300;
-    ctx.translate((width - 300 * scale) / 2, (height - 300 * scale) / 2);
+    const scale = Math.min(width/scene.width,height/scene.height);
+    ctx.translate((width-scene.width*scale)/2,(height-scene.height*scale)/2);
     ctx.scale(scale, scale);
     for (const m of scene.marks) {
         if (m.layer !== layer || m.kind === 'image')

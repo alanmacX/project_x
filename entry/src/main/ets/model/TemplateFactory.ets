@@ -1,14 +1,55 @@
+import { compositionDefinition, compositionLayout } from './CompositionCatalog';
 import { FridgeCard, BOARD_W } from './CardSchema';
 import { templateDefinition, newCardTemplate } from './CardTemplate';
+
+function templateCard(id: string, kind: string, makeId: () => string, now: number): FridgeCard {
+    const card = new FridgeCard();
+    card.id = makeId();
+    card.template = newCardTemplate(id);
+    card.capability = { k: kind };
+    card.shape = 'rect';
+    card.frame = false;
+    card.rot = 0;
+    card.z = 0;
+    if (kind === 'anniversary' || kind === 'countdown') {
+        const day = new Date(now);
+        const date = day.getFullYear() + '-' + ('0' + (day.getMonth() + 1)).slice(-2) + '-' + ('0' + day.getDate()).slice(-2);
+        card.capability.date = date;
+        card.capability.seed = date;
+    }
+    if (kind === 'worldclock') card.capability.zone = 'Asia/Shanghai';
+    return card;
+}
+
 export function makeTemplateCards(id: string, aspect: number, makeId: () => string, now: number = Date.now()): FridgeCard[] {
     const definition = templateDefinition(id);
-    if (!definition)
-        return [];
-    const ids = definition.kind === 'ensemble' ? (id === 'mix-standby' ? ['standby', 'calendar-month'] : id === 'mix-modular' ? ['standby', 'agenda-editorial', 'battery-ring'] : id === 'mix-study' ? ['standby', 'course-next', 'day-blocks'] : id === 'mix-travel' ? ['world-duo', 'countdown-poster'] : ['anniversary-photo', 'date-paper', 'lunar-paper']) : [id];
-    const multiple = ids.length > 1, group = multiple ? makeId() : '', height = BOARD_W / Math.max(.3, aspect), columns = multiple ? (aspect >= 1.5 ? ids.length : 2) : 1, rows = Math.ceil(ids.length / columns), size = multiple ? Math.min(150, (BOARD_W - (columns + 1) * 12) / columns, (height - (rows + 1) * 12) / rows) : Math.min(260, height - 24), left = (BOARD_W - columns * size - (columns - 1) * 12) / 2, top = Math.max(12, (height - rows * size - (rows - 1) * 12) / 2), date = new Date(now), dateString = date.getFullYear() + '-' + ('0' + (date.getMonth() + 1)).slice(-2) + '-' + ('0' + date.getDate()).slice(-2);
-    return ids.map((key, index) => { const card = new FridgeCard(); card.id = makeId(); card.template = newCardTemplate(key); card.capability = { k: templateDefinition(key)?.kind ?? 'clock' }; card.shape = 'rect'; card.frame = false; card.w = size; card.h = size; card.rot = 0; card.groupId = group; card.x = left + index % columns * (size + 12); card.y = (top + Math.floor(index / columns) * (size + 12)) * 470 / height; card.z = index; if (card.capability.k === 'countdown' || card.capability.k === 'anniversary') {
-        card.capability.date = dateString;
-        card.capability.seed = dateString;
-    } if (card.capability.k === 'worldclock')
-        card.capability.zone = 'Asia/Shanghai'; return card; });
+    if (!definition) return [];
+    const height = BOARD_W / Math.max(.3, aspect);
+    const face = compositionDefinition(id);
+    if (face) {
+        const layout = compositionLayout(face, aspect);
+        if (!layout.slots.length) return [];
+        const scale = Math.min((BOARD_W - 24) / layout.width, (height - 24) / layout.height);
+        const left = (BOARD_W - layout.width * scale) / 2;
+        const top = (height - layout.height * scale) / 2;
+        const group = makeId();
+        return layout.slots.map((slot, index) => {
+            const card = templateCard(slot.id, slot.kind, makeId, now);
+            card.groupId = group;
+            card.z = index;
+            card.x = left + slot.x * scale;
+            card.y = (top + slot.y * scale) / height * 470;
+            card.w = slot.w * scale;
+            card.h = slot.h * scale;
+            return card;
+        });
+    }
+    // An ensemble must have an authored face. Never fall back to a miniature widget grid.
+    if (definition.kind === 'ensemble') return [];
+    const card = templateCard(id, definition.kind, makeId, now);
+    card.w = Math.min(260, height - 24);
+    card.h = card.w;
+    card.x = (BOARD_W - card.w) / 2;
+    card.y = Math.max(12, (height - card.h) / 2) * 470 / height;
+    return [card];
 }

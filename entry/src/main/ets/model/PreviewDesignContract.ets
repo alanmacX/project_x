@@ -1,3 +1,3 @@
 /** Generated production model and native-render identities. */
-export const PREVIEW_DESIGN_FINGERPRINT:string="b302aa9284bc040f4ccc7a3e8f6dc4d2f13f912da8a358ffcd356a8f8c296ede";
-export const PREVIEW_RENDER_FINGERPRINT:string="25d76c948197b63fa24aa590b3099da3bf2db84330c41d8368c6175af85f163a";
+export const PREVIEW_DESIGN_FINGERPRINT:string="21555be32157190c5cfc47e04e2d6c35303317d57b2ede0a19e5107a1309be5b";
+export const PREVIEW_RENDER_FINGERPRINT:string="97a37d2cd1f00fa137b2feea657c6225600cac40137bf8a0aba1cd607bcb341e";

@@ -22,7 +22,7 @@ export function cardColorRaster(card:FridgeCard, images:Map<string,ColorRaster>,
     }
     if(card.shape==='round'&&((u-.5)**2+(v-.5)**2)*4>1)continue;
     if(!subject&&card.shape!=='round'&&card.shape!=='pill'){
-      const radius=Math.min(card.w/2,card.h/2,card.capability?.k==='album'?ALBUM_CARD_CORNER_RADIUS:RECT_CORNER_RADIUS);
+      const radius=template&&!template.surface?0:Math.min(card.w/2,card.h/2,card.capability?.k==='album'?ALBUM_CARD_CORNER_RADIUS:RECT_CORNER_RADIUS);
       const px=u*card.w,py=v*card.h,dx=Math.max(radius-px,0,px-(card.w-radius)),dy=Math.max(radius-py,0,py-(card.h-radius));
       if(dx*dx+dy*dy>radius*radius)continue;
     }
@@ -31,7 +31,7 @@ export function cardColorRaster(card:FridgeCard, images:Map<string,ColorRaster>,
       const dx=Math.max(radius-px,0,px-(card.w-radius)),dy=Math.max(radius-py,0,py-(card.h-radius));
       if(dx*dx+dy*dy>radius*radius)continue;
     }
-    let out=template?templatePixel(card,marks,images,u,v,rgb(template.background)):paper.slice();
+    let out=template?templatePixel(card,marks,images,u,v,template.surface?rgb(template.background):[0,0,0,0],template.width,template.height):paper.slice();
     if(template){rgba.set(out.map((n:number)=>Math.round(n)),i);continue;}
     if(subject&&card.subjectPhoto&&mask!==undefined)out=layers.length===0?sample(mask,u,v,card.w/card.h,false):over(out,sample(mask,u,v,card.w/card.h,false),1);
     if(album!==undefined)out=over(out,sample(album,u,v,card.w/card.h,true),1);
@@ -117,8 +117,8 @@ export function canvasArtworkCoverage(cards:FridgeCard[],rasters:ColorRaster[],a
 }
 
 /** Sample shared template geometry off-thread; no UI snapshots or full-size bitmap allocation. */
-function templatePixel(card:FridgeCard,marks:TemplateMark[],images:Map<string,ColorRaster>,u:number,v:number,base:number[]):number[]{
-  const edge=Math.min(card.w,card.h),x=(u*card.w-(card.w-edge)/2)/edge*300,y=(v*card.h-(card.h-edge)/2)/edge*300;
+function templatePixel(card:FridgeCard,marks:TemplateMark[],images:Map<string,ColorRaster>,u:number,v:number,base:number[],logicalW:number=300,logicalH:number=300):number[]{
+  const unit=Math.min(card.w/logicalW,card.h/logicalH),x=(u*card.w-(card.w-logicalW*unit)/2)/unit,y=(v*card.h-(card.h-logicalH*unit)/2)/unit;
   let out=base;
   for(const m of marks){
     const a=-m.angle*Math.PI/180,dx=x-m.x-m.w/2,dy=y-m.y-m.h/2,px=dx*Math.cos(a)-dy*Math.sin(a)+m.w/2,py=dx*Math.sin(a)+dy*Math.cos(a)+m.h/2;

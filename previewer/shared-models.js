@@ -91,6 +91,7 @@ exports.templateArcPath = templateArcPath;
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.cardTemplateScene = exports.templatePhoto = exports.templateContrastInk = exports.templateColors = exports.TemplateScene = exports.TemplateMark = void 0;
+const CompositionCatalog_1 = require("./CompositionCatalog");
 const HolidayCalendar_1 = require("./HolidayCalendar");
 const AlbumRotation_1 = require("./AlbumRotation");
 const CapabilityCalendar_1 = require("./CapabilityCalendar");
@@ -98,43 +99,16 @@ const TimeCapabilities_1 = require("./TimeCapabilities");
 const CapabilityData_1 = require("./CapabilityData");
 const TimetableLayout_1 = require("./TimetableLayout");
 const DepthComposition_1 = require("./DepthComposition");
-class TemplateMark {
-    constructor() {
-        this.kind = 'rect';
-        this.x = 0;
-        this.y = 0;
-        this.w = 0;
-        this.h = 0;
-        this.r = 0;
-        this.color = '#222823';
-        this.end = '';
-        this.angle = 0;
-        this.opacity = 1;
-        this.text = '';
-        this.lines = 1;
-        this.size = 16;
-        this.weight = 400;
-        this.align = 'left';
-        this.font = 'sans-serif';
-        this.start = 0;
-        this.sweep = 360;
-        this.stroke = 0;
-        this.layer = 0;
-        this.src = '';
-    }
-}
-exports.TemplateMark = TemplateMark;
-class TemplateScene {
-    constructor() {
-        this.marks = [];
-        this.background = '#F1EDE3';
-        this.ink = '#30362D';
-        this.accent = '#B6593D';
-    }
-}
-exports.TemplateScene = TemplateScene;
+const TemplateSceneTypes_1 = require("./TemplateSceneTypes");
+const CompositionScene_1 = require("./CompositionScene");
+var TemplateSceneTypes_2 = require("./TemplateSceneTypes");
+Object.defineProperty(exports, "TemplateMark", { enumerable: true, get: function () { return TemplateSceneTypes_2.TemplateMark; } });
+Object.defineProperty(exports, "TemplateScene", { enumerable: true, get: function () { return TemplateSceneTypes_2.TemplateScene; } });
 function templateColors(card) {
     const id = card.template?.id ?? '', p = card.template?.palette ?? '';
+    const face = (0, CompositionCatalog_1.compositionOwner)(id);
+    if (face)
+        return (0, CompositionCatalog_1.compositionColors)(face.id, p);
     if (p === 'cobalt')
         return ['#2443A2', '#F5EDDA', '#EABB65'];
     if (p === 'cream')
@@ -181,14 +155,17 @@ exports.templatePhoto = templatePhoto;
 /** Logical 300-square scene. All hosts consume the same positions and reading data. */
 function cardTemplateScene(card, tick) {
     tick = Number.isFinite(tick) && tick > 0 ? tick : Date.now();
-    const s = new TemplateScene(), colors = templateColors(card);
+    const composed = (0, CompositionScene_1.compositionScene)(card, tick);
+    if (composed)
+        return composed;
+    const s = new TemplateSceneTypes_1.TemplateScene(), colors = templateColors(card);
     s.background = colors[0];
     s.ink = colors[1];
     s.accent = colors[2];
     const cap = card.capability ?? { k: 'clock' };
     const id = card.template?.id ?? '', now = new Date(tick || Date.now()), zone = cap.zone ?? 'Asia/Shanghai', zoned = cap.k === 'worldclock' ? new Date(tick - (0, TimeCapabilities_1.clockOffset)(zone, tick) * 3600000) : now;
     const hour = cap.k === 'worldclock' ? zoned.getUTCHours() : now.getHours(), minute = cap.k === 'worldclock' ? zoned.getUTCMinutes() : now.getMinutes(), hh = ('0' + hour).slice(-2), mm = ('0' + minute).slice(-2), day = now.getDate(), month = now.getMonth() + 1, year = now.getFullYear(), week = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][now.getDay()];
-    const add = (kind, x, y, w, h, color = s.ink) => { const m = new TemplateMark(); m.kind = kind; m.x = x; m.y = y; m.w = w; m.h = h; m.color = color; s.marks.push(m); return m; };
+    const add = (kind, x, y, w, h, color = s.ink) => { const m = new TemplateSceneTypes_1.TemplateMark(); m.kind = kind; m.x = x; m.y = y; m.w = w; m.h = h; m.color = color; s.marks.push(m); return m; };
     const text = (value, x, y, size = 16, color = s.ink, width = 250, align = 'left', weight = 400) => { const m = add('text', x, y, Math.max(1, Math.min(width, 300 - x)), Math.max(1, Math.min(size * 1.2, 300 - y)), color); m.text = value.trim().replace(/\s+/g, ' '); m.size = size; m.align = align; m.weight = weight; return m; };
     const rect = (x, y, w, h, color, r = 0) => { const m = add('rect', x, y, w, h, color); m.r = r; return m; };
     const arc = (x, y, r, start, sweep, color, width) => { const m = add('arc', x, y, r * 2, r * 2, color); m.r = r; m.start = start; m.sweep = sweep; m.stroke = width; return m; };
@@ -563,6 +540,83 @@ function cardTemplateScene(card, tick) {
     return s;
 }
 exports.cardTemplateScene = cardTemplateScene;
+
+},
+"CompositionCatalog":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.compositionLayout = exports.compositionColors = exports.compositionOwner = exports.compositionSlot = exports.compositionDefinition = exports.COMPOSITIONS = void 0;
+exports.COMPOSITIONS = [
+    { id: 'mix-standby', revision: 1, name: '桌边', slots: [
+            { id: 'face-desk-clock', kind: 'clock', role: '主时间', x: 0, y: 0, w: 300, h: 300, primary: true },
+            { id: 'face-desk-calendar', kind: 'calendar', role: '周历', x: 22, y: 180, w: 256, h: 98, primary: false }
+        ] },
+    { id: 'mix-modular', revision: 1, name: '今日', slots: [
+            { id: 'face-day-clock', kind: 'clock', role: '主时间', x: 0, y: 0, w: 300, h: 300, primary: true },
+            { id: 'face-day-agenda', kind: 'agenda', role: '接下来的日程', x: 24, y: 151, w: 252, h: 65, primary: false },
+            { id: 'face-day-battery', kind: 'battery', role: '电量', x: 24, y: 238, w: 252, h: 40, primary: false }
+        ] },
+    { id: 'mix-study', revision: 1, name: '课间', slots: [
+            { id: 'face-study-clock', kind: 'clock', role: '时间', x: 0, y: 0, w: 300, h: 300, primary: true },
+            { id: 'face-study-course', kind: 'timetable', role: '下节课', x: 22, y: 106, w: 256, h: 124, primary: false },
+            { id: 'face-study-progress', kind: 'dayprogress', role: '今日进度', x: 22, y: 251, w: 256, h: 27, primary: false }
+        ] },
+    { id: 'mix-travel', revision: 1, name: '远行', slots: [
+            { id: 'face-travel-world', kind: 'worldclock', role: '目的地时间', x: 0, y: 0, w: 300, h: 300, primary: true },
+            { id: 'face-travel-countdown', kind: 'countdown', role: '出发倒计时', x: 24, y: 239, w: 252, h: 39, primary: false }
+        ] },
+    { id: 'mix-memory', revision: 1, name: '相片日历', slots: [
+            { id: 'face-memory-photo', kind: 'anniversary', role: '照片与纪念日', x: 0, y: 0, w: 300, h: 300, primary: true },
+            { id: 'face-memory-date', kind: 'date', role: '日期', x: 22, y: 20, w: 256, h: 28, primary: false },
+            { id: 'face-memory-lunar', kind: 'lunar', role: '农历', x: 22, y: 265, w: 256, h: 16, primary: false }
+        ] }
+];
+function compositionDefinition(id) { return exports.COMPOSITIONS.find(c => c.id === id); }
+exports.compositionDefinition = compositionDefinition;
+function compositionSlot(id) {
+    for (const face of exports.COMPOSITIONS) {
+        const slot = face.slots.find(s => s.id === id);
+        if (slot)
+            return slot;
+    }
+    return undefined;
+}
+exports.compositionSlot = compositionSlot;
+function compositionOwner(id) { return exports.COMPOSITIONS.find(c => c.slots.some(s => s.id === id)); }
+exports.compositionOwner = compositionOwner;
+function compositionColors(id, palette) {
+    if (palette === 'cream')
+        return ['#EFE8D9', '#333C43', '#B36143'];
+    if (palette === 'cobalt')
+        return ['#173F89', '#F5EDDB', '#ECC071'];
+    if (palette === 'ink')
+        return ['#131A1E', '#F1EDE4', '#B9D889'];
+    if (id === 'mix-modular')
+        return ['#111B22', '#F5F0E5', '#BBDD88'];
+    if (id === 'mix-travel')
+        return ['#172F3D', '#F2E7D4', '#E9AB69'];
+    if (id === 'mix-study')
+        return ['#F0EADD', '#493F33', '#A6523C'];
+    if (id === 'mix-memory')
+        return ['#D8DECD', '#2B4338', '#5F795F'];
+    return ['#E9E8DD', '#263B4E', '#AF653D'];
+}
+exports.compositionColors = compositionColors;
+/** Wide faces have separately authored positions, never stretched square glyphs. */
+function compositionLayout(face, aspect) {
+    if (aspect < 1.5)
+        return { width: 300, height: 300, slots: face.slots };
+    const output = face.slots.map((s) => ({ id: s.id, kind: s.kind, role: s.role, x: s.x, y: s.y, w: s.w, h: s.h, primary: s.primary }));
+    if (!output.length)
+        return { width: 300, height: 150, slots: [] };
+    output[0].h = 150;
+    const boxes = face.id === 'mix-standby' ? [[176, 16, 104, 120]] : face.id === 'mix-modular' ? [[180, 18, 100, 67], [180, 103, 100, 30]] : face.id === 'mix-study' ? [[156, 18, 124, 88], [18, 119, 262, 18]] : face.id === 'mix-travel' ? [[174, 46, 104, 80]] : face.id === 'mix-memory' ? [[18, 14, 130, 22], [18, 128, 130, 12]] : [];
+    if (boxes.length !== output.length - 1)
+        return { width: 300, height: 150, slots: [] };
+    boxes.forEach((b, i) => { output[i + 1].x = b[0]; output[i + 1].y = b[1]; output[i + 1].w = b[2]; output[i + 1].h = b[3]; });
+    return { width: 300, height: 150, slots: output };
+}
+exports.compositionLayout = compositionLayout;
 
 },
 "HolidayCalendar":function(require,module,exports){
@@ -1343,6 +1397,7 @@ exports.depthRenderCards = depthRenderCards;
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.normalizeCapability = exports.contrastingInk = exports.serializeDoorCards = exports.serializeFaceCards = exports.normalizeState = exports.normalizeElement = exports.localImageSource = exports.normalizeBox = exports.bounded = exports.defaultState = exports.cardCornerRadius = exports.shapeRadius = exports.materialColors = exports.typeLabel = exports.FridgeState = exports.normalizeBackground = exports.CanvasBackground = exports.BackgroundAnchor = exports.DoorState = exports.FridgeCard = exports.CanvasElement = exports.PhotoDepthCrop = exports.ElementBox = exports.CAPABILITIES = exports.CapType = exports.MIN_SUBJECT_EDGE = exports.ALBUM_CARD_CORNER_RADIUS = exports.ALBUM_CORNER_RADIUS = exports.ALBUM_INSET = exports.RECT_CORNER_RADIUS = exports.MIN_CARD_EDGE = exports.BOARD_H = exports.BOARD_W = void 0;
+const CompositionCatalog_1 = require("./CompositionCatalog");
 const CardTemplate_1 = require("./CardTemplate");
 const HtmlCardTemplate_1 = require("./HtmlCardTemplate");
 const ReadingStylePolicy_1 = require("./ReadingStylePolicy");
@@ -1656,8 +1711,8 @@ function normalizeState(raw) {
         card.id = source.id;
         card.hidden = source.hidden === true;
         card.groupId = typeof source.groupId === 'string' ? source.groupId.slice(0, 96) : '';
-        card.w = bounded(source.w, source.shape === 'subject' ? exports.MIN_SUBJECT_EDGE : exports.MIN_CARD_EDGE, card.template?.fill ? exports.BOARD_W : 320, 180);
-        card.h = bounded(source.h, source.shape === 'subject' ? exports.MIN_SUBJECT_EDGE : exports.MIN_CARD_EDGE, card.template?.fill ? exports.BOARD_W / state.canvasAspect : 420, 180);
+        card.w = bounded(source.w, card.template && (0, CompositionCatalog_1.compositionSlot)(card.template.id) ? 1 : source.shape === 'subject' ? exports.MIN_SUBJECT_EDGE : exports.MIN_CARD_EDGE, card.template?.fill ? exports.BOARD_W : 320, 180);
+        card.h = bounded(source.h, card.template && (0, CompositionCatalog_1.compositionSlot)(card.template.id) ? 1 : source.shape === 'subject' ? exports.MIN_SUBJECT_EDGE : exports.MIN_CARD_EDGE, card.template?.fill ? exports.BOARD_W / state.canvasAspect : 420, 180);
         // Validate finite coordinates here. Rotated/host-aware recovery belongs to
         // the whole canvas, where grouping and the actual aspect are available.
         card.x = bounded(source.x, -840, exports.BOARD_W + 840, 24);
@@ -1839,6 +1894,7 @@ exports.normalizeCapability = normalizeCapability;
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.copyCardTemplate = exports.newCardTemplate = exports.normalizeCardTemplate = exports.templateDefinition = exports.CARD_TEMPLATES = void 0;
+const CompositionCatalog_1 = require("./CompositionCatalog");
 exports.CARD_TEMPLATES = [
     { "id": "standby", "kind": "clock", "name": "浮字", "sources": ["clock"] },
     { "id": "dial", "kind": "clock", "name": "色盘", "sources": ["clock"] },
@@ -1885,7 +1941,8 @@ exports.CARD_TEMPLATES = [
     { "id": "mix-travel", "kind": "ensemble", "name": "远行", "sources": ["worldclock", "countdown"] },
     { "id": "mix-memory", "kind": "ensemble", "name": "相片日历", "sources": ["anniversary", "date", "lunar"] }
 ];
-function templateDefinition(id) { return exports.CARD_TEMPLATES.find(d => d.id === id); }
+function templateDefinition(id) { const single = exports.CARD_TEMPLATES.find(d => d.id === id); if (single)
+    return single; const slot = (0, CompositionCatalog_1.compositionSlot)(id); return slot ? { id: slot.id, kind: slot.kind, name: slot.role, sources: [slot.kind] } : undefined; }
 exports.templateDefinition = templateDefinition;
 function normalizeCardTemplate(raw) {
     if (!raw || raw.version !== 1 || !templateDefinition(raw.id) || templateDefinition(raw.id)?.kind === 'ensemble')
@@ -2407,40 +2464,293 @@ function compactContours(loops, tolerance = .00035) {
 exports.compactContours = compactContours;
 
 },
+"TemplateSceneTypes":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.TemplateScene = exports.TemplateMark = void 0;
+class TemplateMark {
+    constructor() {
+        this.kind = 'rect';
+        this.x = 0;
+        this.y = 0;
+        this.w = 0;
+        this.h = 0;
+        this.r = 0;
+        this.color = '#222823';
+        this.end = '';
+        this.angle = 0;
+        this.opacity = 1;
+        this.text = '';
+        this.lines = 1;
+        this.size = 16;
+        this.weight = 400;
+        this.align = 'left';
+        this.font = 'sans-serif';
+        this.start = 0;
+        this.sweep = 360;
+        this.stroke = 0;
+        this.layer = 0;
+        this.src = '';
+    }
+}
+exports.TemplateMark = TemplateMark;
+class TemplateScene {
+    constructor() {
+        this.width = 300;
+        this.height = 300;
+        this.surface = true;
+        this.marks = [];
+        this.background = '#F1EDE3';
+        this.ink = '#30362D';
+        this.accent = '#B6593D';
+    }
+}
+exports.TemplateScene = TemplateScene;
+
+},
+"CompositionScene":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.compositionScene = void 0;
+const TemplateSceneTypes_1 = require("./TemplateSceneTypes");
+const CompositionCatalog_1 = require("./CompositionCatalog");
+const CapabilityData_1 = require("./CapabilityData");
+const CapabilityCalendar_1 = require("./CapabilityCalendar");
+const HolidayCalendar_1 = require("./HolidayCalendar");
+const TimeCapabilities_1 = require("./TimeCapabilities");
+/** A face's data slots use its typography and color roles, not miniature standalone widgets. */
+function compositionScene(card, tick) {
+    const id = card.template?.id ?? '', slot = (0, CompositionCatalog_1.compositionSlot)(id), face = (0, CompositionCatalog_1.compositionOwner)(id);
+    if (!slot || !face)
+        return undefined;
+    const s = new TemplateSceneTypes_1.TemplateScene(), colors = (0, CompositionCatalog_1.compositionColors)(face.id, card.template?.palette ?? '');
+    s.background = colors[0];
+    s.ink = colors[1];
+    s.accent = colors[2];
+    s.width = 300;
+    s.height = 300 * card.h / card.w;
+    s.surface = slot.primary;
+    const H = s.height, wide = H < 220, cap = card.capability ?? { k: slot.kind }, now = new Date(tick), hour = now.getHours(), min = now.getMinutes(), hh = ('0' + hour).slice(-2), mm = ('0' + min).slice(-2), date = (now.getMonth() + 1) + '月' + now.getDate() + '日', week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][now.getDay()];
+    const mark = (kind, x, y, w, h, color = s.ink) => { const m = new TemplateSceneTypes_1.TemplateMark(); m.kind = kind; m.x = x; m.y = y; m.w = w; m.h = h; m.color = color; s.marks.push(m); return m; };
+    const text = (value, x, y, size, w = 300 - x, align = 'left', font = 'sans-serif', lines = 1, height = size * 1.2 * lines) => { const m = mark('text', x, y, Math.max(1, Math.min(w, 300 - x)), Math.max(1, Math.min(height, H - y))); m.text = value.trim().replace(/\s+/g, ' '); m.size = size; m.align = align; m.font = font; m.lines = lines; return m; };
+    const rect = (x, y, w, h, color, r = 0) => { const m = mark('rect', x, y, w, h, color); m.r = r; return m; };
+    const line = (x, y, x2, y2, color = s.ink, width = .6) => { const m = mark('line', x, y, x2, y2, color); m.stroke = width; };
+    const arc = (x, y, r, start, sweep, color, width) => { const m = mark('arc', x, y, r * 2, r * 2, color); m.r = r; m.start = start; m.sweep = sweep; m.stroke = width; return m; };
+    const image = (src, x, y, w, h, r = 0) => { const m = mark('image', x, y, w, h); m.src = src; m.layer = 1; m.r = r; };
+    const dateHead = () => { text(date, 22, 19, 13, 170); text(week, 215, 19, 13, 63, 'right'); };
+    if (id === 'face-desk-clock') {
+        text(week, 22, 22, 14, 110);
+        text(hh + ':' + mm, 18, wide ? 43 : 56, wide ? 66 : 81, wide ? 152 : 264, 'left', 'digits');
+        if (!wide)
+            line(22, 158, 278, 158, s.accent, .8);
+        else
+            line(162, 18, 162, 132, s.accent, .6);
+    }
+    else if (id === 'face-desk-calendar') {
+        text(now.getFullYear() + ' / ' + ('0' + (now.getMonth() + 1)).slice(-2), 0, 0, H > 200 ? 30 : 17, 300);
+        if (H > 200) {
+            ['日', '一', '二', '三', '四', '五', '六'].forEach((v, i) => { text(v, i * 43, 57, 20, 40, 'center'); });
+            (0, CapabilityCalendar_1.calendarCells)(now).forEach((day, i) => {
+                if (!day)
+                    return;
+                const x = i % 7 * 43, y = 101 + Math.floor(i / 7) * 41;
+                if (day === now.getDate())
+                    rect(x + 2, y - 2, 36, 36, s.accent, 18);
+                const m = text(String(day), x, y, 24, 40, 'center');
+                if (day === now.getDate())
+                    m.color = accentInk(s.accent);
+            });
+        }
+        else {
+            ['日', '一', '二', '三', '四', '五', '六'].forEach((v, i) => {
+                const x = i * 43, d = new Date(now);
+                d.setDate(now.getDate() - now.getDay() + i);
+                if (i === now.getDay())
+                    rect(x + 1, 35, 37, H - 36, s.accent, 18);
+                const a = text(v, x, 44, 14, 39, 'center'), b = text(String(d.getDate()), x, 77, 25, 39, 'center', 'digits');
+                if (i === now.getDay()) {
+                    a.color = accentInk(s.accent);
+                    b.color = accentInk(s.accent);
+                }
+            });
+        }
+    }
+    else if (id === 'face-day-clock') {
+        if (wide)
+            text(date + ' · ' + week, 22, 19, 12, 133);
+        else
+            dateHead();
+        text(hh + ':' + mm, wide ? 16 : 22, wide ? 47 : 40, wide ? 66 : 78, wide ? 150 : 256, 'left', 'digits');
+        if (!wide) {
+            line(24, 135, 276, 135, s.ink, .35);
+            line(24, 228, 276, 228, s.ink, .35);
+        }
+        else
+            line(165, 20, 165, 132, s.ink, .4);
+    }
+    else if (id === 'face-day-agenda') {
+        const event = (0, CapabilityData_1.agendaItems)(cap, tick)[0];
+        text(event ? (0, CapabilityData_1.eventWhen)(event, tick) : '接下来的日程', 0, 0, H > 120 ? 24 : 14, 300).color = s.accent;
+        text(event?.title || '暂无日程', 0, H > 120 ? 44 : 26, H > 120 ? 33 : 25, 300, 'left', 'sans-serif', H > 120 ? 2 : 1, H > 120 ? 83 : 31);
+        if (event?.location && H > 65)
+            text(event.location, 0, H - 18, 14, 300).opacity = .6;
+    }
+    else if (id === 'face-day-battery') {
+        const value = Number.isFinite(cap.percent) && (cap.percent ?? -1) >= 0 ? Math.min(100, cap.percent) : null, label = value === null ? '—' : String(value);
+        if (H > 65) {
+            text(label + (value === null ? '' : '%'), 0, 0, 48, 300, 'center', 'digits');
+            rect(0, H - 7, 300, 5, s.ink, 2).opacity = .2;
+            if (value !== null)
+                rect(0, H - 7, value * 3, 5, s.accent, 2);
+        }
+        else {
+            arc(24, H / 2, 19, 0, 360, s.ink, 3).opacity = .18;
+            arc(24, H / 2, 19, -90, (value ?? 0) * 3.6, s.accent, 3);
+            text(label, 5, H / 2 - 9, 16, 38, 'center', 'digits');
+            text('本机电量', 62, 1, 15, 238);
+            text(cap.charging ? '充电中' : value === null ? '等待数据' : value + '%', 62, 25, 13, 238).opacity = .65;
+        }
+    }
+    else if (id === 'face-study-clock') {
+        text(hh + ':' + mm, 22, wide ? 26 : 25, wide ? 43 : 49, wide ? 112 : 180, 'left', 'digits');
+        text(date + ' · ' + week, 22, wide ? 86 : 82, 12, wide ? 114 : 256);
+        if (wide)
+            line(141, 19, 141, 104, s.accent, .5);
+        else {
+            line(22, 99, 278, 99, s.accent, .6);
+            line(22, 241, 278, 241, s.accent, .6);
+        }
+    }
+    else if (id === 'face-study-course') {
+        const e = (0, CapabilityData_1.courseInstances)(cap, tick)[0];
+        text(e ? '下节课' : '课程表', 0, 0, 15, 300).color = s.accent;
+        text(e?.title || ((cap.courses ?? []).length ? '暂无后续课程' : '导入课表'), 0, 30, H > 180 ? 37 : 30, 300, 'left', 'sans-serif', 2, Math.min(H - 65, 88));
+        if (e) {
+            text((0, CapabilityData_1.eventWhen)(e, tick), 0, H - 39, 14, 300);
+            text(e.location, 0, H - 17, 12, 300).opacity = .65;
+        }
+    }
+    else if (id === 'face-study-progress') {
+        const p = (0, CapabilityCalendar_1.progressOf)('dayprogress', now);
+        text('今天', 0, 0, 12, 150);
+        text(Math.floor(p * 100) + '%', 150, 0, 12, 150, 'right');
+        rect(0, H - 4, 300, 4, s.ink, 2).opacity = .15;
+        rect(0, H - 4, 300 * p, 4, s.accent, 2);
+    }
+    else if (id === 'face-travel-world') {
+        const zoned = new Date(tick - (0, TimeCapabilities_1.clockOffset)(cap.zone ?? 'Asia/Shanghai', tick) * 3600000), h = zoned.getUTCHours(), m = zoned.getUTCMinutes(), cx = wide ? 86 : 150, cy = wide ? 81 : 129, r = wide ? 55 : 90;
+        text(cap.city || '目的地', 22, 17, 13, wide ? 125 : 155);
+        if (!wide)
+            text(('0' + h).slice(-2) + ':' + ('0' + m).slice(-2), 187, 17, 17, 91, 'right', 'digits');
+        for (let i = 0; i < 60; i++) {
+            const a = i * Math.PI / 30, inner = r - (i % 5 === 0 ? 8 : 3);
+            line(cx + Math.sin(a) * inner, cy - Math.cos(a) * inner, cx + Math.sin(a) * r, cy - Math.cos(a) * r, i % 5 ? s.ink : s.accent, i % 5 ? .35 : 1.4);
+        }
+        const hand = (a, len, width, color) => { const rad = a * Math.PI / 180; line(cx, cy, cx + Math.sin(rad) * len, cy - Math.cos(rad) * len, color, width); };
+        hand(h % 12 * 30 + m / 2, r * .56, 4, s.ink);
+        hand(m * 6, r * .82, 2, s.accent);
+        mark('circle', cx - 3, cy - 3, 6, 6, s.ink);
+        if (wide)
+            text('本地 ' + hh + ':' + mm, 174, 17, 12, 104, 'right');
+        else
+            line(24, 226, 276, 226, s.accent, .45);
+    }
+    else if (id === 'face-travel-countdown') {
+        const left = cap.date && (0, HolidayCalendar_1.validDay)(cap.date) ? (0, CapabilityCalendar_1.daysLeftOf)(cap.date, tick) : null, value = left === null ? '—' : String(Math.abs(left)), phase = left === null ? '天' : left < 0 ? '天前' : '天后';
+        text(cap.title || '出发', 0, 0, H > 100 ? 23 : 15, H > 100 ? 300 : 170);
+        text(value, H > 100 ? 0 : 175, H > 100 ? 44 : 0, H > 100 ? 92 : 37, H > 100 ? 300 : 99, H > 100 ? 'left' : 'right', 'digits');
+        text(phase, H > 100 ? 0 : 276, H > 100 ? 161 : 25, H > 100 ? 22 : 12, H > 100 ? 300 : 24);
+    }
+    else if (id === 'face-memory-photo') {
+        const photo = card.elements.find(e => e.kind === 'image' && e.src.length > 0), t = card.template, box = wide ? [148, 16, 134, 118] : [138, 58, 140, 169];
+        if (photo) {
+            if (t.depth && photo.depthForeground && photo.depthEnabled) {
+                const aspect = Math.max(.05, photo.depthSourceAspect * photo.depthCrop.w / Math.max(.01, photo.depthCrop.h)), h = Math.min(box[3], box[2] / aspect) * t.zoom, w = h * aspect;
+                image(photo.depthForeground, box[0] + (box[2] - w) / 2 + t.offsetX * box[2], box[1] + (box[3] - h) / 2 + t.offsetY * box[3], w, h);
+            }
+            else
+                image(photo.src, box[0], box[1], box[2], box[3], 10);
+        }
+        const left = cap.date && (0, HolidayCalendar_1.validDay)(cap.date) ? (0, CapabilityCalendar_1.daysLeftOf)(cap.date, tick) : null;
+        const number = text(left === null ? '—' : String(Math.abs(left)), 22, wide ? 43 : 106, wide ? 57 : 88, wide ? 92 : 114, 'left', 'digits');
+        number.layer = 2;
+        text(left !== null && left > 0 ? '天后' : '天', wide ? 120 : 24, wide ? 90 : 218, wide ? 11 : 14, wide ? 22 : 100).layer = 2;
+        const title = text(cap.title || '纪念日', 22, wide ? 112 : 244, wide ? 11 : 15, wide ? 116 : 256);
+        title.layer = 2;
+    }
+    else if (id === 'face-memory-date') {
+        text(date + ' · ' + week, 0, 0, Math.min(28, H / 1.2), 300);
+    }
+    else if (id === 'face-memory-lunar') {
+        const lunar = (0, TimeCapabilities_1.lunarReading)(tick);
+        text(lunar.year + ' · ' + lunar.date, 0, 0, Math.min(16, H / 1.2), 300);
+    }
+    return s;
+}
+exports.compositionScene = compositionScene;
+function accentInk(color) { const value = parseInt(color.slice(1), 16), light = ((value >> 16) * 299 + ((value >> 8) & 255) * 587 + (value & 255) * 114) / 1000; return light > 155 ? '#26312A' : '#FFFFFF'; }
+
+},
 "TemplateFactory":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.makeTemplateCards = void 0;
+const CompositionCatalog_1 = require("./CompositionCatalog");
 const CardSchema_1 = require("./CardSchema");
 const CardTemplate_1 = require("./CardTemplate");
+function templateCard(id, kind, makeId, now) {
+    const card = new CardSchema_1.FridgeCard();
+    card.id = makeId();
+    card.template = (0, CardTemplate_1.newCardTemplate)(id);
+    card.capability = { k: kind };
+    card.shape = 'rect';
+    card.frame = false;
+    card.rot = 0;
+    card.z = 0;
+    if (kind === 'anniversary' || kind === 'countdown') {
+        const day = new Date(now);
+        const date = day.getFullYear() + '-' + ('0' + (day.getMonth() + 1)).slice(-2) + '-' + ('0' + day.getDate()).slice(-2);
+        card.capability.date = date;
+        card.capability.seed = date;
+    }
+    if (kind === 'worldclock')
+        card.capability.zone = 'Asia/Shanghai';
+    return card;
+}
 function makeTemplateCards(id, aspect, makeId, now = Date.now()) {
     const definition = (0, CardTemplate_1.templateDefinition)(id);
     if (!definition)
         return [];
-    const ids = definition.kind === 'ensemble' ? (id === 'mix-standby' ? ['standby', 'calendar-month'] : id === 'mix-modular' ? ['standby', 'agenda-editorial', 'battery-ring'] : id === 'mix-study' ? ['standby', 'course-next', 'day-blocks'] : id === 'mix-travel' ? ['world-duo', 'countdown-poster'] : ['anniversary-photo', 'date-paper', 'lunar-paper']) : [id];
-    const multiple = ids.length > 1, group = multiple ? makeId() : '', height = CardSchema_1.BOARD_W / Math.max(.3, aspect), columns = multiple ? (aspect >= 1.5 ? ids.length : 2) : 1, rows = Math.ceil(ids.length / columns), size = multiple ? Math.min(150, (CardSchema_1.BOARD_W - (columns + 1) * 12) / columns, (height - (rows + 1) * 12) / rows) : Math.min(260, height - 24), left = (CardSchema_1.BOARD_W - columns * size - (columns - 1) * 12) / 2, top = Math.max(12, (height - rows * size - (rows - 1) * 12) / 2), date = new Date(now), dateString = date.getFullYear() + '-' + ('0' + (date.getMonth() + 1)).slice(-2) + '-' + ('0' + date.getDate()).slice(-2);
-    return ids.map((key, index) => {
-        const card = new CardSchema_1.FridgeCard();
-        card.id = makeId();
-        card.template = (0, CardTemplate_1.newCardTemplate)(key);
-        card.capability = { k: (0, CardTemplate_1.templateDefinition)(key)?.kind ?? 'clock' };
-        card.shape = 'rect';
-        card.frame = false;
-        card.w = size;
-        card.h = size;
-        card.rot = 0;
-        card.groupId = group;
-        card.x = left + index % columns * (size + 12);
-        card.y = (top + Math.floor(index / columns) * (size + 12)) * 470 / height;
-        card.z = index;
-        if (card.capability.k === 'countdown' || card.capability.k === 'anniversary') {
-            card.capability.date = dateString;
-            card.capability.seed = dateString;
-        }
-        if (card.capability.k === 'worldclock')
-            card.capability.zone = 'Asia/Shanghai';
-        return card;
-    });
+    const height = CardSchema_1.BOARD_W / Math.max(.3, aspect);
+    const face = (0, CompositionCatalog_1.compositionDefinition)(id);
+    if (face) {
+        const layout = (0, CompositionCatalog_1.compositionLayout)(face, aspect);
+        if (!layout.slots.length)
+            return [];
+        const scale = Math.min((CardSchema_1.BOARD_W - 24) / layout.width, (height - 24) / layout.height);
+        const left = (CardSchema_1.BOARD_W - layout.width * scale) / 2;
+        const top = (height - layout.height * scale) / 2;
+        const group = makeId();
+        return layout.slots.map((slot, index) => {
+            const card = templateCard(slot.id, slot.kind, makeId, now);
+            card.groupId = group;
+            card.z = index;
+            card.x = left + slot.x * scale;
+            card.y = (top + slot.y * scale) / height * 470;
+            card.w = slot.w * scale;
+            card.h = slot.h * scale;
+            return card;
+        });
+    }
+    // An ensemble must have an authored face. Never fall back to a miniature widget grid.
+    if (definition.kind === 'ensemble')
+        return [];
+    const card = templateCard(id, definition.kind, makeId, now);
+    card.w = Math.min(260, height - 24);
+    card.h = card.w;
+    card.x = (CardSchema_1.BOARD_W - card.w) / 2;
+    card.y = Math.max(12, (height - card.h) / 2) * 470 / height;
+    return [card];
 }
 exports.makeTemplateCards = makeTemplateCards;
 
@@ -2850,6 +3160,7 @@ exports.cloudReadingPath = cloudReadingPath;
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.restoreStartupLayouts = exports.warmStartupLayouts = exports.capabilityPreset = exports.cardCapabilityMinimum = exports.capabilityInset = exports.cardHandlePoint = exports.ensureCapabilitySize = exports.minimumCardSize = exports.clampCardGeometry = exports.capabilityPlacement = exports.resizeFactor = exports.capabilityBox = exports.capabilityObstructed = exports.freeCapabilityBox = exports.constrainCapabilityDrag = exports.fitCapabilityPosition = exports.capabilityAttachmentEdges = exports.fitContentBox = exports.safeContentBox = exports.subjectSurfaceFactor = exports.subjectInterior = void 0;
+const CompositionCatalog_1 = require("./CompositionCatalog");
 const MicaGeometry_1 = require("./MicaGeometry");
 const ReadingComposition_1 = require("./ReadingComposition");
 const CapabilityPresentation_1 = require("./CapabilityPresentation");
@@ -3257,8 +3568,9 @@ function minimumCardSize(card) {
     size.w = card.shape === 'subject' ? CardSchema_1.MIN_SUBJECT_EDGE : CardSchema_1.MIN_CARD_EDGE;
     size.h = card.shape === 'subject' ? CardSchema_1.MIN_SUBJECT_EDGE : CardSchema_1.MIN_CARD_EDGE;
     if (card.template) {
-        size.w = 80;
-        size.h = 80;
+        const slot = (0, CompositionCatalog_1.compositionSlot)(card.template.id);
+        size.w = slot && !slot.primary ? 12 : 80;
+        size.h = slot && !slot.primary ? 4 : 80;
         return size;
     }
     if (card.capability === null || card.capability.k === 'album')
@@ -3286,6 +3598,8 @@ function minimumCardSize(card) {
 exports.minimumCardSize = minimumCardSize;
 /** Expand proportionally and refuse a shape whose interior cannot support this capability on the board. */
 function ensureCapabilitySize(card) {
+    if (card.template && (0, CompositionCatalog_1.compositionSlot)(card.template.id))
+        return card.w > 0 && card.h > 0 && card.w <= 344 && card.h <= 1147;
     const min = minimumCardSize(card), factor = Math.max(1, min.w / card.w, min.h / card.h);
     const w = card.w * factor, h = card.h * factor;
     if (w > (card.template?.fill ? CardSchema_1.BOARD_W : 320) + .01 || h > (card.template?.fill ? CardSchema_1.BOARD_W / .3 : 420) + .01)
@@ -5047,4 +5361,4 @@ exports.creationDimension = creationDimension;
 function creationAspect(dimension) { return dimension === '2*4' ? 2 : 1; }
 exports.creationAspect = creationAspect;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"b302aa9284bc040f4ccc7a3e8f6dc4d2f13f912da8a358ffcd356a8f8c296ede"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"21555be32157190c5cfc47e04e2d6c35303317d57b2ede0a19e5107a1309be5b"};})(globalThis);

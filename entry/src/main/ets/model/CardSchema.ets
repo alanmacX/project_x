@@ -1,3 +1,4 @@
+import { compositionSlot } from './CompositionCatalog';
 import { CardTemplate, normalizeCardTemplate } from './CardTemplate';
 import { CanvasRotation } from './CanvasRotation';
 import { HtmlCardTemplate, normalizeHtmlCard } from './HtmlCardTemplate';
@@ -284,7 +285,7 @@ export function normalizeState(raw: FridgeState): FridgeState {
   for (const source of (Array.isArray(raw.cards) ? raw.cards : [])) {
     if (source === null || typeof source.id !== 'string') continue;
     const card = new FridgeCard(); if(source.template!==undefined)card.template=normalizeCardTemplate(source.template); if(source.html!==undefined)card.html=normalizeHtmlCard(source.html); card.id = source.id; card.hidden = source.hidden === true; card.groupId = typeof source.groupId === 'string' ? source.groupId.slice(0, 96) : '';
-    card.w = bounded(source.w, source.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE, card.template?.fill?BOARD_W:320, 180); card.h = bounded(source.h, source.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE, card.template?.fill?BOARD_W/state.canvasAspect:420, 180);
+    card.w = bounded(source.w, card.template&&compositionSlot(card.template.id)?1:source.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE, card.template?.fill?BOARD_W:320, 180); card.h = bounded(source.h, card.template&&compositionSlot(card.template.id)?1:source.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE, card.template?.fill?BOARD_W/state.canvasAspect:420, 180);
     // Validate finite coordinates here. Rotated/host-aware recovery belongs to
     // the whole canvas, where grouping and the actual aspect are available.
     card.x = bounded(source.x, -840, BOARD_W + 840, 24); card.y = bounded(source.y, -840, BOARD_H + 840, 32);

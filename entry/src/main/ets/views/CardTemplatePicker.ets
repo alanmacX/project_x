@@ -14,7 +14,7 @@ export struct CardTemplatePicker {
   @State category:string='clock';
   private tick:number=Date.now();
   private card(id:string):FridgeCard {return makeTemplateCards(id,1,()=>id,this.tick)[0];}
-  private recipe(id:string):FridgeCard[]{return makeTemplateCards(id,1,()=>id,this.tick);}
+  private recipe(id:string):FridgeCard[]{let index=0;return makeTemplateCards(id,1,()=>id+String(++index),this.tick);}
   private items():TemplateDefinition[]{return CARD_TEMPLATES.filter(item=>item.kind===this.category);}
   build(){
     Column({space:16}){
@@ -24,7 +24,7 @@ export struct CardTemplatePicker {
         Column({space:16}){
           Scroll(){Row({space:8}){ForEach(CAPABILITY_CATALOG,(item:CapabilityDescriptor)=>{Button(item.name,{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(34).fontSize(13).fontColor(this.category===item.key?AppDesign.background(this.appDark):AppDesign.text(this.appDark)).backgroundColor(this.category===item.key?AppDesign.text(this.appDark):AppDesign.control(this.appDark)).onClick(()=>{this.category=item.key;})});Button('组合',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(34).fontSize(13).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>{this.category='ensemble';})}}.scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).width('100%')
           Grid(){ForEach(this.items(),(item:TemplateDefinition)=>{GridItem(){Button({type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}){Column({space:8}){
-            Stack({alignContent:Alignment.TopStart}){if(item.kind==='ensemble'){ForEach(this.recipe(item.id),(card:FridgeCard)=>{TemplateFace({card:card,scaleFactor:136/344,tick:this.tick}).width(card.w*136/344).height(card.h*136/344).position({x:card.x*136/344,y:card.y*136/470}).borderRadius(8).clip(true)})}else{TemplateFace({card:this.card(item.id),scaleFactor:136/260,tick:this.tick})}}.width(136).height(136).borderRadius(20).clip(true)
+            Stack({alignContent:Alignment.TopStart}){if(item.kind==='ensemble'){ForEach(this.recipe(item.id),(card:FridgeCard)=>{TemplateFace({card:card,scaleFactor:136/344,tick:this.tick}).width(card.w*136/344).height(card.h*136/344).position({x:card.x*136/344,y:card.y*136/470}).clip(true)})}else{TemplateFace({card:this.card(item.id),scaleFactor:136/260,tick:this.tick})}}.width(136).height(136).borderRadius(20).clip(true)
             Text(item.name).fontSize(14).fontColor(AppDesign.text(this.appDark))
           }.padding(8).width('100%')}.backgroundColor(Color.Transparent).onClick(()=>this.onChoose(item.id))}} ,(item:TemplateDefinition)=>item.id)}.columnsTemplate('1fr 1fr').columnsGap(8).rowsGap(12).layoutWeight(1).width('100%')
         }.width('100%').height('100%')

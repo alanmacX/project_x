@@ -1,3 +1,4 @@
+import { compositionSlot } from '../model/CompositionCatalog';
 import { TemplateSnapshot } from './TemplateSnapshot';
 import { TemplateFace } from './TemplateFace';
 import { sceneImage } from '../model/SceneImageCache';
@@ -63,8 +64,8 @@ export struct CardFace {
   build() {
     Stack() {
       if(this.card.template){
-        if(this.offscreen){TemplateSnapshot({card:this.card,tick:this.tick,scaleFactor:this.scaleFactor}).width('100%').height('100%').borderRadius(this.card.template.fill?0:cardCornerRadius(this.card,this.scaleFactor)).clip(true)}else{
-        TemplateFace({card:this.card,tick:this.tick,scaleFactor:this.scaleFactor,snapshot:this.snapshot}).width('100%').height('100%').borderRadius(this.card.template.fill?0:cardCornerRadius(this.card,this.scaleFactor)).clip(true)
+        if(this.offscreen){TemplateSnapshot({card:this.card,tick:this.tick,scaleFactor:this.scaleFactor}).width('100%').height('100%').borderRadius(this.card.template.fill||compositionSlot(this.card.template.id)?.primary===false?0:cardCornerRadius(this.card,this.scaleFactor)).clip(true)}else{
+        TemplateFace({card:this.card,tick:this.tick,scaleFactor:this.scaleFactor,snapshot:this.snapshot}).width('100%').height('100%').borderRadius(this.card.template.fill||compositionSlot(this.card.template.id)?.primary===false?0:cardCornerRadius(this.card,this.scaleFactor)).clip(true)
         }
       }else if(this.card.depthPass==='foreground'){
         CardCanvas({snapshot:this.snapshot,card:this.card,layerMotion:this.layerMotion,scaleFactor:this.scaleFactor,tick:this.tick,widget:this.widget,hideContent:this.hideContent}).width(subjectSurfaceFactor(this.card)*100+'%').height(subjectSurfaceFactor(this.card)*100+'%')

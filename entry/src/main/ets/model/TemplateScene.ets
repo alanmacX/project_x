@@ -1,3 +1,4 @@
+import { compositionOwner, compositionColors } from './CompositionCatalog';
 import { validDay } from './HolidayCalendar';
 import { activeAlbum } from './AlbumRotation';
 import { FridgeCard, CapBlock, CanvasElement } from './CardSchema';
@@ -6,37 +7,12 @@ import { clockOffset, lunarReading } from './TimeCapabilities';
 import { agendaItems, timeText, semesterWeek, courseInstances } from './CapabilityData';
 import { weekLessons } from './TimetableLayout';
 import { depthPhotoBox } from './DepthComposition';
-export class TemplateMark {
-    kind: string = 'rect';
-    x: number = 0;
-    y: number = 0;
-    w: number = 0;
-    h: number = 0;
-    r: number = 0;
-    color: string = '#222823';
-    end: string = '';
-    angle: number = 0;
-    opacity: number = 1;
-    text: string = '';
-    lines: number = 1;
-    size: number = 16;
-    weight: number = 400;
-    align: string = 'left';
-    font: string = 'sans-serif';
-    start: number = 0;
-    sweep: number = 360;
-    stroke: number = 0;
-    layer: number = 0;
-    src: string = '';
-}
-export class TemplateScene {
-    marks: TemplateMark[] = [];
-    background: string = '#F1EDE3';
-    ink: string = '#30362D';
-    accent: string = '#B6593D';
-}
+import { TemplateMark, TemplateScene } from './TemplateSceneTypes';
+import { compositionScene } from './CompositionScene';
+export { TemplateMark, TemplateScene } from './TemplateSceneTypes';
 export function templateColors(card: FridgeCard): string[] {
     const id = card.template?.id ?? '', p = card.template?.palette ?? '';
+    const face=compositionOwner(id);if(face)return compositionColors(face.id,p);
     if (p === 'cobalt')
         return ['#2443A2', '#F5EDDA', '#EABB65'];
     if (p === 'cream')
@@ -80,6 +56,7 @@ export function templatePhoto(card: FridgeCard): CanvasElement | undefined { ret
 /** Logical 300-square scene. All hosts consume the same positions and reading data. */
 export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene {
     tick = Number.isFinite(tick)&&tick>0?tick:Date.now();
+    const composed=compositionScene(card,tick);if(composed)return composed;
     const s = new TemplateScene(), colors = templateColors(card);
     s.background = colors[0];
     s.ink = colors[1];

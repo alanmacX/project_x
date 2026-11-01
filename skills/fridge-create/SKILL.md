@@ -70,3 +70,7 @@ Check target aspect, long text, overlap/z order, minimum size, empty data, missi
 Deliver the actual file, a concise explanation of editable layers and data binding, and any compatibility limitations. Do not share externally or install onto a device unless authorized by the user.
 
 For a generated work, save a separate `.qa.json` receipt alongside the `.fridge` with the contract identity, target dimensions/time, package checksum and actual validation/visual-review results. Keep renderer metadata out of the v1 package itself. Retain source assets and editable package; do not flatten the deliverable to avoid later design upgrades. A receipt records evidence, never guarantees future app or Form behavior.
+
+## Native template standard
+
+When adding or changing shipped card-template designs or unified compositions, read [the template standard](../../standards/templates/STANDARD.md) and fill [the authoring record](../../standards/templates/AUTHORING.md). A composition uses one primary surface and transparent data-role slots with a shared hierarchy; do not assemble miniature standalone widget tiles. Register square and wide layouts, use the shared production scene, and run `npm run templates:check` before native verification. Preserve legacy cards, group IDs and bindings.

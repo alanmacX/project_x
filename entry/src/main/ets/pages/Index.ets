@@ -1,3 +1,4 @@
+import { compositionPaletteState, restoreCompositionPalette, setCompositionPalette } from '../model/CompositionPalette';
 import { templateColors } from '../model/TemplateScene';
 import { makeTemplateCards } from '../model/TemplateFactory';
 import { templateDefinition } from '../model/CardTemplate';
@@ -1303,7 +1304,7 @@ struct Index {
   private select(id: string, refresh: boolean = false): void {
     if (!refresh && !this.editing && !this.viewing && this.selectedId === id) return;
     const selected = this.store.findCard(id);
-    if (selected !== null && this.selectedId !== id) { this.history.reset(selected); this.undoAvailable = false; this.redoAvailable = false; }
+    if (selected !== null && this.selectedId !== id) { this.history.reset(selected,compositionPaletteState(selected,this.store.state.cards)); this.undoAvailable = false; this.redoAvailable = false; }
     this.selectedId = id; this.layerId = ''; this.syncFields();
     const card = this.current(); if (card !== null) this.preview = cardRenderSnapshot(card);
   }
@@ -1329,7 +1330,7 @@ struct Index {
       }
       if (card.capability !== null&&!card.template) card.capBox = capabilityPlacement(card);
       this.clamp(card);
-      if (this.editing) { this.history.record(card, group); this.undoAvailable = this.history.canUndo(); this.redoAvailable = this.history.canRedo(); }
+      if (this.editing) { this.history.record(card, group,compositionPaletteState(card,this.store.state.cards)); this.undoAvailable = this.history.canUndo(); this.redoAvailable = this.history.canRedo(); }
     }
     this.render();
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer);
@@ -1342,6 +1343,7 @@ struct Index {
     const index = this.store.state.cards.findIndex((card: FridgeCard) => card.id === restored.id);
     if (index < 0) return;
     this.store.state.cards[index] = restored;
+    restoreCompositionPalette(this.history.paletteState(),this.store.state.cards);
     if (this.layerId !== 'capability' && !restored.elements.some((el: CanvasElement) => el.id === this.layerId)) this.layerId = '';
     if (this.layerId === 'capability' && restored.capability === null) this.layerId = '';
     this.gestureGroup = ''; this.syncFields(); this.render();
@@ -1495,7 +1497,7 @@ struct Index {
   private templateSetting(key:string,value:string|number|boolean,mode?:SliderChangeMode):void{
     const card=this.current(),t=card?.template;if(!card||!t)return;
     if(key==='id'){const next=templateDefinition(String(value));if(next?.kind!==card.capability?.k)return;t.id=String(value);}
-    else if(key==='palette')t.palette=String(value);else if(key==='depth')t.depth=value===true;
+    else if(key==='palette')setCompositionPalette(card,this.store.state.cards,String(value));else if(key==='depth')t.depth=value===true;
     else if(key==='fill'){t.fill=value===true;if(t.fill){const bg=this.templateBrightness(this.canvasBackground.color),ink=this.templateBrightness(templateColors(card)[1]);if(bg>180&&ink>180)t.palette='cream';else if(bg<90&&ink<90)t.palette='ink';}if(!t.fill){card.w=Math.min(260,BOARD_W/this.canvasAspect-24);card.h=card.w;card.x=(BOARD_W-card.w)/2;card.y=12;}this.clamp(card);}
     else if(key==='zoom')t.zoom=Number(value);else if(key==='offsetX')t.offsetX=Number(value);else if(key==='offsetY')t.offsetY=Number(value);
     if(mode===undefined)this.change();else this.continuousChange(mode);
