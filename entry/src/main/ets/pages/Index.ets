@@ -1484,7 +1484,7 @@ struct Index {
         const saved=await this.store.savedTimetable();if(!this.alive||canvas!==this.store.state.canvasId)return;
         for(const card of cards)if(card.capability?.k==='timetable'){if(saved)card.capability=useSavedTimetable(card.capability,saved);else{const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));card.capability.semester=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);card.capability.courses=[];}}
       }
-      cards.forEach(card=>this.clamp(card));this.store.addCards(cards);this.select(cards[0].id);this.change();this.openEditor(cards[0].id,true);this.refreshCapabilities();
+      cards.forEach(card=>this.clamp(card));this.store.addCards(cards);this.select(cards[0].id);this.change();this.openEditor(cards[0].id,true);this.scheduleForegroundRefresh();
     }catch(e){this.getUIContext().getPromptAction().showToast({message:(e as Error).message});}finally{this.busy=false;}
   }
   private templatePhotoElement():CanvasElement|null {
@@ -1940,7 +1940,7 @@ struct Index {
     Stack({ alignContent: Alignment.TopStart }) {
       Stack({ alignContent: Alignment.TopStart }) {
         CanvasBackdrop({ snapshot:true, sceneBackground: this.canvasBackground,showFrame:false }).width('100%').height('100%')
-        Column().width('100%').height('100%').onClick(() => { this.selectedId = ''; })
+        Column().width('100%').height('100%').onClick(() => { if(this.cards.length===0)this.addCard();else this.selectedId = ''; })
         if (this.cards.length === 0) {
           Text('添加卡片').fontSize(16).fontColor('#989898').width('100%').height('100%').textAlign(TextAlign.Center).hitTestBehavior(HitTestMode.None)
         }
@@ -2222,7 +2222,7 @@ struct Index {
         }
         }.width('100%').height('100%')
         this.homeToolIslands(floating)
-      }.width(floating?this.screenWidth-32:this.panelWidth).height(floating?this.homeToolsHeight():this.panelHeight).padding(12).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
+      }.width(floating?this.screenWidth-32:this.panelWidth).height(floating?this.homeToolsHeight():this.cards.length===0&&!this.scheduleOpen&&!this.backgroundOpen?AppDesign.controlHeight+24:this.panelHeight).padding(12).backgroundColor(this.appSurface()).borderRadius(AppDesign.sectionRadius).clip(true)
         .position({x:floating?0:this.panelLeft,y:floating?0:this.panelTop})
   }
   private homeActionHeight():number {return this.groupSelecting?60:this.selectedId.length===0?0:60;}

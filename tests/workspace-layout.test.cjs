@@ -59,3 +59,8 @@ for(const [w,h] of [[300,260],[320,240],[480,300],[600,300],[640,300]]) {
  assert.ok(l.panelY+l.panelH<=h-24);
 }
 console.log("PASS small floating windows retain canvas and dock within safe bounds");
+
+for(const [w,h] of [[672,1078],[768,1024],[834,1194],[1024,1366]])for(const aspect of [1,2,3]){
+ const l=workspaceLayout(w,h,94,24,aspect);assert.ok(l.panelH<=320,'stacked tablet layer panel stays bounded for short wide canvases');assert.ok(l.panelY+l.panelH<=h-24+.001);
+}
+console.log('PASS portrait tablet wide canvases keep a bounded, scrollable layer panel');

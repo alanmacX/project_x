@@ -20,7 +20,8 @@ export function workspaceLayout(width:number,height:number,top:number,bottom:num
   out.boardX=m+(stageW-out.boardW)/2;out.boardY=top+m;out.expandedBoardY=out.boardY;
   if(out.floating){out.boardW=Math.min(usableW,Math.max(96,usableH-88)*ratio);out.boardH=out.boardW/ratio;out.boardX=m+(usableW-out.boardW)/2;out.boardY=top+m+Math.max(0,(usableH-88-out.boardH)/2);}
   out.panelX=homeWide?width-m-out.panelW:m;out.panelY=homeWide?out.boardY:out.boardY+out.boardH+12;
-  out.panelH=Math.max(128,height-bottom-m-out.panelY);
+  const panelRoom=height-bottom-m-out.panelY;
+  out.panelH=Math.max(128,homeWide?panelRoom:Math.min(320,panelRoom));
   if(out.floating){out.panelW=Math.min(360,width-32);out.panelX=(width-out.panelW)/2;out.panelY=height-bottom-68;out.panelH=52;}
   const body=Math.max(120,height-top-bottom-76);
   out.previewW=out.wide?width-Math.min(400,Math.max(300,width*.4)):width;
