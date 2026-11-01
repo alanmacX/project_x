@@ -93,7 +93,12 @@
     else if(m.kind==='circle')shape=`<ellipse cx="${m.x+m.w/2}" cy="${m.y+m.h/2}" rx="${m.w/2}" ry="${m.h/2}" fill="${fill}"/>`;
     else if(m.kind==='line')shape=`<path d="M${m.x} ${m.y}L${m.w} ${m.h}" fill="none" stroke="${m.color}" stroke-width="${m.stroke}" stroke-linecap="round"/>`;
     else if(m.kind==='arc'){if(m.sweep>=359.99)shape=`<circle cx="${m.x}" cy="${m.y}" r="${m.r}" fill="none" stroke="${m.color}" stroke-width="${m.stroke}"/>`;else if(m.sweep>0){const a=m.start*Math.PI/180,b=(m.start+m.sweep)*Math.PI/180;shape=`<path d="M${m.x+Math.cos(a)*m.r} ${m.y+Math.sin(a)*m.r}A${m.r} ${m.r} 0 ${m.sweep>180?1:0} 1 ${m.x+Math.cos(b)*m.r} ${m.y+Math.sin(b)*m.r}" fill="none" stroke="${m.color}" stroke-width="${m.stroke}" stroke-linecap="round"/>`;}}
-    else if(m.kind==='text'){defs+=`<clipPath id="${key}"><rect x="${m.x}" y="${m.y}" width="${m.w}" height="${m.h}"/></clipPath>`;shape=`<text x="${m.x+(m.align==='center'?m.w/2:m.align==='right'?m.w:0)}" y="${m.y}" dominant-baseline="text-before-edge" text-anchor="${m.align==='center'?'middle':m.align==='right'?'end':'start'}" font-size="${m.font==='digits'?Math.min(m.size,m.w/Math.max(1,m.text.length*.5)):m.size}" font-weight="${m.weight}" font-family="${m.font==='digits'?'TemplateDigits':m.font}" fill="${m.color}" clip-path="url(#${key})">${escape(m.font==='digits'?m.text:fitted(m.text,m.size,m.w))}</text>`;}
+    else if(m.kind==='text'){
+     const family=m.font==='digits'?'TemplateDigits':m.font,fit=FridgeCore.load('TemplateTextLayout').layoutTemplateText(m,(value,size)=>{if(!measure)return Array.from(value).reduce((sum,char)=>sum+size*(/[^\x00-\xff]/.test(char)?1:.58),0);measure.font=(m.font!=='digits'&&m.weight>=600?'bold ':'')+size+'px '+family;return measure.measureText(value).width;});
+     defs+=`<clipPath id="${key}"><rect x="${m.x}" y="${m.y}" width="${m.w}" height="${m.h}"/></clipPath>`;
+     const x=m.x+(m.align==='center'?m.w/2:m.align==='right'?m.w:0);
+     shape=`<text dominant-baseline="text-before-edge" text-anchor="${m.align==='center'?'middle':m.align==='right'?'end':'start'}" font-size="${fit.fontSize}" font-weight="${m.font!=='digits'&&m.weight>=600?700:400}" font-family="${family}" fill="${m.color}" clip-path="url(#${key})">`+fit.lines.map((line,row)=>`<tspan x="${x}" y="${m.y+row*fit.lineHeight}">${escape(line)}</tspan>`).join('')+'</text>';
+    }
     else if(m.kind==='image')shape=image(media(m.src),m.x,m.y,m.w,m.h,0,key,'xMidYMid slice');
     marks+=`<g opacity="${m.opacity}"${m.angle?` transform="rotate(${m.angle} ${m.x+m.w/2} ${m.y+m.h/2})"`:''}>${shape}</g>`;
    });out+=`<g transform="translate(${ox} ${oy}) scale(${unit})">${marks}</g>`;

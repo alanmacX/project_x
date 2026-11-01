@@ -4,9 +4,9 @@ import { paintTemplate } from '../model/TemplatePaint';
 import { sceneImage } from '../model/SceneImageCache';
 @Component
 export struct TemplateFace {
-  @Prop @Watch('redraw') card:FridgeCard=new FridgeCard();
-  @Prop @Watch('redraw') tick:number=0;
-  @Prop @Watch('redraw') scaleFactor:number=1;
+  @Prop @Watch('sceneChanged') card:FridgeCard=new FridgeCard();
+  @Prop @Watch('sceneChanged') tick:number=0;
+  @Prop @Watch('sceneChanged') scaleFactor:number=1;
   @Prop snapshot:boolean=false;
   private base:CanvasRenderingContext2D=new CanvasRenderingContext2D(new RenderingContextSettings(true));
   private ink:CanvasRenderingContext2D=new CanvasRenderingContext2D(new RenderingContextSettings(true));
@@ -18,6 +18,7 @@ export struct TemplateFace {
   private scene():TemplateScene{if(this.cachedCard!==this.card||this.cachedTick!==this.tick){this.cachedCard=this.card;this.cachedTick=this.tick;this.cachedScene=cardTemplateScene(this.card,this.tick);}return this.cachedScene;}
   private unit():number{return Math.min(this.card.w,this.card.h)*this.scaleFactor/300;}
   private photos(layer:number):TemplateMark[]{return this.scene().marks.filter(m=>m.kind==='image'&&m.layer===layer);}
+  private sceneChanged():void {this.cachedCard=null;this.redraw();}
   private redraw():void {if(!this.ready)return;const scene=this.scene();paintTemplate(this.base,scene,this.card.w*this.scaleFactor,this.card.h*this.scaleFactor,0,this.card.template?.fill===true);if(this.card.template?.id==='portrait')paintTemplate(this.ink,scene,this.card.w*this.scaleFactor,this.card.h*this.scaleFactor,2,true);}
   @Builder
   images(layer:number){ForEach(this.photos(layer),(m:TemplateMark)=>{Image(sceneImage(m.src)).syncLoad(this.snapshot).width(m.w*this.unit()).height(m.h*this.unit()).position({x:(this.card.w*this.scaleFactor-300*this.unit())/2+m.x*this.unit(),y:(this.card.h*this.scaleFactor-300*this.unit())/2+m.y*this.unit()}).objectFit(ImageFit.Cover).draggable(false).hitTestBehavior(HitTestMode.None)},(m:TemplateMark)=>m.src+':'+layer)}

@@ -1496,7 +1496,7 @@ struct Index {
     const card=this.current(),t=card?.template;if(!card||!t)return;
     if(key==='id'){const next=templateDefinition(String(value));if(next?.kind!==card.capability?.k)return;t.id=String(value);}
     else if(key==='palette')t.palette=String(value);else if(key==='depth')t.depth=value===true;
-    else if(key==='fill'){t.fill=value===true;if(t.fill){card.z=Math.min(0,...this.store.state.cards.filter(c=>c.id!==card.id).map(c=>c.z))-1;const bg=this.templateBrightness(this.canvasBackground.color),ink=this.templateBrightness(templateColors(card)[1]);if(bg>180&&ink>180)t.palette='cream';else if(bg<90&&ink<90)t.palette='ink';}if(!t.fill){card.w=Math.min(260,BOARD_W/this.canvasAspect-24);card.h=card.w;card.x=(BOARD_W-card.w)/2;card.y=12;}this.clamp(card);}
+    else if(key==='fill'){t.fill=value===true;if(t.fill){const bg=this.templateBrightness(this.canvasBackground.color),ink=this.templateBrightness(templateColors(card)[1]);if(bg>180&&ink>180)t.palette='cream';else if(bg<90&&ink<90)t.palette='ink';}if(!t.fill){card.w=Math.min(260,BOARD_W/this.canvasAspect-24);card.h=card.w;card.x=(BOARD_W-card.w)/2;card.y=12;}this.clamp(card);}
     else if(key==='zoom')t.zoom=Number(value);else if(key==='offsetX')t.offsetX=Number(value);else if(key==='offsetY')t.offsetY=Number(value);
     if(mode===undefined)this.change();else this.continuousChange(mode);
   }
@@ -2407,14 +2407,14 @@ struct Index {
   shareScene() {
     Column() {
       Stack({ alignContent: Alignment.TopStart }) {
-        if (!this.shareSingle) { CanvasBackdrop({ sceneBackground: this.shareBackground,showFrame:false }).width('100%').height('100%') }
+        if (!this.shareSingle) { CanvasBackdrop({ snapshot:true, sceneBackground: this.shareBackground,showFrame:false }).width('100%').height('100%').zIndex(-1000000) }
         ForEach(depthRenderCards(this.shareCards).filter((card:FridgeCard)=>this.shareSingle||!card.hidden), (card: FridgeCard) => {
-          CardFace({ card: card, scaleFactor: 1, tick: this.shareTick, widget: true })
+          CardFace({ snapshot:true, offscreen:true, card: card, scaleFactor: 1, tick: this.shareTick, widget: true })
             .width(card.w).height(card.h)
             .position({ x: this.shareSingle ? this.shareX : card.x, y: this.shareSingle ? this.shareY : card.y * this.shareCanvasHeight / BOARD_H })
             .rotate({ angle: card.rot, centerX: 0, centerY: '100%' }).zIndex(card.z)
         }, (card: FridgeCard) => card.id)
-        if(!this.shareSingle&&this.shareBackground.frameStyle!=='none'){CanvasFrame({material:this.shareBackground.frameMaterial,style:this.shareBackground.frameStyle,square:true}).width('100%').height('100%').zIndex(100000)}
+        if(!this.shareSingle&&this.shareBackground.frameStyle!=='none'){CanvasFrame({snapshot:true,material:this.shareBackground.frameMaterial,style:this.shareBackground.frameStyle,square:true}).width('100%').height('100%').zIndex(100000)}
       }.width(this.shareWidth).height(this.shareCanvasHeight).backgroundColor(this.shareOpaque ? Color.White : Color.Transparent).clip(true)
       if (!this.shareSingle) {
         Row({space:2}) {
@@ -2915,7 +2915,7 @@ struct Index {
   private layerElement(id: string): CanvasElement | null { return this.preview.elements.find((el: CanvasElement) => el.id === id) ?? null; }
   private layerTitle(id:string):string {
     if(id==='capability')return typeLabel(this.preview.capability?.k??'');
-    if(id.length===0)return '主体底板';
+    if(id.length===0)return this.preview.template?'模板':'主体底板';
     return this.layerElement(id)?.kind==='image'?'图片':this.layerElement(id)?.kind==='shape'?'形状':'文字';
   }
   @Builder
@@ -2929,7 +2929,7 @@ struct Index {
   private layerBaseValue:FridgeCard=new FridgeCard();
   private layerBaseCard():FridgeCard {
     if(this.layerBaseSource===this.preview)return this.layerBaseValue;
-    const card=cardStorageShell(this.preview);card.capability=null;card.capBox=new ElementBox();card.elements=[];
+    const card=cardStorageShell(this.preview);if(!card.template){card.capability=null;card.capBox=new ElementBox();card.elements=[];}
     this.layerBaseSource=this.preview;this.layerBaseValue=card;return card;
   }
   @Builder

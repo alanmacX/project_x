@@ -1,3 +1,4 @@
+import { TemplateSnapshot } from './TemplateSnapshot';
 import { TemplateFace } from './TemplateFace';
 import { sceneImage } from '../model/SceneImageCache';
 import { EditorLayerMotion } from '../model/EditorLayerMotion';
@@ -16,6 +17,7 @@ export struct CardFace {
   @Prop lifted: boolean = false;
   @Prop widget: boolean = false;
   @Prop snapshot: boolean = false;
+  @Prop offscreen: boolean = false;
   @Prop hideContent: boolean = false;
   @Prop animateContent: boolean = false;
   @State layerMotion: EditorLayerMotion = new EditorLayerMotion();
@@ -61,7 +63,9 @@ export struct CardFace {
   build() {
     Stack() {
       if(this.card.template){
+        if(this.offscreen){TemplateSnapshot({card:this.card,tick:this.tick,scaleFactor:this.scaleFactor}).width('100%').height('100%').borderRadius(this.card.template.fill?0:cardCornerRadius(this.card,this.scaleFactor)).clip(true)}else{
         TemplateFace({card:this.card,tick:this.tick,scaleFactor:this.scaleFactor,snapshot:this.snapshot}).width('100%').height('100%').borderRadius(this.card.template.fill?0:cardCornerRadius(this.card,this.scaleFactor)).clip(true)
+        }
       }else if(this.card.depthPass==='foreground'){
         CardCanvas({snapshot:this.snapshot,card:this.card,layerMotion:this.layerMotion,scaleFactor:this.scaleFactor,tick:this.tick,widget:this.widget,hideContent:this.hideContent}).width(subjectSurfaceFactor(this.card)*100+'%').height(subjectSurfaceFactor(this.card)*100+'%')
       }else {

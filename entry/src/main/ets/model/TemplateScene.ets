@@ -1,3 +1,4 @@
+import { validDay } from './HolidayCalendar';
 import { activeAlbum } from './AlbumRotation';
 import { FridgeCard, CapBlock, CanvasElement } from './CardSchema';
 import { calendarCells, progressOf, daysLeftOf } from './CapabilityCalendar';
@@ -17,6 +18,7 @@ export class TemplateMark {
     angle: number = 0;
     opacity: number = 1;
     text: string = '';
+    lines: number = 1;
     size: number = 16;
     weight: number = 400;
     align: string = 'left';
@@ -73,19 +75,20 @@ export function templateColors(card: FridgeCard): string[] {
         return ['#1C2C63', '#E9EDFF', '#A4B7EA'];
     return ['#F1EDE3', '#403B30', '#9A6048'];
 }
+export function templateContrastInk(color:string):string {const light=parseInt(color.slice(1,3),16)*.2126+parseInt(color.slice(3,5),16)*.7152+parseInt(color.slice(5,7),16)*.0722;return light>155?'#26312A':'#FFFFFF';}
 export function templatePhoto(card: FridgeCard): CanvasElement | undefined { return card.elements.find(e => e.kind === 'image' && e.src.length > 0); }
 /** Logical 300-square scene. All hosts consume the same positions and reading data. */
 export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene {
-    tick = tick || Date.now();
+    tick = Number.isFinite(tick)&&tick>0?tick:Date.now();
     const s = new TemplateScene(), colors = templateColors(card);
     s.background = colors[0];
     s.ink = colors[1];
     s.accent = colors[2];
     const cap: CapBlock = card.capability ?? { k: 'clock' };
-    const id = card.template?.id ?? '', now = new Date(tick || Date.now()), zone = cap.zone ?? 'Asia/Shanghai', zoned = new Date((tick || Date.now()) - clockOffset(zone, tick || Date.now()) * 3600000);
+    const id = card.template?.id ?? '', now = new Date(tick || Date.now()), zone = cap.zone ?? 'Asia/Shanghai', zoned = cap.k==='worldclock'?new Date(tick-clockOffset(zone,tick)*3600000):now;
     const hour = cap.k === 'worldclock' ? zoned.getUTCHours() : now.getHours(), minute = cap.k === 'worldclock' ? zoned.getUTCMinutes() : now.getMinutes(), hh = ('0' + hour).slice(-2), mm = ('0' + minute).slice(-2), day = now.getDate(), month = now.getMonth() + 1, year = now.getFullYear(), week = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][now.getDay()];
     const add = (kind: string, x: number, y: number, w: number, h: number, color: string = s.ink): TemplateMark => { const m = new TemplateMark(); m.kind = kind; m.x = x; m.y = y; m.w = w; m.h = h; m.color = color; s.marks.push(m); return m; };
-    const text = (value: string, x: number, y: number, size: number = 16, color: string = s.ink, width: number = 250, align: string = 'left', weight: number = 400): TemplateMark => { const m = add('text', x, y, width, size * 1.35, color); m.text = value; m.size = size; m.align = align; m.weight = weight; return m; };
+    const text = (value: string, x: number, y: number, size: number = 16, color: string = s.ink, width: number = 250, align: string = 'left', weight: number = 400): TemplateMark => { const m = add('text', x, y, Math.max(1,Math.min(width,300-x)), Math.max(1,Math.min(size*1.2,300-y)), color); m.text = value.trim().replace(/\s+/g,' '); m.size = size; m.align = align; m.weight = weight; return m; };
     const rect = (x: number, y: number, w: number, h: number, color: string, r: number = 0): TemplateMark => { const m = add('rect', x, y, w, h, color); m.r = r; return m; };
     const arc = (x: number, y: number, r: number, start: number, sweep: number, color: string, width: number): TemplateMark => { const m = add('arc', x, y, r * 2, r * 2, color); m.r = r; m.start = start; m.sweep = sweep; m.stroke = width; return m; };
     const line = (x: number, y: number, a: number, b: number, color: string = s.ink, width: number = 1): TemplateMark => { const m = add('line', x, y, a, b, color); m.stroke = width; return m; };
@@ -106,9 +109,9 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
     } const hand = (a: number, len: number, width: number, color: string): void => { const rad = a * Math.PI / 180; line(cx, cy, cx + Math.sin(rad) * len, cy - Math.cos(rad) * len, color, width); }; hand((hour % 12) * 30 + minute / 2, r * .53, 6, s.ink); hand(minute * 6, r * .76, 3.5, s.ink); add('circle', cx - 3, cy - 3, 6, 6, s.accent); };
     const monthGrid = (): void => { const cells = calendarCells(now); ['日', '一', '二', '三', '四', '五', '六'].forEach((n, i) => { text(n, 18 + i * 39, 67, 12, s.ink, 30, 'center').opacity = .5; }); cells.forEach((n, i) => { if (!n)
         return; const x = 18 + i % 7 * 39, y = 96 + Math.floor(i / 7) * 32; if (n === day)
-        add('circle', x + 2, y - 2, 26, 26, s.accent); text(String(n), x, y, 14, n === day ? '#FFFFFF' : s.ink, 30, 'center'); }); };
-    const ring = (p: number, value: string, label: string): void => { arc(150, 142, 108, 0, 360, s.ink, 8).opacity = .12; arc(150, 142, 108, -90, Math.max(0, Math.min(1, p)) * 360, s.accent, 8); text(value, 35, 104, 67, s.ink, 230, 'center', 600); text(label, 30, 180, 14, s.ink, 240, 'center'); };
-    const dayP = progressOf('dayprogress', now), yearP = progressOf('yearprogress', now), left = cap.date ? daysLeftOf(cap.date, tick) : null;
+        add('circle', x + 2, y - 2, 26, 26, s.accent); text(String(n), x, y, 14, n === day ? templateContrastInk(s.accent) : s.ink, 30, 'center'); }); };
+    const ring = (p: number, value: string, label: string): void => { arc(150, 142, 108, 0, 360, s.ink, 8).opacity = .12; arc(150, 142, 108, -90, Math.max(0, Math.min(1, p)) * 360, s.accent, 8); text(value, 35, 100, 65, s.ink, 230, 'center', 600); text(label, 30, 195, 14, s.ink, 240, 'center'); };
+    const dayP = progressOf('dayprogress', now), yearP = progressOf('yearprogress', now), left = cap.date&&validDay(cap.date) ? daysLeftOf(cap.date, tick) : null;
     if (id === 'dial') {
         const a = rect(87, 9, 126, 282, '#6797F0', 33);
         a.end = '#E782BA';
@@ -173,9 +176,9 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
         }
         else {
             rect(0, 211, 300, 89, s.background);
-            text(cap.title || '纪念日', 20, 236, 17, s.ink, 140);
-            text(left === null ? '—' : String(-left), 157, 220, 51, s.ink, 120, 'right', 700).font = 'digits';
-            text('天', 268, 260, 12);
+            text(cap.title || '纪念日', 20, 236, 17, s.ink, 126);
+            text(left === null ? '—' : String(Math.abs(left)), 156, 223, 48, s.ink, 104, 'right', 700).font = 'digits';
+            text(left!==null&&left>0?'天后':'天', 268, 260, 12);
         }
     }
     else if (id.startsWith('date-')) {
@@ -187,7 +190,7 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
         }
         else if (id === 'date-paper') {
             text(year + ' · ' + month + '月', 24, 22, 15);
-            text(String(day), 22, 51, 174, s.ink, 230).font = 'serif';
+            text(String(day), 22, 61, 148, s.ink, 230).font = 'serif';
             line(24, 231, 276, 231, s.ink, .5);
             date();
         }
@@ -203,8 +206,8 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
                 const x = 20 + i * 38;
                 if (i === now.getDay())
                     rect(x, 207, 32, 70, s.accent, 16);
-                text(['日', '一', '二', '三', '四', '五', '六'][i], x, 217, 12, i === now.getDay() ? '#FFFFFF' : s.ink, 32, 'center');
-                text(String(d.getDate()), x, 247, 17, i === now.getDay() ? '#FFFFFF' : s.ink, 32, 'center');
+                text(['日', '一', '二', '三', '四', '五', '六'][i], x, 217, 12, i === now.getDay() ? templateContrastInk(s.accent) : s.ink, 32, 'center');
+                text(String(d.getDate()), x, 247, 17, i === now.getDay() ? templateContrastInk(s.accent) : s.ink, 32, 'center');
             }
         }
     }
@@ -218,29 +221,29 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
                 d.setDate(day - now.getDay() + i);
                 if (i === now.getDay())
                     rect(x, 189, 32, 68, s.accent, 16);
-                text(['日', '一', '二', '三', '四', '五', '六'][i], x, 199, 12, i === now.getDay() ? '#FFFFFF' : s.ink, 32, 'center');
-                text(String(d.getDate()), x, 229, 17, i === now.getDay() ? '#FFFFFF' : s.ink, 32, 'center');
+                text(['日', '一', '二', '三', '四', '五', '六'][i], x, 199, 12, i === now.getDay() ? templateContrastInk(s.accent) : s.ink, 32, 'center');
+                text(String(d.getDate()), x, 229, 17, i === now.getDay() ? templateContrastInk(s.accent) : s.ink, 32, 'center');
             }
         }
         else
             monthGrid();
     }
     else if (id.startsWith('countdown-') || id === 'anniversary-type') {
-        const n = left === null ? '—' : String(id === 'anniversary-type' ? -left : left), title = cap.title || (id === 'anniversary-type' ? '纪念日' : '倒计时');
+        const n = left === null ? '—' : String(Math.abs(left)), title = cap.title || (id === 'anniversary-type' ? '纪念日' : '倒计时');
         if (id === 'countdown-orbit') {
             arc(150, 147, 115, 135, 270, s.ink, 2).opacity = .2;
             const total = cap.seed ? daysLeftOf(cap.date ?? '', new Date(cap.seed).getTime()) : 30, p = left === null ? 0 : 1 - Math.max(0, left) / Math.max(1, total);
             arc(150, 147, 115, 135, Math.max(0, Math.min(1, p)) * 270, s.accent, 3);
             text(title, 45, 38, 17, s.ink, 210, 'center');
-            text(n, 45, 92, 103, s.ink, 210, 'center', 800).font = 'digits';
-            text('天后', 80, 190, 16, s.ink, 140, 'center');
-            text(cap.date || '设置目标日期', 40, 270, 12, s.ink, 220, 'center');
+            text(n, 45, 95, 88, s.ink, 210, 'center', 800).font = 'digits';
+            text(left===null?'天':left<0?'天前':left===0?'就是今天':'天后', 80, 210, 16, s.ink, 140, 'center');
+            text(left===null?'设置目标日期':cap.date??'', 40, 270, 12, s.ink, 220, 'center');
         }
         else {
-            text(title, 24, 24, 18);
-            text(n, 24, 83, n.length > 3 ? 110 : 155, s.ink, 252, 'left', 800).font = 'digits';
-            text(id === 'anniversary-type' ? '天' : '天后', 24, 258, 17);
-            text(cap.date || '设置日期', 127, 270, 12, s.ink, 150, 'right');
+            const heading=text(title, 24, 21, 18);heading.lines=2;heading.h=46;
+            text(n, 24, 87, n.length > 3 ? 104 : 132, s.ink, 252, 'left', 800).font = 'digits';
+            text(left===null?'天':id==='anniversary-type'?(left>0?'天后':'天'):left<0?'天前':left===0?'就是今天':'天后', 24, 249, 17);
+            text(left===null?'设置日期':cap.date??'', 127, 274, 11, s.ink, 150, 'right');
             if (id === 'countdown-paper')
                 line(24, 69, 276, 69, s.ink, .4);
         }
@@ -275,7 +278,7 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
         }
     }
     else if (id.startsWith('year-')) {
-        const total = Math.round((new Date(year + 1, 0, 1).getTime() - new Date(year, 0, 1).getTime()) / 86400000), passed = Math.floor(yearP * total);
+        const total=(Date.UTC(year+1,0,1)-Date.UTC(year,0,1))/86400000,passed=(Date.UTC(year,month-1,day)-Date.UTC(year,0,1))/86400000;
         if (id === 'year-dots') {
             text(String(year), 24, 20, 29, s.ink, 160, 'left', 800).font = 'digits';
             text(Math.floor(yearP * 100) + '%', 213, 28, 13);
@@ -316,11 +319,12 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
             rect(132, 66, 36, 8, s.ink, 2);
             if (value !== null)
                 rect(88, 267 - 184 * value / 100, 124, 184 * value / 100, s.accent, 10);
+            rect(91,133,118,101,s.background,5).opacity=.94;
             text(n, 88, 137, 87, s.ink, 124, 'center', 800).font = 'digits';
         }
         else {
             text('本机电量', 34, 34, 14);
-            text(n, 45, 88, 112, s.ink, 210, 'center', 400).font = 'monospace';
+            text(n, 45, 88, 102, s.ink, 210, 'center', 400).font = 'monospace';
             for (let i = 0; i < 10; i++) {
                 rect(34 + i * 24, 238, 18, 29, s.ink).opacity = .1;
                 if (value !== null && value > i * 10)
@@ -329,53 +333,53 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
         }
     }
     else if (id.startsWith('agenda-')) {
-        text(id === 'agenda-paper' ? '今日小记' : '接下来', 24, 24, 19);
+        text(id === 'agenda-paper' ? '日程小记' : '接下来', 24, 24, 19);
         const events = agendaItems(cap, tick).slice(0, 3);
         if (!events.length)
             text('暂无日程', 24, 123, 24);
-        events.forEach((e, i) => { const y = 83 + i * 65; text(timeText(e.start), 24, y, 13, s.accent, 50); text(e.title, 90, y, i === 0 && id === 'agenda-editorial' ? 22 : 17, s.ink, 185, 'left', 500); if (e.location)
+        events.forEach((e, i) => { const y = 83 + i * 65; text(e.allDay?'全天':timeText(e.start), 24, y, 13, s.accent, 50);if(new Date(e.start).toDateString()!==now.toDateString())text((new Date(e.start).getMonth()+1)+'/'+new Date(e.start).getDate(),24,y+24,10,s.accent,50); text(e.title, 90, y, i === 0 && id === 'agenda-editorial' ? 22 : 17, s.ink, 185, 'left', 500); if (e.location)
             text(e.location, 90, y + 27, 11, s.ink, 185).opacity = .55; if (id === 'agenda-paper' || id === 'agenda-editorial' && i === 0)
-            line(24, y + 48, 276, y + 48, s.ink, .3); if (id === 'agenda-timeline')
+            line(24, y + 48, 276, y + 48, s.ink, .3); if (id === 'agenda-timeline'&&i<events.length-1)
             line(77, y + 4, 77, y + 65, s.accent, .5); });
     }
     else if (id.startsWith('course-')) {
         if (id === 'course-week') {
             text('周课表', 24, 20, 17);
             const week = semesterWeek(cap.semester ?? '', tick);
-            text('第 ' + Math.max(1, week) + ' 周', 212, 20, 12);
+            text(!cap.semester?'导入课表':week<1?'未开学':(cap.courses??[]).length&&week>Math.max(...(cap.courses??[]).map(c=>c.lastWeek))?'学期已结束':'第 '+Math.max(1,week)+' 周',204,20,12,s.ink,72,'right');
             const items = weekLessons(cap, Math.max(1, week)), days = items.some(e => e.day > 5) ? 7 : 5, col = 234 / days, start = Math.min(480, ...items.map(e => new Date(e.event.start).getHours() * 60)), end = Math.max(1080, ...items.map(e => new Date(e.event.end).getHours() * 60 + new Date(e.event.end).getMinutes())), span = Math.max(60, end - start);
             ['一', '二', '三', '四', '五', '六', '日'].slice(0, days).forEach((v, i) => { text(v, 48 + i * col, 60, 12, s.ink, col, 'center'); });
             for (let i = 0; i < 5; i++) {
-                text(String(Math.floor((start + span * i / 4) / 60)), 12, 85 + i * 44, 10);
+                const stamp=Math.round(start+span*i/4);text(('0'+Math.floor(stamp/60)).slice(-2)+':'+('0'+stamp%60).slice(-2),10,85+i*44,8.5,s.ink,32,'right');
                 line(46, 92 + i * 44, 282, 92 + i * 44, s.ink, .2);
             }
-            items.forEach(e => { const d = new Date(e.event.start), y = 89 + (d.getHours() * 60 + d.getMinutes() - start) / span * 177, h = Math.max(12, (e.event.end - e.event.start) / 60000 / span * 177), w = (col - 3) / Math.max(1, e.lanes), x = 48 + (e.day - 1) * col + e.lane * w; rect(x, y, w - 1, h, ['#CEDAD6', '#DDD5E5', '#E2D6BD'][e.day % 3], 3); text(e.event.title, x + 2, y + 2, Math.min(11, w * .45), s.ink, Math.max(1, w - 4)); });
+            items.forEach(e => { const d = new Date(e.event.start), y = 89 + (d.getHours() * 60 + d.getMinutes() - start) / span * 177, h = Math.max(12, (e.event.end - e.event.start) / 60000 / span * 177), w = (col - 3) / Math.max(1, e.lanes), x = 48 + (e.day - 1) * col + e.lane * w; rect(x, y, w - 1, h, ['#CEDAD6', '#DDD5E5', '#E2D6BD'][e.day % 3], 3); if(w>=12&&h>=14){const label=text(e.event.title,x+2,y+2,Math.min(11,w*.45),'#303C37',Math.max(1,w-4));label.h=Math.max(1,h-4);} });
         }
         else {
             const events = courseInstances(cap, tick).filter(e => e.end > tick).slice(0, 3);
             text('接下来', 24, 22, 16);
             if (!events.length)
-                text((cap.courses ?? []).length ? '今日无课' : '导入你的课表', 24, 126, 25);
+                text((cap.courses ?? []).length ? '暂无后续课程' : '导入你的课表', 24, 126, 25);
             else if (id === 'course-next') {
                 const e = events[0];
-                text(e.title, 24, 89, 40, s.ink, 252, 'left', 600);
-                text(timeText(e.start) + '—' + timeText(e.end), 24, 234, 17);
+                const title=text(e.title, 24, 83, 36, s.ink, 252, 'left', 600);title.lines=2;title.h=96;
+                text((new Date(e.start).toDateString()===now.toDateString()?'':(new Date(e.start).getMonth()+1)+'月'+new Date(e.start).getDate()+'日 · ')+timeText(e.start)+'—'+timeText(e.end), 24, 234, 15);
                 text(e.location, 24, 266, 12);
             }
             else
-                events.forEach((e, i) => { const y = 77 + i * 66; rect(21, y, 258, 57, '#FFFFFF', 5).opacity = .6; text(timeText(e.start), 29, y + 12, 12, s.accent, 50); text(e.title, 91, y + 9, 17, s.ink, 172); text(e.location, 91, y + 34, 11, s.ink, 172).opacity = .6; });
+                events.forEach((e, i) => { const y = 77 + i * 66; rect(21, y, 258, 57, templateContrastInk(s.ink)==='#FFFFFF'?'#FFFFFF':'#000000', 5).opacity = templateContrastInk(s.ink)==='#FFFFFF'?.6:.18; text(timeText(e.start), 29, y + 12, 12, s.accent, 50); text(e.title, 91, y + 9, 17, s.ink, 172); text(e.location, 91, y + 34, 11, s.ink, 172).opacity = .6; });
         }
     }
     else if (id.startsWith('world-')) {
         if (id === 'world-dial') {
             drawDial();
-            text((cap.city || '目的地') + ' ' + hh + ':' + mm, 75, 207, 12, s.ink, 150, 'center');
+            text(cap.city||'目的地',75,207,11,s.ink,88);text(hh+':'+mm,167,207,11,s.ink,58,'right');
         }
         else if (id === 'world-duo') {
             text('本地', 25, 25, 17, s.ink, 110, 'center');
             text(cap.city || '目的地', 166, 25, 17, s.accent, 110, 'center');
             const local = new Date(tick);
-            [('0' + local.getHours()).slice(-2), hh].forEach((v, i) => { text(v, 25 + i * 141, 78, 84, i ? s.accent : s.ink, 110, 'center', 800).font = 'digits'; text(i ? mm : ('0' + local.getMinutes()).slice(-2), 25 + i * 141, 160, 84, i ? s.accent : s.ink, 110, 'center', 800).font = 'digits'; });
+            [('0' + local.getHours()).slice(-2), hh].forEach((v, i) => { text(v, 25 + i * 141, 74, 78, i ? s.accent : s.ink, 110, 'center', 800).font = 'digits'; text(i ? mm : ('0' + local.getMinutes()).slice(-2), 25 + i * 141, 177, 78, i ? s.accent : s.ink, 110, 'center', 800).font = 'digits'; });
         }
         else {
             text(cap.city || '目的地', 24, 24, 18);
@@ -391,8 +395,8 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
             text(parts[1] ?? '', 114, 57, 65, s.ink, 150).font = 'serif';
         }
         else {
-            text(parts[0] ?? '', 24, 84, 57, s.ink, 252).font = 'serif';
-            text(parts[1] ?? '', 24, 154, 57, s.ink, 252).font = 'serif';
+            text(parts[0] ?? '', 24, 80, 52, s.ink, 252).font = 'serif';
+            text(parts[1] ?? '', 24, 160, 52, s.ink, 252).font = 'serif';
         }
         date();
     }
@@ -402,7 +406,7 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
             add('circle', 99, 30, 183, 183, '#252724');
             for (let i = 0; i < 12; i++)
                 arc(190, 121, 40 + i * 4, 0, 360, '#52584C', .4);
-            image(cover, 22, 42, 164, 164);
+            if(!cover)rect(22,42,164,164,'#EFE7D8',3);image(cover, 22, 42, 164, 164);
         }
         else if (id === 'album-sleeve') {
             rect(42, 21, 216, 203, '#DCD3BE', 3);
@@ -411,7 +415,7 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
         else
             image(cover, 18, 18, 264, 206);
         if (!cover)
-            text('选择本地封面', 45, 100, 20, s.ink, 210, 'center');
+            text('选择本地封面', id==='album-record'?28:45, 100, id==='album-record'?16:20, id==='album-record'?'#40382C':s.ink, id==='album-record'?152:210, 'center');
         text(album.title || '专辑名称', 24, 243, 20, s.ink, 252, 'left', 600);
         text(album.artist || '', 24, 272, 12, s.ink, 252).opacity = .6;
     }

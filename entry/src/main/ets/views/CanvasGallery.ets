@@ -1,3 +1,4 @@
+import { PREVIEW_RENDER_FINGERPRINT } from '../model/PreviewDesignContract';
 import { capabilityRenderTick } from '../model/CapabilityClock';
 import { sceneRect } from '../model/SceneLayout';
 import { widgetFrameMetrics } from '../model/WidgetFrameGeometry';
@@ -372,7 +373,7 @@ export struct CanvasGallery {
   }
   private previewSource(state:FridgeState):string {
     let source=this.sourceCache.get(state);if(source===undefined){source=storageSnapshot(state);this.sourceCache.set(state,source);}
-    return 'v12-ellipse-relief:'+source+':hostAspect='+this.previewAspect(state)+':corner='+this.previewFrameCorner(state)+':ticks='+state.cards.map((card:FridgeCard)=>capabilityRenderTick(card.capability,this.previewTick)).join(',');
+    return 'v13-template-native-snapshot:'+PREVIEW_RENDER_FINGERPRINT+':'+source+':hostAspect='+this.previewAspect(state)+':corner='+this.previewFrameCorner(state)+':ticks='+state.cards.map((card:FridgeCard)=>capabilityRenderTick(card.capability,this.previewTick)).join(',');
   }
   private artworkCards(state: FridgeState): FridgeCard[] {
     return depthRenderCards(state.cards.filter((card: FridgeCard) => !card.hidden).map((card: FridgeCard) => cardRenderSnapshot(card)))
@@ -381,9 +382,9 @@ export struct CanvasGallery {
   @Builder
   artwork(state: FridgeState) {
     Stack({ alignContent: Alignment.TopStart }) {
-      CanvasBackdrop({ snapshot:true, sceneBackground: state.background, showFrame: false }).width('100%').height('100%')
+      CanvasBackdrop({ snapshot:true, sceneBackground: state.background, showFrame: false }).width('100%').height('100%').zIndex(-1000000)
       ForEach(this.artworkCards(state), (card: FridgeCard) => {
-        CardFace({ snapshot:true, card: card, scaleFactor: 1, tick: capabilityRenderTick(card.capability,this.previewTick), widget: true })
+        CardFace({ snapshot:true, offscreen:true, card: card, scaleFactor: 1, tick: capabilityRenderTick(card.capability,this.previewTick), widget: true })
           .width(card.w).height(card.h).position(sceneRect(card,BOARD_W,BOARD_W/this.previewAspect(state)))
           .rotate({ angle: card.rot, centerX: 0, centerY: '100%' }).zIndex(card.z)
       }, (card: FridgeCard) => card.id)

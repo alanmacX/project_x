@@ -15,11 +15,12 @@ const {Fixture}=execute(`export class Fixture {
  onLoad=async id=>{reads.push(id);return {canvasDimension:'2*4',canvasAspect:2,cards:[]};};
  prepareReturn(id){return Promise.resolve();}
  requestPreview(id){snapshots.push(id);return new Promise(()=>{});}
+ rendererVersion(value){PREVIEW_RENDER_FINGERPRINT=value;}
  previewAspect(){return 2;}previewFrameCorner(){return 8;}
  ${loading}
  ${source}
  ${policy}
-}`,{GalleryItem:gallery.GalleryItem,reads,snapshots,capabilityRenderTick:clock.capabilityRenderTick,storageSnapshot:JSON.stringify,rememberedGalleryPreview:()=>null,cachedGalleryPreview:async()=>null,widgetRectangles:()=>{throw Error('navigation must reuse measured geometry');}});
+}`,{PREVIEW_RENDER_FINGERPRINT:'render-v1',GalleryItem:gallery.GalleryItem,reads,snapshots,capabilityRenderTick:clock.capabilityRenderTick,storageSnapshot:JSON.stringify,rememberedGalleryPreview:()=>null,cachedGalleryPreview:async()=>null,widgetRectangles:()=>{throw Error('navigation must reuse measured geometry');}});
 (async()=>{
  const f=new Fixture();await Promise.race([f.loadItems('a'),new Promise((_,reject)=>setTimeout(()=>reject(Error('return navigation blocked by snapshot queue')),200))]);
  assert.deepEqual(reads,['a'],'returning rereads the changed canvas, not the entire catalog');assert.deepEqual(snapshots,['a']);
@@ -28,6 +29,7 @@ const {Fixture}=execute(`export class Fixture {
  const state={cards:[{capability:{k:'album',albumRotationMinutes:2,albumRotationStart:60000}}]};
  f.previewTick=60000;const a=f.previewSource(state);f.previewTick=119999;assert.equal(f.previewSource(state),a);f.previewTick=180000;assert.notEqual(f.previewSource(state),a,'album rollover invalidates its thumbnail');
  const staticState={cards:[{capability:null}]};const fixed=f.previewSource(staticState);f.previewTick+=60000;assert.equal(f.previewSource(staticState),fixed,'static geometry does not trigger minute-by-minute screenshots');
+ f.rendererVersion('render-v2');assert.notEqual(f.previewSource(staticState),fixed,'native renderer updates invalidate old thumbnail pixels even when user data is unchanged');
  assert.match(view,/const GALLERY_MEASUREMENT_DELAY_MS:number=300/,'capability paper/text measurement uses native offscreen settling rather than forcing the first frame');
  assert.equal((view.match(/this.artwork\(state\);\},layoutDelay,/g)||[]).length,2,'normal and missing-image fallback captures both wait for measured paper geometry');
  const split=view.slice(view.indexOf('  splitCreationButton()'),view.indexOf('  private async loadItems('));

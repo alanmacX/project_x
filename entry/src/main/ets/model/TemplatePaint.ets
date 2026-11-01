@@ -1,3 +1,4 @@
+import { layoutTemplateText } from './TemplateTextLayout';
 import { TemplateScene, TemplateMark } from './TemplateScene';
 function rounded(ctx: CanvasRenderingContext2D, m: TemplateMark): void {
     const r = Math.min(m.r, m.w / 2, m.h / 2);
@@ -68,24 +69,15 @@ export function paintTemplate(ctx: CanvasRenderingContext2D, scene: TemplateScen
         }
         else if (m.kind === 'text') {
             const family = m.font === 'digits' ? 'TemplateDigits' : m.font;
-            ctx.font = (m.weight >= 600 ? 'bold ' : '') + m.size + 'vp ' + family;
+            ctx.font = (m.font!=='digits'&&m.weight >= 600 ? 'bold ' : '') + m.size + 'vp ' + family;
             ctx.textBaseline = 'top';
             ctx.textAlign = m.align === 'center' ? 'center' : m.align === 'right' ? 'right' : 'left';
             ctx.beginPath();
             ctx.rect(m.x, m.y, m.w, m.h);
             ctx.clip();
-            let value = m.text;
-            if (m.font === 'digits') {
-                const measured = ctx.measureText(value).width;
-                if (measured > m.w)
-                    ctx.font = (m.weight >= 600 ? 'bold ' : '') + (m.size * m.w / measured) + 'vp ' + family;
-            }
-            else {
-                while (value.length > 1 && ctx.measureText(value).width > m.w) {
-                    value = value.slice(0, -2) + '…';
-                }
-            }
-            ctx.fillText(value, m.x + (m.align === 'center' ? m.w / 2 : m.align === 'right' ? m.w : 0), m.y, m.w);
+            const layout=layoutTemplateText(m,(value:string,size:number):number=>{ctx.font=(m.font!=='digits'&&m.weight>=600?'bold ':'')+size+'vp '+family;return ctx.measureText(value).width;});
+            ctx.font=(m.font!=='digits'&&m.weight>=600?'bold ':'')+layout.fontSize+'vp '+family;
+            layout.lines.forEach((value:string,index:number)=>{ctx.fillText(value,m.x+(m.align==='center'?m.w/2:m.align==='right'?m.w:0),m.y+index*layout.lineHeight,m.w);});
         }
         ctx.restore();
     }
