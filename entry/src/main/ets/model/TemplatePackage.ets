@@ -1,3 +1,4 @@
+import { templateDefinition, normalizeCardTemplate } from './CardTemplate';
 import { sharedCapability } from './SharedCapability';
 import { validateHtmlCard } from './HtmlCardTemplate';
 import { FridgeState, FridgeCard, normalizeState, defaultState, BOARD_W, BOARD_H } from './CardSchema';
@@ -11,16 +12,17 @@ export function packageScene(json: string, cardId: string): TemplatePackage {
   state.canvasId='canvas_main';
   for(const rule of state.sceneRules){rule.createdAt=0;rule.dismissed='';rule.enabled=false;}
   for(const card of state.cards)if(card.capability)card.capability=sharedCapability(card.capability);
-  return {format:'fridgememo-template',version:state.cards.some((c:FridgeCard)=>c.html!==undefined)?2:1,kind:cardId.length>0?'card':'canvas',state:state,assets:[]};
+  return {format:'fridgememo-template',version:state.cards.some((c:FridgeCard)=>c.template!==undefined)?3:state.cards.some((c:FridgeCard)=>c.html!==undefined)?2:1,kind:cardId.length>0?'card':'canvas',state:state,assets:[]};
 }
 export function readPackage(json: string): TemplatePackage {
   if(json.length>90*1024*1024)throw new Error('作品包超过大小限制');
   const raw=JSON.parse(json) as TemplatePackage;
-  if(raw.format!=='fridgememo-template'||![1,2].includes(raw.version)||!['card','canvas'].includes(raw.kind)||raw.state?.schemaVersion!==2||!Array.isArray(raw.state?.cards)||raw.state.cards.length>128||!Array.isArray(raw.assets)||raw.assets.length>256)throw new Error('不是支持的作品包');
+  if(raw.format!=='fridgememo-template'||![1,2,3].includes(raw.version)||!['card','canvas'].includes(raw.kind)||raw.state?.schemaVersion!==2||!Array.isArray(raw.state?.cards)||raw.state.cards.length>128||!Array.isArray(raw.assets)||raw.assets.length>256)throw new Error('不是支持的作品包');
   assertCanvasCapacity(0, raw.state.cards.length);
   for(const card of raw.state.cards) {
+    if(card.template!==undefined){if(raw.version<3)throw new Error('模板卡片需要 v3 作品包');if(!normalizeCardTemplate(card.template)||templateDefinition(card.template.id)?.kind!==card.capability?.k||card.html!==undefined)throw new Error('模板版本或能力不受支持，请更新应用');}
     if(card.html!==undefined) {
-      if(raw.version!==2)throw new Error('HTML 卡片需要 v2 作品包');
+      if(raw.version<2)throw new Error('HTML 卡片需要 v2 作品包');
       validateHtmlCard(card.html);
       const layer=(card.elements??[]).find(el=>el.id===card.html!.previewElementId);
       if(!layer||layer.kind!=='image'||layer.animated===true||!layer.src||card.capability?.k==='album')throw new Error('HTML 卡片渲染缓存或原生能力绑定无效');
@@ -54,7 +56,7 @@ export function importedCards(state:FridgeState,newId:()=>string):FridgeCard[]{
 export function fitImportedCanvas(cards:FridgeCard[],sourceAspect:number,targetAspect:number):void {
   const sourceH=BOARD_W/sourceAspect,targetH=BOARD_W/targetAspect;
   const scale=Math.min(1,targetH/sourceH),left=BOARD_W*(1-scale)/2,top=(targetH-sourceH*scale)/2;
-  for(const c of cards){c.x=c.x*scale+left;c.y=(c.y/BOARD_H*sourceH*scale+top)/targetH*BOARD_H;c.w*=scale;c.h*=scale;}
+  for(const c of cards){if(c.template?.fill){c.x=0;c.y=0;c.w=BOARD_W;c.h=targetH;c.rot=0;continue;}c.x=c.x*scale+left;c.y=(c.y/BOARD_H*sourceH*scale+top)/targetH*BOARD_H;c.w*=scale;c.h*=scale;}
 }
 /** Layouts travel with a canvas. Imported schedules are opt-in; external canvas targets cannot travel in a single document. */
 export function remapSceneSchedules(state:FridgeState,cards:FridgeCard[],newId:()=>string,targetAspect:number):void {

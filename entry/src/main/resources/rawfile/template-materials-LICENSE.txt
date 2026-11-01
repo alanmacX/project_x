@@ -1,0 +1,6 @@
+Template paper texture: ambientCG / Lennart Demes, CC0 1.0 Universal.
+Source: https://commons.wikimedia.org/wiki/File:Paper002_4K_Color.jpg
+License: https://creativecommons.org/publicdomain/zero/1.0/
+Processed locally: center crop, resize 768x768, encode WebP.
+Digits: Barlow Condensed Black, SIL Open Font License 1.1; see template-digits-OFL.txt.
+No AI-generated artwork is included in these templates.

@@ -1,3 +1,4 @@
+import { copyCardTemplate } from '../model/CardTemplate';
 import { compositionOverflow, CompositionOverflow } from '../model/ReadingComposition';
 import { alignToCanvas } from '../model/AlignmentGuide';
 import { groupBox } from '../model/GroupGeometry';
@@ -155,7 +156,7 @@ export struct BoardCard {
   @State atMinimum: boolean = false;
   private copyCard(): FridgeCard {
     const copy = new FridgeCard();
-    copy.id = this.card.id; copy.groupId = this.card.groupId;
+    if(this.card.template!==undefined)copy.template=copyCardTemplate(this.card.template);copy.id = this.card.id; copy.groupId = this.card.groupId;
     copy.x = this.card.x;
     copy.y = this.card.y;
     copy.w = this.card.w;
@@ -214,9 +215,11 @@ export struct BoardCard {
     return {x:2+x*Math.cos(a)+y*Math.sin(a)+this.visibleOverflow().left,y:2+h-x*Math.sin(a)+y*Math.cos(a)+this.visibleOverflow().top};
   }
   private startMove(): void {
+    if(this.card.template?.fill)return;
     this.animateLift(true); this.originX = this.card.x; this.originY = this.card.y; this.dx = 0; this.dy = 0; this.dragX = 0; this.dragY = 0; this.lastDX = 0; this.moveBounds = this.getMoveBounds(this.card);this.alignmentAnchor=this.getAlignmentAnchor(this.card); this.moving = true; this.onInteraction(true);
   }
   private move(e: GestureEvent): void {
+    if(this.card.template?.fill)return;
     const offset = this.screenOffset(e);
     let x = Math.max(this.moveBounds.minX, Math.min(this.moveBounds.maxX, this.originX + offset.x / this.scaleFactor));
     let y = Math.max(this.moveBounds.minY, Math.min(this.moveBounds.maxY, this.originY + offset.y / this.yScaleFactor));
@@ -271,6 +274,7 @@ export struct BoardCard {
     return this.overflowValue;
   }
   private controlRegions():Rectangle[] {
+    if(this.controlsOnly&&this.card.template?.fill)return [];
     if(!this.controlsOnly)return [{x:0,y:0,width:'100%',height:'100%'}];
     return [this.controlPosition(true,false),this.controlPosition(false,true)]
       .map((p:ShapePoint):Rectangle=>({x:p.x,y:p.y,width:44,height:44}));
@@ -318,7 +322,7 @@ export struct BoardCard {
       }
       // Mount material controls and contour-aware handles only on selection.
       // Keep them alive through their dismissal animation.
-      if(this.showControls&&(this.shown() || this.controlsMounted)) {
+      if(!this.card.template?.fill&&this.showControls&&(this.shown() || this.controlsMounted)) {
       Button({ type: ButtonType.Circle, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }) {SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right')).fontSize(22).fontColor([AppDesign.text(this.appDark)]).hitTestBehavior(HitTestMode.None)}.width(44).height(44).fontSize(22).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.surface(this.appDark))
         .attributeModifier(immersiveChrome(this.appDark))
         .opacity(this.controlsOpacity).scale({ x: this.resizeControlScale, y: this.resizeControlScale })

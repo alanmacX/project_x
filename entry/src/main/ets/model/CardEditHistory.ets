@@ -10,7 +10,7 @@ export class CardEditHistory {
   private activeGroup: string = '';
   private key(card: FridgeCard): string {
     return JSON.stringify([card.id, card.x, card.y, card.w, card.h, card.rot, card.z, card.shape,
-      card.frame, card.material, card.paper, card.ink, card.capability, card.capBox, card.elements,
+      card.template,card.frame, card.material, card.paper, card.ink, card.capability, card.capBox, card.elements,
       card.subjectPhoto, card.subjectBorder, card.subjectAspect, card.subjectInk, card.subjectVersion, card.cutout, card.inDoor]);
   }
   reset(card: FridgeCard): void {

@@ -1,3 +1,4 @@
+import { cardTemplateScene, TemplateMark } from './TemplateScene';
 import { FridgeCard, CanvasElement, materialColors, BOARD_W, BOARD_H, RECT_CORNER_RADIUS, ALBUM_CARD_CORNER_RADIUS } from './CardSchema';
 import { BackgroundAnchor } from './CardSchema';
 import { colorLab, representativeSwatches } from './BackgroundPalette';
@@ -8,6 +9,7 @@ export function cardColorRaster(card:FridgeCard, images:Map<string,ColorRaster>,
   const width=size,height=Math.max(12,Math.min(96,Math.round(size*card.h/Math.max(1,card.w))));
   const rgba=new Uint8Array(width*height*4),paper=rgb(materialColors(card.material,card.paper)[0]);
   const subject=card.shape==='subject',mask=images.get(card.cutout),album=card.capability?.k==='album'?images.get(card.capability.albumCover??''):undefined;
+  const template=card.template?cardTemplateScene(card,Date.now()):undefined,marks=template?.marks.filter(m=>['rect','circle','arc','image'].includes(m.kind))??[];
   const elements=card.elements.filter((el:CanvasElement)=>el.kind==='image'||el.kind==='shape');
   // Match the two image/shape stacks surrounding the capability foreground.
   const layers=elements.filter((el:CanvasElement)=>el.behindCapability).concat(elements.filter((el:CanvasElement)=>!el.behindCapability));
@@ -29,7 +31,8 @@ export function cardColorRaster(card:FridgeCard, images:Map<string,ColorRaster>,
       const dx=Math.max(radius-px,0,px-(card.w-radius)),dy=Math.max(radius-py,0,py-(card.h-radius));
       if(dx*dx+dy*dy>radius*radius)continue;
     }
-    let out=paper.slice();
+    let out=template?templatePixel(card,marks,images,u,v,rgb(template.background)):paper.slice();
+    if(template){rgba.set(out.map((n:number)=>Math.round(n)),i);continue;}
     if(subject&&card.subjectPhoto&&mask!==undefined)out=layers.length===0?sample(mask,u,v,card.w/card.h,false):over(out,sample(mask,u,v,card.w/card.h,false),1);
     if(album!==undefined)out=over(out,sample(album,u,v,card.w/card.h,true),1);
     for(const el of layers){
@@ -111,4 +114,26 @@ export function canvasArtworkCoverage(cards:FridgeCard[],rasters:ColorRaster[],a
     }
   }
   return coverage;
+}
+
+/** Sample shared template geometry off-thread; no UI snapshots or full-size bitmap allocation. */
+function templatePixel(card:FridgeCard,marks:TemplateMark[],images:Map<string,ColorRaster>,u:number,v:number,base:number[]):number[]{
+  const edge=Math.min(card.w,card.h),x=(u*card.w-(card.w-edge)/2)/edge*300,y=(v*card.h-(card.h-edge)/2)/edge*300;
+  let out=base;
+  for(const m of marks){
+    const a=-m.angle*Math.PI/180,dx=x-m.x-m.w/2,dy=y-m.y-m.h/2,px=dx*Math.cos(a)-dy*Math.sin(a)+m.w/2,py=dx*Math.sin(a)+dy*Math.cos(a)+m.h/2;
+    if(m.kind==='arc'){
+      const distance=Math.hypot(x-m.x,y-m.y);if(Math.abs(distance-m.r)>m.stroke/2)continue;
+      const angle=(Math.atan2(y-m.y,x-m.x)*180/Math.PI-m.start+720)%360;if(angle>m.sweep)continue;out=over(out,rgb(m.color),m.opacity);continue;
+    }
+    if(px<0||py<0||px>m.w||py>m.h)continue;
+    if(m.kind==='image'){const source=images.get(m.src);if(source)out=over(out,sample(source,px/m.w,py/m.h,m.w/m.h,true),m.opacity);continue;}
+    if(m.kind==='circle'&&((px/m.w-.5)**2+(py/m.h-.5)**2)*4>1)continue;
+    if(m.kind==='rect'){
+      const r=Math.min(m.r,m.w/2,m.h/2),cx=Math.max(r-px,0,px-(m.w-r)),cy=Math.max(r-py,0,py-(m.h-r));if(cx*cx+cy*cy>r*r)continue;
+      if(m.stroke&&px>m.stroke&&py>m.stroke&&px<m.w-m.stroke&&py<m.h-m.stroke)continue;
+    }
+    let color=rgb(m.color);if(m.end){const end=rgb(m.end),q=Math.max(0,Math.min(1,(px/m.w+py/m.h)/2));color=color.map((c:number,i:number)=>i===3?255:c+(end[i]-c)*q);}
+    out=over(out,color,m.opacity);
+  }return out;
 }

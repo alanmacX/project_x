@@ -211,6 +211,7 @@ export function capabilityPlacement(card: FridgeCard): ElementBox {
 }
 /** Permit cropped compositions, while keeping a recoverable portion inside the canvas. */
 export function clampCardGeometry(card: FridgeCard, width: number = BOARD_W, height: number = BOARD_H, renderedHeight: number = height): void {
+  if(card.template?.fill){card.x=0;card.y=0;card.w=width;card.h=renderedHeight;card.rot=0;return;}
   const a = card.rot * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
   const xs: number[] = [0, card.h * s, card.w * c + card.h * s, card.w * c];
   const ys: number[] = [0, -card.h * c, card.w * s - card.h * c, card.w * s];
@@ -228,6 +229,7 @@ function readableSlot(card: FridgeCard, safe: ElementBox): ElementBox {
 }
 export function minimumCardSize(card: FridgeCard): CapabilitySize {
   const size = new CapabilitySize(); size.w = card.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE; size.h = card.shape === 'subject' ? MIN_SUBJECT_EDGE : MIN_CARD_EDGE;
+  if(card.template){size.w=80;size.h=80;return size;}
   if (card.capability === null || card.capability.k==='album') return size;
   if(card.capFree){const min=cardCapabilityMinimum(card,true,card.w*card.capBox.w);size.w=Math.max(size.w,min.w);size.h=Math.max(size.h,min.h);return size;}
   const safe = safeContentBox(card), min = cardCapabilityMinimum(card, true, card.w*safe.w);
@@ -246,7 +248,7 @@ export function minimumCardSize(card: FridgeCard): CapabilitySize {
 export function ensureCapabilitySize(card: FridgeCard): boolean {
   const min = minimumCardSize(card), factor = Math.max(1, min.w / card.w, min.h / card.h);
   const w = card.w * factor, h = card.h * factor;
-  if (w > 320 + .01 || h > 420 + .01) return false;
+  if (w > (card.template?.fill?BOARD_W:320) + .01 || h > (card.template?.fill?BOARD_W/.3:420) + .01) return false;
   card.w = w; card.h = h; return true;
 }
 
@@ -289,7 +291,7 @@ class StartupLayoutCache {
 }
 /** Only immutable photo assets can retain the same identity across worker boundaries. */
 export function warmStartupLayouts(cards: FridgeCard[]): string {
-  for(const card of cards) {minimumCardSize(card);if(card.capability!==null)capabilityPlacement(card);if(card.capability&&['space','sticker'].includes(card.capability.readingBlend??''))capabilityAttachmentEdges(card,card.capBox);}
+  for(const card of cards) {if(card.template)continue;minimumCardSize(card);if(card.capability!==null)capabilityPlacement(card);if(card.capability&&['space','sticker'].includes(card.capability.readingBlend??''))capabilityAttachmentEdges(card,card.capBox);}
   const assets=cards.filter((card:FridgeCard)=>card.shape==='subject'&&card.cutout.length>0).map(outlineIdentity);
   const cache=new StartupLayoutCache();
   for(const entry of subjectCache)if(assets.some((asset:string)=>entry[0].endsWith(':'+asset)))cache.interiors[entry[0]]=entry[1];

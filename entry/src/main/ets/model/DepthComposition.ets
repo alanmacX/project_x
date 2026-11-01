@@ -32,7 +32,7 @@ function project(source:FridgeCard,pass:string,z:number,id:string=source.id):Fri
 }
 /** Render projection only: editable cards, groups, geometry and resource ownership remain unchanged. */
 export function depthRenderCards(cards:FridgeCard[]):FridgeCard[] {
-  const output:FridgeCard[]=[],sources=cards.filter(c=>!c.hidden&&(c.groupId??'').length>0&&c.depthGroup&&hasDepthSubject(c));
+  const output:FridgeCard[]=[],sources=cards.filter(c=>!c.template&&!c.hidden&&(c.groupId??'').length>0&&c.depthGroup&&hasDepthSubject(c));
   const used:string[]=[],occupied=cards.map(c=>c.id);
   for(const card of cards){
     const source=sources.find(c=>c.id===card.id&&!used.includes(c.groupId));

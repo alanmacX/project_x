@@ -72,5 +72,10 @@ assert.deepEqual(JSON.parse(JSON.stringify(restoredLayout.capabilityPlacement(ph
 assert.doesNotThrow(()=>restoredLayout.minimumCardSize(photo));
 photo.subjectVersion++;assert.throws(()=>restoredLayout.minimumCardSize(photo),/outline rescanned/,'new asset version must invalidate worker geometry');
 console.log('PASS startup layout handoff: immutable geometry, exact placement, no UI contour scanning and asset-version invalidation');
+const templateCard=load('TemplateFactory').makeTemplateCards('portrait',1,()=> 'template-photo')[0];
+const element=new s.CanvasElement();element.id='personal';element.kind='image';element.src='file:///cache/personal.webp';element.depthForeground='file:///cache/personal-alpha.png';element.depthEnabled=true;templateCard.elements=[element];testFiles.add('/cache/personal.webp');testFiles.add('/cache/personal-alpha.png');
+state.cards=[templateCard];const nativeTemplate=await payload.prepareWidgetPayload(JSON.stringify(state)),sent=JSON.parse(nativeTemplate.cards)[0];assert.equal(sent.template.id,'portrait');assert.equal(sent.template.depth,true);assert.ok(sent.elements[0].src.startsWith('memory://'));assert.ok(sent.elements[0].depthForeground.startsWith('memory://'));assert.equal(Object.keys(nativeTemplate.images).length,2);
+const opensBefore=opens,cachedTemplate=await payload.prepareWidgetPayload(JSON.stringify(state),'',nativeTemplate.manifest);assert.equal(opens,opensBefore,'unchanged template image/alpha must reuse Form cache');assert.equal(JSON.parse(cachedTemplate.cards)[0].template.id,'portrait');
+console.log('PASS native template Form payload: metadata, photo and alpha mapped together; unchanged images reuse native cache');
 console.log('PASS cold contour cache: exact-source/asset matching, worker avoidance, geometry reuse, corruption/version fallback and edit invalidation');
 })().catch(e=>{console.error(e);process.exitCode=1;});

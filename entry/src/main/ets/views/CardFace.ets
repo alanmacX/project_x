@@ -1,3 +1,4 @@
+import { TemplateFace } from './TemplateFace';
 import { sceneImage } from '../model/SceneImageCache';
 import { EditorLayerMotion } from '../model/EditorLayerMotion';
 import { contourPath } from '../model/ContourPath';
@@ -59,7 +60,9 @@ export struct CardFace {
 
   build() {
     Stack() {
-      if(this.card.depthPass==='foreground'){
+      if(this.card.template){
+        TemplateFace({card:this.card,tick:this.tick,scaleFactor:this.scaleFactor,snapshot:this.snapshot}).width('100%').height('100%').borderRadius(this.card.template.fill?0:cardCornerRadius(this.card,this.scaleFactor)).clip(true)
+      }else if(this.card.depthPass==='foreground'){
         CardCanvas({snapshot:this.snapshot,card:this.card,layerMotion:this.layerMotion,scaleFactor:this.scaleFactor,tick:this.tick,widget:this.widget,hideContent:this.hideContent}).width(subjectSurfaceFactor(this.card)*100+'%').height(subjectSurfaceFactor(this.card)*100+'%')
       }else {
       // Soft cast shadow + tight contact shadow + a solid, slightly warm sidewall.

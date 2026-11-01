@@ -83,6 +83,25 @@
   const ew=el.w*w,eh=el.h*h,box=composition.depthPhotoBox(el,el.w*c.w,el.h*c.h);
   return `<defs><clipPath id="${id}depthclip"><rect width="${ew}" height="${eh}"/></clipPath></defs><g transform="translate(${ox+el.x*w} ${oy+el.y*h}) rotate(${el.rot} ${ew/2} ${eh/2})" opacity="${el.opacity}" clip-path="url(#${id}depthclip)">`+image(media(el.depthForeground),box.x*ew,box.y*eh,box.w*ew,box.h*eh,0,id+'depthphoto','none')+'</g>';
  }
+ function templateArtwork(card,tick,id,media){
+  const scene=FridgeCore.load('TemplateScene').cardTemplateScene(card,tick),unit=Math.min(card.w,card.h)/300,ox=(card.w-unit*300)/2,oy=(card.h-unit*300)/2;
+  let out=card.template.fill?'':`<rect width="${card.w}" height="${card.h}" fill="${scene.background}"/>`,defs='';
+  for(const layer of [0,1,2,3]){
+   let marks='';scene.marks.forEach((m,index)=>{if(m.layer!==layer)return;let fill=m.color,shape='';const key=id+'mark'+index;
+    if(m.end){defs+=`<linearGradient id="${key}" x2="1" y2="1"><stop stop-color="${m.color}"/><stop offset="1" stop-color="${m.end}"/></linearGradient>`;fill=`url(#${key})`;}
+    if(m.kind==='rect')shape=`<rect x="${m.x}" y="${m.y}" width="${Math.max(0,m.w)}" height="${Math.max(0,m.h)}" rx="${m.r}" fill="${m.stroke?'none':fill}" stroke="${m.stroke?m.color:'none'}" stroke-width="${m.stroke}"/>`;
+    else if(m.kind==='circle')shape=`<ellipse cx="${m.x+m.w/2}" cy="${m.y+m.h/2}" rx="${m.w/2}" ry="${m.h/2}" fill="${fill}"/>`;
+    else if(m.kind==='line')shape=`<path d="M${m.x} ${m.y}L${m.w} ${m.h}" fill="none" stroke="${m.color}" stroke-width="${m.stroke}" stroke-linecap="round"/>`;
+    else if(m.kind==='arc'){if(m.sweep>=359.99)shape=`<circle cx="${m.x}" cy="${m.y}" r="${m.r}" fill="none" stroke="${m.color}" stroke-width="${m.stroke}"/>`;else if(m.sweep>0){const a=m.start*Math.PI/180,b=(m.start+m.sweep)*Math.PI/180;shape=`<path d="M${m.x+Math.cos(a)*m.r} ${m.y+Math.sin(a)*m.r}A${m.r} ${m.r} 0 ${m.sweep>180?1:0} 1 ${m.x+Math.cos(b)*m.r} ${m.y+Math.sin(b)*m.r}" fill="none" stroke="${m.color}" stroke-width="${m.stroke}" stroke-linecap="round"/>`;}}
+    else if(m.kind==='text'){defs+=`<clipPath id="${key}"><rect x="${m.x}" y="${m.y}" width="${m.w}" height="${m.h}"/></clipPath>`;shape=`<text x="${m.x+(m.align==='center'?m.w/2:m.align==='right'?m.w:0)}" y="${m.y}" dominant-baseline="text-before-edge" text-anchor="${m.align==='center'?'middle':m.align==='right'?'end':'start'}" font-size="${m.font==='digits'?Math.min(m.size,m.w/Math.max(1,m.text.length*.5)):m.size}" font-weight="${m.weight}" font-family="${m.font==='digits'?'TemplateDigits':m.font}" fill="${m.color}" clip-path="url(#${key})">${escape(m.font==='digits'?m.text:fitted(m.text,m.size,m.w))}</text>`;}
+    else if(m.kind==='image')shape=image(media(m.src),m.x,m.y,m.w,m.h,0,key,'xMidYMid slice');
+    marks+=`<g opacity="${m.opacity}"${m.angle?` transform="rotate(${m.angle} ${m.x+m.w/2} ${m.y+m.h/2})"`:''}>${shape}</g>`;
+   });out+=`<g transform="translate(${ox} ${oy}) scale(${unit})">${marks}</g>`;
+   if(layer===0&&/(paper|ledger|slips|sleeve)/.test(card.template.id)&&global.FridgeMaterials.template_paper)out+=`<image href="${global.FridgeMaterials.template_paper}" width="${card.w}" height="${card.h}" opacity=".09" preserveAspectRatio="xMidYMid slice"/>`;
+  }
+  return `<defs>${defs}<clipPath id="${id}template"><rect width="${card.w}" height="${card.h}" rx="${card.template.fill?0:schema.cardCornerRadius(card)}"/></clipPath></defs><g clip-path="url(#${id}template)">${out}</g>`;
+ }
+
  function renderPackage(pack,width,tick,options={}){
   const namespace=options.namespace||'fridge';if(!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(namespace))throw Error('Invalid SVG namespace');
   if(!Number.isFinite(width)||width<=0||!Number.isFinite(tick))throw Error('Invalid render dimensions/time');
@@ -95,7 +114,7 @@
    assetDefs+=`<image id="${key.slice(1)}" href="data:image/${mime};base64,${a.data}" width="1" height="1" preserveAspectRatio="none"/>`;
   }
   const media=ref=>assets.get(ref)||'';
-  let defs=assetDefs,body=scene.background.mode==='transparent'?'':`<rect width="${width}" height="${height}" fill="${color(scene.background.color)}"/>`;
+  let defs=assetDefs+(global.FridgeMaterials.template_digits?`<style>@font-face{font-family:TemplateDigits;src:url(${global.FridgeMaterials.template_digits})}</style>`:''),body=scene.background.mode==='transparent'?'':`<rect width="${width}" height="${height}" fill="${color(scene.background.color)}"/>`;
   if(scene.background.mode!=='transparent'&&scene.background.src&&scene.background.mode!=='solid'&&scene.background.mode!=='smart')body+=image(media(scene.background.src),0,0,width,height,0,namespace+'backdrop','xMidYMid slice');
   const background=body,cards=[];
   composition.depthRenderCards(scene.cards).filter(c=>!c.hidden).sort((a,b)=>a.z-b.z).forEach((c,i)=>{
@@ -104,6 +123,10 @@
    defs+=shadow(id)+shadow(id+'cast',depth.CARD_CAST_RADIUS,depth.CARD_CAST_Y,41/255)+shadow(id+'contact',depth.CARD_CONTACT_RADIUS,depth.CARD_CONTACT_Y,50/255)+`<clipPath id="${id}clip"><rect width="${c.w}" height="${c.h}" rx="${r}"/></clipPath>`;
    const x=c.x*scale,y=c.y*height/schema.BOARD_H;
    body+=`<g data-fridge-card="${escape(c.id)}"><g transform="translate(${x} ${y}) scale(${scale})"><g transform="rotate(${c.rot} ${c.w/2} ${c.h/2})">`;
+   if(c.template){
+    body+=templateArtwork(c,tick,id,media)+'</g></g></g>';
+    cards.push({id:c.id,groupId:c.groupId,z:c.z,x,y,width:c.w*scale,height:c.h*scale,rotation:c.rot,pivot:{x:x+c.w*scale/2,y:y+c.h*scale/2},markup:body.slice(start)});return;
+   }
    if(c.depthPass==='foreground'){
     body+=depthForeground(c,media,id);
     const fw=c.w*f,fh=c.h*f,fx=(c.w-fw)/2,fy=(c.h-fh)/2;
