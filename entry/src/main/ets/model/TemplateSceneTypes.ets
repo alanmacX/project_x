@@ -20,6 +20,7 @@ export class TemplateMark {
     stroke: number = 0;
     layer: number = 0;
     src: string = '';
+    fit: string = 'cover';
 }
 export class TemplateScene {
     width: number = 300;

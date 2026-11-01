@@ -99,7 +99,7 @@
      const x=m.x+(m.align==='center'?m.w/2:m.align==='right'?m.w:0);
      shape=`<text dominant-baseline="text-before-edge" text-anchor="${m.align==='center'?'middle':m.align==='right'?'end':'start'}" font-size="${fit.fontSize}" font-weight="${m.font!=='digits'&&m.weight>=600?700:400}" font-family="${family}" fill="${m.color}" clip-path="url(#${key})">`+fit.lines.map((line,row)=>`<tspan x="${x}" y="${m.y+row*fit.lineHeight}">${escape(line)}</tspan>`).join('')+'</text>';
     }
-    else if(m.kind==='image')shape=image(media(m.src),m.x,m.y,m.w,m.h,m.r,key,'xMidYMid slice');
+    else if(m.kind==='image')shape=image(media(m.src),m.x,m.y,m.w,m.h,m.r,key,m.fit==='contain'?'xMidYMid meet':'xMidYMid slice');
     marks+=`<g opacity="${m.opacity}"${m.angle?` transform="rotate(${m.angle} ${m.x+m.w/2} ${m.y+m.h/2})"`:''}>${shape}</g>`;
    });out+=`<g transform="translate(${ox} ${oy}) scale(${unit})">${marks}</g>`;
    if(layer===0&&/(paper|ledger|slips|sleeve)/.test(card.template.id)&&global.FridgeMaterials.template_paper)out+=`<image href="${global.FridgeMaterials.template_paper}" width="${card.w}" height="${card.h}" opacity=".09" preserveAspectRatio="xMidYMid slice"/>`;

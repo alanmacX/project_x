@@ -40,3 +40,14 @@ peerCards[0]=paletteHistory.undo();paletteModel.restoreCompositionPalette(palett
 peerCards[0]=paletteHistory.redo();paletteModel.restoreCompositionPalette(paletteHistory.paletteState(),peerCards);assert.deepEqual(peerCards.map(c=>c.template.palette),['cobalt','cobalt','cobalt','cream']);
 for(const c of peerCards.slice(0,3)){const model=nativeLoad('TemplateScene'),scene=model.cardTemplateScene(c,now);assert.deepEqual(Array.from(model.templateColors(c)),[scene.background,scene.ink,scene.accent]);}
 console.log('PASS unified composition palettes: group switch, exact undo/redo of mixed previous palettes, matching swatches and legacy group isolation');
+
+// Photo combinations preserve the whole source in square and wide layouts, including smart-color area.
+for(const aspect of [1,2])for(const ratio of [.125,1,8]){
+ const card=nativeFactory.makeTemplateCards('mix-memory',aspect,()=>String(++id),now)[0],photo=new (nativeLoad('CardSchema').CanvasElement)();photo.kind='image';photo.src='file:///photo.webp';card.elements=[photo];
+ const scene=nativeLoad('TemplateScene').cardTemplateScene(card,now),image=scene.marks.find(m=>m.kind==='image');assert.equal(image.fit,'contain');assert.ok(image.x>=0&&image.y>=0&&image.x+image.w<=scene.width&&image.y+image.h<=scene.height);
+ const width=ratio<1?8:64,height=ratio<1?64:64/ratio,rgba=new Uint8Array(width*height*4);for(let i=0;i<rgba.length;i+=4){rgba[i]=255;rgba[i+3]=255;}
+ const raster=nativeLoad('CardColorDistribution').cardColorRaster(card,new Map([[photo.src,{width,height,rgba}]]),240),count=Array.from(raster.rgba).filter((v,i)=>i%4===0&&v===255&&raster.rgba[i+1]===0&&raster.rgba[i+2]===0).length;
+ const expected=image.w*image.h/(scene.width*scene.height)*Math.min(ratio/(image.w/image.h),(image.w/image.h)/ratio),actual=count/(raster.width*raster.height);assert.ok(Math.abs(actual-expected)<.015,`contain image area ${aspect}/${ratio}: ${actual} vs ${expected}`);
+ photo.depthEnabled=true;photo.depthForeground='file:///subject.png';photo.depthSourceAspect=ratio;assert.equal(nativeLoad('TemplateScene').cardTemplateScene(card,now).marks.find(m=>m.kind==='image').fit,'contain');
+}
+console.log('PASS photo combination fit: tall/square/wide sources in square and wide faces, complete image/subject and matching smart-color area');

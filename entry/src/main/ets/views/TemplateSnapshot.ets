@@ -27,7 +27,7 @@ export struct TemplateSnapshot {
         .textAlign(m.align==='center'?TextAlign.Center:m.align==='right'?TextAlign.End:TextAlign.Start).width('100%').height(this.fitted(m).lineHeight*this.unit())})}
         .width(m.w*this.unit()).height(m.h*this.unit()).clip(true).position({x:this.x(m),y:this.y(m)})
     }else if(m.kind==='image'){
-      Image(sceneImage(m.src)).syncLoad(true).objectFit(ImageFit.Cover).width(m.w*this.unit()).height(m.h*this.unit()).position({x:this.x(m),y:this.y(m)}).borderRadius(m.r*this.unit()).clip(m.r>0)
+      Image(sceneImage(m.src)).syncLoad(true).objectFit(m.fit==='contain'?ImageFit.Contain:ImageFit.Cover).width(m.w*this.unit()).height(m.h*this.unit()).position({x:this.x(m),y:this.y(m)}).borderRadius(m.r*this.unit()).clip(m.r>0)
     }else if(m.kind==='line'){
       Line().startPoint([m.x*this.unit(),m.y*this.unit()]).endPoint([m.w*this.unit(),m.h*this.unit()]).stroke(m.color).strokeWidth(m.stroke*this.unit()).strokeLineCap(LineCapStyle.Round)
         .width(this.scene.width*this.unit()).height(this.scene.height*this.unit()).position({x:(this.card.w*this.scaleFactor-this.scene.width*this.unit())/2,y:(this.card.h*this.scaleFactor-this.scene.height*this.unit())/2})

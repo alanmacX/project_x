@@ -21,7 +21,7 @@ export struct TemplateFace {
   private sceneChanged():void {this.cachedCard=null;this.redraw();}
   private redraw():void {if(!this.ready)return;const scene=this.scene();paintTemplate(this.base,scene,this.card.w*this.scaleFactor,this.card.h*this.scaleFactor,0,this.card.template?.fill===true);if(this.scene().marks.some(m=>m.layer===2&&m.kind!=='image'))paintTemplate(this.ink,scene,this.card.w*this.scaleFactor,this.card.h*this.scaleFactor,2,true);}
   @Builder
-  images(layer:number){ForEach(this.photos(layer),(m:TemplateMark)=>{Image(sceneImage(m.src)).syncLoad(this.snapshot).width(m.w*this.unit()).height(m.h*this.unit()).position({x:(this.card.w*this.scaleFactor-this.scene().width*this.unit())/2+m.x*this.unit(),y:(this.card.h*this.scaleFactor-this.scene().height*this.unit())/2+m.y*this.unit()}).objectFit(ImageFit.Cover).borderRadius(m.r*this.unit()).clip(m.r>0).draggable(false).hitTestBehavior(HitTestMode.None)},(m:TemplateMark)=>m.src+':'+layer)}
+  images(layer:number){ForEach(this.photos(layer),(m:TemplateMark)=>{Image(sceneImage(m.src)).syncLoad(this.snapshot).width(m.w*this.unit()).height(m.h*this.unit()).position({x:(this.card.w*this.scaleFactor-this.scene().width*this.unit())/2+m.x*this.unit(),y:(this.card.h*this.scaleFactor-this.scene().height*this.unit())/2+m.y*this.unit()}).objectFit(m.fit==='contain'?ImageFit.Contain:ImageFit.Cover).borderRadius(m.r*this.unit()).clip(m.r>0).draggable(false).hitTestBehavior(HitTestMode.None)},(m:TemplateMark)=>m.src+':'+layer)}
   build(){
     Stack({alignContent:Alignment.TopStart}){
       Canvas(this.base).width('100%').height('100%').onReady(()=>{this.ready=true;this.redraw();}).onAreaChange(()=>this.redraw())

@@ -23,7 +23,7 @@ export function compositionScene(card: FridgeCard, tick: number): TemplateScene 
     const rect = (x: number, y: number, w: number, h: number, color: string, r: number = 0): TemplateMark => { const m = mark('rect', x, y, w, h, color); m.r = r; return m; };
     const line = (x: number, y: number, x2: number, y2: number, color: string = s.ink, width: number = .6): void => { const m = mark('line', x, y, x2, y2, color); m.stroke = width; };
     const arc = (x: number, y: number, r: number, start: number, sweep: number, color: string, width: number): TemplateMark => { const m = mark('arc', x, y, r * 2, r * 2, color); m.r = r; m.start = start; m.sweep = sweep; m.stroke = width; return m; };
-    const image = (src: string, x: number, y: number, w: number, h: number, r: number = 0): void => { const m = mark('image', x, y, w, h); m.src = src; m.layer = 1; m.r = r; };
+    const image = (src: string, x: number, y: number, w: number, h: number, r: number = 0): TemplateMark => { const m = mark('image', x, y, w, h); m.src = src; m.layer = 1; m.r = r; return m; };
     const dateHead = (): void => { text(date, 22, 19, 13, 170); text(week, 215, 19, 13, 63, 'right'); };
     if (id === 'face-desk-clock') {
         text(week, 22, 22, 14, 110);
@@ -123,10 +123,10 @@ export function compositionScene(card: FridgeCard, tick: number): TemplateScene 
         if (photo) {
             if (t.depth && photo.depthForeground && photo.depthEnabled) {
                 const aspect = Math.max(.05, photo.depthSourceAspect * photo.depthCrop.w / Math.max(.01, photo.depthCrop.h)), h = Math.min(box[3], box[2] / aspect) * t.zoom, w = h * aspect;
-                image(photo.depthForeground, box[0] + (box[2] - w) / 2 + t.offsetX * box[2], box[1] + (box[3] - h) / 2 + t.offsetY * box[3], w, h);
+                image(photo.depthForeground, box[0] + (box[2] - w) / 2 + t.offsetX * box[2], box[1] + (box[3] - h) / 2 + t.offsetY * box[3], w, h).fit = 'contain';
             }
             else
-                image(photo.src, box[0], box[1], box[2], box[3], 10);
+                image(photo.src, box[0], box[1], box[2], box[3], 10).fit = 'contain';
         }
         const left = cap.date && validDay(cap.date) ? daysLeftOf(cap.date, tick) : null;
         const number = text(left === null ? '—' : String(Math.abs(left)), 22, wide ? 43 : 106, wide ? 57 : 88, wide ? 92 : 114, 'left', 'digits');

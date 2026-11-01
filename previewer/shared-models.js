@@ -2491,6 +2491,7 @@ class TemplateMark {
         this.stroke = 0;
         this.layer = 0;
         this.src = '';
+        this.fit = 'cover';
     }
 }
 exports.TemplateMark = TemplateMark;
@@ -2536,7 +2537,7 @@ function compositionScene(card, tick) {
     const rect = (x, y, w, h, color, r = 0) => { const m = mark('rect', x, y, w, h, color); m.r = r; return m; };
     const line = (x, y, x2, y2, color = s.ink, width = .6) => { const m = mark('line', x, y, x2, y2, color); m.stroke = width; };
     const arc = (x, y, r, start, sweep, color, width) => { const m = mark('arc', x, y, r * 2, r * 2, color); m.r = r; m.start = start; m.sweep = sweep; m.stroke = width; return m; };
-    const image = (src, x, y, w, h, r = 0) => { const m = mark('image', x, y, w, h); m.src = src; m.layer = 1; m.r = r; };
+    const image = (src, x, y, w, h, r = 0) => { const m = mark('image', x, y, w, h); m.src = src; m.layer = 1; m.r = r; return m; };
     const dateHead = () => { text(date, 22, 19, 13, 170); text(week, 215, 19, 13, 63, 'right'); };
     if (id === 'face-desk-clock') {
         text(week, 22, 22, 14, 110);
@@ -2648,10 +2649,10 @@ function compositionScene(card, tick) {
         if (photo) {
             if (t.depth && photo.depthForeground && photo.depthEnabled) {
                 const aspect = Math.max(.05, photo.depthSourceAspect * photo.depthCrop.w / Math.max(.01, photo.depthCrop.h)), h = Math.min(box[3], box[2] / aspect) * t.zoom, w = h * aspect;
-                image(photo.depthForeground, box[0] + (box[2] - w) / 2 + t.offsetX * box[2], box[1] + (box[3] - h) / 2 + t.offsetY * box[3], w, h);
+                image(photo.depthForeground, box[0] + (box[2] - w) / 2 + t.offsetX * box[2], box[1] + (box[3] - h) / 2 + t.offsetY * box[3], w, h).fit = 'contain';
             }
             else
-                image(photo.src, box[0], box[1], box[2], box[3], 10);
+                image(photo.src, box[0], box[1], box[2], box[3], 10).fit = 'contain';
         }
         const left = cap.date && (0, HolidayCalendar_1.validDay)(cap.date) ? (0, CapabilityCalendar_1.daysLeftOf)(cap.date, tick) : null;
         const number = text(left === null ? '—' : String(Math.abs(left)), 22, wide ? 43 : 106, wide ? 57 : 88, wide ? 92 : 114, 'left', 'digits');
@@ -5343,4 +5344,4 @@ exports.creationDimension = creationDimension;
 function creationAspect(dimension) { return dimension === '2*4' ? 2 : 1; }
 exports.creationAspect = creationAspect;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"432d97d53fe50ce7853f338e28adfa9e7e1dfc5a48e0e3e7e20a5f8692bd70a5"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"69e4d7dcd21dd570239cc0245643106ae05e26190b9c681386481203cbf38091"};})(globalThis);

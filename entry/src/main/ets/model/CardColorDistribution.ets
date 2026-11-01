@@ -127,7 +127,19 @@ function templatePixel(card:FridgeCard,marks:TemplateMark[],images:Map<string,Co
       const angle=(Math.atan2(y-m.y,x-m.x)*180/Math.PI-m.start+720)%360;if(angle>m.sweep)continue;out=over(out,rgb(m.color),m.opacity);continue;
     }
     if(px<0||py<0||px>m.w||py>m.h)continue;
-    if(m.kind==='image'){const source=images.get(m.src);if(source)out=over(out,sample(source,px/m.w,py/m.h,m.w/m.h,true),m.opacity);continue;}
+    if(m.kind==='image'){
+      const source=images.get(m.src);
+      if(source){
+        let u=px/m.w,v=py/m.h;
+        if(m.fit==='contain'){
+          const ratio=source.width/source.height,aspect=m.w/m.h;
+          if(ratio>aspect)v=.5+(v-.5)*ratio/aspect;else u=.5+(u-.5)*aspect/ratio;
+          if(u<0||u>1||v<0||v>1)continue;
+        }
+        out=over(out,sample(source,u,v,m.w/m.h,m.fit!=='contain'),m.opacity);
+      }
+      continue;
+    }
     if(m.kind==='circle'&&((px/m.w-.5)**2+(py/m.h-.5)**2)*4>1)continue;
     if(m.kind==='rect'){
       const r=Math.min(m.r,m.w/2,m.h/2),cx=Math.max(r-px,0,px-(m.w-r)),cy=Math.max(r-py,0,py-(m.h-r));if(cx*cx+cy*cy>r*r)continue;
