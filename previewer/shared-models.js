@@ -2541,10 +2541,6 @@ function compositionScene(card, tick) {
     if (id === 'face-desk-clock') {
         text(week, 22, 22, 14, 110);
         text(hh + ':' + mm, 18, wide ? 43 : 56, wide ? 66 : 81, wide ? 152 : 264, 'left', 'digits');
-        if (!wide)
-            line(22, 158, 278, 158, s.accent, .8);
-        else
-            line(162, 18, 162, 132, s.accent, .6);
     }
     else if (id === 'face-desk-calendar') {
         text(now.getFullYear() + ' / ' + ('0' + (now.getMonth() + 1)).slice(-2), 0, 0, H > 200 ? 30 : 17, 300);
@@ -2581,12 +2577,6 @@ function compositionScene(card, tick) {
         else
             dateHead();
         text(hh + ':' + mm, wide ? 16 : 22, wide ? 47 : 40, wide ? 66 : 78, wide ? 150 : 256, 'left', 'digits');
-        if (!wide) {
-            line(24, 135, 276, 135, s.ink, .35);
-            line(24, 228, 276, 228, s.ink, .35);
-        }
-        else
-            line(165, 20, 165, 132, s.ink, .4);
     }
     else if (id === 'face-day-agenda') {
         const event = (0, CapabilityData_1.agendaItems)(cap, tick)[0];
@@ -2614,12 +2604,6 @@ function compositionScene(card, tick) {
     else if (id === 'face-study-clock') {
         text(hh + ':' + mm, 22, wide ? 26 : 25, wide ? 43 : 49, wide ? 112 : 180, 'left', 'digits');
         text(date + ' · ' + week, 22, wide ? 86 : 82, 12, wide ? 114 : 256);
-        if (wide)
-            line(141, 19, 141, 104, s.accent, .5);
-        else {
-            line(22, 99, 278, 99, s.accent, .6);
-            line(22, 241, 278, 241, s.accent, .6);
-        }
     }
     else if (id === 'face-study-course') {
         const e = (0, CapabilityData_1.courseInstances)(cap, tick)[0];
@@ -2652,8 +2636,6 @@ function compositionScene(card, tick) {
         mark('circle', cx - 3, cy - 3, 6, 6, s.ink);
         if (wide)
             text('本地 ' + hh + ':' + mm, 174, 17, 12, 104, 'right');
-        else
-            line(24, 226, 276, 226, s.accent, .45);
     }
     else if (id === 'face-travel-countdown') {
         const left = cap.date && (0, HolidayCalendar_1.validDay)(cap.date) ? (0, CapabilityCalendar_1.daysLeftOf)(cap.date, tick) : null, value = left === null ? '—' : String(Math.abs(left)), phase = left === null ? '天' : left < 0 ? '天前' : '天后';
@@ -5361,4 +5343,4 @@ exports.creationDimension = creationDimension;
 function creationAspect(dimension) { return dimension === '2*4' ? 2 : 1; }
 exports.creationAspect = creationAspect;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"21555be32157190c5cfc47e04e2d6c35303317d57b2ede0a19e5107a1309be5b"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"432d97d53fe50ce7853f338e28adfa9e7e1dfc5a48e0e3e7e20a5f8692bd70a5"};})(globalThis);

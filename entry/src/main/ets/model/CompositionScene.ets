@@ -28,10 +28,6 @@ export function compositionScene(card: FridgeCard, tick: number): TemplateScene 
     if (id === 'face-desk-clock') {
         text(week, 22, 22, 14, 110);
         text(hh + ':' + mm, 18, wide ? 43 : 56, wide ? 66 : 81, wide ? 152 : 264, 'left', 'digits');
-        if (!wide)
-            line(22, 158, 278, 158, s.accent, .8);
-        else
-            line(162, 18, 162, 132, s.accent, .6);
     }
     else if (id === 'face-desk-calendar') {
         text(now.getFullYear() + ' / ' + ('0' + (now.getMonth() + 1)).slice(-2), 0, 0, H > 200 ? 30 : 17, 300);
@@ -56,12 +52,6 @@ export function compositionScene(card: FridgeCard, tick: number): TemplateScene 
         else
             dateHead();
         text(hh + ':' + mm, wide ? 16 : 22, wide ? 47 : 40, wide ? 66 : 78, wide ? 150 : 256, 'left', 'digits');
-        if (!wide) {
-            line(24, 135, 276, 135, s.ink, .35);
-            line(24, 228, 276, 228, s.ink, .35);
-        }
-        else
-            line(165, 20, 165, 132, s.ink, .4);
     }
     else if (id === 'face-day-agenda') {
         const event = agendaItems(cap, tick)[0];
@@ -89,12 +79,6 @@ export function compositionScene(card: FridgeCard, tick: number): TemplateScene 
     else if (id === 'face-study-clock') {
         text(hh + ':' + mm, 22, wide ? 26 : 25, wide ? 43 : 49, wide ? 112 : 180, 'left', 'digits');
         text(date + ' · ' + week, 22, wide ? 86 : 82, 12, wide ? 114 : 256);
-        if (wide)
-            line(141, 19, 141, 104, s.accent, .5);
-        else {
-            line(22, 99, 278, 99, s.accent, .6);
-            line(22, 241, 278, 241, s.accent, .6);
-        }
     }
     else if (id === 'face-study-course') {
         const e = courseInstances(cap, tick)[0];
@@ -127,8 +111,6 @@ export function compositionScene(card: FridgeCard, tick: number): TemplateScene 
         mark('circle', cx - 3, cy - 3, 6, 6, s.ink);
         if (wide)
             text('本地 ' + hh + ':' + mm, 174, 17, 12, 104, 'right');
-        else
-            line(24, 226, 276, 226, s.accent, .45);
     }
     else if (id === 'face-travel-countdown') {
         const left = cap.date && validDay(cap.date) ? daysLeftOf(cap.date, tick) : null, value = left === null ? '—' : String(Math.abs(left)), phase = left === null ? '天' : left < 0 ? '天前' : '天后';
