@@ -1,3 +1,4 @@
+import { MinutePulse } from '../model/MinutePulse';
 import { TemplatePhotoEditor } from '../views/TemplatePhotoEditor';
 import { cardCapabilities, replaceCardCapability } from '../model/TemplateSources';
 import { compositionDefinition } from '../model/CompositionCatalog';
@@ -214,7 +215,7 @@ struct Index {
   private saveTimer: number = -1;
   private previewTimer: number = -1;
   private alive: boolean = true;
-  private clockTimer: number = -1;
+  private minutePulse:MinutePulse=new MinutePulse(()=>this.clockPulse());
   private layerStartX: number = 0;
   private layerStartY: number = 0;
   private layerFreeStart:boolean=false;
@@ -365,8 +366,13 @@ struct Index {
     this.alive = true;
     this.context = this.getUIContext().getHostContext() ?? null;
     this.initialize();
-    this.clockTimer = setInterval(() => { if(!this.alive||!this.ready||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded)return;if(this.galleryTransitioning||this.canvasChanging||this.deletionId||this.readingComparisonOpen||this.gestureGroup||this.activeBoardId||this.heroActive||this.arriving){this.scheduleForegroundRefresh();return;}this.tick = Math.floor(Date.now()/60000)*60000;this.refreshLiveData();this.updateScheduledScene(true); }, 60000);
+    this.minutePulse.start();
     this.batteryObserver.start(()=>{invalidateCapabilityRead('battery');this.refreshLiveData();});
+  }
+  private clockPulse():void {
+    if(!this.alive||!this.ready||!this.pageVisible||!this.appWindowFocused||this.appBackgrounded)return;
+    if(this.galleryTransitioning||this.canvasChanging||this.deletionId||this.readingComparisonOpen||this.gestureGroup||this.activeBoardId||this.heroActive||this.arriving){this.scheduleForegroundRefresh();return;}
+    this.tick=Math.floor(Date.now()/60000)*60000;this.refreshLiveData();this.updateScheduledScene(true);
   }
   private initialize(): void {
     if (this.context === null) return;
@@ -1001,7 +1007,7 @@ struct Index {
       }
     } finally { this.repairingSubjects = false; }
   }
-  aboutToDisappear(): void { this.cancelGalleryWarm();this.cancelGalleryTransition();this.canvasFlightGeneration++;this.canvasFlightY=0;this.canvasFlightX=0;this.canvasFlightAngle=0;this.canvasChanging=false; this.reliefGeneration++;if(this.reliefTimer>=0)clearTimeout(this.reliefTimer); this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer); if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); if (this.clockTimer >= 0) clearInterval(this.clockTimer); }
+  aboutToDisappear(): void { this.cancelGalleryWarm();this.cancelGalleryTransition();this.canvasFlightGeneration++;this.canvasFlightY=0;this.canvasFlightX=0;this.canvasFlightAngle=0;this.canvasChanging=false; this.reliefGeneration++;if(this.reliefTimer>=0)clearTimeout(this.reliefTimer); this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer); if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); this.minutePulse.stop(); }
   onBackPress(): boolean {
     if(this.photoEditorOpen){this.finishPhotoEditor(null);return true;}
     if(this.galleryTransitioning)return true;
@@ -1529,7 +1535,7 @@ struct Index {
   }
   private templateSetting(key:string,value:string|number|boolean,mode?:SliderChangeMode):void{
     const card=this.current(),t=card?.template;if(!card||!t)return;
-    if(key==='id'){const next=templateDefinition(String(value));if(next?.kind!==card.capability?.k)return;t.id=String(value);}
+    if(key==='id'){const next=templateDefinition(String(value));if(next?.kind!==card.capability?.k)return;t.id=String(value);this.templateCanvasBackground();}
     else if(key==='palette'){setCompositionPalette(card,this.store.state.cards,String(value));t.clockInk='';this.templateCanvasBackground();}else if(key==='background'){t.background=String(value);this.templateCanvasBackground();}else if(key==='photoMode'){t.photoMode=String(value);t.zoom=1;t.offsetX=0;t.offsetY=0;}else if(key==='reset'){t.zoom=1;t.offsetX=0;t.offsetY=0;}else if(key==='depth')t.depth=value===true;
     else if(key==='fill'){t.fill=value===true;if(t.fill)this.templateCanvasBackground();if(!t.fill){card.w=Math.min(260,BOARD_W/this.canvasAspect-24);card.h=compositionDefinition(t.id)&&this.canvasAspect>=1.5?card.w/2:card.w;card.x=(BOARD_W-card.w)/2;card.y=12;}this.clamp(card);}
     else if(key==='zoom')t.zoom=Number(value);else if(key==='offsetX')t.offsetX=Number(value);else if(key==='offsetY')t.offsetY=Number(value);
@@ -1881,7 +1887,7 @@ struct Index {
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_: Area, area: Area) => {
         const width = Number(area.width), height = Number(area.height);
-        if (width > 0 && height > 0 && (width!==this.screenWidth || height!==this.screenHeight)) { if(this.galleryTransitioning||this.galleryReturnAnimating)this.cancelGalleryTransition();this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height);AppStorage.setOrCreate('workspaceWidth',width);if(this.editing&&!this.heroActive)this.editorSheetOpen=!this.editorLandscape(); this.layoutBoard(); }
+        if (width > 0 && height > 0 && (width!==this.screenWidth || height!==this.screenHeight)) { if(this.galleryTransitioning||this.galleryReturnAnimating)this.cancelGalleryTransition();this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height);AppStorage.setOrCreate('workspaceWidth',width);if(this.editing&&!this.heroActive)this.editorSheetOpen=!this.photoEditorOpen&&!this.editorLandscape(); this.layoutBoard(); }
       })
   }
   private showCardActions(): boolean {

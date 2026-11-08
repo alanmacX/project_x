@@ -15,3 +15,14 @@ const mask=new m.PhotoSamples();mask.width=mask.height=16;mask.rgba=Array.from({
 t.offsetY=.55;assert.ok(m.recommendPhotoClock(card,mask,empty,'#16191C').position.startsWith('top'));assert.equal(m.recommendPhotoClock(card,mask,empty,'#16191C').ink,'#FFFFFF');
 Object.assign(t,{clockPosition:'bottom-right',clockAuto:true,clockInk:'#FFFFFF',zoom:3.2,offsetX:.8,offsetY:-.9,photoFraming:'cover'});const state=schema.defaultState();state.cards=[card];const normalized=schema.normalizeState(JSON.parse(JSON.stringify(state))).cards[0];assert.equal(normalized.template.clockPosition,'bottom-right');assert.equal(normalized.template.zoom,3.2);assert.equal(normalized.template.offsetX,.8);assert.equal(normalized.template.clockInk,'#FFFFFF');const portable=pack.packageScene(JSON.stringify(state),'');portable.state.cards[0].elements=[];assert.equal(pack.readPackage(JSON.stringify(portable)).state.cards[0].template.clockPosition,'bottom-right');
 console.log(`PASS photo composition: ${count} time placements, exact one/two-finger pan and anchored zoom, pointer-count changes without jumps, alpha-based recommendations and durable/exported framing`);
+
+// Letterboxed composition cards must use the same pinch anchor as their rendered scene.
+{
+ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),ctx=vm.createContext({});vm.runInContext(fs.readFileSync('previewer/shared-models.js','utf8'),ctx);
+ const load=n=>ctx.FridgeCore.load(n),photo=load('TemplatePhotoComposition');
+ for(const id of ['portrait','mix-memory'])for(const aspect of [.3,.9,1,1.5,2,3]){
+  const card=load('TemplateFactory').makeTemplateCards(id,1,()=>id)[0];card.w=300;card.h=300/aspect;const scale=.7,v=photo.photoCompositionViewport(card,scale),scene=load('TemplateScene').cardTemplateScene(card,Date.now());
+  assert.ok(Math.abs(v.unit-Math.min(card.w/scene.width,card.h/scene.height)*scale)<1e-9);assert.ok(Math.abs(v.offsetY-(card.h*scale-scene.height*v.unit)/2)<1e-9);
+ }
+ console.log('PASS photo gesture coordinates match letterboxed renderer across 12 template/aspect pairs');
+}

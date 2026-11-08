@@ -24,7 +24,7 @@ export struct TemplateSnapshot {
   mark(m:TemplateMark){
     if(m.kind==='text'){
       Column(){ForEach(this.fitted(m).lines,(value:string)=>{Text(value).fontSize(this.fitted(m).fontSize*this.unit()+'vp').fontFamily(m.font==='digits'?'TemplateDigits':m.font).fontWeight(m.font!=='digits'&&m.weight>=600?FontWeight.Bold:FontWeight.Normal).fontColor(m.color).maxLines(1)
-        .textAlign(m.align==='center'?TextAlign.Center:m.align==='right'?TextAlign.End:TextAlign.Start).width('100%').height(this.fitted(m).lineHeight*this.unit())})}
+        .textAlign(m.align==='center'?TextAlign.Center:m.align==='right'?TextAlign.End:TextAlign.Start).width('100%').height(this.fitted(m).lineHeight*this.unit())},(value:string,index:number)=>String(index))}
         .width(m.w*this.unit()).height(m.h*this.unit()).clip(true).position({x:this.x(m),y:this.y(m)})
     }else if(m.kind==='image'){
       Image(sceneImage(m.src)).syncLoad(true).objectFit(m.fit==='contain'?ImageFit.Contain:ImageFit.Cover).width(m.w*this.unit()).height(m.h*this.unit()).position({x:this.x(m),y:this.y(m)}).borderRadius(m.r*this.unit()).clip(m.r>0)

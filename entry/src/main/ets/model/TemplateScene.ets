@@ -129,7 +129,7 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
         date();
     }
     else if (id === 'flip') {
-        [hh, mm].forEach((v, i) => { const x = 15 + i * 141; rect(x, 54, 128, 190, '#30322F', 12).end = '#212320'; text(v, x, 80, 100, s.ink, 128, 'center', 800).font = 'digits'; line(x, 149, x + 128, 149, '#121412', 2); });
+        [hh, mm].forEach((v, i) => { const x = 15 + i * 141; rect(x, 54, 128, 190, '#30322F', 12).end = '#212320'; text(v, x, 80, 100, '#F0EEE5', 128, 'center', 800).font = 'digits'; line(x, 149, x + 128, 149, '#121412', 2); });
         date();
     }
     else if (id === 'portrait') {
@@ -200,10 +200,10 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
         const n = left === null ? '—' : String(Math.abs(left)), title = cap.title || (id === 'anniversary-type' ? '纪念日' : '倒计时');
         if (id === 'countdown-orbit') {
             arc(150, 147, 115, 135, 270, s.ink, 2).opacity = .2;
-            const total = cap.seed ? daysLeftOf(cap.date ?? '', new Date(cap.seed).getTime()) : 30, p = left === null ? 0 : 1 - Math.max(0, left) / Math.max(1, total);
+            const total = cap.seed && validDay(cap.seed) && cap.date && validDay(cap.date) ? daysLeftOf(cap.date, new Date(cap.seed + 'T12:00:00').getTime()) : 30, p = left === null ? 0 : 1 - Math.max(0, left) / Math.max(1, total);
             arc(150, 147, 115, 135, Math.max(0, Math.min(1, p)) * 270, s.accent, 3);
-            text(title, 45, 38, 17, s.ink, 210, 'center');
-            text(n, 45, 95, 88, s.ink, 210, 'center', 800).font = 'digits';
+            text(title, 78, 61, 16, s.ink, 144, 'center');
+            text(n, 53, 100, 78, s.ink, 194, 'center', 800).font = 'digits';
             text(left===null?'天':left<0?'天前':left===0?'就是今天':'天后', 80, 210, 16, s.ink, 140, 'center');
             text(left===null?'设置目标日期':cap.date??'', 40, 270, 12, s.ink, 220, 'center');
         }
@@ -321,11 +321,11 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
                 const stamp=Math.round(start+span*i/4);text(('0'+Math.floor(stamp/60)).slice(-2)+':'+('0'+stamp%60).slice(-2),10,85+i*44,8.5,s.ink,32,'right');
                 line(46, 92 + i * 44, 282, 92 + i * 44, s.ink, .2);
             }
-            items.forEach(e => { const d = new Date(e.event.start), y = 89 + (d.getHours() * 60 + d.getMinutes() - start) / span * 177, h = Math.max(12, (e.event.end - e.event.start) / 60000 / span * 177), w = (col - 3) / Math.max(1, e.lanes), x = 48 + (e.day - 1) * col + e.lane * w; rect(x, y, w - 1, h, ['#CEDAD6', '#DDD5E5', '#E2D6BD'][e.day % 3], 3); if(w>=12&&h>=14){const label=text(e.event.title,x+2,y+2,Math.min(11,w*.45),'#303C37',Math.max(1,w-4));label.h=Math.max(1,h-4);} });
+            items.forEach(e => { const d = new Date(e.event.start), y = 89 + (d.getHours() * 60 + d.getMinutes() - start) / span * 177, h = Math.max(12, (e.event.end - e.event.start) / 60000 / span * 177), w = (col - 3) / Math.max(1, e.lanes), x = 48 + (e.day - 1) * col + e.lane * w; rect(x, y, w * .82, h, ['#CEDAD6', '#DDD5E5', '#E2D6BD'][e.day % 3], 3); if(w>=12&&h>=14){const label=text(e.event.title,x+2,y+2,Math.min(11,w*.45),'#303C37',Math.max(1,w-4));label.h=Math.max(1,h-4);} });
         }
         else {
             const events = courseInstances(cap, tick).filter(e => e.end > tick).slice(0, 3);
-            text('接下来', 24, 22, 16);
+            text(events[0] && events[0].start <= tick ? '正在上课' : '接下来', 24, 22, 16);
             if (!events.length)
                 text((cap.courses ?? []).length ? '暂无后续课程' : '导入你的课表', 24, 126, 25);
             else if (id === 'course-next') {
@@ -383,7 +383,7 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
         else
             image(cover, 18, 18, 264, 206);
         if (!cover)
-            text('选择本地封面', id==='album-record'?28:45, 100, id==='album-record'?16:20, id==='album-record'?'#40382C':s.ink, id==='album-record'?152:210, 'center');
+            text('选择本地封面', id==='album-record'?28:45, 100, id==='album-record'?16:20, id==='album-record'||id==='album-sleeve'?'#40382C':s.ink, id==='album-record'?152:210, 'center');
         text(album.title || '专辑名称', 24, 243, 20, s.ink, 252, 'left', 600);
         text(album.artist || '', 24, 272, 12, s.ink, 252).opacity = .6;
     }

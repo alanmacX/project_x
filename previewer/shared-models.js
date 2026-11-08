@@ -17,7 +17,7 @@ function templateClusters(value) {
     const result = [];
     let join = false, regional = false;
     for (const char of Array.from(value)) {
-        const mark = /[\u0300-\u036f\ufe00-\ufe0f\u{1f3fb}-\u{1f3ff}]/u.test(char), flag = /[\u{1f1e6}-\u{1f1ff}]/u.test(char);
+        const mark = /[\p{M}\ufe00-\ufe0f\u{1f3fb}-\u{1f3ff}\u{e0020}-\u{e007f}]/u.test(char), flag = /[\u{1f1e6}-\u{1f1ff}]/u.test(char);
         if (result.length && (join || mark || char === '\u200d' || flag && regional))
             result[result.length - 1] += char;
         else
@@ -247,7 +247,7 @@ function cardTemplateScene(card, tick) {
         date();
     }
     else if (id === 'flip') {
-        [hh, mm].forEach((v, i) => { const x = 15 + i * 141; rect(x, 54, 128, 190, '#30322F', 12).end = '#212320'; text(v, x, 80, 100, s.ink, 128, 'center', 800).font = 'digits'; line(x, 149, x + 128, 149, '#121412', 2); });
+        [hh, mm].forEach((v, i) => { const x = 15 + i * 141; rect(x, 54, 128, 190, '#30322F', 12).end = '#212320'; text(v, x, 80, 100, '#F0EEE5', 128, 'center', 800).font = 'digits'; line(x, 149, x + 128, 149, '#121412', 2); });
         date();
     }
     else if (id === 'portrait') {
@@ -344,10 +344,10 @@ function cardTemplateScene(card, tick) {
         const n = left === null ? '—' : String(Math.abs(left)), title = cap.title || (id === 'anniversary-type' ? '纪念日' : '倒计时');
         if (id === 'countdown-orbit') {
             arc(150, 147, 115, 135, 270, s.ink, 2).opacity = .2;
-            const total = cap.seed ? (0, CapabilityCalendar_1.daysLeftOf)(cap.date ?? '', new Date(cap.seed).getTime()) : 30, p = left === null ? 0 : 1 - Math.max(0, left) / Math.max(1, total);
+            const total = cap.seed && (0, HolidayCalendar_1.validDay)(cap.seed) && cap.date && (0, HolidayCalendar_1.validDay)(cap.date) ? (0, CapabilityCalendar_1.daysLeftOf)(cap.date, new Date(cap.seed + 'T12:00:00').getTime()) : 30, p = left === null ? 0 : 1 - Math.max(0, left) / Math.max(1, total);
             arc(150, 147, 115, 135, Math.max(0, Math.min(1, p)) * 270, s.accent, 3);
-            text(title, 45, 38, 17, s.ink, 210, 'center');
-            text(n, 45, 95, 88, s.ink, 210, 'center', 800).font = 'digits';
+            text(title, 78, 61, 16, s.ink, 144, 'center');
+            text(n, 53, 100, 78, s.ink, 194, 'center', 800).font = 'digits';
             text(left === null ? '天' : left < 0 ? '天前' : left === 0 ? '就是今天' : '天后', 80, 210, 16, s.ink, 140, 'center');
             text(left === null ? '设置目标日期' : cap.date ?? '', 40, 270, 12, s.ink, 220, 'center');
         }
@@ -477,14 +477,14 @@ function cardTemplateScene(card, tick) {
                 text(('0' + Math.floor(stamp / 60)).slice(-2) + ':' + ('0' + stamp % 60).slice(-2), 10, 85 + i * 44, 8.5, s.ink, 32, 'right');
                 line(46, 92 + i * 44, 282, 92 + i * 44, s.ink, .2);
             }
-            items.forEach(e => { const d = new Date(e.event.start), y = 89 + (d.getHours() * 60 + d.getMinutes() - start) / span * 177, h = Math.max(12, (e.event.end - e.event.start) / 60000 / span * 177), w = (col - 3) / Math.max(1, e.lanes), x = 48 + (e.day - 1) * col + e.lane * w; rect(x, y, w - 1, h, ['#CEDAD6', '#DDD5E5', '#E2D6BD'][e.day % 3], 3); if (w >= 12 && h >= 14) {
+            items.forEach(e => { const d = new Date(e.event.start), y = 89 + (d.getHours() * 60 + d.getMinutes() - start) / span * 177, h = Math.max(12, (e.event.end - e.event.start) / 60000 / span * 177), w = (col - 3) / Math.max(1, e.lanes), x = 48 + (e.day - 1) * col + e.lane * w; rect(x, y, w * .82, h, ['#CEDAD6', '#DDD5E5', '#E2D6BD'][e.day % 3], 3); if (w >= 12 && h >= 14) {
                 const label = text(e.event.title, x + 2, y + 2, Math.min(11, w * .45), '#303C37', Math.max(1, w - 4));
                 label.h = Math.max(1, h - 4);
             } });
         }
         else {
             const events = (0, CapabilityData_1.courseInstances)(cap, tick).filter(e => e.end > tick).slice(0, 3);
-            text('接下来', 24, 22, 16);
+            text(events[0] && events[0].start <= tick ? '正在上课' : '接下来', 24, 22, 16);
             if (!events.length)
                 text((cap.courses ?? []).length ? '暂无后续课程' : '导入你的课表', 24, 126, 25);
             else if (id === 'course-next') {
@@ -547,7 +547,7 @@ function cardTemplateScene(card, tick) {
         else
             image(cover, 18, 18, 264, 206);
         if (!cover)
-            text('选择本地封面', id === 'album-record' ? 28 : 45, 100, id === 'album-record' ? 16 : 20, id === 'album-record' ? '#40382C' : s.ink, id === 'album-record' ? 152 : 210, 'center');
+            text('选择本地封面', id === 'album-record' ? 28 : 45, 100, id === 'album-record' ? 16 : 20, id === 'album-record' || id === 'album-sleeve' ? '#40382C' : s.ink, id === 'album-record' ? 152 : 210, 'center');
         text(album.title || '专辑名称', 24, 243, 20, s.ink, 252, 'left', 600);
         text(album.artist || '', 24, 272, 12, s.ink, 252).opacity = .6;
     }
@@ -561,7 +561,7 @@ exports.cardTemplateScene = cardTemplateScene;
 "TemplatePhotoComposition":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.recommendPhotoClock = exports.PhotoClockRecommendation = exports.PhotoSamples = exports.PhotoCameraGesture = exports.PhotoCameraPose = exports.PhotoGesturePoint = exports.portraitPhotoFrame = exports.photoControlRegion = exports.photoClockLayout = exports.PhotoClockLayout = exports.PHOTO_CLOCK_POSITIONS = void 0;
+exports.recommendPhotoClock = exports.PhotoClockRecommendation = exports.PhotoSamples = exports.PhotoCameraGesture = exports.PhotoCameraPose = exports.PhotoGesturePoint = exports.photoCompositionViewport = exports.PhotoCompositionViewport = exports.portraitPhotoFrame = exports.photoControlRegion = exports.photoClockLayout = exports.PhotoClockLayout = exports.PHOTO_CLOCK_POSITIONS = void 0;
 const CardSchema_1 = require("./CardSchema");
 const TemplatePhotoGeometry_1 = require("./TemplatePhotoGeometry");
 exports.PHOTO_CLOCK_POSITIONS = ['top-left', 'top', 'top-right', 'bottom-left', 'bottom', 'bottom-right'];
@@ -615,6 +615,23 @@ function portraitPhotoFrame(card, photo) {
     return box;
 }
 exports.portraitPhotoFrame = portraitPhotoFrame;
+class PhotoCompositionViewport {
+    constructor() {
+        this.unit = 1;
+        this.offsetX = 0;
+        this.offsetY = 0;
+    }
+}
+exports.PhotoCompositionViewport = PhotoCompositionViewport;
+/** Match the renderer's centered scene, including letterboxing on a filled canvas. */
+function photoCompositionViewport(card, scale) {
+    const out = new PhotoCompositionViewport(), height = card.template?.id === 'portrait' ? 300 * card.h / card.w : card.w / card.h >= 1.5 ? 150 : 300;
+    out.unit = Math.min(card.w / 300, card.h / height) * scale;
+    out.offsetX = (card.w * scale - 300 * out.unit) / 2;
+    out.offsetY = (card.h * scale - height * out.unit) / 2;
+    return out;
+}
+exports.photoCompositionViewport = photoCompositionViewport;
 class PhotoGesturePoint {
     constructor() {
         this.id = 0;
@@ -2518,7 +2535,7 @@ function compositionScene(card, tick) {
     }
     else if (id === 'face-study-course') {
         const e = (0, CapabilityData_1.courseInstances)(cap, tick)[0];
-        text(e ? '下节课' : '课程表', 0, 0, 15, 300).color = s.accent;
+        text(e ? e.start <= tick ? '正在上课' : '下节课' : '课程表', 0, 0, 15, 300).color = s.accent;
         text(e?.title || ((cap.courses ?? []).length ? '暂无后续课程' : '导入课表'), 0, 30, H > 180 ? 37 : 30, 300, 'left', 'sans-serif', 2, Math.min(H - 65, 88));
         if (e) {
             text((0, CapabilityData_1.eventWhen)(e, tick), 0, H - 39, 14, 300);
@@ -2549,7 +2566,7 @@ function compositionScene(card, tick) {
             text('本地 ' + hh + ':' + mm, 174, 17, 12, 104, 'right');
     }
     else if (id === 'face-travel-countdown') {
-        const left = cap.date && (0, HolidayCalendar_1.validDay)(cap.date) ? (0, CapabilityCalendar_1.daysLeftOf)(cap.date, tick) : null, value = left === null ? '—' : String(Math.abs(left)), phase = left === null ? '天' : left < 0 ? '天前' : '天后';
+        const left = cap.date && (0, HolidayCalendar_1.validDay)(cap.date) ? (0, CapabilityCalendar_1.daysLeftOf)(cap.date, tick) : null, value = left === null ? '—' : String(Math.abs(left)), phase = left === null ? '天' : left < 0 ? '天前' : left === 0 ? '今天' : '天后';
         text(cap.title || '出发', 0, 0, H > 100 ? 23 : 15, H > 100 ? 300 : 170);
         text(value, H > 100 ? 0 : 175, H > 100 ? 44 : 0, H > 100 ? 92 : 37, H > 100 ? 300 : 99, H > 100 ? 'left' : 'right', 'digits');
         text(phase, H > 100 ? 0 : 276, H > 100 ? 161 : 25, H > 100 ? 22 : 12, H > 100 ? 300 : 24);
@@ -2569,11 +2586,11 @@ function compositionScene(card, tick) {
         title.layer = 2;
     }
     else if (id === 'face-memory-date') {
-        text(date + ' · ' + week, 0, 0, Math.min(28, H / 1.2), 300);
+        text(date + ' · ' + week, 0, 0, Math.min(28, H / 1.2), 300).layer = 2;
     }
     else if (id === 'face-memory-lunar') {
         const lunar = (0, TimeCapabilities_1.lunarReading)(tick);
-        text(lunar.year + ' · ' + lunar.date, 0, 0, Math.min(16, H / 1.2), 300);
+        text(lunar.year + ' · ' + lunar.date, 0, 0, Math.min(16, H / 1.2), 300).layer = 2;
     }
     return s;
 }
@@ -5690,4 +5707,4 @@ exports.creationDimension = creationDimension;
 function creationAspect(dimension) { return dimension === '2*4' ? 2 : 1; }
 exports.creationAspect = creationAspect;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"0da2e614f597accca552eda27b467424500526c1f637fd2aadf577c5835e4c37"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"5f20dc0764d5ece45c4bf10990f839a54cef945fccf693062541d44935267651"};})(globalThis);

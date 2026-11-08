@@ -20,6 +20,13 @@ export function portraitPhotoFrame(card:FridgeCard,photo:CanvasElement):ElementB
  const region=photoControlRegion(card),t=card.template!,subject=photo.depthEnabled&&!!photo.depthForeground&&t.photoMode!=='photo';
  const box=templatePhotoBox(photo,t,region.w,region.h,t.photoFraming==='cover'&&!subject,subject);box.x+=region.x;box.y+=region.y;return box;
 }
+export class PhotoCompositionViewport {unit:number=1;offsetX:number=0;offsetY:number=0;}
+/** Match the renderer's centered scene, including letterboxing on a filled canvas. */
+export function photoCompositionViewport(card:FridgeCard,scale:number):PhotoCompositionViewport {
+ const out=new PhotoCompositionViewport(),height=card.template?.id==='portrait'?300*card.h/card.w:card.w/card.h>=1.5?150:300;
+ out.unit=Math.min(card.w/300,card.h/height)*scale;
+ out.offsetX=(card.w*scale-300*out.unit)/2;out.offsetY=(card.h*scale-height*out.unit)/2;return out;
+}
 export class PhotoGesturePoint {id:number=0;x:number=0;y:number=0;}
 export class PhotoCameraPose {zoom:number=1;offsetX:number=0;offsetY:number=0;}
 /** Pointer coordinates and camera dimensions use the same local scene units. */

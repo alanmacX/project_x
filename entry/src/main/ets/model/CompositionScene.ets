@@ -99,7 +99,7 @@ export function compositionScene(card: FridgeCard, tick: number): TemplateScene 
     }
     else if (id === 'face-study-course') {
         const e = courseInstances(cap, tick)[0];
-        text(e ? '下节课' : '课程表', 0, 0, 15, 300).color = s.accent;
+        text(e ? e.start <= tick ? '正在上课' : '下节课' : '课程表', 0, 0, 15, 300).color = s.accent;
         text(e?.title || ((cap.courses ?? []).length ? '暂无后续课程' : '导入课表'), 0, 30, H > 180 ? 37 : 30, 300, 'left', 'sans-serif', 2, Math.min(H - 65, 88));
         if (e) {
             text(eventWhen(e, tick), 0, H - 39, 14, 300);
@@ -130,7 +130,7 @@ export function compositionScene(card: FridgeCard, tick: number): TemplateScene 
             text('本地 ' + hh + ':' + mm, 174, 17, 12, 104, 'right');
     }
     else if (id === 'face-travel-countdown') {
-        const left = cap.date && validDay(cap.date) ? daysLeftOf(cap.date, tick) : null, value = left === null ? '—' : String(Math.abs(left)), phase = left === null ? '天' : left < 0 ? '天前' : '天后';
+        const left = cap.date && validDay(cap.date) ? daysLeftOf(cap.date, tick) : null, value = left === null ? '—' : String(Math.abs(left)), phase = left === null ? '天' : left < 0 ? '天前' : left === 0 ? '今天' : '天后';
         text(cap.title || '出发', 0, 0, H > 100 ? 23 : 15, H > 100 ? 300 : 170);
         text(value, H > 100 ? 0 : 175, H > 100 ? 44 : 0, H > 100 ? 92 : 37, H > 100 ? 300 : 99, H > 100 ? 'left' : 'right', 'digits');
         text(phase, H > 100 ? 0 : 276, H > 100 ? 161 : 25, H > 100 ? 22 : 12, H > 100 ? 300 : 24);
@@ -150,11 +150,11 @@ export function compositionScene(card: FridgeCard, tick: number): TemplateScene 
         title.layer = 2;
     }
     else if (id === 'face-memory-date') {
-        text(date + ' · ' + week, 0, 0, Math.min(28, H / 1.2), 300);
+        text(date + ' · ' + week, 0, 0, Math.min(28, H / 1.2), 300).layer=2;
     }
     else if (id === 'face-memory-lunar') {
         const lunar = lunarReading(tick);
-        text(lunar.year + ' · ' + lunar.date, 0, 0, Math.min(16, H / 1.2), 300);
+        text(lunar.year + ' · ' + lunar.date, 0, 0, Math.min(16, H / 1.2), 300).layer=2;
     }
     return s;
 }

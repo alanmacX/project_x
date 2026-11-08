@@ -4,7 +4,7 @@ export class TemplateTextLayout {fontSize:number=16;lineHeight:number=18;lines:s
 export function templateClusters(value:string):string[]{
   const result:string[]=[];let join=false,regional=false;
   for(const char of Array.from(value)){
-    const mark=/[\u0300-\u036f\ufe00-\ufe0f\u{1f3fb}-\u{1f3ff}]/u.test(char),flag=/[\u{1f1e6}-\u{1f1ff}]/u.test(char);
+    const mark=/[\p{M}\ufe00-\ufe0f\u{1f3fb}-\u{1f3ff}\u{e0020}-\u{e007f}]/u.test(char),flag=/[\u{1f1e6}-\u{1f1ff}]/u.test(char);
     if(result.length&&(join||mark||char==='\u200d'||flag&&regional))result[result.length-1]+=char;else result.push(char);
     join=char==='\u200d';regional=flag&&!regional;
   }return result;
