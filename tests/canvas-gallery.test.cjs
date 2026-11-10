@@ -139,10 +139,18 @@ const { Fixture } = execute(`class Fixture {
   returnFrame.start();assert.equal(interrupted.galleryHeroW,172);interrupted.cancelGalleryTransition();interrupted.galleryHeroSource='next.png';lateReturn();assert.equal(interrupted.galleryHeroSource,'next.png','late decorative animation cannot clear a subsequent navigation');
   // A widget route may point to an offscreen or clipped gallery tile. Keep
   // return nonblocking and dissolve in place rather than flying into chrome.
-  for(const rect of [{x:16,y:-200,w:172,h:172},{x:16,y:90,w:172,h:172},{x:16,y:600,w:172,h:172},{x:400,y:120,w:172,h:172}]){
+  for(const rect of [{x:16,y:-200,w:172,h:172},{x:16,y:0,w:172,h:172},{x:16,y:650,w:172,h:172},{x:400,y:120,w:172,h:172}]){
     const offscreen=new Fixture();Object.assign(offscreen,{screenWidth:390,screenHeight:800,galleryAnchorWidth:390,galleryAnchorHeight:800,safeTop:36,safeBottom:24,boardLeft:23,boardTop:160,boardScale:1,boardHeight:344,galleryVisible:false,galleryAnchor:{id:'a',preview:'cached.png',...rect}});
     let completed;offscreen.getUIContext=()=>({postFrameCallback:frame=>frame.start(),animateTo:(options,change)=>{change();completed=options.onFinish;}});
     await offscreen.setGalleryPage(true);assert.equal(offscreen.galleryVisible,true);assert.equal(offscreen.galleryTransitioning,false);assert.equal(offscreen.galleryHeroId,'','offscreen tile must not be hidden for a hero flight');assert.equal(offscreen.galleryHeroOpacity,0);assert.equal(offscreen.galleryHeroX,26.44);assert.equal(offscreen.galleryHeroY,163.44);assert.equal(offscreen.galleryHeroW,337.12);completed();assert.equal(offscreen.galleryHeroSource,'');
+  }
+  // Returning near either edge still shrinks into the same partially visible tile.
+  for(const y of [90,570]){
+    const edge=new Fixture();Object.assign(edge,{screenWidth:390,screenHeight:800,galleryAnchorWidth:390,galleryAnchorHeight:800,safeTop:36,safeBottom:24,boardLeft:23,boardTop:160,boardScale:1,boardHeight:344,galleryVisible:false,galleryAnchor:{id:'a',preview:'cached.png',x:16,y,w:172,h:172}});
+    let end;edge.getUIContext=()=>({postFrameCallback:frame=>frame.start(),animateTo:(options,change)=>{change();end=options.onFinish;}});
+    // A hidden gallery can temporarily lose measured component rectangles.
+    edge.galleryController.anchor=()=>null;
+    await edge.showGallery();assert.equal(edge.galleryHeroId,'a');assert.equal(edge.galleryHeroW,172);assert.equal(edge.galleryHeroY,y);assert.equal(edge.galleryHeroOpacity,1);end();
   }
   const noAnchor=new Fixture();Object.assign(noAnchor,{galleryVisible:false,boardLeft:23,boardTop:160,boardScale:1,boardHeight:344});noAnchor.galleryController.preview=()=>'widget-cache.png';await noAnchor.setGalleryPage(true);assert.equal(noAnchor.galleryVisible,true);assert.equal(noAnchor.galleryHeroSource,'','widget-only return also completes a local dissolve without an old anchor');
   const blockedIO=new Fixture();blockedIO.galleryVisible=false;

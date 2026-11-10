@@ -15,6 +15,8 @@ export struct AlbumSettings {
   @Prop @Watch('cardChanged') cardId:string='';
   @Prop appDark:boolean=false;
   @Prop tick:number=0;
+  @Prop useMaterialLibrary:boolean=false;
+  onChooseAlbum:()=>void=()=>{};
   @Prop section:string='all';
   @Prop showPresentation:boolean=true;
   onUpdate:(id:string,cap:CapBlock)=>void=()=>{};
@@ -72,7 +74,7 @@ export struct AlbumSettings {
       if(this.showPresentation) {SettingsSegmented({labels:['纯封面','经典信息','横向信息'],selectedIndex:Math.max(0,['cover','classic','row'].indexOf(this.cap.albumPresentation??'cover')),appDark:this.appDark,onSelect:(i:number)=>this.setPresentation(i)})}
       if(this.section==='all'||this.section==='library') {
       if(this.cap.albumCover) {Image(this.cap.albumCover).width(64).height(64).borderRadius(6).objectFit(ImageFit.Contain).draggable(false)}
-      SettingsAction({label:this.busy?'处理中':this.cap.albumCover?'添加到封面库':'选择本地封面',appDark:this.appDark,fillWidth:true,isEnabled:!this.busy&&albumLibrary(this.cap).length<12,onPress:()=>this.choose()})
+      SettingsAction({label:this.busy?'处理中':this.cap.albumCover?'添加到封面库':'选择本地封面',appDark:this.appDark,fillWidth:true,isEnabled:!this.busy&&albumLibrary(this.cap).length<12,onPress:()=>{if(this.useMaterialLibrary)this.onChooseAlbum();else this.choose();}})
       }
       if(this.section==='all'||this.section==='metadata') {
       TextInput({text:this.currentAlbum().title,placeholder:'专辑名（可选）'}).height(44).maxLength(160).fontColor(AppDesign.text(this.appDark)).placeholderColor(AppDesign.muted(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).borderRadius(14).enabled(!this.busy).onChange((v:string)=>this.text(v,false))

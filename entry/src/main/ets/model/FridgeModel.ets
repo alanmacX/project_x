@@ -1,3 +1,4 @@
+import { enforceSingleTemplateFill } from './TemplateFillPolicy';
 import { getLibraryPreferences, LibraryPreferences } from './LibraryStorage';
 import { importLegacyWidgets, widgetInstances, detachDeletedCanvas } from './WidgetRegistry';
 import { normalizeCanvasRotation } from './CanvasRotation';
@@ -154,7 +155,8 @@ export class FridgeStore {
     if(scene&&target.cards.length>0&&!replace)throw new Error('这个场景已有中央卡片');if(scene&&replace)target.cards=[];
     assertCanvasCapacity(target.cards.length,1);const card=this.copyCard(source);card.z=++target.maxZ;
     if(scene){card.rot=0;card.x=(BOARD_W-card.w)/2;card.y=(BOARD_W/target.canvasAspect-card.h)/2/(BOARD_W/target.canvasAspect/BOARD_H);}
-    target.cards.push(card);await this.saveQueue;if(this.prefs===null)throw new Error('本地存储尚未就绪');
+    const owner=target.cards.find(c=>c.template?.fill)?.id??'';
+    target.cards.push(card);enforceSingleTemplateFill(target.cards,target.canvasAspect,owner);await this.saveQueue;if(this.prefs===null)throw new Error('本地存储尚未就绪');
     await this.prefs.put(canvasKey(id),storageSnapshot(target));await this.prefs.flush();this.documents=this.documents.filter(c=>c.id!==id);this.savedScenes[id]=storageSnapshot(target);
     const queue=this.queueFor(id);await queue.waitForIdle();queue.invalidate();await queue.submit(storageSnapshot(target));
   }
@@ -357,7 +359,9 @@ export class FridgeStore {
   addCards(cards: FridgeCard[]): void {
     if(this.catalog.scenes.some(c=>c.id===this.state.canvasId)&&this.state.cards.length+cards.length>1)throw new Error('定时场景只保留一张中央卡片');
     assertCanvasCapacity(this.state.cards.length, cards.length);
+    const owner=this.state.cards.find(c=>c.template?.fill)?.id??'';
     for (const card of cards) { card.z = this.nextZ(); this.state.cards.push(card); }
+    enforceSingleTemplateFill(this.state.cards,this.state.canvasAspect,owner);
   }
   removeCard(id: string): void {
     const cap=this.findCard(id)?.capability;

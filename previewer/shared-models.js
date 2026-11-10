@@ -252,17 +252,17 @@ function cardTemplateScene(card, tick) {
     }
     else if (id === 'portrait') {
         s.height = 300 * card.h / card.w;
-        const subject = photo?.depthEnabled && !!photo.depthForeground, subjectMode = subject && personal.photoMode !== 'photo';
+        const subject = photo?.depthEnabled && !!photo.depthForeground, subjectMode = subject && personal.photoMode !== 'photo', safeDepth = (0, TemplatePhotoComposition_1.photoClockDepthAllowed)(card);
         if (photo) {
             const frame = (0, TemplatePhotoComposition_1.portraitPhotoFrame)(card, photo);
             if (subjectMode) {
-                image(photo.depthForeground, frame.x, frame.y, frame.w, frame.h, personal.depth ? 3 : 1);
+                image(photo.depthForeground, frame.x, frame.y, frame.w, frame.h, safeDepth ? 3 : 1);
             }
             else {
                 image(photo.src, frame.x, frame.y, frame.w, frame.h);
                 if (subject && personal.depth) {
                     const box = (0, TemplatePhotoGeometry_1.templateSubjectBox)(photo, frame);
-                    image(photo.depthForeground, box.x, box.y, box.w, box.h, 3);
+                    image(photo.depthForeground, box.x, box.y, box.w, box.h, safeDepth ? 3 : 1);
                 }
             }
         }
@@ -561,7 +561,7 @@ exports.cardTemplateScene = cardTemplateScene;
 "TemplatePhotoComposition":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.recommendPhotoClock = exports.PhotoClockRecommendation = exports.PhotoSamples = exports.PhotoCameraGesture = exports.PhotoCameraPose = exports.PhotoGesturePoint = exports.photoCompositionViewport = exports.PhotoCompositionViewport = exports.portraitPhotoFrame = exports.photoControlRegion = exports.photoClockLayout = exports.PhotoClockLayout = exports.PHOTO_CLOCK_POSITIONS = void 0;
+exports.recommendPhotoClock = exports.PhotoClockRecommendation = exports.PhotoSamples = exports.PhotoCameraGesture = exports.PhotoCameraPose = exports.PhotoGesturePoint = exports.photoCompositionViewport = exports.PhotoCompositionViewport = exports.photoClockDepthAllowed = exports.portraitPhotoFrame = exports.photoControlRegion = exports.photoClockLayout = exports.PhotoClockLayout = exports.PHOTO_CLOCK_POSITIONS = void 0;
 const CardSchema_1 = require("./CardSchema");
 const TemplatePhotoGeometry_1 = require("./TemplatePhotoGeometry");
 exports.PHOTO_CLOCK_POSITIONS = ['top-left', 'top', 'top-right', 'bottom-left', 'bottom', 'bottom-right'];
@@ -590,6 +590,8 @@ function photoClockLayout(width, height, position = 'top') {
 exports.photoClockLayout = photoClockLayout;
 function photoControlRegion(card) {
     const box = new CardSchema_1.ElementBox(), wide = card.w / card.h >= 1.5;
+    box.x = 0;
+    box.y = 0;
     box.w = 300;
     box.h = 300 * card.h / card.w;
     if (card.template?.id === 'portrait') {
@@ -615,6 +617,26 @@ function portraitPhotoFrame(card, photo) {
     return box;
 }
 exports.portraitPhotoFrame = portraitPhotoFrame;
+/** Conservative per-digit safety: small edge overlaps retain depth, large overlaps put time in front.
+ * This geometry-only guard runs in every renderer, including old saved canvases and widgets. */
+function photoClockDepthAllowed(card) {
+    const photo = card.elements.find(e => e.kind === 'image' && !!e.src), t = card.template;
+    if (!photo || !t || !t.depth || !photo.depthEnabled || !photo.depthForeground)
+        return false;
+    const frame = portraitPhotoFrame(card, photo), front = t.photoMode !== 'photo' ? frame : (0, TemplatePhotoGeometry_1.templateSubjectBox)(photo, frame);
+    const clock = photoClockLayout(300, 300 * card.h / card.w, t.clockPosition ?? 'top');
+    const rows = clock.stacked ? 2 : 1, columns = clock.stacked ? 2 : 5;
+    for (let row = 0; row < rows; row++)
+        for (let col = 0; col < columns; col++) {
+            const x = clock.x + col * clock.w / columns, y = clock.y + row * clock.size * 1.04, w = clock.w / columns, h = clock.size;
+            const overlapW = Math.max(0, Math.min(x + w, front.x + front.w) - Math.max(x, front.x));
+            const overlapH = Math.max(0, Math.min(y + h, front.y + front.h) - Math.max(y, front.y));
+            if (overlapW * overlapH / (w * h) > .18)
+                return false;
+        }
+    return true;
+}
+exports.photoClockDepthAllowed = photoClockDepthAllowed;
 class PhotoCompositionViewport {
     constructor() {
         this.unit = 1;
@@ -741,6 +763,7 @@ exports.recommendPhotoClock = recommendPhotoClock;
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.normalizeCapability = exports.contrastingInk = exports.serializeDoorCards = exports.serializeFaceCards = exports.normalizeState = exports.normalizeElement = exports.localImageSource = exports.normalizeBox = exports.bounded = exports.defaultState = exports.cardCornerRadius = exports.shapeRadius = exports.materialColors = exports.typeLabel = exports.FridgeState = exports.normalizeBackground = exports.CanvasBackground = exports.BackgroundAnchor = exports.DoorState = exports.FridgeCard = exports.CanvasElement = exports.PhotoDepthCrop = exports.ElementBox = exports.CAPABILITIES = exports.CapType = exports.MIN_SUBJECT_EDGE = exports.ALBUM_CARD_CORNER_RADIUS = exports.ALBUM_CORNER_RADIUS = exports.ALBUM_INSET = exports.RECT_CORNER_RADIUS = exports.MIN_CARD_EDGE = exports.BOARD_H = exports.BOARD_W = void 0;
+const TemplateFillPolicy_1 = require("./TemplateFillPolicy");
 const TemplateGroupMigration_1 = require("./TemplateGroupMigration");
 const CompositionCatalog_1 = require("./CompositionCatalog");
 const CardTemplate_1 = require("./CardTemplate");
@@ -1173,6 +1196,7 @@ function normalizeState(raw) {
     }
     if (state.sceneLayouts.length === 0 && state.sceneRules.length === 0)
         state.cards = (0, TemplateGroupMigration_1.unifyTemplateGroups)(state.cards, state.canvasAspect);
+    (0, TemplateFillPolicy_1.enforceSingleTemplateFill)(state.cards, state.canvasAspect);
     return state;
 }
 exports.normalizeState = normalizeState;
@@ -1240,44 +1264,83 @@ function normalizeCapability(raw) {
 exports.normalizeCapability = normalizeCapability;
 
 },
-"TemplateGroupMigration":function(require,module,exports){
+"TemplateFillPolicy":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.unifyTemplateGroups = void 0;
+exports.restoreTemplateFillState = exports.templateFillState = exports.TemplateFillPlacement = exports.enforceSingleTemplateFill = exports.releaseTemplateFill = void 0;
+const CardSchema_1 = require("./CardSchema");
 const CompositionCatalog_1 = require("./CompositionCatalog");
-/** Coalesce only intact pre-release built-in faces. Free compositions and moved/missing roles remain untouched. */
-function unifyTemplateGroups(cards, aspect) {
-    const removed = [], replacements = new Map();
-    for (const primary of cards) {
-        const face = (0, CompositionCatalog_1.compositionOwner)(primary.template?.id ?? '');
-        if (!face || !primary.groupId || primary.template?.id !== face.slots[0].id || primary.rot !== 0)
-            continue;
-        const members = cards.filter(c => c.groupId === primary.groupId);
-        if (members.length !== face.slots.length)
-            continue;
-        const layout = (0, CompositionCatalog_1.compositionLayout)(face, primary.w / primary.h), scale = primary.w / layout.width, boardHeight = 344 / Math.max(.3, aspect), baseY = primary.y / 470 * boardHeight;
-        const ordered = [];
-        let valid = true;
-        for (const slot of layout.slots) {
-            const card = members.find(c => c.template?.id === slot.id);
-            if (!card || (!slot.primary && card.elements.length > 0) || card.hidden !== primary.hidden || card.rot !== 0 || card.template?.palette !== primary.template?.palette || Math.abs(card.x - (primary.x + slot.x * scale)) > .1 || Math.abs(card.y / 470 * boardHeight - (baseY + slot.y * scale)) > .1 || Math.abs(card.w - slot.w * scale) > .1 || Math.abs(card.h - slot.h * scale) > .1) {
-                valid = false;
-                break;
-            }
-            ordered.push(card);
-        }
-        if (!valid)
-            continue;
-        const card = JSON.parse(JSON.stringify(primary));
-        card.template.id = face.id;
-        card.template.sources = ordered.slice(1).map(c => c.capability);
-        card.groupId = '';
-        replacements.set(primary.id, card);
-        removed.push(...ordered.slice(1).map(c => c.id));
+/** Relinquish only full-canvas placement; artwork, grouping and layer order remain intact. */
+function releaseTemplateFill(card, aspect) {
+    const t = card.template;
+    if (!t?.fill)
+        return;
+    t.fill = false;
+    const p = t.freePlacement;
+    if (p) {
+        card.x = p.x;
+        card.y = p.y;
+        card.w = p.w;
+        card.h = p.h;
+        card.rot = p.rot;
     }
-    return replacements.size ? cards.filter(c => !removed.includes(c.id)).map(c => replacements.get(c.id) ?? c) : cards;
+    else {
+        card.w = Math.min(260, CardSchema_1.BOARD_W / Math.max(.3, aspect) - 24);
+        card.h = (0, CompositionCatalog_1.compositionDefinition)(t.id) && aspect >= 1.5 ? card.w / 2 : card.w;
+        card.x = (CardSchema_1.BOARD_W - card.w) / 2;
+        card.y = 12;
+        card.rot = 0;
+    }
 }
-exports.unifyTemplateGroups = unifyTemplateGroups;
+exports.releaseTemplateFill = releaseTemplateFill;
+/** Explicit replacement selects the owner; legacy duplicates retain the topmost owner. */
+function enforceSingleTemplateFill(cards, aspect, preferredId = '') {
+    const full = cards.filter(card => card.template?.fill);
+    if (full.length < 2)
+        return [];
+    const owner = full.find(card => card.id === preferredId) ?? full.reduce((a, b) => b.z > a.z ? b : a);
+    const released = [];
+    for (const card of full)
+        if (card !== owner) {
+            releaseTemplateFill(card, aspect);
+            released.push(card.id);
+        }
+    return released;
+}
+exports.enforceSingleTemplateFill = enforceSingleTemplateFill;
+class TemplateFillPlacement {
+    constructor() {
+        this.id = '';
+        this.fill = false;
+        this.x = 0;
+        this.y = 0;
+        this.w = 0;
+        this.h = 0;
+        this.rot = 0;
+    }
+}
+exports.TemplateFillPlacement = TemplateFillPlacement;
+function templateFillState(cards) {
+    return cards.filter(card => card.template !== undefined).map((card) => ({ id: card.id, fill: card.template.fill, x: card.x, y: card.y, w: card.w, h: card.h, rot: card.rot, freePlacement: card.template.freePlacement ? JSON.parse(JSON.stringify(card.template.freePlacement)) : undefined }));
+}
+exports.templateFillState = templateFillState;
+/** Undo the paired placement change without replacing peers' content or live capability data. */
+function restoreTemplateFillState(entries, cards, aspect) {
+    for (const entry of entries) {
+        const card = cards.find(c => c.id === entry.id);
+        if (!card?.template)
+            continue;
+        card.x = entry.x;
+        card.y = entry.y;
+        card.w = entry.w;
+        card.h = entry.h;
+        card.rot = entry.rot;
+        card.template.fill = entry.fill;
+        card.template.freePlacement = entry.freePlacement ? JSON.parse(JSON.stringify(entry.freePlacement)) : undefined;
+    }
+    enforceSingleTemplateFill(cards, aspect);
+}
+exports.restoreTemplateFillState = restoreTemplateFillState;
 
 },
 "CompositionCatalog":function(require,module,exports){
@@ -1357,10 +1420,50 @@ function compositionLayout(face, aspect) {
 exports.compositionLayout = compositionLayout;
 
 },
+"TemplateGroupMigration":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.unifyTemplateGroups = void 0;
+const CompositionCatalog_1 = require("./CompositionCatalog");
+/** Coalesce only intact pre-release built-in faces. Free compositions and moved/missing roles remain untouched. */
+function unifyTemplateGroups(cards, aspect) {
+    const removed = [], replacements = new Map();
+    for (const primary of cards) {
+        const face = (0, CompositionCatalog_1.compositionOwner)(primary.template?.id ?? '');
+        if (!face || !primary.groupId || primary.template?.id !== face.slots[0].id || primary.rot !== 0)
+            continue;
+        const members = cards.filter(c => c.groupId === primary.groupId);
+        if (members.length !== face.slots.length)
+            continue;
+        const layout = (0, CompositionCatalog_1.compositionLayout)(face, primary.w / primary.h), scale = primary.w / layout.width, boardHeight = 344 / Math.max(.3, aspect), baseY = primary.y / 470 * boardHeight;
+        const ordered = [];
+        let valid = true;
+        for (const slot of layout.slots) {
+            const card = members.find(c => c.template?.id === slot.id);
+            if (!card || (!slot.primary && card.elements.length > 0) || card.hidden !== primary.hidden || card.rot !== 0 || card.template?.palette !== primary.template?.palette || Math.abs(card.x - (primary.x + slot.x * scale)) > .1 || Math.abs(card.y / 470 * boardHeight - (baseY + slot.y * scale)) > .1 || Math.abs(card.w - slot.w * scale) > .1 || Math.abs(card.h - slot.h * scale) > .1) {
+                valid = false;
+                break;
+            }
+            ordered.push(card);
+        }
+        if (!valid)
+            continue;
+        const card = JSON.parse(JSON.stringify(primary));
+        card.template.id = face.id;
+        card.template.sources = ordered.slice(1).map(c => c.capability);
+        card.groupId = '';
+        replacements.set(primary.id, card);
+        removed.push(...ordered.slice(1).map(c => c.id));
+    }
+    return replacements.size ? cards.filter(c => !removed.includes(c.id)).map(c => replacements.get(c.id) ?? c) : cards;
+}
+exports.unifyTemplateGroups = unifyTemplateGroups;
+
+},
 "CardTemplate":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.copyCardTemplate = exports.newCardTemplate = exports.normalizeCardTemplate = exports.templateDefinition = exports.CARD_TEMPLATES = void 0;
+exports.copyCardTemplate = exports.newCardTemplate = exports.normalizeCardTemplate = exports.normalizeTemplatePlacement = exports.templateDefinition = exports.CARD_TEMPLATES = void 0;
 const CompositionCatalog_1 = require("./CompositionCatalog");
 exports.CARD_TEMPLATES = [
     { "id": "standby", "kind": "clock", "name": "浮字", "sources": ["clock"] },
@@ -1411,17 +1514,23 @@ exports.CARD_TEMPLATES = [
 function templateDefinition(id) { const single = exports.CARD_TEMPLATES.find(d => d.id === id); if (single)
     return single; const slot = (0, CompositionCatalog_1.compositionSlot)(id); return slot ? { id: slot.id, kind: slot.kind, name: slot.role, sources: [slot.kind] } : undefined; }
 exports.templateDefinition = templateDefinition;
+function normalizeTemplatePlacement(raw) {
+    if (!raw || ![raw.x, raw.y, raw.w, raw.h, raw.rot].every((n) => Number.isFinite(n)) || raw.w < 1 || raw.h < 1 || raw.w > 344 || raw.h > 1147)
+        return undefined;
+    return { x: raw.x, y: raw.y, w: raw.w, h: raw.h, rot: raw.rot };
+}
+exports.normalizeTemplatePlacement = normalizeTemplatePlacement;
 function normalizeCardTemplate(raw) {
     if (!raw || raw.version !== 1 || !templateDefinition(raw.id))
         return undefined;
     const definition = templateDefinition(raw.id);
     const sources = definition.kind === 'ensemble' ? definition.sources.slice(1).map((k, index) => { const cap = raw.sources?.[index]; return cap?.k === k ? JSON.parse(JSON.stringify(cap)) : { k: k }; }) : undefined;
-    return { clockPosition: ['top-left', 'top', 'top-right', 'bottom-left', 'bottom', 'bottom-right'].includes(raw.clockPosition ?? '') ? raw.clockPosition : 'top', clockAuto: raw.clockAuto === true, clockInk: ['#FFFFFF', '#202222'].includes(raw.clockInk ?? '') ? raw.clockInk : '', photoFraming: raw.photoFraming === 'cover' ? 'cover' : 'fit', photoMode: raw.photoMode === 'photo' ? 'photo' : 'subject', background: raw.background === 'smart' ? 'smart' : 'template', sources: sources, version: 1, id: raw.id, palette: ['', 'cobalt', 'cream', 'ink'].includes(raw.palette) ? raw.palette : '', fill: raw.fill === true, depth: raw.depth !== false, zoom: Math.max(.25, Math.min(4, Number.isFinite(raw.zoom) ? raw.zoom : 1)), offsetX: Math.max(-1, Math.min(1, Number.isFinite(raw.offsetX) ? raw.offsetX : 0)), offsetY: Math.max(-1, Math.min(1, Number.isFinite(raw.offsetY) ? raw.offsetY : 0)) };
+    return { freePlacement: normalizeTemplatePlacement(raw.freePlacement), clockPosition: ['top-left', 'top', 'top-right', 'bottom-left', 'bottom', 'bottom-right'].includes(raw.clockPosition ?? '') ? raw.clockPosition : 'top', clockAuto: raw.clockAuto === true, clockInk: ['#FFFFFF', '#202222'].includes(raw.clockInk ?? '') ? raw.clockInk : '', photoFraming: raw.photoFraming === 'cover' ? 'cover' : 'fit', photoMode: raw.photoMode === 'photo' ? 'photo' : 'subject', background: raw.background === 'smart' ? 'smart' : 'template', sources: sources, version: 1, id: raw.id, palette: ['', 'cobalt', 'cream', 'ink'].includes(raw.palette) ? raw.palette : '', fill: raw.fill === true, depth: raw.depth !== false, zoom: Math.max(.25, Math.min(4, Number.isFinite(raw.zoom) ? raw.zoom : 1)), offsetX: Math.max(-1, Math.min(1, Number.isFinite(raw.offsetX) ? raw.offsetX : 0)), offsetY: Math.max(-1, Math.min(1, Number.isFinite(raw.offsetY) ? raw.offsetY : 0)) };
 }
 exports.normalizeCardTemplate = normalizeCardTemplate;
 function newCardTemplate(id) { return { photoMode: 'subject', background: 'template', version: 1, id, palette: '', fill: false, depth: true, zoom: 1, offsetX: 0, offsetY: 0 }; }
 exports.newCardTemplate = newCardTemplate;
-function copyCardTemplate(raw, includeSources = true) { return raw ? { clockPosition: raw.clockPosition, clockAuto: raw.clockAuto, clockInk: raw.clockInk, photoFraming: raw.photoFraming, photoMode: raw.photoMode, background: raw.background, sources: includeSources && raw.sources ? JSON.parse(JSON.stringify(raw.sources)) : undefined, version: raw.version, id: raw.id, palette: raw.palette, fill: raw.fill, depth: raw.depth, zoom: raw.zoom, offsetX: raw.offsetX, offsetY: raw.offsetY } : undefined; }
+function copyCardTemplate(raw, includeSources = true) { return raw ? { freePlacement: normalizeTemplatePlacement(raw.freePlacement), clockPosition: raw.clockPosition, clockAuto: raw.clockAuto, clockInk: raw.clockInk, photoFraming: raw.photoFraming, photoMode: raw.photoMode, background: raw.background, sources: includeSources && raw.sources ? JSON.parse(JSON.stringify(raw.sources)) : undefined, version: raw.version, id: raw.id, palette: raw.palette, fill: raw.fill, depth: raw.depth, zoom: raw.zoom, offsetX: raw.offsetX, offsetY: raw.offsetY } : undefined; }
 exports.copyCardTemplate = copyCardTemplate;
 
 },
@@ -5707,4 +5816,4 @@ exports.creationDimension = creationDimension;
 function creationAspect(dimension) { return dimension === '2*4' ? 2 : 1; }
 exports.creationAspect = creationAspect;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"5f20dc0764d5ece45c4bf10990f839a54cef945fccf693062541d44935267651"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"749484395c86df2aff177748f109e350ac5fe40868e96a6ed81adce92ebc31eb"};})(globalThis);

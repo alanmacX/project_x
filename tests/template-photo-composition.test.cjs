@@ -26,3 +26,24 @@ console.log(`PASS photo composition: ${count} time placements, exact one/two-fin
  }
  console.log('PASS photo gesture coordinates match letterboxed renderer across 12 template/aspect pairs');
 }
+
+// Readability protection is derived by the shared renderer, including legacy saved templates.
+{
+ const card=factory.makeTemplateCards('portrait',1,()=> 'depth-guard')[0];card.w=card.h=300;
+ const p=new schema.CanvasElement();Object.assign(p,{kind:'image',src:'original',depthForeground:'subject',depthEnabled:true,depthSourceAspect:1});
+ Object.assign(p.depthCrop,{x:0,y:0,w:1,h:1});card.elements=[p];
+ Object.assign(card.template,{depth:true,photoMode:'photo',photoFraming:'cover',clockPosition:'top',zoom:1,offsetX:0,offsetY:0});
+ const before=JSON.stringify(card);assert.equal(m.photoClockDepthAllowed(card),false);
+ let marks=scene.cardTemplateScene(card,1793536957629).marks;assert(!marks.some(x=>x.layer===3));assert(marks.some(x=>x.layer===2&&x.kind==='text'));assert.equal(JSON.stringify(card),before,'guard must not rewrite saved artwork');
+ let checked=0;
+ for(const mode of ['photo','subject'])for(const pos of m.PHOTO_CLOCK_POSITIONS)for(const zoom of [.5,1,2,4])for(const y of [-.8,0,.8]){
+  Object.assign(card.template,{photoMode:mode,clockPosition:pos,zoom,offsetY:y});
+  const allowed=m.photoClockDepthAllowed(card);marks=scene.cardTemplateScene(card,1793536957629).marks;
+  assert.equal(marks.some(x=>x.layer===3),allowed);checked++;
+ }
+ Object.assign(card.template,{photoMode:'photo',clockPosition:'top',zoom:1,offsetY:0});
+ Object.assign(p.depthCrop,{x:.2,y:.30,w:.6,h:.65});assert.equal(m.photoClockDepthAllowed(card),true,'small lower-edge overlap keeps depth');
+ p.depthCrop.y=.1;assert.equal(m.photoClockDepthAllowed(card),false,'large overlap protects time automatically');
+ p.depthCrop.y=.30;assert.equal(m.photoClockDepthAllowed(card),true,'moving the subject clear restores depth without changing the user toggle');
+ console.log(`PASS depth readability: ${checked} mode/position/zoom/pan cases, legacy render protection, small-overlap depth and automatic restoration`);
+}

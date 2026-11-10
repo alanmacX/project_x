@@ -22,6 +22,8 @@ export struct CapabilitySettings {
   @Prop appDark:boolean=false;
   @Prop section:string='all';
   @Prop tick:number=0;
+  @Prop useMaterialLibrary:boolean=false;
+  onChooseAlbum:()=>void=()=>{};
   onUpdate:(id:string,cap:CapBlock)=>void=()=>{};
   onReuseTimetable:(id:string)=>void=()=>{};
   @StorageProp('workspaceWidth') private viewportWidth:number=390;
@@ -105,7 +107,7 @@ export struct CapabilitySettings {
   }
   build() {
     Column({space:12}) {
-      if(this.cap.k==='album') {AlbumSettings({section:this.section,showPresentation:false,tick:this.tick,cap:this.cap,cardId:this.cardId,appDark:this.appDark,onUpdate:this.onUpdate})}
+      if(this.cap.k==='album') {AlbumSettings({useMaterialLibrary:this.useMaterialLibrary,onChooseAlbum:this.onChooseAlbum,section:this.section,showPresentation:false,tick:this.tick,cap:this.cap,cardId:this.cardId,appDark:this.appDark,onUpdate:this.onUpdate})}
       if(this.cap.k==='battery') {
 
         SettingsAction({label:this.busy?'更新中':'更新电量',onPress:()=>this.refresh(),appDark:this.appDark,isEnabled:!this.busy,fillWidth:true})

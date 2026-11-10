@@ -35,3 +35,6 @@ local.properties
 
 # Node test dependencies
 /node_modules/
+
+# Local simulator databases, recordings and captures
+/demo-verification/

@@ -1,4 +1,4 @@
-import { portraitPhotoFrame, photoClockLayout } from './TemplatePhotoComposition';
+import { portraitPhotoFrame, photoClockLayout, photoClockDepthAllowed } from './TemplatePhotoComposition';
 import { compositionDefinition } from './CompositionCatalog';
 import { templatePhotoBox, templateSubjectBox } from './TemplatePhotoGeometry';
 import { compositionOwner, compositionColors } from './CompositionCatalog';
@@ -134,11 +134,11 @@ export function cardTemplateScene(card: FridgeCard, tick: number): TemplateScene
     }
     else if (id === 'portrait') {
         s.height=300*card.h/card.w;
-        const subject=photo?.depthEnabled&&!!photo.depthForeground,subjectMode=subject&&personal.photoMode!=='photo';
+        const subject=photo?.depthEnabled&&!!photo.depthForeground,subjectMode=subject&&personal.photoMode!=='photo',safeDepth=photoClockDepthAllowed(card);
         if(photo){
           const frame=portraitPhotoFrame(card,photo);
-          if(subjectMode){image(photo.depthForeground,frame.x,frame.y,frame.w,frame.h,personal.depth?3:1);}
-          else{image(photo.src,frame.x,frame.y,frame.w,frame.h);if(subject&&personal.depth){const box=templateSubjectBox(photo,frame);image(photo.depthForeground,box.x,box.y,box.w,box.h,3);}}
+          if(subjectMode){image(photo.depthForeground,frame.x,frame.y,frame.w,frame.h,safeDepth?3:1);}
+          else{image(photo.src,frame.x,frame.y,frame.w,frame.h);if(subject&&personal.depth){const box=templateSubjectBox(photo,frame);image(photo.depthForeground,box.x,box.y,box.w,box.h,safeDepth?3:1);}}
         }else text('选择你的照片',24,Math.min(174,s.height-28),22,s.ink,252,'center');
         const clock=photoClockLayout(300,s.height,personal.clockPosition??'top'),ink=personal.clockInk||s.ink;
         if(clock.stacked){const hour=text(hh,clock.x,clock.y,clock.size,ink,clock.w,'center',800);hour.layer=2;hour.font='digits';const minute=text(mm,clock.x,clock.y+clock.size*1.04,clock.size,ink,clock.w,'center',800);minute.layer=2;minute.font='digits';}

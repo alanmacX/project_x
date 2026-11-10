@@ -1,3 +1,4 @@
+import { enforceSingleTemplateFill } from './TemplateFillPolicy';
 import { unifyTemplateGroups } from './TemplateGroupMigration';
 import { compositionSlot } from './CompositionCatalog';
 import { CardTemplate, normalizeCardTemplate } from './CardTemplate';
@@ -355,6 +356,7 @@ export function normalizeState(raw: FridgeState): FridgeState {
     if (card.shape === 'subject' && card.cutout.length === 0) card.shape = 'rect';
   }
   if(state.sceneLayouts.length===0&&state.sceneRules.length===0)state.cards=unifyTemplateGroups(state.cards,state.canvasAspect);
+  enforceSingleTemplateFill(state.cards,state.canvasAspect);
   return state;
 }
 export function serializeFaceCards(state: FridgeState): string { return JSON.stringify(state.cards.filter((c: FridgeCard) => !c.inDoor && !c.hidden)); }

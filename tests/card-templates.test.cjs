@@ -19,7 +19,7 @@ for(const item of t.CARD_TEMPLATES){
  }
 }
 const dial=f.makeTemplateCards('dial',1,()=>String(++id),now)[0],marks=r.cardTemplateScene(dial,now).marks,rects=marks.filter(m=>m.kind==='rect');assert.equal(rects.length,2);assert.equal(marks.filter(m=>m.kind==='text').length,0);assert.equal(rects[0].angle,48);assert.equal(rects[1].angle,304);assert.ok(rects.every(m=>m.end&&m.h>m.w));
-const photo=f.makeTemplateCards('portrait',1,()=>String(++id),now)[0],el=new s.CanvasElement();Object.assign(el,{kind:'image',src:'file:///photo.webp',depthForeground:'file:///subject.png',depthEnabled:true,depthSourceAspect:1});photo.elements=[el];let scene=r.cardTemplateScene(photo,now);assert.ok(scene.marks.some(m=>m.layer===3&&m.src===el.depthForeground));photo.template.depth=false;assert.ok(!r.cardTemplateScene(photo,now).marks.some(m=>m.layer===3));
+const photo=f.makeTemplateCards('portrait',1,()=>String(++id),now)[0],el=new s.CanvasElement();Object.assign(el,{kind:'image',src:'file:///photo.webp',depthForeground:'file:///subject.png',depthEnabled:true,depthSourceAspect:1});photo.elements=[el];photo.template.offsetY=.2;let scene=r.cardTemplateScene(photo,now);assert.ok(scene.marks.some(m=>m.layer===3&&m.src===el.depthForeground));photo.template.depth=false;assert.ok(!r.cardTemplateScene(photo,now).marks.some(m=>m.layer===3));
 const state=s.defaultState();state.cards=[new s.FridgeCard()];assert.equal(p.packageScene(JSON.stringify(state),'').version,1);assert.equal(s.normalizeState(state).cards[0].template,undefined);
 console.log('Native card templates: 39 designs / 5 recipes, 5 canvas ratios, round trips, palette axes, depth layering passed');
 

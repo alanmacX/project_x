@@ -1,3 +1,7 @@
+import { enforceSingleTemplateFill, templateFillState, restoreTemplateFillState } from '../model/TemplateFillPolicy';
+import { CUSTOMIZER_ENTER_DURATION, CUSTOMIZER_EXIT_DURATION } from '../model/CustomizerTransition';
+import { CardCustomizer } from '../views/CardCustomizer';
+import { DemoAsset } from '../demo/DemoAssets';
 import { MinutePulse } from '../model/MinutePulse';
 import { TemplatePhotoEditor } from '../views/TemplatePhotoEditor';
 import { cardCapabilities, replaceCardCapability } from '../model/TemplateSources';
@@ -7,7 +11,8 @@ import { templateColors } from '../model/TemplateScene';
 import { makeTemplateCards } from '../model/TemplateFactory';
 import { templateDefinition, CardTemplate, copyCardTemplate } from '../model/CardTemplate';
 import { CardTemplatePicker } from '../views/CardTemplatePicker';
-import { TemplateSettings } from '../views/TemplateSettings';
+import { toggleTemplateCanvasFill } from '../model/TemplateCanvasPlacement';
+import { bindDemoAlbum } from '../demo/DemoMaterialBinding';
 import { projectCapabilityData } from '../model/CapabilityProjection';
 import { prepareSceneImages, trimSceneImages } from '../model/SceneImageCache';
 import { GalleryAnchor, GalleryController, galleryReturnTargetVisible } from '../model/CanvasGallery';
@@ -470,7 +475,9 @@ struct Index {
       // disposable previews must never gate returning to the retained gallery.
       const id=this.store.state.canvasId,saved=this.store.save(false);
       this.refreshCanvasList();this.galleryMounted=true;
-      this.galleryAnchor=this.galleryController.anchor(id,false);
+      const measuredAnchor=this.galleryController.anchor(id,false);
+      if(measuredAnchor){this.galleryAnchor=measuredAnchor;this.galleryAnchorWidth=this.screenWidth;this.galleryAnchorHeight=this.screenHeight;}
+      else if(this.galleryAnchor?.id!==id||this.galleryAnchorWidth!==this.screenWidth||this.galleryAnchorHeight!==this.screenHeight)this.galleryAnchor=null;
       await this.setGalleryPage(true);
       const returnedGeneration=this.galleryTransitionGeneration;
       AppStorage.setOrCreate('launchFromWidget', false);
@@ -506,7 +513,7 @@ struct Index {
     finally { this.canvasChanging = false; this.refreshCanvasList(); this.galleryRevision++; }
   }
   private workspaceChromeVisible():boolean {
-    return !this.galleryVisible&&!this.canvasChanging&&!this.galleryTransitioning;
+    return !this.galleryVisible&&!this.canvasChanging&&!this.galleryTransitioning&&!this.customizerOpen&&!this.materialLibraryOpen;
   }
   private cancelGalleryTransition(): void {
     this.galleryTransitionGeneration++;
@@ -542,7 +549,7 @@ struct Index {
       if(!this.alive||generation!==this.galleryTransitionGeneration||!this.galleryVisible)return;
       if(shared){this.animateGalleryPreview(true,finish);}
       else{
-        // Never fly toward an offscreen/clipped tile or scroll the homepage.
+        // Only a mostly offscreen tile uses the local fallback; never scroll the homepage.
         // The cached image dissolves locally; gallery interaction stays enabled.
         this.getUIContext().animateTo({duration:180,curve:Curve.Friction,expectedFrameRateRange:this.frameRate,onFinish:finish},()=>{
           this.galleryHeroOpacity=0;
@@ -673,7 +680,7 @@ struct Index {
         }
         Column().width(1).height(1).position({ x: this.selectedActionAnchor().x, y: this.selectedActionAnchor().y })
           .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
-          .bindPopup(this.showCardActions(), { builder: this.cardActions, width: 176, radius: 26, targetSpace: 8,
+          .bindPopup(this.showCardActions(), { builder: this.cardActions, width: this.preview.template?260:176, radius: 26, targetSpace: 8,
             placement: this.selectedActionAnchor().above ? Placement.Top : Placement.Bottom,
             systemMaterial: chromeMaterial(this.appDark), popupColor: AppDesign.popup(this.appDark),
             backgroundBlurStyle: chromeMaterial(this.appDark) !== undefined ? BlurStyle.NONE : BlurStyle.COMPONENT_THIN,
@@ -705,11 +712,16 @@ struct Index {
   }
   private async canvasMoreMenu(): Promise<void> {
     const id = this.store.state.canvasId;
-    const choice = await this.navChoice('画布', ['分享画布', '复制画布', '导入作品'], 'shareCanvas');
+    const labels=['分享画布','复制画布','导入作品'];
+    if(this.selectedId&&this.undoAvailable)labels.push('撤销上一步');
+    if(this.selectedId&&this.redoAvailable)labels.push('重做上一步');
+    const choice = await this.navChoice('画布', labels, 'shareCanvas');
     if (!this.alive || id !== this.store.state.canvasId || this.galleryVisible) return;
     if (choice === 0) this.shareCanvasById(id);
     else if (choice === 1) this.duplicateGalleryCanvas(id);
     else if (choice === 2) this.pickTemplate();
+    else if(labels[choice]==='撤销上一步')this.restoreHistory(false);
+    else if(labels[choice]==='重做上一步')this.restoreHistory(true);
   }
   private canvasRouteChanged(): void { if(this.ready && this.routeCanvasId) this.scheduleWidgetRoute(); }
   private widgetLaunchChanged(): void { if (this.ready && this.launchFromWidget) this.scheduleWidgetRoute(); }
@@ -1009,6 +1021,8 @@ struct Index {
   }
   aboutToDisappear(): void { this.cancelGalleryWarm();this.cancelGalleryTransition();this.canvasFlightGeneration++;this.canvasFlightY=0;this.canvasFlightX=0;this.canvasFlightAngle=0;this.canvasChanging=false; this.reliefGeneration++;if(this.reliefTimer>=0)clearTimeout(this.reliefTimer); this.finishNavMenu(-1); this.finishCardDeletion(); this.enhancementDialog?.close();this.enhancementOpen=false; if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer); this.capabilityPickerOpen=false;this.scheduleGeneration++;if(this.scheduleTimer>=0)clearTimeout(this.scheduleTimer); this.batteryObserver.stop(); if(this.widgetRouteTimer>=0)clearTimeout(this.widgetRouteTimer); if (this.previewTimer >= 0 || this.gestureGroup.length > 0) this.flushPreview(); this.alive = false; if(this.readingTintTimer>=0)clearTimeout(this.readingTintTimer); if(this.incomingTimer>=0)clearTimeout(this.incomingTimer); this.backgroundGeneration += 1; if (this.backgroundTimer >= 0) clearTimeout(this.backgroundTimer); if (this.maintenanceTimer >= 0) clearTimeout(this.maintenanceTimer); if (this.transitionTimer >= 0) clearTimeout(this.transitionTimer); this.activeBoardId = ''; this.persist(true); this.minutePulse.stop(); }
   onBackPress(): boolean {
+    if(this.customizerEntranceRunning||this.customizerExitRunning)return true;
+    if(this.customizerOpen||this.materialLibraryOpen){this.customizerExitRequest++;return true;}
     if(this.photoEditorOpen){this.finishPhotoEditor(null);return true;}
     if(this.galleryTransitioning)return true;
     if(this.galleryVisible&&this.galleryController.dismiss())return true;
@@ -1108,13 +1122,87 @@ struct Index {
     const rect = sceneRect(this.preview, this.boardScale * BOARD_W, this.boardHeight);
     rect.x += this.boardLeft; rect.y += this.boardTop; return rect;
   }
+  @State customizerOpen:boolean=false;
+  @State customizerEntranceOrigin:SceneRect=new SceneRect();
+  @State customizerEntranceRunning:boolean=false;
+  @State customizerReturnOrigin:SceneRect=new SceneRect();
+  @State customizerExitRequest:number=0;
+  @State customizerExitRunning:boolean=false;
+  @State customizerSurfaceTaken:boolean=false;
+  @State materialLibraryOpen:boolean=false;
+  private customizationCanvas:string='';
+  private customizationCard:string='';
+  private materialElement:string='';
+  @State materialPurpose:string='image';
+  private materialCapabilityIndex:number=-1;
+  private customizerFromCanvas:boolean=false;
+  private openCustomizer(fromCanvas:boolean=false,created:boolean=false):void{
+    if((this.busy&&!created)||this.heroActive||!this.current())return;
+    this.customizerFromCanvas=fromCanvas;
+    this.customizerEntranceOrigin=this.boardRect();
+    this.customizerReturnOrigin=this.boardRect();this.customizerExitRunning=false;
+    if(created){const rect=new SceneRect();rect.w=28;rect.h=28*this.preview.h/this.preview.w;rect.x=this.panelLeft+this.panelWidth-38;rect.y=this.panelTop+22-rect.h/2;this.customizerEntranceOrigin=rect;}
+    this.customizerEntranceRunning=fromCanvas;this.customizerSurfaceTaken=false;
+    this.customizationCanvas=this.store.state.canvasId;this.customizationCard=this.selectedId;
+    this.editorSheetOpen=false;this.customizerOpen=true;
+  }
+  private customizerEntranceStart():void{
+    if(!this.customizerOpen||!this.customizerFromCanvas)return;
+    this.customizerSurfaceTaken=true;
+    this.getUIContext().animateTo({duration:CUSTOMIZER_ENTER_DURATION,curve:Curve.Friction,expectedFrameRateRange:this.frameRate},()=>{this.boardOpacity=0;this.scatter=1;});
+  }
+  private customizerExitStart():void{
+    if(!this.customizerOpen||!this.customizerFromCanvas)return;
+    this.customizerExitRunning=true;
+    this.getUIContext().animateTo({duration:CUSTOMIZER_EXIT_DURATION,curve:Curve.Friction,expectedFrameRateRange:this.frameRate},()=>{this.boardOpacity=1;this.scatter=0;});
+  }
+  private closeLocalPanel():void{
+    this.customizerExitRunning=false;
+    this.customizerEntranceRunning=false;this.customizerSurfaceTaken=false;this.boardOpacity=1;this.scatter=0;
+    this.customizerOpen=false;this.materialLibraryOpen=false;this.customizerFromCanvas=false;
+    if(this.editing&&!this.editorLandscape())this.editorSheetOpen=true;
+  }
+  private finishCustomizer(next:FridgeCard):void{
+    const old=this.store.findCard(this.customizationCard);
+    if(old&&this.store.state.canvasId===this.customizationCanvas&&next.id===old.id){
+      const i=this.store.state.cards.findIndex(c=>c.id===old.id);
+      next.x=old.x;next.y=old.y;next.w=old.w;next.h=old.h;next.rot=old.rot;next.z=old.z;next.groupId=old.groupId;next.hidden=old.hidden;next.inDoor=old.inDoor;
+      this.store.state.cards[i]=cardViewSnapshot(next);this.templateCanvasBackground(false);
+      if(this.customizerFromCanvas){this.history.record(next,'local-customization-'+Date.now(),compositionPaletteState(next,this.store.state.cards),this.canvasBackground,templateFillState(this.store.state.cards));this.undoAvailable=this.history.canUndo();this.redoAvailable=this.history.canRedo();}
+      this.change('local-customization-'+Date.now());this.syncFields();
+    }
+    this.closeLocalPanel();
+  }
+  private openMaterialLibrary(replace:boolean=false,album:boolean=false):void{
+    if(this.busy||this.scheduledName||this.scheduleTransition)return;
+    this.customizationCanvas=this.store.state.canvasId;this.customizationCard=replace||album?this.selectedId:'';this.materialElement=replace?this.layerId:'';
+    this.materialPurpose=album?'album':'image';this.materialCapabilityIndex=album?this.templateDataIndex:-1;
+    this.addCardOpen=false;this.homeToolsOpen=false;this.editorSheetOpen=false;this.materialLibraryOpen=true;
+  }
+  private useLibraryAsset(asset:DemoAsset,subject:boolean):void{
+    if(this.store.state.canvasId!==this.customizationCanvas){this.closeLocalPanel();return;}
+    let card=this.customizationCard?this.store.findCard(this.customizationCard):null;
+    if(this.customizationCard&&!card){this.closeLocalPanel();return;}
+    if(this.materialPurpose==='album'&&card){if(!bindDemoAlbum(card,this.materialCapabilityIndex,asset)){this.getUIContext().getPromptAction().showToast({message:'封面库最多保留 12 张'});return;}this.change('album-material-'+Date.now());this.syncFields();this.closeLocalPanel();return;}
+    const replacing=card!==null;
+    if(!card){if(!this.canAddCards(1))return;card=new FridgeCard();card.id=this.store.newId();card.w=210;card.h=Math.min(280,210/Math.max(.1,asset.aspect));card.x=(BOARD_W-card.w)/2;card.y=40;}
+    let element=replacing?card.elements.find(e=>e.id===this.materialElement):undefined;
+    if(replacing&&!element){this.closeLocalPanel();return;}
+    if(!element){element=new CanvasElement();element.id=this.store.newId();element.kind='image';element.x=0;element.y=0;element.w=1;element.h=1;card.elements.push(element);}
+    element.src=subject&&asset.subject?asset.subject:asset.original;element.animated=false;element.depthEnabled=false;element.depthForeground='';element.depthSourceAspect=subject?asset.aspect*asset.crop.w/Math.max(.001,asset.crop.h):asset.aspect;
+    if(!replacing){this.clamp(card);this.store.addCard(card);this.select(card.id);}
+    this.change('material-reuse-'+Date.now());this.syncFields();this.closeLocalPanel();
+  }
   private openEditor(id: string, created: boolean = false): void {
     if(this.scheduledName||this.scheduleTransition){this.getUIContext().getPromptAction().showToast({message:'请先恢复原始画布再编辑'});return;}
     if (this.heroActive || this.arriving) return;
     this.galleryVisible=false;
+    if(this.store.findCard(id)?.template){
+      this.select(id,true);this.homeToolsOpen=false;this.openCustomizer(true,created);return;
+    }
     this.templateDataIndex=0;this.editorExpanded=false;this.editorSheetHeightVp=0;this.editorBackPending=false;
     this.editorContentStage=0;this.editorMountGeneration++;
-    this.heroHideContent = false; this.select(id, true);if(this.current()?.template?.fill){this.templateCanvasBackground(false);this.history.reset(this.current()!,[],this.canvasBackground);} this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false;this.editorSection=0;this.editorSheetTab=0;this.settingsTab=this.preview.capability!==null?1:0;
+    this.heroHideContent = false; this.select(id, true);if(this.current()?.template?.fill){this.templateCanvasBackground(false);this.history.reset(this.current()!,[],this.canvasBackground,templateFillState(this.store.state.cards));} this.scatter = 0; this.showEditorContent = false; this.showBackgroundOptions = false; this.showLayerOptions = false;this.editorSection=0;this.editorSheetTab=0;this.settingsTab=this.preview.capability!==null?1:0;
     this.heroRect = this.boardRect();
     if (created) {
       const rect = new SceneRect(); rect.w = 28; rect.h = 28 * this.preview.h / this.preview.w;
@@ -1318,7 +1406,7 @@ struct Index {
   private select(id: string, refresh: boolean = false): void {
     if (!refresh && !this.editing && !this.viewing && this.selectedId === id) return;
     const selected = this.store.findCard(id);
-    if (selected !== null && this.selectedId !== id) { this.history.reset(selected,compositionPaletteState(selected,this.store.state.cards),selected.template?this.canvasBackground:undefined); this.undoAvailable = false; this.redoAvailable = false; }
+    if (selected !== null && this.selectedId !== id) { this.history.reset(selected,compositionPaletteState(selected,this.store.state.cards),selected.template?this.canvasBackground:undefined,templateFillState(this.store.state.cards)); this.undoAvailable = false; this.redoAvailable = false; }
     this.selectedId = id; this.layerId = ''; this.syncFields();
     const card = this.current(); if (card !== null) this.preview = cardRenderSnapshot(card);
   }
@@ -1344,7 +1432,7 @@ struct Index {
       }
       if (card.capability !== null&&!card.template) card.capBox = capabilityPlacement(card);
       this.clamp(card);
-      if (this.editing) { this.history.record(card, group,compositionPaletteState(card,this.store.state.cards),card.template?this.canvasBackground:undefined); this.undoAvailable = this.history.canUndo(); this.redoAvailable = this.history.canRedo(); }
+      if (this.editing) { this.history.record(card, group,compositionPaletteState(card,this.store.state.cards),card.template?this.canvasBackground:undefined,templateFillState(this.store.state.cards)); this.undoAvailable = this.history.canUndo(); this.redoAvailable = this.history.canRedo(); }
     }
     this.render();
     if (this.saveTimer >= 0) clearTimeout(this.saveTimer);
@@ -1357,6 +1445,7 @@ struct Index {
     const index = this.store.state.cards.findIndex((card: FridgeCard) => card.id === restored.id);
     if (index < 0) return;
     this.store.state.cards[index] = restored;
+    restoreTemplateFillState(this.history.fillState(),this.store.state.cards,this.canvasAspect);
     restoreCompositionPalette(this.history.paletteState(),this.store.state.cards);
     const background=this.history.backgroundState();if(restored.template&&background)this.applyBackground(background);
     if (this.layerId !== 'capability' && !restored.elements.some((el: CanvasElement) => el.id === this.layerId)) this.layerId = '';
@@ -1489,7 +1578,7 @@ struct Index {
     this.addCardOpen=true;
   }
   @Builder
-  addCardSheet(){CardTemplatePicker({appDark:this.appDark,onChoose:(id:string)=>{this.addCardOpen=false;this.createTemplate(id);},onCreative:()=>{this.addCardOpen=false;this.addCreativeCard();}})}
+  addCardSheet(){CardTemplatePicker({appDark:this.appDark,onMaterials:()=>this.openMaterialLibrary(),onChoose:(id:string)=>{this.addCardOpen=false;this.createTemplate(id);},onCreative:()=>{this.addCardOpen=false;this.addCreativeCard();}})}
   private async createTemplate(id:string):Promise<void>{
     const canvas=this.store.state.canvasId,cards=makeTemplateCards(id,this.canvasAspect,()=>this.store.newId());
     if(!cards.length||this.busy||!this.canAddCards(cards.length))return;
@@ -1537,12 +1626,10 @@ struct Index {
     const card=this.current(),t=card?.template;if(!card||!t)return;
     if(key==='id'){const next=templateDefinition(String(value));if(next?.kind!==card.capability?.k)return;t.id=String(value);this.templateCanvasBackground();}
     else if(key==='palette'){setCompositionPalette(card,this.store.state.cards,String(value));t.clockInk='';this.templateCanvasBackground();}else if(key==='background'){t.background=String(value);this.templateCanvasBackground();}else if(key==='photoMode'){t.photoMode=String(value);t.zoom=1;t.offsetX=0;t.offsetY=0;}else if(key==='reset'){t.zoom=1;t.offsetX=0;t.offsetY=0;}else if(key==='depth')t.depth=value===true;
-    else if(key==='fill'){t.fill=value===true;if(t.fill)this.templateCanvasBackground();if(!t.fill){card.w=Math.min(260,BOARD_W/this.canvasAspect-24);card.h=compositionDefinition(t.id)&&this.canvasAspect>=1.5?card.w/2:card.w;card.x=(BOARD_W-card.w)/2;card.y=12;}this.clamp(card);}
+    else if(key==='fill'){if(t.fill!==(value===true))this.toggleCanvasFill();return;}
     else if(key==='zoom')t.zoom=Number(value);else if(key==='offsetX')t.offsetX=Number(value);else if(key==='offsetY')t.offsetY=Number(value);
     if(mode===undefined)this.change();else this.continuousChange(mode);
   }
-  @Builder
-  templateAppearance(){TemplateSettings({card:this.preview,processing:this.busy,appDark:this.appDark,onPhotoEdit:()=>this.openPhotoEditor(),onBackground:(mode:string)=>this.templateSetting('background',mode),onDesign:(id:string)=>this.templateSetting('id',id),onPalette:(value:string)=>this.templateSetting('palette',value),onFill:(value:boolean)=>this.templateSetting('fill',value),onPhoto:()=>{this.templatePhotoPick();},onCutout:()=>{this.templateCutout();}})}
   private addCreativeCard(): void {
     if(this.scheduledName){this.getUIContext().getPromptAction().showToast({message:'请先恢复原始画布再添加卡片'});return;}
     if (this.busy || this.canvasChanging || !this.canAddCards(1)) return;
@@ -1852,8 +1939,8 @@ struct Index {
           this.canvasNavigation()
         }.id('canvasWorkspace').width('100%').height('100%')
           .visibility(!this.galleryVisible||this.galleryTransitioning?Visibility.Visible:Visibility.Hidden)
-          .hitTestBehavior(this.galleryVisible?HitTestMode.None:HitTestMode.Transparent)
-          .accessibilityLevel(this.galleryVisible?'no-hide-descendants':'auto')
+          .hitTestBehavior(this.galleryVisible||this.customizerOpen||this.materialLibraryOpen?HitTestMode.None:HitTestMode.Transparent)
+          .accessibilityLevel(this.galleryVisible||this.customizerOpen||this.materialLibraryOpen?'no-hide-descendants':'auto')
         }
         if(this.galleryMounted){
           CanvasGallery({ entries: this.canvasEntries, appDark: this.appDark, viewportWidth: this.screenWidth, viewportHeight:this.screenHeight, safeTop: this.safeTop, safeBottom: this.safeBottom,
@@ -1870,6 +1957,7 @@ struct Index {
         }
         Column().width(1).height(1).position({x:this.navMenuX,y:this.navMenuY}).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
           .bindMenu(this.navMenuOpen,this.navMenuItems,{placement:Placement.BottomRight,systemMaterial:chromeMaterial(this.appDark),backgroundColor:AppDesign.popup(this.appDark),onDisappear:()=>this.finishNavMenu(this.navMenuResult)})
+        if(this.customizerOpen||this.materialLibraryOpen){CardCustomizer({animateEntrance:this.customizerFromCanvas&&!this.materialLibraryOpen,entranceOrigin:this.customizerEntranceOrigin,returnOrigin:this.customizerReturnOrigin,exitRequest:this.customizerExitRequest,onExitStart:()=>this.customizerExitStart(),onEntranceStart:()=>this.customizerEntranceStart(),onEntranceEnd:()=>{this.customizerEntranceRunning=false;},initialCard:this.preview,initialDocument:this.store.state,libraryMode:this.materialLibraryOpen,libraryPurpose:this.materialPurpose,viewportW:this.screenWidth,viewportH:this.screenHeight,safeTop:this.safeTop,safeBottom:this.safeBottom,onDone:(card:FridgeCard)=>this.finishCustomizer(card),onCancel:()=>this.closeLocalPanel(),onPick:(asset:DemoAsset,subject:boolean)=>this.useLibraryAsset(asset,subject)}).width('100%').height('100%').zIndex(220000)}
         if(this.photoEditorOpen){TemplatePhotoEditor({card:this.preview,sceneBackground:this.canvasBackground,appDark:this.appDark,viewportWidth:this.screenWidth,viewportHeight:this.screenHeight,safeTop:this.safeTop,safeBottom:this.safeBottom,tick:this.tick,onDone:(template:CardTemplate)=>this.finishPhotoEditor(template),onCancel:()=>this.finishPhotoEditor(null)}).width('100%').height('100%').zIndex(210000)}
         if(this.galleryHeroSource){
           Image(this.galleryHeroSource).id('galleryTransitionArtwork').syncLoad(true).objectFit(ImageFit.Fill)
@@ -1887,11 +1975,11 @@ struct Index {
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_: Area, area: Area) => {
         const width = Number(area.width), height = Number(area.height);
-        if (width > 0 && height > 0 && (width!==this.screenWidth || height!==this.screenHeight)) { if(this.galleryTransitioning||this.galleryReturnAnimating)this.cancelGalleryTransition();this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height);AppStorage.setOrCreate('workspaceWidth',width);if(this.editing&&!this.heroActive)this.editorSheetOpen=!this.photoEditorOpen&&!this.editorLandscape(); this.layoutBoard(); }
+        if (width > 0 && height > 0 && (width!==this.screenWidth || height!==this.screenHeight)) { if(this.galleryTransitioning||this.galleryReturnAnimating)this.cancelGalleryTransition();this.screenWidth = width; this.screenHeight = height; AppStorage.setOrCreate('workspaceHeight',height);AppStorage.setOrCreate('workspaceWidth',width);if(this.editing&&!this.heroActive)this.editorSheetOpen=!this.photoEditorOpen&&!this.customizerOpen&&!this.materialLibraryOpen&&!this.editorLandscape(); this.layoutBoard();if(this.customizerOpen)this.customizerReturnOrigin=this.boardRect(); }
       })
   }
   private showCardActions(): boolean {
-    return !this.galleryVisible && !this.galleryTransitioning && !this.canvasChanging && !this.editing && !this.viewing && !this.arriving &&
+    return !this.addCardOpen && !this.customizerOpen && !this.materialLibraryOpen && !this.galleryVisible && !this.galleryTransitioning && !this.canvasChanging && !this.editing && !this.viewing && !this.arriving &&
       !this.heroActive && !this.activeBoardId && !this.groupSelecting && this.selectedGroup().length < 2 &&
       !this.scheduledName && !this.scheduleTransition && !this.deletionId &&
       !!this.cardMap[this.selectedId] && !this.cardMap[this.selectedId].hidden;
@@ -1900,7 +1988,16 @@ struct Index {
     const card = this.cardMap[this.selectedId]; if (!card) return new CardActionAnchor();
     const fringe = compositionOverflow(card, this.boardScale);
     return cardActionAnchor(card, this.boardScale, this.boardHeight / BOARD_H, this.boardLeft, this.boardTop, this.boardHeight,
-      this.screenWidth, this.screenHeight, this.safeTop, this.safeBottom, [fringe.left, fringe.top, fringe.right, fringe.bottom]);
+      this.screenWidth, this.screenHeight, this.safeTop, this.safeBottom, [fringe.left, fringe.top, fringe.right, fringe.bottom],card.template?260:176);
+  }
+  private toggleCanvasFill():void{
+    const card=this.current();if(!card?.template||this.busy||this.heroActive||this.customizerOpen||this.scheduledName)return;
+    if(!toggleTemplateCanvasFill(card,this.canvasAspect))return;
+    const released=enforceSingleTemplateFill(this.store.state.cards,this.canvasAspect,card.id),group='canvas-fill-'+Date.now();
+    this.templateCanvasBackground();this.change(group);
+    this.history.record(card,group,compositionPaletteState(card,this.store.state.cards),this.canvasBackground,templateFillState(this.store.state.cards));
+    if(released.length)this.getUIContext().getPromptAction().showToast({message:'已铺满，原全屏组件已缩回'});
+    this.undoAvailable=this.history.canUndo();this.redoAvailable=this.history.canRedo();this.syncFields();
   }
   @Builder
   cardActions() {
@@ -1909,13 +2006,18 @@ struct Index {
         SymbolGlyph($r('sys.symbol.trash')).fontSize(22).fontColor(['#D3423C']).hitTestBehavior(HitTestMode.None)
       }.width(48).height(44).backgroundColor(Color.Transparent).accessibilityText('删除卡片').onClick(() => this.deleteCard(this.selectedId))
       Divider().vertical(true).width(1).height(24).color(AppDesign.border(this.appDark)).margin({ left: 6, right: 6 })
+      if(this.preview.template){
+        Button({type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}){
+          Row({space:5}){SymbolGlyph(this.preview.template.fill?$r('sys.symbol.arrow_down_right_and_arrow_up_left'):$r('sys.symbol.arrow_up_left_and_arrow_down_right')).fontSize(19).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None);Text(this.preview.template.fill?'缩回':'铺满').fontSize(14).fontColor(this.appText()).hitTestBehavior(HitTestMode.None)}
+        }.width(84).height(44).padding(0).backgroundColor(Color.Transparent).accessibilityText(this.preview.template.fill?'缩回原来布局':'模板铺满画布').onClick(()=>this.toggleCanvasFill())
+      }
       Button({ type: ButtonType.Capsule, buttonStyle: ButtonStyleMode.NORMAL }) {
         Row({ space: 8 }) {
           SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(22).fontColor([this.appText()]).hitTestBehavior(HitTestMode.None)
           Text('编辑').fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.appText()).hitTestBehavior(HitTestMode.None)
         }
       }.width(107).height(44).padding(0).backgroundColor(Color.Transparent).accessibilityText('编辑卡片内容').onClick(() => this.openEditor(this.selectedId))
-    }.width(176).height(52).padding(4)
+    }.width(this.preview.template?260:176).height(52).padding(4)
   }
   private sceneCard(id: string): FridgeCard { return this.editing && id === this.selectedId ? this.preview : this.depthSceneMap[id]??this.cardMap[id]; }
   private sceneScale(id: string): number { return this.editing && id === this.selectedId ? this.surfaceScale() : 1; }
@@ -1953,7 +2055,7 @@ struct Index {
             .height(this.creationClip(id) ? this.transitionClipH : this.screenHeight)
             .position({ x: this.creationClipX(id), y: this.creationClipY(id) })
             .borderRadius(this.creationClip(id) ? this.transitionClipRadius : 0).clip(this.creationClip(id))
-            .opacity(this.deletionBitmap!==undefined&&this.deletionId===id?0:this.editing && id === this.selectedId ? 1 : this.boardOpacity)
+            .opacity(this.customizerSurfaceTaken&&id===this.customizationCard?0:this.deletionBitmap!==undefined&&this.deletionId===id?0:this.editing && id === this.selectedId ? 1 : this.boardOpacity)
             .zIndex(this.activeBoardId === id || this.boardMotion.ids.includes(id) ? 100000 + this.sceneCard(renderId).z / (1 + this.sceneCard(renderId).z) : this.sceneCard(renderId).z)
             .hitTestBehavior(renderId!==id || this.editing || this.arriving || this.homeToolsMoving || this.scheduledName.length>0 || this.scheduleTransition ? HitTestMode.None : HitTestMode.Transparent)
   }
@@ -2166,7 +2268,7 @@ struct Index {
                     }.width(44).height(44).hitTestBehavior(HitTestMode.None)
                     Column({space:4}) {
                       Text(layerLabel(this.cardMap[id])).fontSize(14).maxLines(1).textOverflow({overflow:TextOverflow.Ellipsis}).fontColor(this.appText()).width('100%')
-                      Text((this.cardMap[id].hidden?'已隐藏 · ':this.orderedCards()[0]?.id===id?'最上层 · ':'')+(this.cardMap[id].capability!==null?typeLabel(this.cardMap[id].capability?.k??''):'自定义')).fontSize(11).fontColor(this.appMuted()).width('100%')
+                      Text((this.cardMap[id].template?.fill?'铺满画布 · ':'')+(this.cardMap[id].hidden?'已隐藏 · ':this.orderedCards()[0]?.id===id?'最上层 · ':'')+(this.cardMap[id].capability!==null?typeLabel(this.cardMap[id].capability?.k??''):'自定义')).fontSize(11).fontColor(this.appMuted()).width('100%')
                     }.layoutWeight(1).hitTestBehavior(HitTestMode.None)
                   }.width('100%')
                 }.layoutWeight(1).height(48).padding(0).backgroundColor(Color.Transparent)
@@ -2726,7 +2828,7 @@ struct Index {
       if(this.editorContentStage>=1&&this.sectionTabs().length>0 && (this.preview.template&&this.editorSection===1 || this.preview.capability?.k==='album'&&this.editorSection===1 || this.layerId==='capability'&&this.editorSection===3)) {SettingsSegmented({labels:this.sectionTabs(),selectedIndex:this.editorSheetTab,appDark:this.appDark,onSelect:(i:number)=>{this.editorSheetTab=i;this.scroller.scrollTo({xOffset:0,yOffset:0});}})}
       Scroll(this.scroller) {
         Stack({alignContent:Alignment.TopStart}) {if(this.editorContentStage>=2){ForEach([this.layerId+':'+this.editorSection+':'+this.editorSheetTab+':'+this.templateDataIndex],(sectionKey:string)=>{Column({space:16}) {
-          if(this.preview.template){if(this.editorSection===0){this.templateAppearance()}else{Column(){this.capabilityDataPanel()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(20)}} else if(this.preview.capability?.k==='album') {
+          if(this.preview.capability?.k==='album') {
             if(this.editorSection===0) {this.albumStyleChoices()}
             else {Column() {this.capabilityDataPanel()}.width('100%').padding(16).backgroundColor(this.appSurface()).borderRadius(20)}
           } else if(this.layerId==='capability'&&this.preview.capability!==null) {
@@ -3037,6 +3139,7 @@ struct Index {
               .onChange((v: boolean) => { const el = this.currentElement(); if (el !== null) { el.bold = v; this.change(); } })
           }.width('100%').height(AppDesign.controlHeight)
         } else if (this.elementPreview.kind === 'image') {
+          Button('从素材库选择',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(AppDesign.controlHeight).width('100%').fontColor(this.appText()).backgroundColor(this.appControl()).onClick(()=>this.openMaterialLibrary(true))
           Button(this.busy ? '正在读取' : '选择图片或 GIF', { type: ButtonType.ROUNDED_RECTANGLE, buttonStyle:ButtonStyleMode.NORMAL, role:ButtonRole.NORMAL }).height(AppDesign.controlHeight).fontSize(14).backgroundColor(this.appControl()).fontColor(this.appText()).enabled(!this.busy).onClick(() => this.pickImage())
           if(!this.elementPreview.animated&&this.elementPreview.src.length>0){
             Row(){Text('主体景深').fontSize(14).fontColor(this.appText());Blank();Toggle({type:ToggleType.Switch,isOn:this.elementPreview.depthEnabled}).enabled(!this.busy).onChange((v:boolean)=>this.setElementDepth(v))}.width('100%').height(44)
@@ -3131,7 +3234,7 @@ struct Index {
       }
 
       if(this.dataPreview()!==null && ['album','battery','agenda','timetable'].includes(this.dataPreview()!.k)) {
-        CapabilitySettings({section:this.dataPreview()?.k==='timetable'?['display','courses','calendar'][this.editorSheetTab]:this.dataPreview()?.k==='album'?['library','metadata','rotation'][this.editorSheetTab]:'all',tick:this.tick,cap:this.dataPreview()!,cardId:this.preview.id,appDark:this.appDark,onReuseTimetable:(id:string)=>this.reuseTimetable(id),onUpdate:(id:string,next:CapBlock)=>this.updateExtraCapability(id,next)})
+        CapabilitySettings({useMaterialLibrary:true,onChooseAlbum:()=>this.openMaterialLibrary(false,true),section:this.dataPreview()?.k==='timetable'?['display','courses','calendar'][this.editorSheetTab]:this.dataPreview()?.k==='album'?['library','metadata','rotation'][this.editorSheetTab]:'all',tick:this.tick,cap:this.dataPreview()!,cardId:this.preview.id,appDark:this.appDark,onReuseTimetable:(id:string)=>this.reuseTimetable(id),onUpdate:(id:string,next:CapBlock)=>this.updateExtraCapability(id,next)})
       }
     }.width('100%')
   }

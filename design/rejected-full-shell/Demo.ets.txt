@@ -1,0 +1,400 @@
+import { constrainDemoPhoto } from '../demo/DemoPhotoGeometry';
+import { readPhotoSamples } from '../model/TemplatePhotoAnalysis';
+import { projectCapabilityData } from '../model/CapabilityProjection';
+import { common, Want } from '@kit.AbilityKit';
+import { fileIo } from '@kit.CoreFileKit';
+import { AddFormMenuItem, window } from '@kit.ArkUI';
+import { FridgeStore } from '../model/FridgeModel';
+import { FridgeState, FridgeCard, CanvasElement, CanvasBackground, CapBlock, ElementBox, normalizeState } from '../model/CardSchema';
+import { CanvasEntry } from '../model/CanvasLibrary';
+import { CARD_TEMPLATES, TemplateDefinition, newCardTemplate, templateDefinition } from '../model/CardTemplate';
+import { makeTemplateCards } from '../model/TemplateFactory';
+import { cardCapabilities, replaceCardCapability } from '../model/TemplateSources';
+import { capabilityDescriptor } from '../model/CapabilityCatalog';
+import { templateColors } from '../model/TemplateScene';
+import { cardViewSnapshot } from '../model/CardViewSnapshot';
+import { storageSnapshot } from '../model/StorageSnapshot';
+import { PhotoCameraGesture, PhotoGesturePoint, photoControlRegion, PHOTO_CLOCK_POSITIONS, recommendPhotoClock, PhotoSamples, photoClockLayout, portraitPhotoFrame } from '../model/TemplatePhotoComposition';
+import { templatePhotoBox } from '../model/TemplatePhotoGeometry';
+import { CardFace } from '../views/CardFace';
+import { CanvasBackdrop } from '../views/CanvasBackdrop';
+import { CapabilitySettings } from '../views/CapabilitySettings';
+import { TimeCapabilitySettings } from '../views/TimeCapabilitySettings';
+import { DemoAssets, DemoAsset, writeDemoFile } from '../demo/DemoAssets';
+import { inspectTemplate, materializeTemplateUri } from '../model/TemplateFiles';
+import { TemplateSummary } from '../model/TemplatePackage';
+import { picker } from '@kit.CoreFileKit';
+import { taskpool } from '@kit.ArkTS';
+import { widgetInstances } from '../model/WidgetRegistry';
+
+class DemoWork { id:string=''; name:string=''; state:FridgeState=new FridgeState(); count:number=0; }
+class DemoDraft { id:string=''; state:FridgeState=new FridgeState(); }
+class DemoDraftFile { items:DemoDraft[]=[]; id:string=''; state?:FridgeState; }
+const GREEN:string='#D1F18A';
+const INK:string='#24251F';
+const PAPER:string='#F4F2ED';
+
+@Entry
+@Component
+struct Demo {
+  @StorageProp('safeTop') safeTop:number=32;
+  @StorageProp('safeBottom') safeBottom:number=24;
+  @State viewportW:number=390;
+  @State viewportH:number=844;
+  @State ready:boolean=false;
+  @State busy:boolean=false;
+  @State error:string='';
+  @State tab:number=0;
+  @State @Watch('updateBars') screen:string='home';
+  @State works:DemoWork[]=[];
+  @State assets:DemoAsset[]=[];
+  @State assetFilter:string='全部';
+  @State category:string='全部';
+  @State document:FridgeState=new FridgeState();
+  @State workName:string='我的作品';
+  @State selected:string='';
+  @State face:FridgeCard=new FridgeCard();
+  @State editTab:number=0;
+  @State boardTab:number=0;
+  @State sheet:boolean=false;
+  @State sheetType:string='';
+  @State contentIndex:number=0;
+  @State recoverable:boolean=false;
+  @State undoCount:number=0;
+  @State redoCount:number=0;
+  @State tick:number=Date.now();
+  @State toneIndex:number=0;
+  @State subjectMaterial:boolean=false;
+  @State nameInput:string='';
+  @State newDimension:string='4*4';
+  @State desktopStatus:string='';
+  private store:FridgeStore=new FridgeStore();
+  private library:DemoAssets=new DemoAssets();
+  private context:common.UIAbilityContext|null=null;
+  private previews:Map<string,FridgeCard>=new Map();
+  private undoStack:string[]=[];
+  private redoStack:string[]=[];
+  private nestedBefore:string='';
+  private beforeGesture:string='';
+  private camera:PhotoCameraGesture=new PhotoCameraGesture();
+  private draftTimer:number=-1;
+  private pulse:number=-1;
+  private alive:boolean=false;
+  private materialTarget:string='library';
+  private materialOwner:string='';
+  private routeConsumed:string='';
+  aboutToAppear():void{this.alive=true;this.initialize();this.pulse=setInterval(()=>{this.tick=Date.now();},60000);}
+  aboutToDisappear():void{this.alive=false;if(this.pulse>=0)clearInterval(this.pulse);this.flushDraft();}
+  onBackPress():boolean {
+    if(this.busy)return true;
+    if(this.sheet){this.sheet=false;return true;}
+    if(this.screen==='edit'){this.cancelFace();return true;}
+    if(this.screen==='board'||this.screen==='desktop'){this.saveWork();return true;}
+    return false;
+  }
+  private updateBars():void {if(!this.context)return;const dark=this.screen!=='home';window.getLastWindow(this.context).then(w=>w.setWindowSystemBarProperties({statusBarContentColor:dark?'#FFFFFF':'#24251F',navigationBarContentColor:dark?'#FFFFFF':'#24251F'})).catch(()=>{});}
+  private toast(value:string):void{this.getUIContext().getPromptAction().showToast({message:value});}
+  private async initialize():Promise<void>{
+    try{this.context=this.getUIContext().getHostContext() as common.UIAbilityContext;
+      await this.store.init(this.context);await this.library.init(this.context);this.assets=this.library.items.slice();
+      for(const definition of CARD_TEMPLATES){const c=makeTemplateCards(definition.id,1,()=>definition.id)[0];if(c){if(definition.id==='portrait'){this.attachPhoto(c,this.assets[0],false);await this.suggestClock(c);}this.previews.set(definition.id,c);}}
+      await this.refreshWorks();this.recoverable=fileIo.accessSync(this.draftPath());this.ready=true;this.updateBars();
+      const route=AppStorage.get<string>('routeCanvasId')??'';if(route){this.routeConsumed=route;await this.openWork(route);}
+    }catch(e){this.error=(e as Error).message;}
+  }
+  onPageShow():void{if(this.ready&&this.screen==='home')this.reload();}
+  private async reload():Promise<void>{try{await this.store.init(this.context!);await this.refreshWorks();}catch(e){this.toast((e as Error).message);}}
+  private async refreshWorks():Promise<void>{
+    const rows:DemoWork[]=[];
+    for(const entry of this.store.catalog.canvases){const row=new DemoWork();row.id=entry.id;row.name=entry.name;row.state=await this.store.canvasPreviewSnapshot(entry.id);row.count=row.state.cards.length;rows.push(row);}
+    this.works=rows;
+  }
+  private draftPath():string{return this.context!.filesDir+'/demo-draft.json';}
+  private readDrafts():DemoDraft[]{if(!fileIo.accessSync(this.draftPath()))return [];const raw=JSON.parse(fileIo.readTextSync(this.draftPath())) as DemoDraftFile;return Array.isArray(raw.items)?raw.items:raw.id&&raw.state?[{id:raw.id,state:raw.state}]:[];}
+  private flushDraft():void{
+    if(this.draftTimer>=0)clearTimeout(this.draftTimer);this.draftTimer=-1;
+    if(!this.context||!['board','edit'].includes(this.screen))return;
+    const draft=new DemoDraft();draft.id=this.document.canvasId;draft.state=JSON.parse(JSON.stringify(this.document)) as FridgeState;
+    // Nested customization is recoverable as part of its parent work.
+    if(this.screen==='edit'){const i=draft.state.cards.findIndex(c=>c.id===this.face.id);if(i>=0)draft.state.cards[i]=cardViewSnapshot(this.face);}
+    try{const data=new DemoDraftFile();data.items=this.readDrafts().filter(d=>d.id!==draft.id).concat([draft]);writeDemoFile(this.draftPath(),JSON.stringify(data));}catch(e){this.toast('草稿保存失败：'+(e as Error).message);}
+  }
+  private queueDraft():void{if(this.draftTimer>=0)clearTimeout(this.draftTimer);this.draftTimer=setTimeout(()=>this.flushDraft(),180);}
+  private clearDraft():void{if(this.draftTimer>=0)clearTimeout(this.draftTimer);this.draftTimer=-1;const data=new DemoDraftFile();data.items=this.readDrafts().filter(d=>d.id!==this.document.canvasId);if(data.items.length)writeDemoFile(this.draftPath(),JSON.stringify(data));else if(fileIo.accessSync(this.draftPath()))fileIo.unlinkSync(this.draftPath());this.recoverable=data.items.length>0;}
+  private async recover():Promise<void>{
+    try{const draft=this.readDrafts()[0];if(!draft)return;await this.openWork(draft.id);this.document=draft.state;this.selected='';this.screen='board';this.resetHistory();this.recoverable=false;}catch(e){this.toast((e as Error).message);}
+  }
+  private resetHistory():void{this.undoStack=[];this.redoStack=[];this.undoCount=0;this.redoCount=0;}
+  private checkpoint():void{this.undoStack.push(JSON.stringify(this.document));if(this.undoStack.length>40)this.undoStack.shift();this.redoStack=[];this.undoCount=this.undoStack.length;this.redoCount=0;}
+  private undo(redo:boolean=false):void{
+    const from=redo?this.redoStack:this.undoStack,to=redo?this.undoStack:this.redoStack;if(!from.length)return;
+    to.push(JSON.stringify(this.document));this.document=JSON.parse(from.pop()!) as FridgeState;this.undoCount=this.undoStack.length;this.redoCount=this.redoStack.length;if(!this.document.cards.some(c=>c.id===this.selected))this.selected='';this.queueDraft();
+  }
+  private async openWork(id:string):Promise<void>{
+    if(this.busy)return;this.busy=true;
+    try{await this.store.selectCanvas(id,false);this.document=JSON.parse(storageSnapshot(this.store.state)) as FridgeState;this.workName=this.store.activeName;this.selected='';this.screen='board';this.resetHistory();}
+    catch(e){this.toast((e as Error).message);}finally{this.busy=false;}
+  }
+  private async createWork(templateId:string=''):Promise<void>{
+    if(this.busy)return;this.busy=true;
+    try{this.store.createCanvas(templateDefinition(templateId)?.name??'自由创作',undefined,this.newDimension);this.store.state.cards=[];this.store.state.background.color='#EEE9DF';
+      if(templateId){const card=makeTemplateCards(templateId,this.store.state.canvasAspect,()=>this.store.newId())[0];card.x=0;card.y=0;card.w=344;card.h=344/this.store.state.canvasAspect;card.template!.fill=true;
+        if(templateId==='portrait'){this.attachPhoto(card,this.assets[0],false);await this.suggestClock(card);}this.store.addCard(card);this.store.state.background.color=templateColors(card)[0];}
+      this.store.state=await projectCapabilityData(this.store.state,this.context!);this.store.adoptCanvas(this.store.state);await this.store.save(false);this.document=JSON.parse(storageSnapshot(this.store.state)) as FridgeState;this.workName=this.store.activeName;this.screen='board';this.resetHistory();
+      if(templateId)this.customize(this.document.cards[0].id);this.sheet=false;
+    }catch(e){this.toast((e as Error).message);}finally{this.busy=false;}
+  }
+  private async saveWork(desktop:boolean=false):Promise<void>{
+    if(this.busy)return;this.busy=true;
+    try{this.store.renameCanvas(this.workName,this.document.canvasId);this.store.state=this.document;this.store.adoptCanvas(this.document);await this.store.save(true);this.clearDraft();await this.refreshWorks();this.screen=desktop?'desktop':'home';this.tab=0;this.desktopStatus='';}
+    catch(e){this.toast('保存失败：'+(e as Error).message);}finally{this.busy=false;}
+  }
+  private publishDocument():void{this.document=JSON.parse(JSON.stringify(this.document)) as FridgeState;this.queueDraft();}
+  private selectedCard():FridgeCard|undefined{return this.document.cards.find(c=>c.id===this.selected);}
+  private label(card:FridgeCard):string{return templateDefinition(card.template?.id??'')?.name??(card.capability?capabilityDescriptor(card.capability.k).name:card.elements.some(e=>e.kind==='image')?'照片贴纸':'文字贴纸');}
+  private customize(id:string):void{this.tick=Date.now();const card=this.document.cards.find(c=>c.id===id);if(!card)return;this.selected=id;this.face=cardViewSnapshot(card);this.nestedBefore=JSON.stringify(card);this.editTab=0;const photo=card.elements.find(e=>e.kind==='image'),asset=this.library.match(photo?.src??'');this.toneIndex=Math.max(0,asset?.tones.indexOf(photo?.src??'')??0);this.screen='edit';this.camera.reset();}
+  private publishFace():void{this.face=cardViewSnapshot(this.face);this.queueDraft();}
+  private finishFace():void{if(JSON.stringify(this.face)!==this.nestedBefore){this.checkpoint();const i=this.document.cards.findIndex(c=>c.id===this.face.id);if(i>=0)this.document.cards[i]=cardViewSnapshot(this.face);this.publishDocument();}this.screen='board';this.queueDraft();}
+  private cancelFace():void{this.screen='board';this.sheet=false;this.queueDraft();}
+  private currentPhoto():CanvasElement|undefined{return this.face.elements.find(e=>e.kind==='image');}
+  private photoTemplate():boolean{return ['portrait','anniversary-photo','mix-memory'].includes(this.face.template?.id??'');}
+  private contentAvailable():boolean{return this.face.elements.length>0||this.photoTemplate()||cardCapabilities(this.face).some(c=>['countdown','anniversary','worldclock','timetable','agenda','album'].includes(c.k));}
+  private attachPhoto(card:FridgeCard,item:DemoAsset,subject:boolean):void{
+    const element=card.elements.find(e=>e.kind==='image')??new CanvasElement();if(!element.id){element.id=this.store.newId();card.elements.push(element);}element.kind='image';element.src=subject&&item.subject?item.subject:item.original;element.x=0;element.y=0;element.w=1;element.h=1;element.depthSourceAspect=subject?item.aspect*item.crop.w/item.crop.h:item.aspect;
+    element.depthEnabled=!subject&&!!item.subject;element.depthForeground=subject?'':item.subject;element.depthCrop=JSON.parse(JSON.stringify(item.crop)) as ElementBox;
+    if(card.template){card.template.photoMode='photo';card.template.photoFraming='cover';card.template.zoom=1;card.template.offsetX=0;card.template.offsetY=0;card.template.depth=!!item.subject;}
+  }
+  private async suggestClock(card:FridgeCard):Promise<void>{
+    const photo=card.elements.find(e=>e.kind==='image'),t=card.template;if(!photo||!t||t.id!=='portrait')return;
+    try{const subject=photo.depthForeground?await readPhotoSamples(photo.depthForeground):new PhotoSamples(),original=await readPhotoSamples(photo.src),choice=recommendPhotoClock(card,subject,original,templateColors(card)[0]);
+      t.clockPosition=choice.position;t.clockInk=choice.ink;t.clockAuto=true;
+      const frame=portraitPhotoFrame(card,photo),box=photoClockLayout(300,300*card.h/card.w,choice.position),crop=photo.depthCrop;let hits=0,total=0;
+      for(let y=0;y<10;y++)for(let x=0;x<12;x++){const px=box.x+(x+.5)*box.w/12,py=box.y+(y+.5)*box.h/10,u=((px-frame.x)/frame.w-crop.x)/crop.w,v=((py-frame.y)/frame.h-crop.y)/crop.h;if(subject.width&&u>=0&&u<1&&v>=0&&v<1)hits+=(subject.rgba[(Math.floor(v*subject.height)*subject.width+Math.floor(u*subject.width))*4+3]??0)/255;total++;}
+      t.depth=!!photo.depthForeground&&hits/total<.35;
+    }catch(_){t.clockPosition='bottom-left';t.clockInk='#FFFFFF';t.depth=false;}
+  }
+  private async smartClock():Promise<void>{const id=this.face.id,before=JSON.stringify(this.face),next=cardViewSnapshot(this.face);await this.suggestClock(next);if(this.screen==='edit'&&this.face.id===id&&JSON.stringify(this.face)===before){this.face=next;this.publishFace();}}
+  private addTemplate(id:string):void{if(this.document.cards.length>=16){this.toast('每件作品最多 16 张贴纸');return;}this.checkpoint();const card=makeTemplateCards(id,this.document.canvasAspect,()=>this.store.newId())[0];
+    const scale=Math.min(344*.65/card.w,344/this.document.canvasAspect*.65/card.h);card.w*=scale;card.h*=scale;card.x=(344-card.w)/2;card.y=(344/this.document.canvasAspect-card.h)/2/(344/this.document.canvasAspect)*470;card.z=++this.document.maxZ;
+    if(id==='portrait'){this.attachPhoto(card,this.assets[0],false);const preset=this.previews.get(id)?.template;if(preset){card.template!.clockPosition=preset.clockPosition;card.template!.clockInk=preset.clockInk;card.template!.depth=preset.depth;}}this.document.cards.push(card);this.selected=card.id;this.sheet=false;this.publishDocument();this.customize(card.id);
+  }
+  private addText():void{if(this.document.cards.length>=16){this.toast('每件作品最多 16 张贴纸');return;}this.checkpoint();const card=new FridgeCard();card.id=this.store.newId();card.x=72;card.y=180;card.w=200;card.h=140;card.material='cream';card.z=++this.document.maxZ;const e=new CanvasElement();e.id=this.store.newId();e.text='把喜欢的留在这里';e.fs=24;e.x=.08;e.y=.18;e.w=.84;e.h=.64;e.align='center';card.elements=[e];this.document.cards.push(card);this.publishDocument();this.customize(card.id);this.editTab=2;this.sheetType='text';}
+  private openMaterials(target:string):void{this.materialTarget=target;this.materialOwner=this.screen==='edit'?this.face.id:this.document.canvasId;this.subjectMaterial=false;this.sheetType='materials';this.sheet=true;}
+  private useMaterial(item:DemoAsset):void{
+    if(this.materialTarget==='library'){this.sheetType='asset';this.contentIndex=this.assets.findIndex(a=>a.id===item.id);return;}
+    if(this.materialTarget==='album'&&this.face.id===this.materialOwner&&this.face.capability?.k==='album'){this.face.capability.albumCover=item.original;this.face.capability.albumBackground=item.original;this.publishFace();this.sheet=false;return;}
+    if(this.materialTarget==='face'&&this.face.id===this.materialOwner){this.attachPhoto(this.face,item,this.subjectMaterial);this.publishFace();this.smartClock();this.sheet=false;return;}
+    if(this.materialTarget==='board'&&this.document.canvasId===this.materialOwner){
+      if(this.document.cards.length>=16){this.toast('每件作品最多 16 张贴纸');return;}this.checkpoint();const card=new FridgeCard();card.id=this.store.newId();card.w=210;card.h=Math.min(250,210/item.aspect);card.x=(344-card.w)/2;card.y=(344/this.document.canvasAspect-card.h)/2/(344/this.document.canvasAspect)*470;card.z=++this.document.maxZ;this.attachPhoto(card,item,this.subjectMaterial);this.document.cards.push(card);this.selected=card.id;this.publishDocument();this.sheet=false;
+    }
+  }
+  private async importPhoto():Promise<void>{if(this.busy)return;this.busy=true;const target=this.materialTarget,owner=this.materialOwner;
+    try{const item=await this.library.importPhoto();this.assets=this.library.items.slice();if(item&&target===this.materialTarget&&owner===this.materialOwner&&target!=='library')this.useMaterial(item);}catch(e){this.toast((e as Error).message);}finally{this.busy=false;}
+  }
+  private async extract():Promise<void>{if(this.busy)return;const asset=this.assets[this.contentIndex];if(!asset)return;this.busy=true;try{await this.library.cutout(asset.id);this.assets=this.library.items.slice();this.toast('主体已存入素材库');}catch(e){this.toast((e as Error).message);}finally{this.busy=false;}}
+  private async tone(index:number):Promise<void>{const photo=this.currentPhoto(),asset=this.library.match(photo?.src??'');if(!photo||!asset||this.busy)return;const id=this.face.id;this.busy=true;
+    try{const src=await this.library.tone(asset,index);if(this.screen==='edit'&&this.face.id===id&&this.currentPhoto()?.src===photo.src){this.currentPhoto()!.src=src;this.toneIndex=index;this.publishFace();}}catch(e){this.toast((e as Error).message);}finally{this.busy=false;}}
+  private variants():TemplateDefinition[]{return CARD_TEMPLATES.filter(t=>t.kind===templateDefinition(this.face.template?.id??'')?.kind&&t.kind!=='ensemble');}
+  private changeDesign(id:string):void{if(!this.face.template||id===this.face.template.id)return;const old=this.face.template;this.face.template=newCardTemplate(id);this.face.template.palette=old.palette;this.face.template.fill=old.fill;
+    if(id==='portrait'){if(!this.currentPhoto())this.attachPhoto(this.face,this.assets[0],false);this.face.template.photoMode='photo';this.face.template.photoFraming='cover';}this.publishFace();if(id==='portrait')this.smartClock();}
+  private setCap(cap:CapBlock,index:number):void{const old=cardCapabilities(this.face)[index];if(old){replaceCardCapability(this.face,old,cap);this.publishFace();}}
+  private setText(value:string):void{const text=this.face.elements.find(e=>e.kind==='text');if(text){text.text=value;this.publishFace();}}
+  private setPhotoMode(subject:boolean):void{if(!this.face.template)return;this.face.template.photoMode=subject?'subject':'photo';this.face.template.photoFraming=subject?'fit':'cover';this.face.template.zoom=1;this.face.template.offsetX=0;this.face.template.offsetY=0;this.camera.reset();this.publishFace();}
+  private clampPhoto():void{constrainDemoPhoto(this.face);}
+  private photoTouch(event:TouchEvent):void{if(this.editTab!==2||this.face.template?.id!=='portrait')return;event.stopPropagation();const t=this.face.template;if(event.type===TouchType.Cancel){this.camera.reset();return;}const excluded=event.type===TouchType.Up?event.changedTouches.map(p=>p.id):[];
+    const unit=this.faceWidth()/300,points:PhotoGesturePoint[]=event.touches.filter(p=>!excluded.includes(p.id)).map((p:TouchObject):PhotoGesturePoint=>({id:p.id,x:p.x/unit,y:p.y/unit}));const pose=this.camera.update(points,t,photoControlRegion(this.face));t.zoom=pose.zoom;t.offsetX=pose.offsetX;t.offsetY=pose.offsetY;this.clampPhoto();this.publishFace();}
+  private boardWidth():number{return Math.min(this.viewportW-48,420,(this.viewportH-this.safeTop-this.safeBottom-290)*this.document.canvasAspect);}
+  private faceWidth():number{return Math.max(120,Math.min(this.viewportW-56,400,(this.viewportH-this.safeTop-this.safeBottom-342)*this.face.w/this.face.h));}
+  private thumbWidth():number{return Math.min(174,(this.viewportW-60)/2);}
+  private beginMove(id:string):void{this.selected=id;this.checkpoint();this.beforeGesture=JSON.stringify(this.document);}
+  private move(id:string,dx:number,dy:number):void{const before=JSON.parse(this.beforeGesture) as FridgeState,origin=before.cards.find(c=>c.id===id);if(!origin)return;
+    const sx=344/this.boardWidth(),sy=470/(this.boardWidth()/this.document.canvasAspect);let x=dx*sx,y=dy*sy;
+    if(Math.abs(origin.x+x+origin.w/2-172)<6)x=172-origin.w/2-origin.x;
+    for(const card of this.document.cards){const start=before.cards.find(c=>c.id===card.id);if(start&&(card.id===id||origin.groupId&&card.groupId===origin.groupId)){card.x=start.x+x;card.y=start.y+y;}}
+    this.document=JSON.parse(JSON.stringify(this.document)) as FridgeState;
+  }
+  private arrangement(action:string):void{const card=this.selectedCard();if(!card)return;this.checkpoint();
+    if(action==='front')card.z=++this.document.maxZ;
+    if(action==='back')card.z=Math.min(...this.document.cards.map(c=>c.z))-1;
+    if(action==='center'){card.x=(344-card.w)/2;card.y=(344/this.document.canvasAspect-card.h)/2/(344/this.document.canvasAspect)*470;}
+    if(action==='straight')card.rot=0;
+    if(action==='left')card.rot-=5;if(action==='right')card.rot+=5;
+    if(action==='small'||action==='large'){const factor=action==='small'?.9:1.1,oldW=card.w,oldH=card.h;card.w=Math.max(60,Math.min(344,card.w*factor));card.h=oldH*card.w/oldW;card.x+=(oldW-card.w)/2;card.y+=(oldH-card.h)/2/(344/this.document.canvasAspect)*470;}
+    if(action==='copy'){if(this.document.cards.length>=16){this.toast('每件作品最多 16 张贴纸');return;}const copy=this.store.copyCard(card);copy.x+=12;copy.y+=12;copy.z=++this.document.maxZ;this.document.cards.push(copy);this.selected=copy.id;}
+    if(action==='delete'){this.document.cards=this.document.cards.filter(c=>c.id!==card.id);this.selected='';this.sheet=false;}
+    this.publishDocument();
+  }
+  private templates():TemplateDefinition[]{return CARD_TEMPLATES.filter(t=>this.category==='全部'||this.category==='照片'&&['portrait','anniversary-photo','mix-memory','album-cover','album-sleeve'].includes(t.id)||this.category==='时钟'&&['clock','worldclock'].includes(t.kind)||this.category==='日期'&&['date','calendar','lunar'].includes(t.kind)||this.category==='生活'&&['countdown','anniversary','agenda','timetable','album','battery','dayprogress','yearprogress'].includes(t.kind)||this.category==='组合'&&t.kind==='ensemble');}
+  private filteredAssets():DemoAsset[]{return this.assets.filter(a=>this.assetFilter==='全部'||this.assetFilter==='抠图'&&!!a.subject||this.assetFilter==='照片'||this.assetFilter==='专辑'&&a.category==='专辑');}
+  private want():Want{return {bundleName:'com.fridgewidget.demo',abilityName:'FridgeFormAbility',parameters:{'ohos.extra.param.key.form_dimension':this.document.canvasDimension==='2*4'?3:this.document.canvasDimension==='2*2'?2:4,'ohos.extra.param.key.form_name':'FridgeForm','ohos.extra.param.key.module_name':'entry',canvasId:this.document.canvasId}};}
+  private async advanced():Promise<void>{if(this.screen==='edit')this.finishFace();await this.saveWork();AppStorage.setOrCreate('routeCanvasId',this.document.canvasId);this.getUIContext().getRouter().pushUrl({url:'pages/Index'});}
+  private async importWork():Promise<void>{if(this.busy)return;this.busy=true;try{const uris=await new picker.DocumentViewPicker(this.context!).select({maxSelectNumber:1,fileSuffixFilters:['冰箱贴作品|.fridge']});if(!uris.length)return;
+    const summary=JSON.parse(await taskpool.execute(new taskpool.Task(inspectTemplate,uris[0])) as string) as TemplateSummary;
+    const state=normalizeState(JSON.parse(await taskpool.execute(new taskpool.Task(materializeTemplateUri,uris[0],this.context!.filesDir)) as string) as FridgeState);this.store.createCanvas('导入的作品',state);await this.store.save(false);await this.refreshWorks();this.toast('作品已导入');
+    }catch(e){this.toast((e as Error).message);}finally{this.busy=false;}}
+
+  @Builder chip(label:string,active:boolean,action:()=>void,dark:boolean=false){
+    Button(label,{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(40).fontSize(14).padding({left:17,right:17}).fontColor(active?(dark?'#182010':'#FFFFFF'):(dark?'#E8E8E4':INK)).backgroundColor(active?(dark?GREEN:INK):(dark?'#242622':'#E8E5DE')).onClick(action)
+  }
+  @Builder icon(label:string,action:()=>void,dark:boolean=false){Button(label,{type:ButtonType.Circle,buttonStyle:ButtonStyleMode.NORMAL}).width(44).height(44).fontSize(21).fontColor(dark?'#F2F2EC':INK).backgroundColor(dark?'#252722':'#E8E5DE').onClick(action)}
+  @Builder preview(state:FridgeState,w:number){
+    Stack({alignContent:Alignment.TopStart}){CanvasBackdrop({sceneBackground:state.background})
+      ForEach(state.cards.filter(c=>!c.hidden).slice().sort((a,b)=>a.z-b.z),(card:FridgeCard)=>{CardFace({card:card,scaleFactor:w/344,tick:this.tick,templateBackground:state.background}).width(card.w*w/344).height(card.h*w/344).position({x:card.x*w/344,y:card.y/470*w/state.canvasAspect}).rotate({angle:card.rot}).hitTestBehavior(HitTestMode.None)},(card:FridgeCard)=>card.id)
+    }.width(w).height(w/state.canvasAspect).borderRadius(18).clip(true)
+  }
+  @Builder home(){
+    Column(){
+      Row(){Column({space:5}){Text(['我的作品','找一款喜欢的','素材库'][this.tab]).fontSize(32).fontWeight(FontWeight.Bold).fontColor(INK);Text(['留住日常，也留一点自己的风格','从一个样式开始，做成你的样子','照片、抠图、封面，随时再用'][this.tab]).fontSize(13).fontColor('#7D7D73')}.alignItems(HorizontalAlign.Start).layoutWeight(1)
+        this.icon('+',()=>{if(this.tab===2){this.materialTarget='library';this.importPhoto();}else{this.sheetType='new';this.sheet=true;}})
+      }.width('100%').padding({left:24,right:24,top:20,bottom:22})
+      if(this.tab===0){
+        Scroll(){Column({space:20}){
+          if(this.recoverable){Row(){Text('上次还没完成的创作').fontSize(14).fontColor(INK).layoutWeight(1);this.chip('继续',true,()=>this.recover())}.padding(14).width('100%').backgroundColor('#E4EBCD').borderRadius(18)}
+          Row(){Text(this.works.length+' 件作品').fontSize(13).fontColor('#7D7D73').layoutWeight(1);Button('导入作品',{buttonStyle:ButtonStyleMode.NORMAL}).fontSize(13).fontColor(INK).backgroundColor(Color.Transparent).onClick(()=>this.importWork())}.width('100%')
+          Flex({wrap:FlexWrap.Wrap,justifyContent:FlexAlign.SpaceBetween}){ForEach(this.works,(work:DemoWork)=>{
+            Column({space:10}){this.preview(work.state,this.thumbWidth());Row(){Column({space:3}){Text(work.name).fontSize(16).fontWeight(FontWeight.Medium).fontColor(INK).maxLines(1);Text(work.count+' 张贴纸').fontSize(12).fontColor('#7D7D73')}.alignItems(HorizontalAlign.Start);Blank()}.width('100%')}.width(this.thumbWidth()).margin({bottom:24}).onClick(()=>this.openWork(work.id))
+          },(work:DemoWork)=>work.id)}.width('100%')
+          Button('＋  从空白画布开始',{type:ButtonType.ROUNDED_RECTANGLE,buttonStyle:ButtonStyleMode.NORMAL}).width('100%').height(64).backgroundColor('#E8E5DE').fontColor(INK).borderRadius(20).onClick(()=>this.createWork())
+        }.width('100%').padding({left:24,right:24,bottom:24})}.layoutWeight(1).width('100%').align(Alignment.Top).scrollBar(BarState.Off)
+      }else if(this.tab===1){this.templateGrid(false)}else{this.materialGrid(false)}
+      Row(){ForEach(['作品','模板','素材'],(label:string,index:number)=>{Button({buttonStyle:ButtonStyleMode.NORMAL}){Column({space:5}){Text(['▤','◫','▧'][index]).fontSize(23).fontColor(this.tab===index?INK:'#96968B');Text(label).fontSize(12).fontColor(this.tab===index?INK:'#96968B').fontWeight(this.tab===index?FontWeight.Bold:FontWeight.Normal)}}.layoutWeight(1).height(66).backgroundColor(Color.Transparent).onClick(()=>this.tab=index)})}.width('100%').padding({bottom:this.safeBottom}).backgroundColor(PAPER)
+    }.width('100%').height('100%').padding({top:this.safeTop}).backgroundColor(PAPER)
+  }
+  @Builder templateGrid(adding:boolean){
+    Column({space:18}){
+      Scroll(){Row({space:8}){ForEach(['全部','照片','时钟','日期','生活','组合'],(label:string)=>{this.chip(label,this.category===label,()=>this.category=label,adding)})}.padding({left:24,right:24})}.scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).width('100%')
+      Grid(){ForEach(this.templates(),(t:TemplateDefinition)=>{GridItem(){Column({space:10}){
+        Stack(){CardFace({card:this.previews.get(t.id)!,scaleFactor:this.thumbWidth()/this.previews.get(t.id)!.w,tick:this.tick}).width(this.thumbWidth()).height(this.thumbWidth())}.width(this.thumbWidth()).height(this.thumbWidth()).borderRadius(20).clip(true)
+        Text(t.name).fontSize(15).fontColor(adding?'#F3F3EB':INK).width('100%')
+      }.padding({bottom:10}).onClick(()=>{if(adding)this.addTemplate(t.id);else this.createWork(t.id);})}},(t:TemplateDefinition)=>t.id)}.columnsTemplate('1fr 1fr').columnsGap(12).rowsGap(20).layoutWeight(1).padding({left:24,right:24})
+    }.width('100%').layoutWeight(1)
+  }
+  @Builder materialGrid(picking:boolean){
+    Column({space:16}){
+      Scroll(){Row({space:8}){ForEach(['全部','照片','抠图','专辑'],(label:string)=>{this.chip(label,this.assetFilter===label,()=>{this.assetFilter=label;this.subjectMaterial=label==='抠图';},picking)})}.padding({left:24,right:24})}.scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).width('100%')
+      if(picking){Button('从系统相册导入',{buttonStyle:ButtonStyleMode.NORMAL}).height(44).fontColor(GREEN).backgroundColor('#242622').onClick(()=>this.importPhoto())}
+      if(this.filteredAssets().length===0){Column({space:12}){Text('把喜欢的素材收在这里').fontSize(18).fontColor(picking?'#F0F0EA':INK);Text('导入后可以反复使用').fontSize(13).fontColor('#929389');Button('导入照片').backgroundColor(picking?GREEN:INK).fontColor(picking?INK:'#FFFFFF').onClick(()=>{this.materialTarget=picking?this.materialTarget:'library';this.importPhoto();})}.layoutWeight(1).justifyContent(FlexAlign.Center)}else{
+      Grid(){ForEach(this.filteredAssets(),(asset:DemoAsset)=>{GridItem(){Column({space:9}){Image(this.assetFilter==='抠图'?asset.subject:asset.original).objectFit(this.assetFilter==='抠图'?ImageFit.Contain:ImageFit.Cover).width('100%').height(180).borderRadius(18).backgroundColor(picking?'#30322C':'#E5E1D8');Text(asset.name).fontSize(14).fontColor(picking?'#ECEDE6':INK).width('100%');Text(asset.subject?'照片 · 可复用主体':'原始照片').fontSize(11).fontColor('#85877D').width('100%')}.onClick(()=>{if(!picking){this.materialTarget='library';this.sheet=true;}this.useMaterial(asset);})}},(asset:DemoAsset)=>asset.id)}.columnsTemplate('1fr 1fr').columnsGap(14).rowsGap(22).layoutWeight(1).padding({left:24,right:24})}
+    }.width('100%').layoutWeight(1)
+  }
+  @Builder board(){
+    Column(){
+      Row(){this.icon('‹',()=>this.saveWork(),true);Text(this.workName).fontSize(17).fontWeight(FontWeight.Medium).fontColor('#F1F2EC').layoutWeight(1).textAlign(TextAlign.Center).onClick(()=>{this.nameInput=this.workName;this.sheetType='rename';this.sheet=true;});Button('完成',{buttonStyle:ButtonStyleMode.NORMAL}).width(62).height(44).fontSize(15).fontColor('#182010').backgroundColor(GREEN).borderRadius(24).onClick(()=>this.saveWork(true))}.width('100%').padding({left:20,right:20,top:8})
+      Row({space:8}){this.chip('排布',this.boardTab===0,()=>this.boardTab=0,true);this.chip('背景',this.boardTab===1,()=>this.boardTab=1,true);Blank();this.icon('≡',()=>{this.sheetType='layers';this.sheet=true;},true)}.padding({left:24,right:24,top:20}).width('100%')
+      Stack(){
+        Stack({alignContent:Alignment.TopStart}){CanvasBackdrop({sceneBackground:this.document.background})
+          ForEach(this.document.cards.filter(c=>!c.hidden).slice().sort((a,b)=>a.z-b.z),(card:FridgeCard)=>{
+            Stack(){CardFace({card:card,scaleFactor:this.boardWidth()/344,tick:this.tick,templateBackground:this.document.background}).hitTestBehavior(HitTestMode.None)}.width(card.w*this.boardWidth()/344).height(card.h*this.boardWidth()/344).position({x:card.x*this.boardWidth()/344,y:card.y/470*this.boardWidth()/this.document.canvasAspect}).rotate({angle:card.rot}).border({width:this.selected===card.id?2:0,color:GREEN}).onClick(()=>this.selected=card.id)
+              .gesture(GestureGroup(GestureMode.Exclusive,LongPressGesture().onAction(()=>this.customize(card.id)),PanGesture({distance:3}).onActionStart(()=>this.beginMove(card.id)).onActionUpdate((e:GestureEvent)=>this.move(card.id,e.offsetX,e.offsetY)).onActionEnd(()=>this.queueDraft()).onActionCancel(()=>{if(this.beforeGesture)this.document=JSON.parse(this.beforeGesture) as FridgeState;})))
+          },(card:FridgeCard)=>card.id)
+        }.id('demoBoard').width(this.boardWidth()).height(this.boardWidth()/this.document.canvasAspect).borderRadius(22).clip(true)
+      }.layoutWeight(1).width('100%')
+      if(this.boardTab===1){Row({space:14}){ForEach(['#EEE9DF','#FFFFFF','#E6ECCC','#BDD2DC','#E7C6BF','#1C211C'],(color:string)=>{Button({type:ButtonType.Circle}){}.width(38).height(38).backgroundColor(color).border({width:this.document.background.color===color?3:1,color:GREEN}).onClick(()=>{this.checkpoint();this.document.background.mode='solid';this.document.background.color=color;this.publishDocument();})})}.height(70)}else if(this.selectedCard()){
+        Text(this.label(this.selectedCard()!)+' · 拖动排布，长按自定').fontSize(12).fontColor('#9DA091').margin({bottom:16})
+        Row({space:10}){this.chip('自定',true,()=>this.customize(this.selected),true);this.chip('排列',false,()=>{this.sheetType='arrange';this.sheet=true;},true);this.chip('•••',false,()=>{this.sheetType='more';this.sheet=true;},true)}.height(50)
+      }else{Text('添加照片、文字，或从模板开始').fontSize(13).fontColor('#9DA091').height(65)}
+      Row(){Button('↶',{buttonStyle:ButtonStyleMode.NORMAL}).fontSize(26).fontColor(this.undoCount? '#F1F2EC':'#55594D').backgroundColor(Color.Transparent).enabled(this.undoCount>0).onClick(()=>this.undo());Button('↷',{buttonStyle:ButtonStyleMode.NORMAL}).fontSize(26).fontColor(this.redoCount?'#F1F2EC':'#55594D').backgroundColor(Color.Transparent).enabled(this.redoCount>0).onClick(()=>this.undo(true));Blank();this.chip('＋ 添加',true,()=>{this.sheetType='add';this.sheet=true;},true)}.width('100%').padding({left:24,right:24,top:14,bottom:this.safeBottom+12})
+    }.width('100%').height('100%').padding({top:this.safeTop}).backgroundColor('#10120F')
+  }
+  @Builder editor(){
+    Column(){
+      Row(){Button('取消',{buttonStyle:ButtonStyleMode.NORMAL}).width(62).height(44).backgroundColor(Color.Transparent).fontColor('#DBDDD4').onClick(()=>this.cancelFace());Text(this.label(this.face)).fontSize(17).fontWeight(FontWeight.Medium).fontColor('#F1F2EC').layoutWeight(1).textAlign(TextAlign.Center);Button('完成',{buttonStyle:ButtonStyleMode.NORMAL}).width(62).height(44).fontColor('#182010').backgroundColor(GREEN).borderRadius(24).onClick(()=>this.finishFace())}.width('100%').padding({left:16,right:20,top:8})
+      Stack(){
+        Stack({alignContent:Alignment.TopStart}){CardFace({card:this.face,scaleFactor:this.faceWidth()/this.face.w,tick:this.tick,templateBackground:this.document.background}).width('100%').height('100%').hitTestBehavior(HitTestMode.None)
+          if(this.editTab===2){Column().width('100%').height('100%').backgroundColor('#01000000').border({width:1,color:'#A0D1F18A'}).onTouch((e:TouchEvent)=>this.photoTouch(e)).onClick(()=>{if(this.face.template?.id!=='portrait')this.openContent();})}
+        }.width(this.faceWidth()).height(this.face.h*this.faceWidth()/this.face.w).borderRadius(24).clip(true)
+      }.width('100%').layoutWeight(1)
+      Text(this.editTab===0?'左右切换外观':this.editTab===1?(this.photoTemplate()?'背景色调 · 保留主体原色':'选择喜欢的配色'):this.face.template?.id==='portrait'?'拖动照片 · 双指缩放':'轻点画面，修改内容').fontSize(12).fontColor('#969B8B').height(32)
+      Row({space:8}){ForEach(this.contentAvailable()?['外观','色彩','内容']:['外观','色彩'],(label:string,index:number)=>{Button(label,{buttonStyle:ButtonStyleMode.NORMAL}).height(40).layoutWeight(1).fontColor(this.editTab===index?GREEN:'#909787').fontWeight(this.editTab===index?FontWeight.Bold:FontWeight.Normal).backgroundColor(this.editTab===index?'#262C20':Color.Transparent).borderRadius(20).onClick(()=>{this.editTab=index;this.camera.reset();})})}.width('100%').padding({left:44,right:44})
+      Swiper(){this.styleControls();this.colorControls();if(this.contentAvailable()){this.contentControls()}}.index(this.editTab).loop(false).indicator(false).onChange((index:number)=>{this.editTab=index;this.camera.reset();}).width('100%').height(172)
+      Row(){Button('排布与添加',{buttonStyle:ButtonStyleMode.NORMAL}).height(40).fontSize(13).fontColor('#B5BCAB').backgroundColor(Color.Transparent).onClick(()=>this.finishFace());Blank();Button('更多编辑',{buttonStyle:ButtonStyleMode.NORMAL}).height(40).fontSize(13).fontColor('#B5BCAB').backgroundColor(Color.Transparent).onClick(()=>this.advanced())}.width('100%').padding({left:24,right:24,bottom:this.safeBottom+4})
+    }.width('100%').height('100%').padding({top:this.safeTop}).backgroundColor('#10120F')
+  }
+  private openContent():void{this.sheetType=this.face.elements.some(e=>e.kind==='text')&&!this.face.template?'text':'content';this.contentIndex=0;this.sheet=true;}
+  @Builder styleControls(){
+    Column(){
+      if(this.face.template&&this.variants().length>0){Scroll(){Row({space:12}){ForEach(this.variants(),(t:TemplateDefinition)=>{Column({space:8}){Stack(){CardFace({card:this.previews.get(t.id)!,scaleFactor:76/this.previews.get(t.id)!.w,tick:this.tick}).width(76).height(76).hitTestBehavior(HitTestMode.None)}.width(86).height(86).borderRadius(17).border({width:this.face.template?.id===t.id?2:0,color:GREEN}).clip(true);Text(t.name).fontSize(11).fontColor(this.face.template?.id===t.id?GREEN:'#ADB4A2')}.onClick(()=>this.changeDesign(t.id))})}.padding({left:24,right:24})}.scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).width('100%')}
+      else if(this.face.template){Text('一张完整的组合画面').fontSize(14).fontColor('#CAD0C0');Text('在内容中修改各个信息来源').fontSize(12).fontColor('#929B85').margin({top:10})}
+      else{Row({space:10}){ForEach(['rect','round','pill'],(shape:string,index:number)=>{this.chip(['圆角','圆形','胶囊'][index],this.face.shape===shape,()=>{this.face.shape=shape;this.publishFace();},true)})};Row(){Text('边框').fontSize(14).fontColor('#C9CFBF');Blank();Toggle({type:ToggleType.Switch,isOn:this.face.frame}).selectedColor(GREEN).onChange((value:boolean)=>{this.face.frame=value;this.publishFace();})}.width('100%').padding({left:32,right:32,top:16})}
+    }.width('100%').height('100%').justifyContent(FlexAlign.Center)
+  }
+  @Builder colorControls(){
+    Column({space:16}){
+      if(this.photoTemplate()&&this.currentPhoto()){
+        Scroll(){Row({space:10}){ForEach(['自然','暖光','冷蓝','玫瑰','黑白'],(name:string,index:number)=>{Column({space:8}){Button({type:ButtonType.Circle}){}.width(42).height(42).backgroundColor(['#AFBB8D','#CEB293','#A3B8CE','#C59FAF','#858780'][index]).border({width:this.toneIndex===index?3:0,color:GREEN}).enabled(!this.busy).onClick(()=>this.tone(index));Text(name).fontSize(11).fontColor('#BAC2AE')}.width(54)})}}.scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).width('100%').padding({left:24,right:24})
+      }else{Row({space:18}){ForEach(this.face.template?['','cream','cobalt','ink']:['white','cream','kraft','mint','blue','pink','dark'],(color:string,index:number)=>{Button({type:ButtonType.Circle}){}.width(this.face.template?46:34).height(this.face.template?46:34).backgroundColor(this.face.template?['#CED6C5','#EDE1C8','#2855BC','#202520'][index]:['#FFFFFF','#F2E6C8','#C3A77F','#B8CCAC','#A6C3D9','#DFB8BD','#202520'][index]).border({width:(this.face.template?this.face.template.palette:this.face.material)===color?3:0,color:GREEN}).onClick(()=>{if(this.face.template)this.face.template.palette=color;else this.face.material=color;this.publishFace();})})}
+        Text(this.face.template?'配色应用到整个模板':'底板色彩').fontSize(12).fontColor('#8E9880')}
+    }.width('100%').height('100%').justifyContent(FlexAlign.Center)
+  }
+  @Builder contentControls(){
+    Column({space:14}){
+      if(this.face.template?.id==='portrait'){
+        Row({space:8}){this.chip('换照片',false,()=>this.openMaterials('face'),true);this.chip('原图',this.face.template?.photoMode==='photo',()=>this.setPhotoMode(false),true);this.chip('主体',this.face.template?.photoMode!=='photo',()=>this.setPhotoMode(true),true)}
+        Row({space:8}){this.chip('时间位置',false,()=>{this.sheetType='clock';this.sheet=true;},true);Text('景深').fontSize(13).fontColor('#C1C9B3');Toggle({type:ToggleType.Switch,isOn:this.face.template?.depth!==false}).enabled(!!this.currentPhoto()?.depthForeground).selectedColor(GREEN).onChange((value:boolean)=>{this.face.template!.depth=value;this.publishFace();})}
+      }else{
+        if(this.face.capability?.k==='album'){this.chip('从素材库选择封面',false,()=>this.openMaterials('album'),true)}
+        if(this.photoTemplate()||this.currentPhoto()){this.chip('更换照片',false,()=>this.openMaterials('face'),true)}
+        if(this.face.elements.some(e=>e.kind==='text')&&!this.face.template){this.chip('编辑文字',true,()=>{this.sheetType='text';this.sheet=true;},true)}
+        if(cardCapabilities(this.face).some(c=>['countdown','anniversary','worldclock','timetable','agenda','album'].includes(c.k))){this.chip('编辑内容',true,()=>{this.contentIndex=0;this.sheetType='content';this.sheet=true;},true)}
+      }
+    }.width('100%').height('100%').justifyContent(FlexAlign.Center)
+  }
+  @Builder desktop(){
+    Column({space:20}){
+      Row(){this.icon('‹',()=>{this.screen='board';},true);Blank();Text('添加到桌面').fontSize(18).fontColor('#EEF1E8');Blank();this.icon('×',()=>this.screen='home',true)}.width('100%')
+      Blank();Stack(){this.preview(this.document,Math.min(this.viewportW-80,320))}.id('demoFormPreview')
+      Text(this.workName).fontSize(25).fontWeight(FontWeight.Medium).fontColor('#EEF1E8')
+      Text(this.document.canvasDimension.replace('*',' × ')+' · '+this.document.cards.length+' 张贴纸').fontSize(13).fontColor('#A0AA91');Blank()
+      Button('添加到桌面',{type:ButtonType.Capsule}).width('100%').height(54).backgroundColor(GREEN).fontColor('#182010').bindMenu(this.formMenu)
+      if(this.desktopStatus){Text(this.desktopStatus).fontSize(13).fontColor('#B9C7A3')}
+      Text('作品已保存在本机，之后可以继续修改').fontSize(12).fontColor('#929D83')
+      Button('回到作品',{buttonStyle:ButtonStyleMode.NORMAL}).fontColor('#CAD2BF').backgroundColor(Color.Transparent).onClick(()=>this.screen='home')
+    }.width('100%').height('100%').padding({left:28,right:28,top:this.safeTop+12,bottom:this.safeBottom+12}).backgroundColor('#10120F')
+  }
+  @Builder formMenu(){Menu(){AddFormMenuItem(this.want(),'demoFormPreview',{style:{options:{content:'确认添加这件作品'}},callback:(err,formId)=>{this.desktopStatus=err?'添加失败：'+err.message:'已添加到桌面';}})}}
+  @Builder sheetBody(){
+    Column({space:18}){
+      Row(){Text(this.sheetType==='materials'?'选择素材':this.sheetType==='templates'?'添加模板':this.sheetType==='content'?'修改内容':this.sheetType==='text'?'编辑文字':this.sheetType==='clock'?'时间与构图':this.sheetType==='layers'?'作品里的贴纸':this.sheetType==='asset'?'素材详情':this.sheetType==='new'?'新建作品':this.sheetType==='arrange'?'排列贴纸':'作品工具').fontSize(22).fontWeight(FontWeight.Medium).fontColor('#F0F2EA').layoutWeight(1);this.icon('×',()=>this.sheet=false,true)}.width('100%').padding({left:24,right:24,top:14})
+      if(this.sheetType==='materials'){this.materialGrid(true)}
+      else if(this.sheetType==='templates'){this.templateGrid(true)}
+      else if(this.sheetType==='new'||this.sheetType==='add'){
+        Column({space:14}){
+          if(this.sheetType==='new'){Row({space:10}){ForEach(['4*4','2*4','2*2'],(dimension:string)=>{this.chip(dimension.replace('*',' × '),this.newDimension===dimension,()=>this.newDimension=dimension,true)})}}
+          Button(this.sheetType==='new'?'从模板开始':'添加模板',{buttonStyle:ButtonStyleMode.NORMAL}).width('100%').height(64).backgroundColor('#30362A').fontColor(GREEN).borderRadius(18).onClick(()=>{if(this.sheetType==='new'){this.sheet=false;this.tab=1;}else this.sheetType='templates';})
+          Button(this.sheetType==='new'?'自由创作':'照片与素材',{buttonStyle:ButtonStyleMode.NORMAL}).width('100%').height(64).backgroundColor('#292D25').fontColor('#E6EBDE').borderRadius(18).onClick(()=>{if(this.sheetType==='new')this.createWork();else this.openMaterials('board');})
+          if(this.sheetType==='add'){Button('写一张文字贴纸',{buttonStyle:ButtonStyleMode.NORMAL}).width('100%').height(64).backgroundColor('#292D25').fontColor('#E6EBDE').borderRadius(18).onClick(()=>this.addText())}
+        }.padding(24).width('100%')
+      }else if(this.sheetType==='rename'){Column({space:18}){TextInput({text:this.nameInput,placeholder:'作品名称'}).fontColor('#F1F4EB').backgroundColor('#30362A').maxLength(40).onChange((value:string)=>this.nameInput=value);this.chip('保存名称',true,()=>{if(this.nameInput.trim())this.workName=this.nameInput.trim();this.sheet=false;},true)}.padding(24).width('100%')
+      }else if(this.sheetType==='text'){
+        Column({space:18}){TextArea({text:this.face.elements.find(e=>e.kind==='text')?.text??'',placeholder:'写点什么…'}).height(140).fontColor('#EFF2E8').backgroundColor('#30362A').fontSize(22).onChange((text:string)=>this.setText(text));Row(){Text('字号').fontColor('#C7D1BA');Slider({value:this.face.elements.find(e=>e.kind==='text')?.fs??24,min:12,max:60,step:1}).layoutWeight(1).selectedColor(GREEN).onChange((value:number)=>{const e=this.face.elements.find(e=>e.kind==='text');if(e){e.fs=value;this.publishFace();}})};Row({space:12}){ForEach(['left','center','right'],(align:string,index:number)=>{this.chip(['左对齐','居中','右对齐'][index],this.face.elements.find(e=>e.kind==='text')?.align===align,()=>{const e=this.face.elements.find(e=>e.kind==='text');if(e){e.align=align;this.publishFace();}},true)})};this.chip('完成',true,()=>this.sheet=false,true)}.width('100%').padding(24)
+      }else if(this.sheetType==='content'){
+        Scroll(){Column({space:16}){ForEach(cardCapabilities(this.face),(cap:CapBlock,index:number)=>{
+          Column({space:12}){Text(capabilityDescriptor(cap.k).name).fontSize(18).fontWeight(FontWeight.Medium).fontColor('#EAF0E0').width('100%');
+            if(['countdown','anniversary'].includes(cap.k)){TextInput({text:cap.title??'',placeholder:'标题'}).fontColor('#F1F4EB').backgroundColor('#30362A').onChange((v:string)=>{const next=JSON.parse(JSON.stringify(cap)) as CapBlock;next.title=v;this.setCap(next,index);});TextInput({text:cap.date??'',placeholder:'日期 YYYY-MM-DD'}).fontColor('#F1F4EB').backgroundColor('#30362A').onChange((v:string)=>{const next=JSON.parse(JSON.stringify(cap)) as CapBlock;next.date=v;this.setCap(next,index);})}
+            else if(cap.k==='worldclock'){TimeCapabilitySettings({cap:cap,appDark:true,onUpdate:(next:CapBlock)=>this.setCap(next,index)})}
+            else if(['timetable','agenda','album'].includes(cap.k)){CapabilitySettings({cap:cap,cardId:this.face.id,appDark:true,tick:this.tick,onUpdate:(_id:string,next:CapBlock)=>this.setCap(next,index)})}
+            else{Text('跟随系统自动更新').fontSize(13).fontColor('#8D9B7C').width('100%')}
+          }.padding(16).backgroundColor('#24291F').borderRadius(18)
+        })}.padding({left:24,right:24,bottom:24}).width('100%')}.layoutWeight(1).width('100%')
+      }else if(this.sheetType==='clock'){
+        Column({space:22}){this.chip('智能选位',this.face.template?.clockAuto===true,()=>this.smartClock(),true);Flex({wrap:FlexWrap.Wrap,justifyContent:FlexAlign.SpaceBetween}){ForEach(PHOTO_CLOCK_POSITIONS,(p:string,index:number)=>{Button(['左上','上方','右上','左下','下方','右下'][index],{buttonStyle:ButtonStyleMode.NORMAL}).width('30%').height(48).margin({bottom:12}).backgroundColor(this.face.template?.clockPosition===p?GREEN:'#30362A').fontColor(this.face.template?.clockPosition===p?INK:'#DAE2CF').borderRadius(14).onClick(()=>{this.face.template!.clockPosition=p;this.face.template!.clockAuto=false;this.publishFace();})})}.width('100%');Row({space:16}){this.chip('浅色文字',this.face.template?.clockInk!=='#202222',()=>{this.face.template!.clockInk='#FFFFFF';this.publishFace();},true);this.chip('深色文字',this.face.template?.clockInk==='#202222',()=>{this.face.template!.clockInk='#202222';this.publishFace();},true)};Row(){Text('照片缩放').fontColor('#BECBAF');Slider({value:this.face.template?.zoom??1,min:this.face.template?.photoMode==='photo'?1:.25,max:4,step:.01}).layoutWeight(1).selectedColor(GREEN).onChange((v:number)=>{this.face.template!.zoom=v;this.clampPhoto();this.publishFace();})};this.chip('重置构图',false,()=>{this.face.template!.zoom=1;this.face.template!.offsetX=0;this.face.template!.offsetY=0;this.publishFace();},true)}.padding(24).width('100%')
+      }else if(this.sheetType==='layers'){
+        Scroll(){Column({space:10}){ForEach(this.document.cards.slice().sort((a,b)=>b.z-a.z),(card:FridgeCard)=>{Row({space:16}){Stack(){CardFace({card:card,scaleFactor:54/Math.max(card.w,card.h),tick:this.tick}).width(card.w*54/Math.max(card.w,card.h)).height(card.h*54/Math.max(card.w,card.h)).hitTestBehavior(HitTestMode.None)}.width(60).height(60);Text(this.label(card)).fontSize(16).fontColor('#E5EDDC').layoutWeight(1);Text(this.selected===card.id?'✓':'').fontColor(GREEN)}.padding(12).backgroundColor(this.selected===card.id?'#343E27':'#252B20').borderRadius(16).onClick(()=>{this.selected=card.id;this.sheet=false;})})}.width('100%').padding(24)}.layoutWeight(1).width('100%')
+      }else if(this.sheetType==='arrange'){
+        Flex({wrap:FlexWrap.Wrap,justifyContent:FlexAlign.SpaceBetween}){ForEach(['small','large','left','right','center','straight','front','back'],(action:string,index:number)=>{Button(['缩小','放大','左转 5°','右转 5°','居中','摆正','置于顶层','置于底层'][index],{buttonStyle:ButtonStyleMode.NORMAL}).width('46%').height(54).margin({bottom:14}).fontColor('#DCE8D0').backgroundColor('#30392A').borderRadius(16).onClick(()=>this.arrangement(action))})}.padding(24).width('100%')
+      }else if(this.sheetType==='asset'&&this.assets[this.contentIndex]){
+        Column({space:16}){Image(this.subjectMaterial?this.assets[this.contentIndex].subject:this.assets[this.contentIndex].original).objectFit(ImageFit.Contain).width('100%').height(230);Text(this.assets[this.contentIndex].name).fontSize(18).fontColor('#E5EDDC');Row({space:10}){this.chip('原图',!this.subjectMaterial,()=>this.subjectMaterial=false,true);if(this.assets[this.contentIndex].subject){this.chip('抠图',this.subjectMaterial,()=>this.subjectMaterial=true,true)}else{this.chip('提取主体',false,()=>this.extract(),true)}};Button('标记为专辑封面',{buttonStyle:ButtonStyleMode.NORMAL}).backgroundColor('#30392A').fontColor('#DCE8D0').onClick(()=>{this.assets[this.contentIndex].category='专辑';writeDemoFile(this.context!.filesDir+'/demo-materials.json',JSON.stringify(this.library.items));this.assets=this.library.items.slice();this.toast('已收进专辑分类');})}.width('100%').padding(24)
+      }else{
+        Column({space:14}){this.chip('复制贴纸',false,()=>{this.arrangement('copy');this.sheet=false;},true);this.chip('删除贴纸',false,()=>this.arrangement('delete'),true);this.chip('完整编辑工具',false,()=>{this.sheet=false;this.advanced();},true)}.padding(24).width('100%')
+      }
+    }.width('100%').height('100%').padding({bottom:this.safeBottom+8}).backgroundColor('#1B2017')
+  }
+  build(){
+    Stack(){
+      if(!this.ready){Column({space:16}){if(!this.error){LoadingProgress().width(36).height(36)}Text(this.error||'正在打开作品').fontColor(INK)}.width('100%').height('100%').justifyContent(FlexAlign.Center).backgroundColor(PAPER)}
+      else if(this.screen==='home'){this.home()}else if(this.screen==='board'){this.board()}else if(this.screen==='edit'){this.editor()}else{this.desktop()}
+      if(this.busy){Column(){LoadingProgress().width(28).height(28).color(GREEN);Text('处理中').fontSize(12).fontColor('#EEF5E6')}.padding(18).borderRadius(20).backgroundColor('#DD20271A').hitTestBehavior(HitTestMode.None)}
+      Column().width(1).height(1).bindSheet($$this.sheet,this.sheetBody,{height:'78%',showClose:false,dragBar:true,backgroundColor:'#1B2017'})
+    }.width('100%').height('100%').onAreaChange((_old:Area,next:Area)=>{this.viewportW=Number(next.width);this.viewportH=Number(next.height);AppStorage.setOrCreate('workspaceWidth',this.viewportW);}).expandSafeArea([SafeAreaType.SYSTEM],[SafeAreaEdge.TOP,SafeAreaEdge.BOTTOM])
+  }
+}

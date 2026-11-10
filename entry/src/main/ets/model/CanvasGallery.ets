@@ -3,7 +3,10 @@ export class GalleryAnchor { id:string='';preview:string='';x:number=0;y:number=
 /** Match the gallery's title/content inset and floating creation dock, in vp. */
 export function galleryReturnTargetVisible(anchor:GalleryAnchor|null,width:number,height:number,safeTop:number,safeBottom:number):boolean{
   if(!anchor||![anchor.x,anchor.y,anchor.w,anchor.h,width,height,safeTop,safeBottom].every((value:number)=>Number.isFinite(value)))return false;
-  return anchor.w>0&&anchor.h>0&&anchor.x>=0&&anchor.x+anchor.w<=width&&anchor.y>=safeTop+76&&anchor.y+anchor.h<=height-safeBottom-104;
+  if(anchor.w<=0||anchor.h<=0)return false;
+  const visibleW=Math.max(0,Math.min(width,anchor.x+anchor.w)-Math.max(0,anchor.x));
+  const visibleH=Math.max(0,Math.min(height-safeBottom-104,anchor.y+anchor.h)-Math.max(safeTop+76,anchor.y));
+  return visibleW*visibleH>=anchor.w*anchor.h*.5;
 }
 export class GalleryController {
   refreshVisible: () => void = () => {};

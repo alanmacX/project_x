@@ -1,71 +1,37 @@
-# 冰箱贴 · FridgeMemo
+# 冰箱贴 · 原画布局部改进 Demo
 
-把照片、文字和实用卡片排成桌面画布。原生 HarmonyOS / ArkUI 应用，支持手机和平板。
+独立目录、独立包名 `com.fridgewidget.demo`，沿用原 App 的 `pages/Index` 作为入口。原来的画布、画框、拖拽、缩放、图层、分组、自由创作、作品切换和桌面添加继续由原界面承接。
 
-## 画布和桌面
+## 体验入口
 
-- 支持 4×4、2×4、2×2 三种尺寸。新建时选择尺寸，作品库按尺寸筛选。
-- 每个桌面组件独立选择画布。长按组件进入系统编辑页即可更换；在 App 里切换作品不改变桌面绑定。
-- 卡片支持拖动、缩放、旋转、排序和组合。图片、GIF、文字、形状及能力各自可编辑。
-- 照片可抠出主体，保留透明边缘和白边，也可与其他图层穿插。
-- 背景支持纯色、智能取色、多色、照片、柔色预设和透明；画框有白岩、胡桃木、浅橡木。
-- 定时场景显示一张中央卡片，到时恢复；普通画布可按时间或系统深浅色轮换。
+1. 原画布 → 添加卡片 → 模板 → 直接进入 **外观 / 色彩 / 内容** 聚焦编辑。再次编辑模板也直接进入这里，完成或取消回到原画布。模板在画布直接调整位置和大小，操控 pill 提供 **铺满 / 缩回**。
+2. 景深模板 → 同一自定页。原图铺满、拖动和缩放、不遮挡预览的时间位置控件、背景色调、原图与主体切换。
+3. 原画布 → 添加卡片 → 右上 **素材库**。预览照片、提取主体、标记专辑，点「使用这个素材」加入当前画布。
+4. 专辑模板 → 内容 → **封面库**。复用已有封面或照片；资料、轮换和封面移除在同一内容页完成。
+5. 普通卡片 → 原来的图片图层设置 → **从素材库选择**。替换当前图片，沿用原图层的位置和尺寸。
 
-## 卡片能力
+自定页只提交当前卡片内容，位置、尺寸、旋转、层级和分组由原画布持有；取消不提交。保存、撤销和桌面更新走原编辑器的逻辑。
 
-时钟、世界时钟、日期、台历、农历、倒计时、纪念日、今日进度、年度进度、电量、日程、课程表和专辑。每张卡片最多一个能力，每张画布最多 16 张卡片。
+## 本机运行
 
-课表在“导入课程”中选学校、登录教务并读取，核对开学日期和作息后保存。也能手动添加课程、调整校历及单次停课／调课。当前目录含 237 个学校／系统条目和 249 个适配脚本；学校改版、验证码及校园网要求会影响导入。
-
-日程支持本地 `.ics` 文件，包括每日／每周重复和例外日期。导入后是本地副本，原文件修改需重新导入。读取全部系统日历需要受限权限，当前安装包未开通。专辑使用本地封面，不连接音乐账号。
-
-## 导入与分享
-
-`.fridge` 文件保留素材、图层、布局和能力样式。整张画布导入为独立作品，单卡添加到所选画布。接收者使用自己的电量、课表、日程和日期设置；图片、装饰文字和 HTML 中的内容随作品分享。
-
-也可分享图片：画布导出 PNG，附 `created by 冰箱贴` 署名；单卡支持透明 PNG 和实色 JPG。文件与图片都使用系统分享面板。
-
-配套 [创作 Skill](https://github.com/alanmacX/fridge-creating-skill) 可让 AI 生成可编辑作品，提供离线预览器和格式检查工具。[Gitee 下载](https://gitee.com/alanmac/fridge-signing-system)提供相同内容。
-
-## 1.2.0 开发
-
-桌面电量每 2 秒检查一次，充电状态或电量变化后才重绘。组件用原生 TextTimer 向 FormExtension 请求本机读数，App 主进程冻结后仍可更新。未变化的数据不重复准备图片，读取失败保留桌面上已有的读数。
-
-时间、日期、课程状态和进度在组件内计算。单独的系统日程组件每 15 分钟请求重读。后台保留电量 5 分钟刷新请求和 30 分钟周期刷新；系统调度受休眠、可见性和每日配额限制。定时场景不作为闹钟使用。
-
-本轮已在连接设备上验证电量变化和插拔充电，2 秒版的响应速度经用户确认。记录见 [本轮验证](ITERATION_1.2.0.md)。
-
-## 本地数据与云同步
-
-作品、素材和课表保存在本机。网络权限用于学校教务网页。App 没有云同步菜单；当前本地包显式关闭文件与结构化云同步能力，实验同步代码与产品调用链隔离。作品存储使用 SQLite 事务、陈旧写入拦截和独立校验快照，真机记录见 [存储验收](tests/native/library-storage-device/README.md)。
-
-接入云能力前的本地版检查点为 `fa38973a97287eac20550d4cd285cf4b7ecdeab1`。回退构建方式、签名包性质及云服务验收情况见 [发布检查点](RELEASE_CHECKPOINTS.md)。
-
-## 开发
-
-使用 DevEco Studio，编译 SDK 为 HarmonyOS API 26，最低兼容 API 24。仓库不含签名证书、密码、个人素材和构建产物。
+DevEco Studio 打开当前目录，选择 `entry` 和手机模拟器；或运行：
 
 ```sh
-cp build-profile.example.json5 build-profile.json5
+./scripts/demo-build.sh
+./scripts/demo-install.sh
 ```
 
-在 DevEco 中配置自己的签名并构建 `entry`。`build-profile.json5` 只保留在本机。
+开发模拟器产物：`entry/build/default/outputs/default/entry-default-unsigned.hap`。真机调试在此工程配置 `com.fridgewidget.demo` 的签名。原应用与 Demo 各自存储作品，可以并存。
 
-测试需要 Node.js 22.13 或更新版本：
+## 改动位置
 
-```sh
-npm ci
-npm test
-node previewer/build.cjs --check
-```
+- `entry/src/main/ets/pages/Index.ets`：局部入口和回写。
+- `entry/src/main/ets/views/CardCustomizer.ets`：独立自定面板与素材选择。
+- `entry/src/main/ets/views/CardTemplatePicker.ets`：添加面板的素材库按钮。
+- `entry/src/main/ets/demo/`：素材和照片构图处理。
 
-测试使用生产模型和服务代码，平台接口由模拟实现，绑定注册表使用 SQLite。跨平台运行时可用 `FRIDGE_TYPESCRIPT` 指定 TypeScript 模块路径。设备上的桌面调度、系统控件和分享仍需真机验收。
+上一版重做的首页、简化画布已移出页面路由和编译目录，归档在 `design/rejected-full-shell/`。
 
-- [界面规范](UI_DESIGN.md)
-- [卡片框架](CARD_FRAMEWORK.md)
-- [作品格式与创作 Skill](skills/fridge-create/SKILL.md)
-- [离线预览器](previewer/README.md)
-- [文案审查](COPY_REVIEW_1.2.0.md)
-- [下个 milestone：稳定性与恢复](MILESTONE_NEXT.md)
-- [鸿蒙组件竞品调研](research/2026-10-31-harmony-widgets.md)
-- [第三方许可](THIRD_PARTY_NOTICES.md)
+编译及回归记录在 `demo-verification/balanced-editor-*`；原工程哈希检查在 `demo-verification/original-integrity.json`。
+
+最新设计与 UI 检查：`design/template-editing-2026-11-09/`；编译、回归和原生截图：`demo-verification/template-redesign-*`、`demo-verification/live-flow/`。

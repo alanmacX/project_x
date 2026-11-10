@@ -10,6 +10,7 @@ export struct CardTemplatePicker {
   @Prop appDark:boolean=false;
   onChoose:(id:string)=>void=()=>{};
   onCreative:()=>void=()=>{};
+  onMaterials:()=>void=()=>{};
   @State tab:number=0;
   @State category:string='clock';
   @State gridWidth:number=300;
@@ -21,7 +22,7 @@ export struct CardTemplatePicker {
   private items():TemplateDefinition[]{return CARD_TEMPLATES.filter(item=>item.kind===this.category);}
   build(){
     Column({space:16}){
-      Row(){Text('添加卡片').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Blank().width(48)}.height(44).width('100%')
+      Row(){Text('添加卡片').fontSize(20).fontWeight(FontWeight.Medium).fontColor(AppDesign.text(this.appDark)).layoutWeight(1);Button('素材库',{type:ButtonType.Capsule,buttonStyle:ButtonStyleMode.NORMAL}).height(36).fontColor(AppDesign.text(this.appDark)).backgroundColor(AppDesign.control(this.appDark)).onClick(()=>this.onMaterials())}.height(44).width('100%')
       SettingsSegmented({labels:['模板','创作'],selectedIndex:this.tab,appDark:this.appDark,onSelect:(i:number)=>{this.tab=i;}})
       Swiper(){
         Column({space:16}){

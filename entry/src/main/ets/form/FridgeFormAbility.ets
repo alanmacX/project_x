@@ -1,3 +1,4 @@
+import { selectWidgetCanvas } from '../model/WidgetRegistry';
 import { cardCapabilities, replaceCardCapability } from '../model/TemplateSources';
 import { getLibraryPreferences, LibraryPreferences } from '../model/LibraryStorage';
 import { projectCapabilityData } from '../model/CapabilityProjection';
@@ -114,6 +115,8 @@ export default class FridgeFormAbility extends FormExtensionAbility {
     const width = Number(want.parameters?.['ohos.extra.param.key.form_width'] ?? 0), height = Number(want.parameters?.['ohos.extra.param.key.form_height'] ?? 0);
     const editFormId=want.parameters?.['ohos.extra.param.key.edit_form_id'];
     this.register(id,dim,false,width,height,typeof editFormId==='string'?editFormId:'',want.parameters?.['ohos.extra.param.key.form_temporary']===true).then(async()=>{
+      const selectedCanvas=want.parameters?.['canvasId'];
+      if(typeof selectedCanvas==='string'&&selectedCanvas)await selectWidgetCanvas(this.context,id,selectedCanvas,dim);
       await this.pushForm(id);
       if(await this.refreshDueData(id))await this.pushForm(id);await this.scheduleForm(id);
     }).catch((e: Error) => {

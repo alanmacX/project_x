@@ -1,0 +1,10 @@
+Demo photograph: Matt Buck, Asian tabby cat.jpg, CC BY-SA 2.0.
+Source: https://commons.wikimedia.org/wiki/File:Asian_tabby_cat.jpg
+License: https://creativecommons.org/licenses/by-sa/2.0/
+Uses the 960 px preview as demo-tabby.jpg.
+
+Full-canvas foreground cutout: Matt Buck / YukiKoKo, CC BY-SA 4.0.
+Copied from this project's design/template-capabilities-2026-11-01/sources/cat-tabby.png.
+License: https://creativecommons.org/licenses/by-sa/4.0/
+See design/template-capabilities-2026-11-01/LICENSES.md for source records.
+Background-tone derivatives are generated locally and retain the corresponding source license.

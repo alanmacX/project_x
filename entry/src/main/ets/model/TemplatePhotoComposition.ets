@@ -10,7 +10,7 @@ export function photoClockLayout(width:number,height:number,position:string='top
  const inset=Math.min(18,height*.065);out.y=position.startsWith('bottom')?height-out.h-inset:inset;return out;
 }
 export function photoControlRegion(card:FridgeCard):ElementBox{
- const box=new ElementBox(),wide=card.w/card.h>=1.5;box.w=300;box.h=300*card.h/card.w;
+ const box=new ElementBox(),wide=card.w/card.h>=1.5;box.x=0;box.y=0;box.w=300;box.h=300*card.h/card.w;
  if(card.template?.id==='portrait'){
   if(card.template.photoFraming!=='cover'){box.y=box.h<180?44:74;box.h=Math.max(1,box.h-box.y);}
  }else{box.x=wide?148:138;box.y=wide?16:58;box.w=wide?134:140;box.h=wide?118:169;}
@@ -19,6 +19,22 @@ export function photoControlRegion(card:FridgeCard):ElementBox{
 export function portraitPhotoFrame(card:FridgeCard,photo:CanvasElement):ElementBox{
  const region=photoControlRegion(card),t=card.template!,subject=photo.depthEnabled&&!!photo.depthForeground&&t.photoMode!=='photo';
  const box=templatePhotoBox(photo,t,region.w,region.h,t.photoFraming==='cover'&&!subject,subject);box.x+=region.x;box.y+=region.y;return box;
+}
+/** Conservative per-digit safety: small edge overlaps retain depth, large overlaps put time in front.
+ * This geometry-only guard runs in every renderer, including old saved canvases and widgets. */
+export function photoClockDepthAllowed(card:FridgeCard):boolean {
+ const photo=card.elements.find(e=>e.kind==='image'&&!!e.src),t=card.template;
+ if(!photo||!t||!t.depth||!photo.depthEnabled||!photo.depthForeground)return false;
+ const frame=portraitPhotoFrame(card,photo),front=t.photoMode!=='photo'?frame:templateSubjectBox(photo,frame);
+ const clock=photoClockLayout(300,300*card.h/card.w,t.clockPosition??'top');
+ const rows=clock.stacked?2:1,columns=clock.stacked?2:5;
+ for(let row=0;row<rows;row++)for(let col=0;col<columns;col++){
+  const x=clock.x+col*clock.w/columns,y=clock.y+row*clock.size*1.04,w=clock.w/columns,h=clock.size;
+  const overlapW=Math.max(0,Math.min(x+w,front.x+front.w)-Math.max(x,front.x));
+  const overlapH=Math.max(0,Math.min(y+h,front.y+front.h)-Math.max(y,front.y));
+  if(overlapW*overlapH/(w*h)>.18)return false;
+ }
+ return true;
 }
 export class PhotoCompositionViewport {unit:number=1;offsetX:number=0;offsetY:number=0;}
 /** Match the renderer's centered scene, including letterboxing on a filled canvas. */

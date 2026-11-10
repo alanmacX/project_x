@@ -1,6 +1,6 @@
 import { fileIo } from '@kit.CoreFileKit';
 
-export const TEMPLATE_UTD: string = 'com.fridgewidget.app.template';
+export const TEMPLATE_UTD: string = 'com.fridgewidget.demo.template';
 export const TEMPLATE_MIME: string = 'application/x-fridgememo';
 export function incomingTemplateUri(uri: string | undefined): string {
   return typeof uri === 'string' && uri.startsWith('file://') && uri.length <= 8192 ? uri : '';
