@@ -1,0 +1,64 @@
+{
+  "cases": [
+    {
+      "case": "known",
+      "cards": 1,
+      "templateRetained": true,
+      "templateInSerializedState": true
+    },
+    {
+      "case": "unknown-id",
+      "cards": 1,
+      "templateRetained": false,
+      "templateInSerializedState": false
+    },
+    {
+      "case": "future-version",
+      "cards": 1,
+      "templateRetained": false,
+      "templateInSerializedState": false
+    }
+  ],
+  "index": {
+    "lines": 3211,
+    "stateDeclarations": 130
+  },
+  "growth": [
+    {
+      "monthlyFirstOpens": 700,
+      "monthlyReturn": 0.35,
+      "months": [
+        700,
+        945,
+        1031,
+        1061,
+        1071,
+        1075
+      ]
+    },
+    {
+      "monthlyFirstOpens": 450,
+      "monthlyReturn": 0.6,
+      "months": [
+        450,
+        720,
+        882,
+        979,
+        1038,
+        1073
+      ]
+    },
+    {
+      "monthlyFirstOpens": 350,
+      "monthlyReturn": 0.75,
+      "months": [
+        350,
+        613,
+        809,
+        957,
+        1068,
+        1151
+      ]
+    }
+  ]
+}

@@ -1,0 +1,660 @@
+[
+  {
+    "id": "standby",
+    "name": "浮字",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "浮字",
+      "色盘",
+      "翻页"
+    ],
+    "svg": true
+  },
+  {
+    "id": "dial",
+    "name": "色盘",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "浮字",
+      "色盘",
+      "翻页"
+    ],
+    "svg": true
+  },
+  {
+    "id": "flip",
+    "name": "翻页",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "浮字",
+      "色盘",
+      "翻页"
+    ],
+    "svg": true
+  },
+  {
+    "id": "portrait",
+    "name": "景深照片",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "背景",
+      "内容"
+    ],
+    "styles": [
+      "原图",
+      "主体"
+    ],
+    "svg": true,
+    "hits": 2
+  },
+  {
+    "id": "date-poster",
+    "name": "日历海报",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "日历海报",
+      "纸页",
+      "一周"
+    ],
+    "svg": true
+  },
+  {
+    "id": "date-paper",
+    "name": "纸页",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "日历海报",
+      "纸页",
+      "一周"
+    ],
+    "svg": true
+  },
+  {
+    "id": "date-strip",
+    "name": "一周",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "日历海报",
+      "纸页",
+      "一周"
+    ],
+    "svg": true
+  },
+  {
+    "id": "calendar-month",
+    "name": "月历",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "月历",
+      "月记",
+      "周历"
+    ],
+    "svg": true
+  },
+  {
+    "id": "calendar-ledger",
+    "name": "月记",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "月历",
+      "月记",
+      "周历"
+    ],
+    "svg": true
+  },
+  {
+    "id": "calendar-week",
+    "name": "周历",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "月历",
+      "月记",
+      "周历"
+    ],
+    "svg": true
+  },
+  {
+    "id": "countdown-poster",
+    "name": "出发",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "出发",
+      "环绕",
+      "撕页"
+    ],
+    "svg": true,
+    "hits": 1
+  },
+  {
+    "id": "countdown-orbit",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "出发",
+      "环绕",
+      "撕页"
+    ],
+    "svg": true,
+    "hits": 1
+  },
+  {
+    "id": "countdown-paper",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "出发",
+      "环绕",
+      "撕页"
+    ],
+    "svg": true,
+    "hits": 1
+  },
+  {
+    "id": "anniversary-photo",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "相遇",
+      "记忆"
+    ],
+    "svg": true,
+    "hits": 2
+  },
+  {
+    "id": "anniversary-type",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "相遇",
+      "记忆"
+    ],
+    "svg": true,
+    "hits": 1
+  },
+  {
+    "id": "day-dial",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "一天",
+      "日线",
+      "时块"
+    ],
+    "svg": true
+  },
+  {
+    "id": "day-timeline",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "一天",
+      "日线",
+      "时块"
+    ],
+    "svg": true
+  },
+  {
+    "id": "day-blocks",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "一天",
+      "日线",
+      "时块"
+    ],
+    "svg": true
+  },
+  {
+    "id": "year-dots",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "年点",
+      "年轮",
+      "十二月"
+    ],
+    "svg": true
+  },
+  {
+    "id": "year-arc",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "年点",
+      "年轮",
+      "十二月"
+    ],
+    "svg": true
+  },
+  {
+    "id": "year-months",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "年点",
+      "年轮",
+      "十二月"
+    ],
+    "svg": true
+  },
+  {
+    "id": "battery-ring",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "能量环",
+      "电芯",
+      "电格"
+    ],
+    "svg": true
+  },
+  {
+    "id": "battery-cell",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "能量环",
+      "电芯",
+      "电格"
+    ],
+    "svg": true
+  },
+  {
+    "id": "battery-segments",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "能量环",
+      "电芯",
+      "电格"
+    ],
+    "svg": true
+  },
+  {
+    "id": "agenda-editorial",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "留白日程",
+      "时间轴",
+      "手帐"
+    ],
+    "svg": true,
+    "hits": 1
+  },
+  {
+    "id": "agenda-timeline",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "留白日程",
+      "时间轴",
+      "手帐"
+    ],
+    "svg": true,
+    "hits": 1
+  },
+  {
+    "id": "agenda-paper",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "留白日程",
+      "时间轴",
+      "手帐"
+    ],
+    "svg": true,
+    "hits": 1
+  },
+  {
+    "id": "course-next",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "下节课",
+      "一周课表",
+      "课程纸条"
+    ],
+    "svg": true,
+    "hits": 1
+  },
+  {
+    "id": "course-week",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "下节课",
+      "一周课表",
+      "课程纸条"
+    ],
+    "svg": true,
+    "hits": 1
+  },
+  {
+    "id": "course-slips",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "下节课",
+      "一周课表",
+      "课程纸条"
+    ],
+    "svg": true,
+    "hits": 1
+  },
+  {
+    "id": "world-dial",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "异地",
+      "两地",
+      "时差"
+    ],
+    "svg": true,
+    "hits": 1
+  },
+  {
+    "id": "world-duo",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "异地",
+      "两地",
+      "时差"
+    ],
+    "svg": true,
+    "hits": 1
+  },
+  {
+    "id": "world-type",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "异地",
+      "两地",
+      "时差"
+    ],
+    "svg": true,
+    "hits": 1
+  },
+  {
+    "id": "lunar-paper",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "东方日历",
+      "月白",
+      "朱印"
+    ],
+    "svg": true
+  },
+  {
+    "id": "lunar-night",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "东方日历",
+      "月白",
+      "朱印"
+    ],
+    "svg": true
+  },
+  {
+    "id": "lunar-seal",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "东方日历",
+      "月白",
+      "朱印"
+    ],
+    "svg": true
+  },
+  {
+    "id": "album-record",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "唱片",
+      "封面",
+      "唱片袋"
+    ],
+    "svg": true,
+    "hits": 2
+  },
+  {
+    "id": "album-cover",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "唱片",
+      "封面",
+      "唱片袋"
+    ],
+    "svg": true,
+    "hits": 2
+  },
+  {
+    "id": "album-sleeve",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "唱片",
+      "封面",
+      "唱片袋"
+    ],
+    "svg": true,
+    "hits": 2
+  },
+  {
+    "id": "mix-standby",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色"
+    ],
+    "styles": [
+      "桌边"
+    ],
+    "svg": true
+  },
+  {
+    "id": "mix-modular",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "今日"
+    ],
+    "svg": true,
+    "hits": 1
+  },
+  {
+    "id": "mix-study",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "课间"
+    ],
+    "svg": true,
+    "hits": 1
+  },
+  {
+    "id": "mix-travel",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "远行"
+    ],
+    "svg": true,
+    "hits": 2
+  },
+  {
+    "id": "mix-memory",
+    "overflow": false,
+    "pages": [
+      "外观",
+      "颜色",
+      "内容"
+    ],
+    "styles": [
+      "相片日历"
+    ],
+    "svg": true,
+    "hits": 2
+  }
+]
