@@ -196,6 +196,7 @@ export class FridgeState {
   schemaVersion: number = 2;
   canvasId: string = 'canvas_main';
   background: CanvasBackground = new CanvasBackground();
+  fillBackground?:CanvasBackground;
   canvasAspect: number = 1;
   canvasDimension: string = '4*4';
   fridge: string = 'board';
@@ -279,6 +280,7 @@ function legacyElement(cap: CapBlock, id: string, index: number, count: number):
 }
 export function normalizeState(raw: FridgeState): FridgeState {
   const state = new FridgeState(); state.canvasId = typeof raw.canvasId === 'string' && /^[a-zA-Z0-9_-]{1,96}$/.test(raw.canvasId) ? raw.canvasId : 'canvas_main'; state.background = normalizeBackground(raw.background); state.door = raw.door ?? new DoorState();
+  state.fillBackground=raw.fillBackground?normalizeBackground(raw.fillBackground):undefined;
   state.canvasDimension = ['2*2', '2*4', '4*4', '6*4'].includes(raw.canvasDimension) ? raw.canvasDimension : '4*4';
   state.canvasAspect = bounded(raw.canvasAspect, .3, 3, 1);
   state.sceneLayouts=normalizeSceneLayouts(raw.sceneLayouts);state.sceneRules=normalizeSceneRules(raw.sceneRules);

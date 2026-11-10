@@ -31,7 +31,7 @@
     "htmlTemplateVersion": 1
   },
   "identity": {
-    "models": "749484395c86df2aff177748f109e350ac5fe40868e96a6ed81adce92ebc31eb",
+    "models": "5e217e98ab8e9b45cc1aebfa50ca7953aed692a30a3b9f959437b159ee71af10",
     "materials": "6d8e88bb47c640df4d872e472f3e5c578e04efc21bedc564d9d86c0ea7daf723",
     "browserAdapter": "afe78ed60496701d0b5d0517ad28a7e3f2dbf4afa528f9b991e51be53c5672d5",
     "nativeViews": "917a1c0495faae95a0cf106480675c8b0d3cfbf2a9870e44461fbfd8bc6776bd"
@@ -1039,6 +1039,7 @@
       "schemaVersion",
       "canvasId",
       "background",
+      "fillBackground",
       "canvasAspect",
       "canvasDimension",
       "fridge",

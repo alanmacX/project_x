@@ -1062,6 +1062,7 @@ function normalizeState(raw) {
     state.canvasId = typeof raw.canvasId === 'string' && /^[a-zA-Z0-9_-]{1,96}$/.test(raw.canvasId) ? raw.canvasId : 'canvas_main';
     state.background = normalizeBackground(raw.background);
     state.door = raw.door ?? new DoorState();
+    state.fillBackground = raw.fillBackground ? normalizeBackground(raw.fillBackground) : undefined;
     state.canvasDimension = ['2*2', '2*4', '4*4', '6*4'].includes(raw.canvasDimension) ? raw.canvasDimension : '4*4';
     state.canvasAspect = bounded(raw.canvasAspect, .3, 3, 1);
     state.sceneLayouts = (0, SceneScheduleSchema_1.normalizeSceneLayouts)(raw.sceneLayouts);
@@ -2808,6 +2809,7 @@ function packageScene(json, cardId) {
         state.sceneRules = [];
         state.sceneBaseLayoutId = '';
         state.background = (0, CardSchema_1.defaultState)().background;
+        state.fillBackground = undefined;
     }
     state.canvasId = 'canvas_main';
     for (const rule of state.sceneRules) {
@@ -2858,7 +2860,7 @@ function readPackage(json) {
             throw new Error('作品图片无效');
         keys.push(a.key);
     }
-    const refs = [raw.state.background?.src ?? '', raw.state.background?.photo ?? ''];
+    const refs = [raw.state.background?.src ?? '', raw.state.background?.photo ?? '', raw.state.fillBackground?.src ?? '', raw.state.fillBackground?.photo ?? ''];
     for (const c of raw.state.cards) {
         refs.push(c.cutout ?? '', c.capability?.albumCover ?? '', c.capability?.albumBackground ?? '');
         for (const a of c.capability?.albumItems ?? [])
@@ -2878,6 +2880,13 @@ function readPackage(json) {
                 bg.src = to;
             if (bg.photo === from)
                 bg.photo = to;
+        }
+        const previous = raw.state.fillBackground;
+        if (previous) {
+            if (previous.src === from)
+                previous.src = to;
+            if (previous.photo === from)
+                previous.photo = to;
         }
         for (const c of raw.state.cards) {
             if (c.cutout === from)
@@ -5704,6 +5713,7 @@ function scenePolicyShell(base) {
     next.canvasId = base.canvasId;
     next.schemaVersion = base.schemaVersion;
     next.background = base.background;
+    next.fillBackground = base.fillBackground;
     next.canvasAspect = base.canvasAspect;
     next.canvasDimension = base.canvasDimension;
     next.fridge = base.fridge;
@@ -5785,7 +5795,7 @@ function depthRenderCards(cards) {
     const used = [], occupied = cards.map(c => c.id);
     for (const card of cards) {
         const source = sources.find(c => c.id === card.id && !used.includes(c.groupId));
-        const members = source ? cards.filter(c => !c.hidden && c.groupId === source.groupId) : [];
+        const members = source ? cards.filter(c => !c.hidden && !c.template?.fill && c.groupId === source.groupId) : [];
         if (source && members.length > 1) {
             used.push(source.groupId);
             output.push(project(source, 'base', Math.min(...members.map(c => c.z)) - .25));
@@ -5796,7 +5806,7 @@ function depthRenderCards(cards) {
             output.push(project(source, 'foreground', Math.max(...members.map(c => c.z)) + .25, foregroundId));
         }
         else
-            output.push(card);
+            output.push(card.template?.fill ? project(card, '', -100000) : card);
     }
     return used.length > 0 ? output.sort((a, b) => a.z - b.z) : output;
 }
@@ -5816,4 +5826,4 @@ exports.creationDimension = creationDimension;
 function creationAspect(dimension) { return dimension === '2*4' ? 2 : 1; }
 exports.creationAspect = creationAspect;
 
-}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"749484395c86df2aff177748f109e350ac5fe40868e96a6ed81adce92ebc31eb"};})(globalThis);
+}};const cache={};function load(name){if(cache[name])return cache[name].exports;if(!modules[name])throw Error("Unknown shared model "+name);const module={exports:{}};cache[name]=module;modules[name](s=>load(s.replace(/^\.\//,"")),module,module.exports);return module.exports;}global.FridgeCore={load,sourceFingerprint:"5e217e98ab8e9b45cc1aebfa50ca7953aed692a30a3b9f959437b159ee71af10"};})(globalThis);

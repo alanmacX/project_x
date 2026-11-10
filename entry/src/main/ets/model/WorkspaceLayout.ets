@@ -30,3 +30,11 @@ export function workspaceLayout(width:number,height:number,top:number,bottom:num
   out.previewH=out.wide?Math.max(64,body-124):Math.max(100,Math.min(stackedPreview,body-100-60-120));
   out.inspectorW=out.wide?width-out.previewW:width;return out;
 }
+
+export function canvasToolsLayout(width:number,height:number,top:number,bottom:number,aspect:number,toolsHeight:number):WorkspaceLayout {
+  const out=workspaceLayout(width,height,top,bottom,aspect);if(!out.floating)return out;
+  const available=Math.max(36,height-bottom-68-8-toolsHeight-16-top),ratio=Math.max(.3,Math.min(3,aspect));
+  out.boardH=Math.min(out.boardH,available);out.boardW=out.boardH*ratio;
+  out.boardX=(width-out.boardW)/2;out.boardY=top+(available-out.boardH)/2;
+  return out;
+}

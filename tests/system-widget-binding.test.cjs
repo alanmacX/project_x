@@ -16,7 +16,7 @@ const gallery=fs.readFileSync('entry/src/main/ets/views/CanvasGallery.ets','utf8
 const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8'),start=index.indexOf('  private showCardActions()'),end=index.indexOf('  private selectedActionAnchor()',start);
 const fixture={exports:{}};vm.runInNewContext(ts.transpileModule('export class Fixture{'+index.slice(start,end)+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,fixture);
 const f=new fixture.exports.Fixture();f.cardMap={a:{hidden:false}};f.selectedId='a';f.selectedGroup=()=>[];
-for(const panel of ['backgroundOpen','homeToolsOpen','scheduleOpen']){f[panel]=true;assert.equal(f.showCardActions(),true,'selected-card actions remain visible in '+panel);f[panel]=false;}
+for(const panel of ['backgroundOpen','homeToolsOpen','scheduleOpen']){f[panel]=true;assert.equal(f.showCardActions(),false,'panel owns selected-card actions while open: '+panel);f[panel]=false;}
 f.editing=true;assert.equal(f.showCardActions(),false);f.editing=false;f.cardMap.a.hidden=true;assert.equal(f.showCardActions(),false);
 console.log('PASS native formEdit sessions, independent preview IDs, system-only configuration route, three sizes and selected-card actions across panels.');
 

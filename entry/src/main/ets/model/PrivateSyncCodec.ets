@@ -1,7 +1,7 @@
 import { FridgeState } from './CardSchema';
 /** Private sync keeps authored capability data; public sharing remains independently redacted. */
 export function privateAssetPaths(state:FridgeState):string[]{
-  const paths:string[]=[state.background.src,state.background.photo];
+  const paths:string[]=[state.background.src,state.background.photo,state.fillBackground?.src??'',state.fillBackground?.photo??''];
   for(const card of state.cards){paths.push(card.cutout);for(const element of card.elements)paths.push(element.src,element.depthForeground);
     const cap=card.capability;if(cap){paths.push(cap.albumCover??'',cap.albumBackground??'');for(const item of cap.albumItems??[])paths.push(item.cover,item.background);}}
   return Array.from(new Set(paths.filter(path=>typeof path==='string'&&path.length>0)));

@@ -37,5 +37,5 @@ export function withScenePolicy(base:FridgeState,catalog:CanvasCatalog,dark:bool
 export function sceneDocumentExists(catalog:CanvasCatalog,id:string):boolean {return catalog.canvases.concat(catalog.scenes).some(c=>c.id===id);}
 
 export function scenePolicyShell(base:FridgeState):FridgeState {
-  const next=new FridgeState();next.canvasId=base.canvasId;next.schemaVersion=base.schemaVersion;next.background=base.background;next.canvasAspect=base.canvasAspect;next.canvasDimension=base.canvasDimension;next.fridge=base.fridge;next.door=base.door;next.maxZ=base.maxZ;next.cards=base.cards;next.sceneRules=base.sceneRules;next.sceneLayouts=base.sceneLayouts;next.sceneBaseLayoutId=base.sceneBaseLayoutId;return next;
+  const next=new FridgeState();next.canvasId=base.canvasId;next.schemaVersion=base.schemaVersion;next.background=base.background;next.fillBackground=base.fillBackground;next.canvasAspect=base.canvasAspect;next.canvasDimension=base.canvasDimension;next.fridge=base.fridge;next.door=base.door;next.maxZ=base.maxZ;next.cards=base.cards;next.sceneRules=base.sceneRules;next.sceneLayouts=base.sceneLayouts;next.sceneBaseLayoutId=base.sceneBaseLayoutId;return next;
 }

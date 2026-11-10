@@ -321,6 +321,10 @@ export struct BoardCard {
           TapGesture().onAction(() => { if (!this.moving) this.onSelect(this.card.id); }),
           LongPressGesture({duration:450,repeat:false}).onAction(()=>{if(!this.moving&&!this.editingSurface)this.onHold(this.card.id); })))
       }
+      if(this.controlsOnly&&this.selected&&!this.card.template?.fill){
+        Column().width(this.w()+this.visibleOverflow().left+this.visibleOverflow().right).height(this.h()+this.visibleOverflow().top+this.visibleOverflow().bottom)
+          .border({width:1.5,color:'#4485EB'}).borderRadius(4).position({x:24,y:24}).hitTestBehavior(HitTestMode.None)
+      }
       // Mount material controls and contour-aware handles only on selection.
       // Keep them alive through their dismissal animation.
       if(!this.card.template?.fill&&this.showControls&&(this.shown() || this.controlsMounted)) {

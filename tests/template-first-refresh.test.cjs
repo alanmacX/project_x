@@ -8,6 +8,7 @@ const env={exports:{},Date,cardCapabilities:models.FridgeCore.load('TemplateSour
 const fixture=`export class Host {
  alive=true;busy=false;canvasAspect=2;pageVisible=true;appWindowFocused=true;appBackgrounded=false;foregroundGeneration=0;foregroundRefreshTimer=-1;heroActive=false;arriving=false;deletionId='';activeBoardId='';layerDrag='';gestureGroup='';tick=0;reads=0;
  store={state:{canvasId:'qa',cards:[]},newId:()=>nextId(),addCards:(cards)=>{this.store.state.cards.push(...cards);}};
+ beginCanvasEdit(){}
  canAddCards(){return true;}clamp(){}select(){}change(){}openEditor(){this.heroActive=true;}
  cancelForegroundRefresh(){this.foregroundGeneration++;if(this.foregroundRefreshTimer>=0)clearTimeout(this.foregroundRefreshTimer);this.foregroundRefreshTimer=-1;}
  foregroundSchedules(){this.reads++;for(const c of this.store.state.cards)for(const cap of cardCapabilities(c))if(cap.k==='battery')cap.percent=78;}

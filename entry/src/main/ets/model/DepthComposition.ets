@@ -36,13 +36,13 @@ export function depthRenderCards(cards:FridgeCard[]):FridgeCard[] {
   const used:string[]=[],occupied=cards.map(c=>c.id);
   for(const card of cards){
     const source=sources.find(c=>c.id===card.id&&!used.includes(c.groupId));
-    const members=source?cards.filter(c=>!c.hidden&&c.groupId===source.groupId):[];
+    const members=source?cards.filter(c=>!c.hidden&&!c.template?.fill&&c.groupId===source.groupId):[];
     if(source&&members.length>1){
       used.push(source.groupId);
       output.push(project(source,'base',Math.min(...members.map(c=>c.z))-.25));
       let foregroundId=source.id+'::depth';while(occupied.includes(foregroundId))foregroundId+=':';occupied.push(foregroundId);
       output.push(project(source,'foreground',Math.max(...members.map(c=>c.z))+.25,foregroundId));
-    }else output.push(card);
+    }else output.push(card.template?.fill?project(card,'',-100000):card);
   }
   return used.length>0?output.sort((a,b)=>a.z-b.z):output;
 }

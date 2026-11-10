@@ -1,9 +1,9 @@
 import { FridgeCard } from './CardSchema';
 import { dragBounds, DragBounds } from './DragGeometry';
-export function groupMembers(cards: FridgeCard[], card: FridgeCard): FridgeCard[] { return card.groupId.length > 0 ? cards.filter((c: FridgeCard) => c.groupId === card.groupId) : [card]; }
+export function groupMembers(cards: FridgeCard[], card: FridgeCard): FridgeCard[] { return card.template?.fill?[card]:card.groupId.length > 0 ? cards.filter((c: FridgeCard) => c.groupId === card.groupId&&!c.template?.fill) : [card]; }
 export function combineCards(cards: FridgeCard[], ids: string[], groupId: string): void {
-  const groups = cards.filter((c: FridgeCard) => ids.includes(c.id) && c.groupId.length > 0).map((c: FridgeCard) => c.groupId);
-  const members = cards.filter((c: FridgeCard) => ids.includes(c.id) || groups.includes(c.groupId));
+  const groups = cards.filter((c: FridgeCard) => ids.includes(c.id) && !c.template?.fill && c.groupId.length > 0).map((c: FridgeCard) => c.groupId);
+  const members = cards.filter((c: FridgeCard) => !c.template?.fill&&(ids.includes(c.id) || groups.includes(c.groupId)));
   if (members.length < 2) return; members.forEach((c: FridgeCard) => { c.groupId = groupId; c.depthGroup=false; });
 }
 export function ungroupCards(cards: FridgeCard[], groupId: string): void { if (groupId.length > 0) cards.forEach((c: FridgeCard) => { if (c.groupId === groupId) {c.groupId = '';c.depthGroup=false;} }); }
@@ -19,6 +19,7 @@ export function groupDragBounds(cards: FridgeCard[], card: FridgeCard, renderedH
 export function clampCanvasGroups(cards: FridgeCard[], renderedHeight?: number): void {
   const seen: string[] = [];
   for(const card of cards) {
+    if(card.template?.fill)continue;
     const key=card.groupId ? 'group:'+card.groupId : 'card:'+card.id;if(seen.includes(key))continue;seen.push(key);
     const bounds=groupDragBounds(cards,card,renderedHeight);
     // A group wider than the canvas cannot keep every member visible at once.
@@ -33,12 +34,12 @@ export function clampCanvasGroups(cards: FridgeCard[], renderedHeight?: number):
 export class LayerSection { id: string = ''; title: string = ''; ids: string[] = []; }
 /** Group rows visually without rewriting the canvas stacking order. */
 export function layerSections(cards: FridgeCard[]): LayerSection[] {
-  const ordered = cards.slice().sort((a: FridgeCard,b: FridgeCard)=>b.z-a.z), sections: LayerSection[] = [];
+  const ordered = cards.slice().sort((a: FridgeCard,b: FridgeCard)=>Number(!!a.template?.fill)-Number(!!b.template?.fill)||b.z-a.z), sections: LayerSection[] = [];
   let number = 0;
   for (const card of ordered) {
-    const key = card.groupId ? 'group:'+card.groupId : 'card:'+card.id;
+    const key = card.groupId&&!card.template?.fill ? 'group:'+card.groupId : 'card:'+card.id;
     let section = sections.find((item: LayerSection)=>item.id===key);
-    if (section === undefined) { section = new LayerSection(); section.id=key; section.title=card.groupId?(cards.some(c=>c.groupId===card.groupId&&c.depthGroup)?'景深组合 ':'组合 ')+(++number):''; sections.push(section); }
+    if (section === undefined) { section = new LayerSection(); section.id=key; section.title=card.groupId&&!card.template?.fill?(cards.some(c=>c.groupId===card.groupId&&c.depthGroup)?'景深组合 ':'组合 ')+(++number):''; sections.push(section); }
     section.ids.push(card.id);
   }
   return sections;

@@ -8,6 +8,7 @@ vm.runInNewContext(ts.transpileModule(`export class Host {
  store={state:{canvasId:'board',cards:[]},findCard:(id)=>this.store.state.cards.find(c=>c.id===id)||null};
  panelLeft=20;panelTop=500;panelWidth=300;selectedId='';preview=null;busy=false;heroActive=false;arriving=false;editing=false;changes=0;legacy=false;scheduledName='';scheduleTransition=false;canvasBackground={mode:'solid',color:'#fff'};
  history=new CardEditHistory();scroller={scrollTo:()=>{}};
+ beginCanvasEdit(){}syncHistoryAvailability(){}
  current(){return this.store.findCard(this.selectedId);}select(id){this.selectedId=id;this.preview=this.current();this.history.reset(this.preview);}
  syncFields(){this.preview=this.current();}change(){this.changes++;}templateCanvasBackground(){}editorLandscape(){return false;}
  boardRect(){return {x:40,y:280,w:220,h:220,rot:12};}editorRect(){return {};}setHeroPose(){}setTransitionClip(){}prepareEditorMotion(){this.legacy=true;}
@@ -34,3 +35,5 @@ const popupEnv={exports:{}};vm.runInNewContext(ts.transpileModule(`export class 
 const popup=new popupEnv.exports.PopupHost();assert.equal(popup.showCardActions(),true);
 for(const panel of ['customizerOpen','materialLibraryOpen']){popup[panel]=true;assert.equal(popup.showCardActions(),false,'canvas delete/edit popup cannot cover '+panel);assert.equal(popup.workspaceChromeVisible(),false);popup[panel]=false;assert.equal(popup.showCardActions(),true);}
 console.log('PASS modal return: opening either panel hides canvas action popup/chrome; closing restores original selection actions');
+
+for(const panel of ['homeToolsOpen','backgroundOpen','scheduleOpen']){popup[panel]=true;assert.equal(popup.showCardActions(),false);popup[panel]=false;}
